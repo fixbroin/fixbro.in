@@ -344,7 +344,7 @@ const Header = () => {
               </Button>
             </div>
 
-            <div className="ml-2">
+            <div className="hidden md:block ml-2">
                {!user && !authIsLoading && (
                  <Button className="rounded-full px-6 font-bold shadow-lg shadow-primary/20" size="sm" onClick={(e) => handleSimpleNav(e, '/auth/login')}>
                    Login
