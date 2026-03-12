@@ -386,7 +386,9 @@ export default function ThankYouPage() {
              <p className="text-muted-foreground mt-1">If applicable, any refund will be processed to your original payment method within 5-7 business days.</p>
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4 sm:pt-6">
-            <Link href="/" passHref><Button size="lg" variant="outline" className="w-full sm:w-auto text-sm sm:text-base"><Home className="mr-2 h-4 w-4" /> Go to Home</Button></Link>
+            <Link href="/" passHref className="hidden md:block">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto text-sm sm:text-base"><Home className="mr-2 h-4 w-4" /> Go to Home</Button>
+            </Link>
             <Link href="/my-bookings" passHref><Button size="lg" className="w-full sm:w-auto text-sm sm:text-base"><ListOrdered className="mr-2 h-4 w-4" /> View My Bookings</Button></Link>
           </CardFooter>
         </Card>
@@ -410,7 +412,9 @@ export default function ThankYouPage() {
                  <p className="text-center text-muted-foreground">Loading booking details or it might have been already confirmed.</p>
              </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-4 sm:pt-6">
-                <Link href="/" passHref><Button size="lg" variant="outline" className="w-full sm:w-auto text-sm sm:text-base"><Home className="mr-2 h-4 w-4" /> Go to Home</Button></Link>
+                <Link href="/" passHref className="hidden md:block">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-sm sm:text-base"><Home className="mr-2 h-4 w-4" /> Go to Home</Button>
+                </Link>
                 <Link href="/my-bookings" passHref><Button size="lg" className="w-full sm:w-auto text-sm sm:text-base"><ListOrdered className="mr-2 h-4 w-4" /> Go to My Bookings</Button></Link>
             </CardFooter>
         </Card>

@@ -361,7 +361,7 @@ export default function SchedulePage() {
              <p className="text-muted-foreground">Loading available slots and configurations...</p>
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-            <Button variant="outline" disabled className="w-full sm:w-auto"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart</Button>
+            <Button variant="outline" disabled className="w-full sm:w-auto hidden md:flex"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart</Button>
             <Button disabled className="w-full sm:w-auto">
               Proceed to Address <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -453,8 +453,8 @@ export default function SchedulePage() {
           )}
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-          <Link href="/cart" passHref className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto hidden md:flex">
+          <Link href="/cart" passHref className="w-full sm:w-auto hidden md:block">
+            <Button variant="outline" className="w-full sm:w-auto">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart
             </Button>
           </Link>

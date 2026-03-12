@@ -71,4 +71,7 @@ export default function CustomRequestDetailsModal({ isOpen, onClose, request }: 
             <Button variant="outline">Close</Button>
           </DialogClose>
         </DialogFooter>
-      </DialogContent
+        </DialogContent>
+        </Dialog>
+        );
+        }

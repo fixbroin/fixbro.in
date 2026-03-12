@@ -1,9 +1,8 @@
 import { adminDb } from '@/lib/firebaseAdmin';
 import { notFound } from 'next/navigation';
-import type { FirestoreBlogPost } from '@/types/firestore';
+import type { FirestoreBlogPost, ClientBlogPost } from '@/types/firestore';
 import AppImage from '@/components/ui/AppImage';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, User, Clock, Share2, Facebook, Twitter, Linkedin, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, User, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -11,9 +10,11 @@ import JsonLdScript from '@/components/shared/JsonLdScript';
 import { getBaseUrl } from '@/lib/config';
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
+import ShareButtons from '@/components/blog/ShareButtons';
+import BlogPostCard from '@/components/blog/BlogPostCard';
 
 interface BlogPostPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 async function getBlogPost(slug: string): Promise<FirestoreBlogPost | null> {
@@ -44,8 +45,8 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
-  const title = post.metaTitle || `${post.title} | FixBro Blog`;
-  const description = post.metaDescription || post.excerpt || '';
+  const title = post.metaTitle || post.meta_title || `${post.title} | FixBro Blog`;
+  const description = post.metaDescription || post.meta_description || post.excerpt || post.title || '';
   
   const ogImage = post.coverImageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
 
@@ -80,6 +81,38 @@ export async function generateStaticParams() {
   }
 }
 
+async function getRelatedPosts(currentSlug: string, categoryId?: string): Promise<ClientBlogPost[]> {
+  try {
+    const blogPostsRef = adminDb.collection('blogPosts');
+    let q = blogPostsRef.where('isPublished', '==', true);
+    
+    if (categoryId) {
+      q = q.where('categoryId', '==', categoryId);
+    }
+    
+    const snapshot = await q.limit(4).get();
+    return snapshot.docs
+      .map(doc => {
+        const data = doc.data() as FirestoreBlogPost;
+        return {
+          ...data,
+          id: doc.id,
+          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
+            ? data.createdAt.toDate().toISOString() 
+            : new Date().toISOString(),
+          updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' 
+            ? data.updatedAt.toDate().toISOString() 
+            : undefined,
+        } as ClientBlogPost;
+      })
+      .filter(post => post.slug !== currentSlug)
+      .slice(0, 3);
+  } catch (error) {
+    console.error('Error fetching related posts:', error);
+    return [];
+  }
+}
+
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
   const post = await getBlogPost(slug);
@@ -87,6 +120,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   if (!post) {
     notFound();
   }
+
+  const relatedPosts = await getRelatedPosts(slug, post.categoryId);
 
   const appBaseUrl = getBaseUrl();
   const postUrl = `${appBaseUrl}/blog/${post.slug}`;
@@ -112,55 +147,62 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       }
     },
     "datePublished": publishDate.toISOString(),
-    "description": post.excerpt || post.metaDescription
+    "description": post.excerpt || post.metaDescription || post.meta_description
   };
 
   return (
-    <article className="min-h-screen pb-20">
+    <article className="min-h-screen pb-20 bg-background/50">
       <JsonLdScript data={blogSchema} idSuffix={`blog-${post.id}`} />
       
       {/* Hero Section */}
-      <div className="relative w-full h-[40vh] md:h-[60vh] overflow-hidden">
+      <div className="relative w-full aspect-square md:aspect-[16/9] lg:aspect-[21/9] overflow-hidden">
         <AppImage 
           src={post.coverImageUrl} 
           alt={post.title} 
           fill 
           priority
-          className="object-cover"
+          objectPosition="top"
         />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="container mx-auto px-4 text-center text-white">
-            <Link href="/blog" className="inline-flex items-center text-sm font-medium mb-6 hover:text-primary-foreground/80 transition-colors">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Blog
-            </Link>
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-headline font-bold mb-6 max-w-4xl mx-auto leading-tight">
-              {post.title}
-            </h1>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm md:text-base font-medium">
-              <div className="flex items-center">
-                <Calendar className="mr-2 h-4 w-4 text-primary-foreground" /> {formattedDate}
-              </div>
-              <div className="flex items-center">
-                <User className="mr-2 h-4 w-4 text-primary-foreground" /> {post.authorName || "FixBro Team"}
-              </div>
-              <div className="flex items-center">
-                <Clock className="mr-2 h-4 w-4 text-primary-foreground" /> {post.readingTime || "5 min"} read
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <div className="absolute inset-0 flex items-end pb-20 md:pb-32">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl">
+              <Link href="/blog" className="hidden md:inline-flex items-center text-sm font-medium mb-6 text-white/80 hover:text-white transition-colors group">
+                <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" /> Back to Blog
+              </Link>
+              {post.categoryName && (
+                <span className="inline-block px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full mb-4 uppercase tracking-wider">
+                  {post.categoryName}
+                </span>
+              )}
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-headline font-bold mb-6 text-white leading-[1.1]">
+                {post.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-6 text-sm md:text-base font-medium text-white/90">
+                <div className="flex items-center">
+                  <Calendar className="mr-2 h-4 w-4 text-primary" /> {formattedDate}
+                </div>
+                <div className="flex items-center">
+                  <User className="mr-2 h-4 w-4 text-primary" /> {post.authorName || "FixBro Team"}
+                </div>
+                <div className="flex items-center">
+                  <Clock className="mr-2 h-4 w-4 text-primary" /> {post.readingTime || "5 min"} read
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 -mt-10 relative z-10">
-        <div className="max-w-4xl mx-auto bg-card rounded-2xl shadow-xl overflow-hidden border">
+      <div className="container mx-auto px-4 -mt-16 md:-mt-24 relative z-10">
+        <div className="max-w-4xl mx-auto bg-card rounded-3xl shadow-2xl overflow-hidden border border-border/50">
           {/* Content */}
           <div className="p-6 md:p-12 lg:p-16">
             <div 
-              className="prose prose-lg dark:prose-invert max-w-none 
+              className="prose prose-lg md:prose-xl dark:prose-invert max-w-none 
                 prose-headings:font-headline prose-headings:font-bold 
                 prose-p:text-foreground/80 prose-p:leading-relaxed
-                prose-img:rounded-xl prose-img:shadow-lg
+                prose-img:rounded-2xl prose-img:shadow-xl
                 prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
@@ -169,7 +211,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             {post.tags && post.tags.length > 0 && (
               <div className="mt-12 pt-8 border-t flex flex-wrap gap-2">
                 {post.tags.map(tag => (
-                  <span key={tag} className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm font-medium">
+                  <span key={tag} className="px-4 py-1.5 bg-muted text-muted-foreground rounded-full text-sm font-medium hover:bg-primary/10 hover:text-primary transition-colors cursor-default">
                     #{tag}
                   </span>
                 ))}
@@ -177,27 +219,28 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             )}
 
             {/* Social Share */}
-            <div className="mt-12 pt-8 border-t flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <h3 className="text-lg font-headline font-bold flex items-center">
-                <Share2 className="mr-2 h-5 w-5 text-primary" /> Share this article
-              </h3>
-              <div className="flex flex-wrap gap-3">
-                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2">
-                  <Facebook className="h-4 w-4" /> Facebook
-                </Button>
-                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2">
-                  <Twitter className="h-4 w-4" /> Twitter
-                </Button>
-                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2">
-                  <Linkedin className="h-4 w-4" /> LinkedIn
-                </Button>
-                <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2">
-                  <LinkIcon className="h-4 w-4" /> Copy Link
-                </Button>
-              </div>
+            <div className="mt-12 pt-8 border-t">
+              <ShareButtons title={post.title} url={postUrl} />
             </div>
           </div>
         </div>
+
+        {/* Related Posts */}
+        {relatedPosts.length > 0 && (
+          <div className="max-w-6xl mx-auto mt-20">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-3xl font-headline font-bold">Related Articles</h2>
+              <Link href="/blog" className="text-primary font-semibold hover:underline flex items-center gap-2">
+                View All <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {relatedPosts.map(rp => (
+                <BlogPostCard key={rp.id} post={rp} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </article>
   );

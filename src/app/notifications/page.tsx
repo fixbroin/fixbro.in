@@ -216,7 +216,7 @@ export default function NotificationsPage() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-           <Link href="/" passHref className="w-full sm:w-auto">
+           <Link href="/" passHref className="w-full sm:w-auto hidden md:block">
             <Button variant="outline" size="sm" className="w-full">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
             </Button>

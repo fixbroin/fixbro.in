@@ -656,7 +656,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     const adsForPlacement = activeAds.filter(ad => ad.placement === placement);
     if (adsForPlacement.length === 0) return null;
     return (
-      <div className="container mx-auto px-4 my-6 md:my-8 space-y-4">
+      <div className="container mx-auto px-0 md:px-4 my-2 md:my-4 space-y-2">
         {adsForPlacement.map(ad => <AdBannerCard key={ad.id} ad={ad} />)}
       </div>
     );
@@ -746,7 +746,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <section className="py-8 md:py-10 bg-secondary/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-8 md:mb-12">
-              <h1 className="text-2xl md:text-3xl font-headline font-semibold text-foreground">
+              <h1 className="text-xl md:text-3xl font-headline font-semibold text-foreground">
                 {finalH1}
               </h1>
               <p className="text-muted-foreground mt-2 text-sm md:text-base">

@@ -601,7 +601,7 @@ export default function PaymentPage() {
           {policyMessage && !isCancellationFeeMode && cartEntries.length > 0 && (<Alert variant="default" className="text-xs bg-primary/5 border-primary/20 mt-4"><Info className="h-4 w-4 text-primary" /><AlertDescription className="text-primary/90">{policyMessage}</AlertDescription></Alert>)}
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-          <Link href={isCancellationFeeMode ? "/my-bookings" : "/checkout/address"} passHref className="w-full sm:w-auto">
+          <Link href={isCancellationFeeMode ? "/my-bookings" : "/checkout/address"} passHref className="w-full sm:w-auto hidden md:block">
             <Button variant="outline" disabled={isProcessingPayment} className="w-full sm:w-auto">
               <ArrowLeft className="mr-2 h-4 w-4" /> {isCancellationFeeMode ? "Back to My Bookings" : "Back to Address"}
             </Button>

@@ -83,21 +83,15 @@ export default function AdBannerCard({ ad, className }: AdBannerCardProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(e as any);}}
       style={{ cursor: 'pointer' }}
     >
-      <div className="relative aspect-[1200/300] w-full"> {/* Aspect ratio for typical banner */}
+      <div className="relative w-full h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px]"> {/* Match HeroCarousel aspect ratios */}
         <AppImage
-          src={displayAdImageUrl}
-          alt={ad.name}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 1200px"
-          className="object-cover"
-          data-ai-hint={aiHintValue}
-           onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              if (target.src !== defaultAdImageUrl) {
-                target.src = defaultAdImageUrl;
-              }
-            }}
-        />
+  src={displayAdImageUrl}
+  alt={ad.name}
+  fill
+  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 1200px"
+  className="object-cover md:object-contain"
+  data-ai-hint={aiHintValue}
+/>
       </div>
     </div>
   );

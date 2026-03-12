@@ -70,16 +70,31 @@ function AccountPageContent() {
 
     const content = (
       <div
-        className="flex items-center w-full p-4 hover:bg-muted/50 rounded-lg transition-colors"
+        className={cn(
+          "flex items-center w-full p-4 rounded-xl border border-border/50 bg-background shadow-sm transition-all duration-300 mb-3 group",
+          isLogout 
+            ? "hover:bg-destructive hover:text-white hover:border-destructive" 
+            : "hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-md"
+        )}
       >
-        <Icon className={cn("h-6 w-6 mr-4", isLogout ? "text-destructive" : "text-primary")} />
-        <span className={cn("flex-grow text-base font-medium", isLogout ? "text-destructive" : "text-foreground")}>{label}</span>
+        <div className={cn(
+          "p-2 rounded-lg mr-4 transition-colors duration-300",
+          isLogout 
+            ? "bg-destructive/10 text-destructive group-hover:bg-white/20 group-hover:text-white" 
+            : "bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-white"
+        )}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className="flex-grow text-base font-semibold">{label}</span>
         {badgeCount !== undefined && badgeCount > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+          <span className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold mr-2",
+            isLogout ? "bg-white text-destructive" : "bg-red-600 text-white shadow-sm"
+          )}>
              {badgeCount > 9 ? '9+' : badgeCount}
           </span>
         )}
-        <ChevronRight className="h-5 w-5 text-muted-foreground ml-2" />
+        <ChevronRight className="h-5 w-5 opacity-50 group-hover:opacity-100 transition-opacity" />
       </div>
     );
   
@@ -140,31 +155,41 @@ function AccountPageContent() {
         </div>
       </div>
       
-      <nav className="space-y-2">
+      <nav className="space-y-6">
         {/* Section 1: Theme Toggle */}
-        <div className="flex items-center justify-between p-4 rounded-lg">
-            <span className="text-base font-medium">Theme Appearance</span>
+        <div className="bg-background border border-border/50 rounded-xl p-4 flex items-center justify-between shadow-sm">
+            <div className="flex items-center">
+              <div className="bg-muted p-2 rounded-lg mr-4">
+                <Info className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <span className="text-base font-semibold">Theme Appearance</span>
+            </div>
             <ThemeToggle />
         </div>
-        <Separator />
         
         {/* Section 2: Account & Bookings */}
-        {accountMenuItems.filter(item => item.condition ? item.condition() : true).map(item => (
-          <AccountLink key={item.href} {...item} />
-        ))}
-        <Separator />
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">My Account</h3>
+          {accountMenuItems.filter(item => item.condition ? item.condition() : true).map(item => (
+            <AccountLink key={item.href} {...item} />
+          ))}
+        </div>
         
         {/* Section 3: Extra Pages */}
-        {extraPagesItems.filter(item => item.condition ? item.condition() : true).map(item => (
-          <AccountLink key={item.href} {...item} />
-        ))}
-        <Separator />
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">More</h3>
+          {extraPagesItems.filter(item => item.condition ? item.condition() : true).map(item => (
+            <AccountLink key={item.href} {...item} />
+          ))}
+        </div>
         
         {/* Section 4: Policies */}
-        {policyItems.map(item => (
-          <AccountLink key={item.href} {...item} />
-        ))}
-        <Separator />
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">Legal</h3>
+          {policyItems.map(item => (
+            <AccountLink key={item.href} {...item} />
+          ))}
+        </div>
         
         {/* Section 5: Logout */}
         <div className="pt-2">

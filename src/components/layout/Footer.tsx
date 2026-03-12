@@ -42,7 +42,11 @@ const FooterLink = ({ href, children }: { href: string; children: React.ReactNod
   };
 
   return (
-    <Link href={href} onClick={handleNav} className="text-muted-foreground hover:text-primary transition-colors duration-200 whitespace-nowrap">
+    <Link 
+      href={href} 
+      onClick={handleNav} 
+      className="inline-block px-3 py-1.5 rounded-lg bg-background border border-border/50 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 whitespace-nowrap text-[13px] font-medium shadow-sm hover:shadow-md"
+    >
       {children}
     </Link>
   );
@@ -183,26 +187,25 @@ const Footer = () => {
           {/* Quick Links Columns */}
           <div className="lg:col-span-2">
             <h3 className="font-headline text-sm font-bold uppercase tracking-wider mb-6">Services</h3>
-            <ul className="space-y-3 text-sm">
+            <div className="flex flex-wrap gap-2">
               {serviceLinks.map(link => (
-                <li key={link.slug}><FooterLink href={`/category/${link.slug}`}>{link.name}</FooterLink></li>
+                <FooterLink key={link.slug} href={`/category/${link.slug}`}>{link.name}</FooterLink>
               ))}
-              <li><FooterLink href="/categories"><span className="font-semibold text-primary">Explore All</span></FooterLink></li>
-            </ul>
+              <FooterLink href="/categories">Explore All</FooterLink>
+            </div>
           </div>
 
           <div className="lg:col-span-2">
             <h3 className="font-headline text-sm font-bold uppercase tracking-wider mb-6">Company</h3>
-            <ul className="space-y-3 text-sm">
-              <li><FooterLink href="/about-us">About Us</FooterLink></li>
-              <li><FooterLink href="/contact-us">Contact Us</FooterLink></li>
-              <li><FooterLink href="/careers">Careers</FooterLink></li>
-              <li><FooterLink href="/blog">Our Blog</FooterLink></li>
-              
-              <li><FooterLink href="/faq">FAQ</FooterLink></li>
-              <li><FooterLink href="/sitemap">Sitemap</FooterLink></li>
-              <li><FooterLink href="/service-disclaimer">Service Disclaimer</FooterLink></li>
-            </ul>
+            <div className="flex flex-wrap gap-2">
+              <FooterLink href="/about-us">About Us</FooterLink>
+              <FooterLink href="/contact-us">Contact Us</FooterLink>
+              <FooterLink href="/careers">Careers</FooterLink>
+              <FooterLink href="/blog">Our Blog</FooterLink>
+              <FooterLink href="/faq">FAQ</FooterLink>
+              <FooterLink href="/sitemap">Sitemap</FooterLink>
+              <FooterLink href="/service-disclaimer">Service Disclaimer</FooterLink>
+            </div>
           </div>
 
           {/* Newsletter Column */}

@@ -78,8 +78,8 @@ export default function ApplicationStatusDisplay({ status, message }: Applicatio
             </Link>
           )}
           {status !== 'approved' && (
-            <Link href="/">
-              <Button variant="outline" size="lg">
+            <Link href="/" className="hidden md:block">
+              <Button variant="outline" size="lg" className="w-full">
                 <Home className="mr-2 h-5 w-5" /> Back to Home
               </Button>
             </Link>

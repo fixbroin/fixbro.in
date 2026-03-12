@@ -15,6 +15,9 @@ export type GenerateBlogContentInput = z.infer<typeof GenerateBlogContentInputSc
 
 const GenerateBlogContentOutputSchema = z.object({
   content: z.string().describe("The full blog post content, formatted in HTML with <h2>, <p>, <br>, and <ul> tags. Should be engaging, professional, and at least 400 words, aimed at homeowners. Include 5-7 sections with headers, benefits, service lists, tips, pricing estimates, and a footer with keywords."),
+  excerpt: z.string().describe("A short, catchy summary of the blog post (max 150 characters) to be used on the blog list card."),
+  tags: z.string().describe("A comma-separated string of 3-5 relevant tags for the post (e.g., 'Maintenance, DIY, Plumbing')."),
+  readingTime: z.string().describe("Estimated reading time, e.g., '5 min' or '8 min'."),
   h1_title: z.string().describe("An H1 title with the exact format: '{Title Name} Service Near You | FixBro'"),
   meta_title: z.string().describe("A meta title with the format: '{Title Name} Near Me {Category Name} Near Me' or '{Title Name} | Home Services Near Me' if no category is provided."),
   meta_description: z.string().describe("An SEO-optimized meta description, under 160 characters, including relevant service keywords (e.g., Carpentry, Plumber, Electrician, Home Cleaning)."),
@@ -54,7 +57,13 @@ Generate the following content based on the input details.
    - Use <br> tags between sections for spacing, as in the examples.
    - Incorporate Bangalore-specific references (e.g., local markets like Whitefield or general mentions of FixBro’s services in Bangalore) without mentioning competitors like Urban Company or NoBroker.
 
-2. **h1_title**: Create an H1 title with the exact format: "{{title}} Service Near You | FixBro".
+2. **excerpt**: A short, catchy summary of the post (under 150 characters) to be used on the blog list card.
+
+3. **tags**: A comma-separated string of 3-5 relevant tags (e.g., "Home Maintenance, Repair, Tips").
+
+4. **readingTime**: An estimate of how long it takes to read (e.g., "5 min").
+
+5. **h1_title**: Create an H1 title with the exact format: "{{title}} Service Near You | FixBro".
 
 3. **meta_title**:
    - If a category is provided, use the format: "{{title}} Near Me | {{categoryName}} Near Me" (under 60 chars).

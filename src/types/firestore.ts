@@ -1244,6 +1244,9 @@ export interface FirestoreBlogPost {
   content: string; // HTML content from rich text editor
   coverImageUrl: string;
   imageHint?: string;
+  excerpt?: string; // Optional excerpt
+  tags?: string[]; // Optional tags
+  readingTime?: string; // Optional reading time (e.g., "5 min")
   isPublished: boolean;
   authorId?: string; // Optional: link to an admin/author user
   authorName?: string; // Optional: denormalized author name
@@ -1256,6 +1259,10 @@ export interface FirestoreBlogPost {
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string;
+  
+  // Legacy or alternative SEO field names used in code
+  metaTitle?: string;
+  metaDescription?: string;
 
   createdAt: Timestamp;
   updatedAt?: Timestamp;

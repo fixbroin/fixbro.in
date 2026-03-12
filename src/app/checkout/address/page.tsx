@@ -324,6 +324,7 @@ export default function AddressPage() {
           <Button variant="outline" className="w-full sm:w-auto hidden md:flex" onClick={() => router.push('/checkout/schedule')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Schedule
           </Button>
+
           <Button onClick={handleProceed} disabled={!selectedAddressId || isServiceable === false} className="w-full sm:w-auto">
             Proceed to Payment <ArrowRight className="ml-2 h-4 w-4" />
           </Button>

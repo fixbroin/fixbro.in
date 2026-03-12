@@ -75,7 +75,7 @@ const BottomNavigationBar = () => {
   const itemWidthClass = `w-1/${filteredNavItems.length}`;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-background border-t border-border shadow-t-lg z-40">
+    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-lg border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40 pb-safe">
       <div className="container mx-auto flex justify-around items-center h-16 px-2">
         {filteredNavItems.map((item) => {
           const isActive = pathname === item.href;
@@ -86,13 +86,24 @@ const BottomNavigationBar = () => {
               href={item.href}
               onClick={(e) => handleNav(e, item)}
               className={cn(
-                "flex flex-col items-center justify-center text-xs py-2 transition-colors duration-150 ease-in-out",
-                itemWidthClass,
-                isActive ? "text-primary font-medium" : "text-muted-foreground hover:text-primary"
+                "flex flex-col items-center justify-center min-w-[64px] h-14 rounded-2xl transition-all duration-300",
+                isActive 
+                  ? "bg-primary/10 text-primary" 
+                  : "text-muted-foreground active:bg-muted active:scale-95"
               )}
             >
-              <IconComponent className={cn("h-5 w-5 mb-0.5", isActive ? "text-primary" : "")} strokeWidth={isActive ? 2.5 : 2} />
-              {item.label}
+              <div className={cn(
+                "p-1.5 rounded-xl transition-transform duration-300",
+                isActive ? "scale-110" : ""
+              )}>
+                <IconComponent className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-tighter mt-0.5",
+                isActive ? "opacity-100" : "opacity-80"
+              )}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

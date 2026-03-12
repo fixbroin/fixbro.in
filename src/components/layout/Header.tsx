@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, Construction, Handshake } from 'lucide-react'; // Added Handshake
 import Logo from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import SearchPopup from '@/components/shared/SearchPopup';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -216,18 +217,24 @@ const Header = () => {
 
   return (
     <>
-      <header className="bg-background/80 backdrop-blur-md shadow-sm sticky top-0 z-50 border-b">
-        <div data-hydration-state="hydrated" className="container mx-auto px-4 h-16 grid grid-cols-2 md:grid-cols-header-layout items-center">
-          <div className="flex items-center justify-start">
+      <header className="bg-background/95 backdrop-blur-xl shadow-sm sticky top-0 z-50 border-b border-border/40 transition-all duration-300">
+        <div data-hydration-state="hydrated" className="container mx-auto px-4 h-16 flex items-center justify-between">
+          {/* Left: Desktop Nav / Mobile Logo */}
+          <div className="flex items-center gap-8">
              <div className="md:hidden">
                 <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} />
              </div>
-            <nav className="hidden md:flex items-center gap-x-3 lg:gap-x-5">
+            <nav className="hidden md:flex items-center gap-2">
               {baseNavItems.map((item) => (
                  <button
                     key={item.href}
                     onClick={(e) => item.isProtected ? handleAuthRequiredNav(e, item.href) : handleSimpleNav(e, item.href)}
-                    className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
+                    className={cn(
+                      "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300",
+                      currentPathnameFromHook === item.href 
+                        ? "bg-primary text-primary-foreground shadow-md" 
+                        : "bg-muted/50 text-foreground/70 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
+                    )}
                   >
                   {item.label}
                  </button>
@@ -236,122 +243,164 @@ const Header = () => {
               { !isLoadingFeaturesConfig && featuresConfig.showCustomServiceButton && (
                  <button
                     onClick={(e) => handleAuthRequiredNav(e, '/custom-service')}
-                    className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors flex items-center"
+                    className={cn(
+                      "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300 flex items-center",
+                      currentPathnameFromHook === '/custom-service'
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "bg-muted/50 text-foreground/70 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
+                    )}
                   >
-                    <Construction className="mr-1 h-4 w-4" /> Custom Service
+                    <Construction className="mr-2 h-4 w-4" /> Custom Service
                  </button>
               )}
               { !isLoadingAppConfig && (appConfig.isProviderRegistrationEnabled || (user && user.email === ADMIN_EMAIL)) && (
                 <button
                   onClick={(e) => handleSimpleNav(e, '/provider-registration')}
-                  className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors flex items-center"
+                  className={cn(
+                    "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300 flex items-center",
+                    currentPathnameFromHook === '/provider-registration'
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "bg-muted/50 text-foreground/70 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
+                  )}
                 >
-                  <UserPlus className="mr-1 h-4 w-4" /> Join as a Provider
-                </button>
-              )}
-               {user && (
-                <button
-                  onClick={(e) => handleAuthRequiredNav(e, '/my-bookings')}
-                  className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
-                >
-                  My Bookings
+                  <UserPlus className="mr-2 h-4 w-4" /> Join as Provider
                 </button>
               )}
             </nav>
           </div>
 
-          <div className="hidden md:flex justify-center col-start-2">
+          {/* Center: Logo (Desktop Only) */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 transform">
              <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} />
-              
           </div>
 
-          <div className="flex items-center justify-end gap-1 md:gap-2">
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
              {user && !isLoadingReferral && referralSettings?.isReferralSystemEnabled && (
                 <button
                   onClick={(e) => handleAuthRequiredNav(e, '/referral')}
-                  className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors hidden md:flex items-center ml-4"
+                  className="hidden lg:flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider bg-primary/5 text-primary border border-primary/20 rounded-full hover:bg-primary hover:text-primary-foreground transition-all duration-300 mr-2"
                 >
-                <Handshake className="mr-1 h-4 w-4" /> Refer & Earn up to ₹{referralSettings?.maxEarningsPerReferrer || referralSettings?.referrerBonus || 100}
+                  <Handshake className="h-4 w-4" /> 
+                  <span>Refer & Earn ₹{referralSettings?.maxEarningsPerReferrer || referralSettings?.referrerBonus || 100}</span>
                 </button>
               )}
-            <div className="hidden md:flex">
+            
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsSearchPopupOpen(true)} 
+                className="rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
+                aria-label="Search"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+              
+              <div className="hidden sm:block">
                 <ThemeToggle />
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsSearchPopupOpen(true)} aria-label="Search">
-              <Search className="h-5 w-5" />
-            </Button>
-            {chatIsEnabled && (
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    aria-label="Chat" 
-                    onClick={(e) => handleAuthRequiredNav(e, '/chat')}
-                    className="relative hidden md:inline-flex" 
-                 >
-                    <MessageSquare className="h-5 w-5" />
+              </div>
+
+              {chatIsEnabled && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  aria-label="Chat" 
+                  onClick={(e) => handleAuthRequiredNav(e, '/chat')}
+                  className="relative hidden md:inline-flex rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300" 
+                >
+                  <MessageSquare className="h-5 w-5" />
                 </Button>
-            )}
-            <Button variant="ghost" size="icon" aria-label="Notifications" onClick={(e) => handleAuthRequiredNav(e, '/notifications')} className="relative">
+              )}
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                aria-label="Notifications" 
+                onClick={(e) => handleAuthRequiredNav(e, '/notifications')} 
+                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
+              >
                 <Bell className="h-5 w-5" />
                 {isMounted && !isLoadingCount && headerUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                    <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white border-2 border-background group-hover:border-primary transition-colors">
                       {headerUnreadCount > 9 ? '9+' : headerUnreadCount}
                     </span>
                 )}
-            </Button>
-            <Button variant="ghost" size="icon" aria-label="Cart" className="relative" onClick={(e) => handleAuthRequiredNav(e, '/cart')}>
+              </Button>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                aria-label="Cart" 
+                className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300" 
+                onClick={(e) => handleAuthRequiredNav(e, '/cart')}
+              >
                 <ShoppingCart className="h-5 w-5" />
                 {isMounted && cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                  <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white border-2 border-background group-hover:border-primary transition-colors">
                     {cartItemCount > 9 ? '9+' : cartItemCount}
                   </span>
                 )}
-            </Button>
+              </Button>
+            </div>
 
-            <div className="hidden md:block">
+            <div className="ml-2">
                {!user && !authIsLoading && (
-                 <Button variant="outline" size="sm" onClick={(e) => handleSimpleNav(e, '/auth/login')}>Login / Sign Up</Button>
+                 <Button className="rounded-full px-6 font-bold shadow-lg shadow-primary/20" size="sm" onClick={(e) => handleSimpleNav(e, '/auth/login')}>
+                   Login
+                 </Button>
                )}
                {user && (
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                        <Avatar className="h-8 w-8">
+                      <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-primary/20 p-0 hover:border-primary transition-colors">
+                        <Avatar className="h-full w-full">
                           <AvatarImage src={user.photoURL || undefined} alt={firestoreUser?.displayName || user.displayName || user.email || "User"} />
-                          <AvatarFallback>{firestoreUser?.displayName?.charAt(0).toUpperCase() || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold">{firestoreUser?.displayName?.charAt(0).toUpperCase() || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                         </Avatar>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="end" forceMount>
-                      <DropdownMenuLabel className="font-normal">
-                        <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none">{firestoreUser?.displayName || user.displayName || "User"}</p>
-                          <p className="text-xs leading-none text-muted-foreground">
+                    <DropdownMenuContent className="w-64 mt-2 rounded-2xl p-2 shadow-2xl border-border/40" align="end" forceMount>
+                      <DropdownMenuLabel className="font-normal p-4">
+                        <div className="flex flex-col space-y-2">
+                          <p className="text-base font-bold leading-none">{firestoreUser?.displayName || user.displayName || "User"}</p>
+                          <p className="text-xs leading-none text-muted-foreground truncate">
                             {user.email}
                           </p>
                         </div>
                       </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {userSpecificNavItems.filter(item => item.condition ? item.condition() : true).map(item => (
-                        <DropdownMenuItem key={item.href} asChild>
-                          <Link href={item.href} onClick={(e) => handleAuthRequiredNav(e, item.href)}>
-                            <item.icon className="mr-2 h-4 w-4" />
-                            {item.label}
-                          </Link>
-                        </DropdownMenuItem>
-                      ))}
+                      <DropdownMenuSeparator className="mx-2" />
+                      <div className="py-2">
+                        {userSpecificNavItems.filter(item => item.condition ? item.condition() : true).map(item => (
+                          <DropdownMenuItem key={item.href} asChild className="rounded-xl px-4 py-3 cursor-pointer">
+                            <Link href={item.href} onClick={(e) => handleAuthRequiredNav(e, item.href)}>
+                              <div className="bg-primary/10 p-2 rounded-lg mr-3 text-primary">
+                                <item.icon className="h-4 w-4" />
+                              </div>
+                              <span className="font-medium">{item.label}</span>
+                            </Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </div>
                       {user.email === ADMIN_EMAIL && (
-                        <DropdownMenuItem asChild>
-                          <Link href="/admin" onClick={(e) => handleAuthRequiredNav(e, "/admin")}>
-                            <Settings2 className="mr-2 h-4 w-4" />
-                            Admin Panel
-                          </Link>
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuSeparator className="mx-2" />
+                          <DropdownMenuItem asChild className="rounded-xl px-4 py-3 cursor-pointer">
+                            <Link href="/admin" onClick={(e) => handleAuthRequiredNav(e, "/admin")}>
+                              <div className="bg-amber-500/10 p-2 rounded-lg mr-3 text-amber-600">
+                                <Settings2 className="h-4 w-4" />
+                              </div>
+                              <span className="font-medium text-amber-600">Admin Control</span>
+                            </Link>
+                          </DropdownMenuItem>
+                        </>
                       )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={(e) => {e.stopPropagation(); showLoading(); logOut();}} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Log out
+                      <DropdownMenuSeparator className="mx-2" />
+                      <DropdownMenuItem onClick={(e) => {e.stopPropagation(); showLoading(); logOut();}} className="rounded-xl px-4 py-3 cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <div className="bg-destructive/10 p-2 rounded-lg mr-3">
+                          <LogOut className="h-4 w-4" />
+                        </div>
+                        <span className="font-medium">Sign Out</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

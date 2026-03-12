@@ -13,6 +13,7 @@ interface AppImageProps {
   sizes?: string
   priority?: boolean
   className?: string
+  objectPosition?: "top" | "center" | "bottom" | "left" | "right" | string
   "data-ai-hint"?: string
 }
 
@@ -25,6 +26,7 @@ export default function AppImage({
   sizes,
   priority = false,
   className,
+  objectPosition = "center",
   "data-ai-hint": aiHint
 }: AppImageProps) {
 
@@ -65,6 +67,7 @@ export default function AppImage({
           isDefaultImage ? "object-contain bg-muted" : "object-cover",
           loaded ? "opacity-100" : "opacity-0"
         )}
+        style={{ objectPosition }}
       />
 
     </div>

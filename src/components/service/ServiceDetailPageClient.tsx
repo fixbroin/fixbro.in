@@ -473,11 +473,11 @@ export default function ServiceDetailPageClient({
     <div className="container mx-auto px-2 sm:px-4 py-6 sm:py-8 pb-24">
       {breadcrumbItems.length > 0 && <Breadcrumbs items={breadcrumbItems} />}
       <nav className="mb-4 sm:mb-6 flex items-center justify-between">
-        <Button variant="outline" onClick={() => router.back()} className="flex items-center text-xs sm:text-sm hidden sm:flex">
+        <Button variant="outline" onClick={() => router.back()} className="flex items-center text-xs sm:text-sm hidden md:flex">
           <ArrowLeft className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Back
         </Button>
         <Link href="/" passHref>
-           <Button variant="ghost" className="text-xs sm:text-sm text-muted-foreground hover:text-primary hidden sm:flex">
+           <Button variant="ghost" className="text-xs sm:text-sm text-muted-foreground hover:text-primary hidden md:flex">
              <HomeIcon className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Home
            </Button>
         </Link>

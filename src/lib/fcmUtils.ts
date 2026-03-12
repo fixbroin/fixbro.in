@@ -101,11 +101,19 @@ export const onForegroundMessage = () => {
     }
 
     // For regular browsers, show a standard notification
-    if (payload.notification) {
-      new Notification(payload.notification.title || "New Message", {
+    if (payload.notification && typeof window !== 'undefined' && 'Notification' in window) {
+      const notification = new Notification(payload.notification.title || "New Message", {
         body: payload.notification.body || "",
         icon: payload.notification.icon || "/android-chrome-192x192.png",
       });
+
+      notification.onclick = (event) => {
+        event.preventDefault(); // prevent the browser from focusing the Notification's tab
+        const url = payload.data?.click_action || payload.data?.url || '/';
+        window.focus();
+        window.location.href = url;
+        notification.close();
+      };
     }
   });
 };

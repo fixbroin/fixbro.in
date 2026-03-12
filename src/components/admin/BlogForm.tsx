@@ -36,6 +36,9 @@ const blogFormSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters long."),
   slug: z.string().min(3, "Slug must be at least 3 characters.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug format."),
   content: z.string().optional(),
+  excerpt: z.string().max(300).optional(),
+  tags: z.string().optional(), // Will be converted to array on submit
+  readingTime: z.string().max(20).optional(),
   coverImageUrl: z.string().url("A valid image URL is required.").optional().or(z.literal('')),
   imageHint: z.string().max(50).optional(),
   isPublished: z.boolean().default(false),
@@ -78,7 +81,8 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
   const form = useForm<BlogFormData>({
     resolver: zodResolver(blogFormSchema),
     defaultValues: {
-      title: "", slug: "", content: "", coverImageUrl: "", imageHint: "", isPublished: false,
+      title: "", slug: "", content: "", excerpt: "", tags: "", readingTime: "",
+      coverImageUrl: "", imageHint: "", isPublished: false,
       categoryId: undefined, customCategory: "",
       h1_title: "", meta_title: "", meta_description: "", meta_keywords: "",
     },
@@ -94,6 +98,9 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
         title: initialData.title,
         slug: initialData.slug,
         content: initialData.content || "",
+        excerpt: initialData.excerpt || "",
+        tags: (initialData.tags || []).join(', '),
+        readingTime: initialData.readingTime || "",
         coverImageUrl: initialData.coverImageUrl || "",
         imageHint: initialData.imageHint || "",
         isPublished: initialData.isPublished,
@@ -107,7 +114,8 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
       setCurrentImagePreview(initialData.coverImageUrl || null);
     } else {
       form.reset({
-          title: "", slug: "", content: "", coverImageUrl: "", imageHint: "", isPublished: false,
+          title: "", slug: "", content: "", excerpt: "", tags: "", readingTime: "",
+          coverImageUrl: "", imageHint: "", isPublished: false,
           categoryId: NO_CATEGORY_VALUE, customCategory: "",
           h1_title: "", meta_title: "", meta_description: "", meta_keywords: "",
       });
@@ -165,6 +173,9 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
     try {
       const result = await generateBlogContent({ title, categoryName });
       form.setValue("content", result.content, { shouldValidate: true });
+      form.setValue("excerpt", result.excerpt, { shouldValidate: true });
+      form.setValue("tags", result.tags, { shouldValidate: true });
+      form.setValue("readingTime", result.readingTime, { shouldValidate: true });
       form.setValue("h1_title", result.h1_title, { shouldValidate: true });
       form.setValue("meta_title", result.meta_title, { shouldValidate: true });
       form.setValue("meta_description", result.meta_description, { shouldValidate: true });
@@ -220,9 +231,12 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
         return;
     }
 
-    const { customCategory, categoryId, ...restOfFormData } = formData;
+    const { customCategory, categoryId, tags, ...restOfFormData } = formData;
     let finalCategoryId: string | null = null;
     let finalCategoryName: string | null = null;
+    
+    // Process tags
+    const processedTags = tags ? tags.split(',').map(tag => tag.trim()).filter(tag => tag !== "") : [];
 
     if (categoryId === OTHER_CATEGORY_VALUE) {
         finalCategoryName = customCategory || null;
@@ -238,6 +252,7 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
       id: initialData?.id,
       categoryId: finalCategoryId,
       categoryName: finalCategoryName,
+      tags: processedTags,
     };
     await onSubmitProp(payload);
     setStatusMessage(""); setUploadProgress(null);
@@ -249,6 +264,32 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
     <Form {...form} key={initialData ? `edit-${initialData.id}` : 'new-post'}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-6 overflow-y-auto">
         <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title</FormLabel><FormControl><Input placeholder="Your blog post title" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField control={form.control} name="readingTime" render={({ field }) => (<FormItem><FormLabel>Reading Time</FormLabel><FormControl><Input placeholder="e.g., 5 min" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+          <FormField control={form.control} name="tags" render={({ field }) => (<FormItem><FormLabel>Tags</FormLabel><FormControl><Input placeholder="e.g., home, tips, plumbing (comma-separated)" {...field} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+        </div>
+
+        <FormField
+          control={form.control}
+          name="excerpt"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Short Excerpt</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="A short summary for the blog card..."
+                  rows={3}
+                  {...field}
+                  value={field.value || ""}
+                  disabled={effectiveIsSubmitting}
+                />
+              </FormControl>
+              <FormDescription>Max 300 characters. Used in card previews.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         
         <FormField
             control={form.control}
