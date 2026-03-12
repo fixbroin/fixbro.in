@@ -44,7 +44,7 @@ export async function sendBulkMarketingEmail(input: BulkMarketingEmailInput): Pr
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("sendBulkMarketingEmail: Error calling flow:", error);
-    return { success: false, message: `Failed to process bulk email flow: ${errorMessage}` };
+    return { success: false, message: `Failed to process bulk email flow.` };
   }
 }
 
@@ -78,19 +78,24 @@ const bulkMarketingEmailFlow = ai.defineFlow(
       // Fetch dynamic content for merge tags
       const baseUrl = getBaseUrl();
       
+      // STYLING FOR LISTS (Matching new design standards)
+      const listStyle = 'list-style: none; padding: 0; margin: 10px 0;';
+      const itemStyle = 'padding: 8px 0; border-bottom: 1px solid #f0f0f0;';
+      const linkStyle = 'color: #0B5ED7; text-decoration: none; font-weight: 500;';
+
       // Popular Content
       const popularServicesSnap = await db.collection("adminServices").where("isActive", "==", true).orderBy("rating", "desc").limit(5).get();
-      const popularServicesHtml = `<ul>${popularServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const popularServicesHtml = `<ul style="${listStyle}">${popularServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       const popularCategoriesSnap = await db.collection("adminCategories").orderBy("order", "asc").limit(5).get();
-      const popularCategoriesHtml = `<ul>${popularCategoriesSnap.docs.map(doc => `<li><a href="${baseUrl}/category/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const popularCategoriesHtml = `<ul style="${listStyle}">${popularCategoriesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/category/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       // All Content
       const allServicesSnap = await db.collection("adminServices").where("isActive", "==", true).orderBy("name", "asc").get();
-      const allServicesHtml = `<ul>${allServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const allServicesHtml = `<ul style="${listStyle}">${allServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       const allCategoriesSnap = await db.collection("adminCategories").orderBy("order", "asc").get();
-      const allCategoriesHtml = `<ul>${allCategoriesSnap.docs.map(doc => `<li><a href="${baseUrl}/category/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+      const allCategoriesHtml = `<ul style="${listStyle}">${allCategoriesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/category/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
 
       // New: Category-specific services
       let categoryServicesHtml = '';
@@ -99,7 +104,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
         const subCatIds = subCatsSnap.docs.map(doc => doc.id);
         if (subCatIds.length > 0) {
             const categoryServicesSnap = await db.collection("adminServices").where("subCategoryId", "in", subCatIds).where("isActive", "==", true).orderBy("name", "asc").get();
-            categoryServicesHtml = `<ul>${categoryServicesSnap.docs.map(doc => `<li><a href="${baseUrl}/service/${doc.data().slug}">${doc.data().name}</a></li>`).join('')}</ul>`;
+            categoryServicesHtml = `<ul style="${listStyle}">${categoryServicesSnap.docs.map(doc => `<li style="${itemStyle}"><a href="${baseUrl}/service/${doc.data().slug}" style="${linkStyle}">${doc.data().name}</a></li>`).join('')}</ul>`;
         }
       }
 
@@ -110,7 +115,6 @@ const bulkMarketingEmailFlow = ai.defineFlow(
         users = usersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreUser));
       } else if (Array.isArray(input.targetUserIds) && input.targetUserIds.length > 0) {
         const userIds = input.targetUserIds;
-        // Firestore 'in' queries are limited to 30 items
         for (let i = 0; i < userIds.length; i += 30) {
             const chunk = userIds.slice(i, i + 30);
             if (chunk.length > 0) {
@@ -121,7 +125,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
       }
 
       if (users.length === 0) {
-        return { success: true, message: "No target users found to send emails to." };
+        return { success: true, message: "No target users found." };
       }
 
       // 3. Iterate, replace tags, and send emails
@@ -137,10 +141,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
       };
       
       for (const user of users) {
-        if (!user.email) {
-            console.warn(`Skipping user ${user.id} (${user.displayName}) due to missing email.`);
-            continue;
-        }
+        if (!user.email) continue;
 
         let emailBody = input.body;
         let emailSubject = input.subject;
@@ -158,17 +159,17 @@ const bulkMarketingEmailFlow = ai.defineFlow(
           popular_categories: popularCategoriesHtml,
           all_services: allServicesHtml,
           all_categories: allCategoriesHtml,
-          category_services: categoryServicesHtml, // New merge tag data
+          category_services: categoryServicesHtml,
         };
 
         // Replace tags
         for (const [key, value] of Object.entries(mergeData)) {
             const tag = new RegExp(`{{${key}}}`, 'g');
-            emailBody = emailBody.replace(tag, value || ''); // Ensure value is not null/undefined
+            emailBody = emailBody.replace(tag, value || '');
             emailSubject = emailSubject.replace(tag, value || '');
         }
 
-        // Send email via the single marketing email flow
+        // Send email via the single marketing email flow (which already uses the new design)
         const result = await sendMarketingEmail({
           toEmail: user.email,
           subject: emailSubject,
@@ -186,18 +187,14 @@ const bulkMarketingEmailFlow = ai.defineFlow(
           successfulSends++;
         } else {
           failedSends++;
-          console.error(`Failed to send email to ${user.email}: ${result.message}`);
         }
       }
 
-      const finalMessage = `Email campaign finished. Successfully sent: ${successfulSends}. Failed: ${failedSends}.`;
-      console.log("====== BULK MARKETING EMAIL FLOW END ======");
-      return { success: true, message: finalMessage };
+      return { success: true, message: `Email campaign finished. Sent: ${successfulSends}. Failed: ${failedSends}.` };
 
     } catch (error) {
       console.error("CRITICAL ERROR in bulkMarketingEmailFlow:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { success: false, message: `Flow failed: ${errorMessage}` };
+      return { success: false, message: `Bulk flow failed.` };
     }
   }
 );

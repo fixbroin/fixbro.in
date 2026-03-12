@@ -378,7 +378,7 @@ export default function CategoryPageClient({
     <div className="container mx-auto px-4 py-4 pb-24">
       {seoPageH1 && <h1 className="sr-only">{seoPageH1}</h1>}
       {breadcrumbItems.length > 0 && <Breadcrumbs items={breadcrumbItems} />}
-      <nav className="mb-1 flex items-center justify-between">
+      <nav className="mb-1 hidden md:flex items-center justify-between">
         <Button variant="outline" onClick={() => { showLoading(); router.back(); }}>
           <ArrowLeft className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Back
         </Button>

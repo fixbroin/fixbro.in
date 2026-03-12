@@ -47,32 +47,38 @@ const createHtmlTemplate = (title: string, bodyContent: string, siteName: string
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; padding: 0; background-color: #F8F9FA; font-family: 'Roboto', sans-serif; }
-        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; }
-        .header { text-align: center; padding-bottom: 20px; }
-        .header img { max-width: 150px; }
-        .content { padding: 20px 0; color: #333333; line-height: 1.6; }
-        .content h2 { font-family: 'Poppins', sans-serif; color: #333333; }
-        .footer { text-align: center; font-size: 12px; color: #999999; padding-top: 20px; border-top: 1px solid #eeeeee; }
-        .summary { border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-top: 20px; background-color: #f9f9f9; }
+        body { margin: 0; padding: 0; background-color: #F8F9FA; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .inner-container { padding: 25px; }
+        .header { text-align: center; padding: 20px 0; border-bottom: 1px solid #f0f0f0; }
+        .header img { max-width: 140px; height: auto; }
+        .content { padding: 25px 0; color: #333333; line-height: 1.6; }
+        .content h2 { color: #111111; font-size: 22px; margin-bottom: 15px; }
+        .footer { text-align: center; font-size: 12px; color: #999999; padding: 25px; border-top: 1px solid #eeeeee; }
+        .summary-box { background-color: #fcfcfc; border: 1px solid #eeeeee; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; margin-bottom: 12px; color: #111111; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .button {
+            display: inline-block; padding: 14px 28px; background-color: #0B5ED7; color: #ffffff !important;
+            text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 20px;
+        }
+        @media only screen and (max-width: 600px) {
+            .inner-container { padding: 15px !important; }
+            .container { width: 100% !important; }
+        }
     </style>
 </head>
 <body>
     <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8F9FA;">
         <tr>
             <td align="center">
-                <table class="container" width="600" border="0" cellspacing="0" cellpadding="20" style="background-color: #ffffff; margin-top: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <table class="container" width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; margin: 20px 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
                     <tr>
-                        <td>
-                             <div class="header">
-                                <a href="${getBaseUrl()}" target="_blank" style="text-decoration:none;">
-
-                                    <img src="${finalLogoUrl}" alt="${siteName} Logo" style="border:0; display:inline-block; max-width:150px;">
-
+                        <td class="inner-container">
+                            <div class="header">
+                                <a href="${getBaseUrl()}" target="_blank">
+                                    <img src="${finalLogoUrl}" alt="${siteName} Logo">
                                 </a>
                             </div>
                             <div class="content">
@@ -81,6 +87,7 @@ const createHtmlTemplate = (title: string, bodyContent: string, siteName: string
                             </div>
                             <div class="footer">
                                 <p>&copy; ${new Date().getFullYear()} ${siteName}. All rights reserved.</p>
+                                <p>This is an automated email. Please do not reply directly.</p>
                             </div>
                         </td>
                     </tr>
@@ -92,6 +99,7 @@ const createHtmlTemplate = (title: string, bodyContent: string, siteName: string
 </html>
 `;
 };
+
 
 const userCancellationEmailFlow = ai.defineFlow(
   {
@@ -112,8 +120,8 @@ const userCancellationEmailFlow = ai.defineFlow(
       let paymentInfoHtml = '';
       if (paymentMethod === 'Online' && paidAmount !== undefined && cancellationFee !== undefined && refundableAmount !== undefined) {
           paymentInfoHtml = `
-            <div class="summary">
-              <h3>Refund Details</h3>
+            <div class="summary-box">
+              <h3 style="margin-top: 0;">Refund Details</h3>
               <p>You paid: ₹${paidAmount.toFixed(2)}</p>
               <p>Cancellation fee: ₹${cancellationFee.toFixed(2)}</p>
               <p><strong>Refundable amount: ₹${refundableAmount.toFixed(2)}</strong></p>
@@ -122,8 +130,8 @@ const userCancellationEmailFlow = ai.defineFlow(
           `;
       } else if (paymentMethod !== 'Online' && cancellationFee !== undefined && cancellationFee > 0) {
           paymentInfoHtml = `
-            <div class="summary">
-              <h3>Pending Balance</h3>
+            <div class="summary-box">
+              <h3 style="margin-top: 0;">Pending Balance</h3>
               <p>Since you chose "${paymentMethod}", you now have a pending balance of <strong>₹${cancellationFee.toFixed(2)}</strong> for the cancellation fee. This balance may be added to your next booking.</p>
             </div>
           `;
