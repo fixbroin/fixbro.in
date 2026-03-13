@@ -391,6 +391,53 @@ if (
       setUser(user);
       setIsCompletingProfile(false);
       setUserCredentialForProfileCompletion(null);
+
+      // --- SEND SIGNUP NOTIFICATIONS (Push + In-App) ---
+      try {
+        // 1. Notify User
+        const userNotification: Omit<FirestoreNotification, 'id'> = {
+          userId: user.uid,
+          title: "Welcome to FixBro!",
+          message: `Hi ${details.fullName}, thank you for joining us! We're excited to help you with your home services.`,
+          type: 'success',
+          href: '/profile',
+          read: false,
+          createdAt: Timestamp.now(),
+        };
+        await setDoc(doc(collection(db, "userNotifications")), userNotification);
+        triggerPushNotification({
+          userId: user.uid,
+          title: userNotification.title,
+          body: userNotification.message,
+          href: userNotification.href
+        }).catch(err => console.error("Error sending user signup push:", err));
+
+        // 2. Notify Admin
+        const adminQuery = query(collection(db, "users"), where("email", "==", ADMIN_EMAIL), limit(1));
+        const adminSnapshot = await getDocs(adminQuery);
+        if (!adminSnapshot.empty) {
+          const adminId = adminSnapshot.docs[0].id;
+          const adminNotification: Omit<FirestoreNotification, 'id'> = {
+            userId: adminId,
+            title: "New User Registered!",
+            message: `${details.fullName} has just signed up on FixBro.`,
+            type: 'info',
+            href: `/admin/users`, // Assuming there's a users management page
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await setDoc(doc(collection(db, "userNotifications")), adminNotification);
+          triggerPushNotification({
+            userId: adminId,
+            title: adminNotification.title,
+            body: adminNotification.message,
+            href: adminNotification.href
+          }).catch(err => console.error("Error sending admin signup push:", err));
+        }
+      } catch (notifyError) {
+        console.error("Error sending signup notifications:", notifyError);
+      }
+      // --- END SIGNUP NOTIFICATIONS ---
   
       toast({ title: "Account Created!", description: "Welcome to FixBro!" });
   
