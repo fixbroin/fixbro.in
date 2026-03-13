@@ -8,7 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { ArrowRight, ArrowLeft, Clock, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Clock, Loader2, AlertTriangle, CalendarDays, CheckCircle2 } from 'lucide-react';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
@@ -31,7 +31,9 @@ import type { BreadcrumbItem } from '@/types/ui';
 import { logUserActivity } from '@/lib/activityLogger';
 import { useAuth } from '@/hooks/useAuth';
 import { getGuestId } from '@/lib/guestIdManager';
-import { Badge } from '@/components/ui/badge'; // Import Badge component
+import { Badge } from '@/components/ui/badge';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Separator } from '@/components/ui/separator';
 
 const DEFAULT_SLOT_INTERVAL_MINUTES = defaultAppSettings.timeSlotSettings.slotIntervalMinutes;
 const DEFAULT_ENABLE_LIMIT_LATE_BOOKINGS = defaultAppSettings.enableLimitLateBookings;
@@ -351,18 +353,18 @@ export default function SchedulePage() {
 
   if (!isMounted || isLoadingAppSettings || (isLoadingSlotsAndConfig && !selectedDate)) { 
      return (
-      <div className="max-w-2xl mx-auto px-2 sm:px-0">
+      <div className="max-w-4xl mx-auto px-2 sm:px-4">
         <Breadcrumbs items={breadcrumbItems} className="mb-4 sm:mb-6" />
         <CheckoutStepper currentStepId="schedule" />
-        <Card className="shadow-lg">
+        <Card className="shadow-lg border-none sm:border">
           <CardHeader><CardTitle className="text-xl sm:text-2xl font-headline text-center">Select Date &amp; Time</CardTitle></CardHeader>
-          <CardContent className="space-y-6 text-center">
-             <Loader2 className="h-10 w-10 text-primary animate-spin mx-auto my-10" />
-             <p className="text-muted-foreground">Loading available slots and configurations...</p>
+          <CardContent className="space-y-6 text-center py-12">
+             <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+             <p className="text-muted-foreground animate-pulse font-medium">Preparing available slots...</p>
           </CardContent>
-          <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-            <Button variant="outline" disabled className="w-full sm:w-auto hidden md:flex"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart</Button>
-            <Button disabled className="w-full sm:w-auto">
+          <CardFooter className="flex flex-col sm:flex-row justify-between gap-3 border-t pt-6 bg-muted/20">
+            <Button variant="ghost" disabled className="hidden sm:flex border border-input"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart</Button>
+            <Button disabled className="w-full sm:w-auto px-8">
               Proceed to Address <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -373,100 +375,212 @@ export default function SchedulePage() {
 
   if (dataFetchError) {
     return (
-       <div className="max-w-2xl mx-auto px-2 sm:px-0">
+       <div className="max-w-4xl mx-auto px-2 sm:px-4">
         <Breadcrumbs items={breadcrumbItems} className="mb-4 sm:mb-6" />
         <CheckoutStepper currentStepId="schedule" />
-        <Card className="shadow-lg">
-          <CardHeader><CardTitle className="text-xl sm:text-2xl font-headline text-center">Error</CardTitle></CardHeader>
-          <CardContent className="space-y-6 text-center">
-            <AlertTriangle className="h-12 w-12 text-destructive mx-auto my-6" />
-            <p className="text-destructive">{dataFetchError}</p>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
-          </CardContent>
+        <Card className="shadow-lg border-destructive/20 overflow-hidden">
+          <div className="bg-destructive/5 py-12 px-6 flex flex-col items-center text-center">
+            <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-xl font-bold text-destructive mb-2">Something went wrong</h2>
+            <p className="text-destructive/80 max-w-md mb-6">{dataFetchError}</p>
+            <Button variant="outline" onClick={() => window.location.reload()} className="border-destructive text-destructive hover:bg-destructive hover:text-white">Try Again</Button>
+          </div>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-2 sm:px-0">
+    <div className="max-w-5xl mx-auto px-2 sm:px-4 pb-12">
       <Breadcrumbs items={breadcrumbItems} className="mb-4 sm:mb-6" />
       <CheckoutStepper currentStepId="schedule" />
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl sm:text-2xl font-headline text-center">Select Date &amp; Time</CardTitle>
+      
+      <Card className="shadow-xl border-none sm:border overflow-hidden">
+        <CardHeader className="bg-primary/5 border-b py-6">
+          <CardTitle className="text-xl sm:text-2xl font-headline text-center flex items-center justify-center gap-2">
+            <CalendarDays className="h-6 w-6 text-primary" />
+            Select Date &amp; Time
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Choose Date</h3>
-            <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleDateSelect}
-                month={displayMonth}
-                onMonthChange={setDisplayMonth}
-                className="rounded-md border"
-                disabled={(date) => date < today}
-              />
+        
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 lg:grid-cols-12">
+            {/* Left Column: Calendar Selection */}
+            <div className="lg:col-span-5 p-4 sm:p-8 border-b lg:border-b-0 lg:border-r bg-muted/5">
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 mb-2">
+                   <div className="h-8 w-1 bg-primary rounded-full" />
+                   <h3 className="text-lg font-bold">Pick a Date</h3>
+                </div>
+                
+                <div className="flex justify-center bg-background p-4 rounded-xl shadow-sm border">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    month={displayMonth}
+                    onMonthChange={setDisplayMonth}
+                    className="rounded-md"
+                    disabled={(date) => date < today}
+                  />
+                </div>
+                
+                <div className="bg-primary/5 p-4 rounded-lg flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Service Duration</p>
+                    <p className="text-xs text-muted-foreground">Estimated duration based on your cart: <span className="text-primary font-bold">{totalCartDuration} mins</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Time Slot Selection */}
+            <div className="lg:col-span-7 p-4 sm:p-8 space-y-6 flex flex-col">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-1 bg-primary rounded-full" />
+                  <h3 className="text-lg font-bold">Available Slots</h3>
+                </div>
+                {selectedDate && (
+                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1">
+                    {formatDateForDisplay(selectedDate)}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex-grow">
+                {selectedDate ? (
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={selectedDate.toISOString()}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="h-full"
+                    >
+                      {isSearchingForNextDay ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                           <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                           <p className="text-muted-foreground font-medium">Finding the next available day...</p>
+                        </div>
+                      ) : availableTimeSlots.length > 0 ? (
+                        <div className="space-y-4">
+                           <RadioGroup
+                            value={selectedTimeSlot}
+                            onValueChange={setSelectedTimeSlot}
+                            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+                          >
+                            {availableTimeSlots.map(({ slot, remainingCapacity }) => (
+                              <div key={slot}>
+                                <RadioGroupItem 
+                                  value={slot} 
+                                  id={`slot-${slot}`} 
+                                  className="sr-only" 
+                                />
+                                <Label
+                                  htmlFor={`slot-${slot}`}
+                                  className={`group relative flex flex-col items-center justify-center border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 hover:border-primary/50
+                                    ${selectedTimeSlot === slot 
+                                      ? 'bg-primary border-primary text-primary-foreground shadow-md ring-2 ring-primary/20 scale-[1.02]' 
+                                      : 'bg-background border-muted hover:bg-muted/30'}`}
+                                >
+                                  <Clock className={`h-4 w-4 mb-2 ${selectedTimeSlot === slot ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-primary'}`} />
+                                  <span className="font-bold text-sm tracking-tight">{slot}</span>
+                                  
+                                  {remainingCapacity > 1 && (
+                                      <Badge 
+                                        variant="default" 
+                                        className={`absolute -top-2 -right-1 text-[9px] px-1.5 py-0 bg-green-500 hover:bg-green-600 border-2 border-background shadow-sm
+                                          ${selectedTimeSlot === slot ? 'bg-white text-green-600 border-primary' : ''}`}
+                                      >
+                                        {remainingCapacity} left
+                                      </Badge>
+                                  )}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                          
+                          {selectedTimeSlot && (
+                             <motion.div 
+                               initial={{ opacity: 0, scale: 0.95 }}
+                               animate={{ opacity: 1, scale: 1 }}
+                               className="mt-6 p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between"
+                             >
+                               <div className="flex items-center gap-3">
+                                 <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+                                   <CheckCircle2 className="h-6 w-6" />
+                                 </div>
+                                 <div>
+                                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Selected Schedule</p>
+                                   <p className="text-sm font-bold">{formatDateForDisplay(selectedDate)} at {selectedTimeSlot}</p>
+                                 </div>
+                               </div>
+                               <Badge className="bg-primary text-primary-foreground">Confirmed</Badge>
+                             </motion.div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed rounded-2xl bg-muted/5">
+                          <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                          <h4 className="font-bold text-lg mb-1">No slots available</h4>
+                          <p className="text-muted-foreground text-sm max-w-xs">
+                            This date is fully booked or doesn't accommodate your service duration. Please select another date.
+                          </p>
+                        </div>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed rounded-2xl opacity-60">
+                    <CalendarDays className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground font-medium">Please select a date on the left to see available time slots</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {selectedDate && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <Clock className="mr-2 h-5 w-5 text-primary" /> Available Time Slots for {formatDateForDisplay(selectedDate)}
-              </h3>
-              {isSearchingForNextDay ? (
-                 <div className="flex justify-center items-center py-4"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Searching for next available day...</div>
-              ) : availableTimeSlots.length > 0 ? (
-                <RadioGroup
-                  value={selectedTimeSlot}
-                  onValueChange={setSelectedTimeSlot}
-                  className="space-y-3"
-                >
-                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {availableTimeSlots.map(({ slot, remainingCapacity }) => {
-                      const requiredSlotsForCart = Math.max(1, Math.ceil(totalCartDuration / slotIntervalMinutes));
-                      return (
-                      <Label
-                        key={slot.replace(/\s+/g, '-').replace(/:/g, '')}
-                        htmlFor={slot.replace(/\s+/g, '-').replace(/:/g, '')}
-                        className={`relative flex items-center justify-center space-x-2 border rounded-md p-3 hover:bg-accent/50 cursor-pointer transition-colors
-                          ${selectedTimeSlot === slot ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary' : 'border-input bg-background'}`}
-                      >
-                        <RadioGroupItem value={slot} id={slot.replace(/\s+/g, '-').replace(/:/g, '')} className="border-muted-foreground data-[state=checked]:border-primary-foreground" />
-                        <span>{slot}</span>
-                        
-                        {remainingCapacity > 1 && (
-                             <Badge variant="default" className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0.5 bg-green-500 hover:bg-green-600">{remainingCapacity} left</Badge>
-                        )}
-                      </Label>
-                      );
-                    })}
-                  </div>
-                </RadioGroup>
-              ) : (
-                <p className="text-muted-foreground text-center py-4">No available slots for this date. This could be due to existing bookings or service duration. Please select another date.</p>
-              )}
-            </div>
-          )}
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-          <Link href="/cart" passHref className="w-full sm:w-auto hidden md:block">
-            <Button variant="outline" className="w-full sm:w-auto">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Cart
+
+        <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-muted/20 p-6 border-t">
+          <Link href="/cart" passHref className="hidden sm:block order-2 sm:order-1">
+            <Button variant="ghost" className="border border-input hover:bg-foreground hover:text-background transition-all duration-300 group">
+              <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" /> Back to Cart
             </Button>
           </Link>
-          <Button 
-            disabled={!selectedDate || !selectedTimeSlot} 
-            onClick={handleProceed}
-            className="w-full sm:w-auto"
-          >
-            Proceed to Address <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3 order-1 sm:order-2">
+            <Button 
+              disabled={!selectedDate || !selectedTimeSlot} 
+              onClick={handleProceed}
+              className="w-full sm:w-auto px-10 py-6 text-base font-bold shadow-lg shadow-primary/20 group relative overflow-hidden"
+            >
+              <span className="relative z-10 flex items-center">
+                Proceed to Address <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </span>
+              <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+            </Button>
+          </div>
         </CardFooter>
       </Card>
+      
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { title: "Instant Booking", desc: "Real-time availability updates" },
+          { title: "Expert Pro", desc: "Verified professional for every job" },
+          { title: "On-time Arrival", desc: "Punctuality is our top priority" }
+        ].map((item, idx) => (
+          <div key={idx} className="flex items-center gap-3 p-4 rounded-xl bg-background border shadow-sm">
+            <div className="h-2 w-2 rounded-full bg-primary" />
+            <div>
+              <p className="text-sm font-bold leading-none mb-1">{item.title}</p>
+              <p className="text-xs text-muted-foreground">{item.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
