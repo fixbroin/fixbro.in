@@ -120,49 +120,65 @@ export default async function AboutUsPage() {
     }
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="max-w-3xl mx-auto">
-          <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute left-0 hidden sm:block">
-              <Link href="/" passHref>
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-                </Button>
-              </Link>
-            </div>
-            <h1 className="text-4xl font-headline font-semibold text-foreground text-center">
-              {pageData.title}
-            </h1>
-          </div>
+      <div className="min-h-screen bg-muted/20 pb-16">
+        <div className="container mx-auto px-4 py-8">
+          <Breadcrumbs items={breadcrumbItems} />
           
-          {pageData.imageUrl && (
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-8 shadow-lg">
-                  <AppImage 
-                      src={pageData.imageUrl} 
-                      alt={pageData.title} 
-                      fill 
-                      priority
-                      className="object-cover"
-                      aiHint={pageData.imageHint || "about us banner"}
-                  />
-              </div>
-          )}
+          <div className="max-w-4xl mx-auto mt-6 bg-card rounded-2xl shadow-sm border border-border/50 overflow-hidden">
+            {pageData.imageUrl && (
+                <div className="relative w-full aspect-[21/9] overflow-hidden">
+                    <AppImage 
+                        src={pageData.imageUrl} 
+                        alt={pageData.title} 
+                        fill 
+                        priority
+                        className="object-cover hover:scale-105 transition-transform duration-700"
+                        aiHint={pageData.imageHint || "about us banner"}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6 md:p-10">
+                        <h1 className="text-3xl md:text-5xl font-headline font-bold text-white drop-shadow-md">
+                        {pageData.title}
+                        </h1>
+                    </div>
+                </div>
+            )}
 
-          {pageData.content ? (
-              <article
-              className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
-                        prose-headings:font-headline prose-headings:text-foreground
-                        prose-p:text-foreground/80
-                        prose-a:text-primary hover:prose-a:text-primary/80
-                        prose-strong:text-foreground
-                        prose-ul:list-disc prose-ol:list-decimal
-                        prose-li:marker:text-primary"
-              dangerouslySetInnerHTML={{ __html: pageData.content }}
-              />
-          ): (
-              <p className="text-muted-foreground">No content available for this page yet.</p>
-          )}
+            <div className="p-6 md:p-10 lg:p-12">
+                {!pageData.imageUrl && (
+                    <div className="mb-8 border-b pb-6">
+                        <h1 className="text-4xl font-headline font-bold text-foreground">
+                        {pageData.title}
+                        </h1>
+                    </div>
+                )}
+
+                {pageData.content ? (
+                    <article
+                    className="prose prose-lg prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
+                                prose-headings:font-headline prose-headings:text-foreground prose-headings:font-bold
+                                prose-p:text-foreground/80 prose-p:leading-relaxed
+                                prose-a:text-primary hover:prose-a:text-primary/80 prose-a:font-semibold
+                                prose-strong:text-foreground prose-strong:font-bold
+                                prose-ul:list-disc prose-ol:list-decimal
+                                prose-li:marker:text-primary"
+                    dangerouslySetInnerHTML={{ __html: pageData.content }}
+                    />
+                ): (
+                    <p className="text-muted-foreground italic text-center py-10">Content for this section is currently being updated. Please check back soon.</p>
+                )}
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto mt-12 bg-primary/10 rounded-2xl p-8 text-center border border-primary/20">
+              <h3 className="text-2xl font-headline font-bold text-foreground mb-3">Ready to experience the FixBro difference?</h3>
+              <p className="text-muted-foreground mb-6">Book a trusted professional for your home needs today.</p>
+              <Link href="/" passHref>
+                  <Button size="lg" className="rounded-full px-8 shadow-lg shadow-primary/25">
+                      Explore Our Services
+                  </Button>
+              </Link>
+          </div>
+
         </div>
       </div>
     );

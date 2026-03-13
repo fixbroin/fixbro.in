@@ -4,7 +4,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, PackageSearch } from "lucide-react";
+import { ArrowLeft, PackageSearch, Mail, Phone, MapPin } from "lucide-react";
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
@@ -12,6 +12,7 @@ import { getBaseUrl } from '@/lib/config';
 import ContactUsForm from "@/components/forms/ContactUsForm";
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
+import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = 'force-dynamic';
 
@@ -97,7 +98,10 @@ export async function generateMetadata(
 
 export default async function ContactUsPage() {
   try {
-    const pageData = await getPageData(PAGE_SLUG);
+    const [pageData, webSettings] = await Promise.all([
+        getPageData(PAGE_SLUG),
+        getGlobalWebsiteSettings()
+    ]);
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -122,55 +126,112 @@ export default async function ContactUsPage() {
     }
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="max-w-6xl mx-auto">
-          <div className="relative flex items-center justify-center mb-12">
-            <div className="absolute left-0 hidden sm:block">
-              <Link href="/" passHref>
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-                </Button>
-              </Link>
-            </div>
-            <h1 className="text-4xl font-headline font-semibold text-foreground text-center">
-              {pageData.title}
-            </h1>
-          </div>
-
-          {pageData.imageUrl && (
-            <div className="relative w-full aspect-[21/9] rounded-xl overflow-hidden mb-12 shadow-lg">
-                <AppImage 
-                    src={pageData.imageUrl} 
-                    alt={pageData.title} 
-                    fill 
-                    priority
-                    className="object-cover"
-                    aiHint={pageData.imageHint || "contact us banner"}
-                />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-            <div className="order-1 lg:order-2">
-              <ContactUsForm />
+      <div className="min-h-screen bg-muted/20 pb-16">
+        <div className="container mx-auto px-4 py-8">
+            <Breadcrumbs items={breadcrumbItems} />
+            <div className="max-w-6xl mx-auto mt-6">
+            <div className="relative flex items-center justify-center mb-8">
+                <div className="absolute left-0 hidden sm:block">
+                <Link href="/" passHref>
+                    <Button variant="outline" size="sm" className="bg-background">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+                    </Button>
+                </Link>
+                </div>
+                <h1 className="text-3xl md:text-5xl font-headline font-bold text-foreground text-center">
+                {pageData.title}
+                </h1>
             </div>
 
-            <div className="order-2 lg:order-1">
-              {pageData.content && (
-                  <article
-                  className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
-                            prose-headings:font-headline prose-headings:text-foreground
-                            prose-p:text-foreground/80 prose-p:leading-relaxed prose-p:mb-6
-                            prose-a:text-primary hover:prose-a:text-primary/80
-                            prose-strong:text-foreground
-                            prose-ul:list-disc prose-ol:list-decimal
-                            prose-li:marker:text-primary"
-                  dangerouslySetInnerHTML={{ __html: pageData.content }}
-                  />
-              )}
+            {pageData.imageUrl && (
+                <div className="relative w-full aspect-[21/9] rounded-2xl overflow-hidden mb-12 shadow-lg border border-border/50">
+                    <AppImage 
+                        src={pageData.imageUrl} 
+                        alt={pageData.title} 
+                        fill 
+                        priority
+                        className="object-cover hover:scale-105 transition-transform duration-700"
+                        aiHint={pageData.imageHint || "contact us banner"}
+                    />
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                {/* Left Side: Contact Info & Prose Content */}
+                <div className="lg:col-span-5 space-y-8 order-2 lg:order-1">
+                    {/* Contact Info Cards */}
+                    <div className="grid gap-4">
+                        {webSettings?.contactEmail && (
+                            <Card className="border-none shadow-sm bg-card hover:shadow-md transition-shadow">
+                                <CardContent className="p-4 flex items-center gap-4">
+                                    <div className="bg-primary/10 p-3 rounded-full text-primary shrink-0">
+                                        <Mail className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Email Us</p>
+                                        <a href={`mailto:${webSettings.contactEmail}`} className="text-lg font-bold text-foreground hover:text-primary transition-colors">
+                                            {webSettings.contactEmail}
+                                        </a>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {webSettings?.contactMobile && (
+                            <Card className="border-none shadow-sm bg-card hover:shadow-md transition-shadow">
+                                <CardContent className="p-4 flex items-center gap-4">
+                                    <div className="bg-primary/10 p-3 rounded-full text-primary shrink-0">
+                                        <Phone className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Call Us</p>
+                                        <a href={`tel:${webSettings.contactMobile}`} className="text-lg font-bold text-foreground hover:text-primary transition-colors">
+                                            {webSettings.contactMobile}
+                                        </a>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        {webSettings?.address && (
+                            <Card className="border-none shadow-sm bg-card hover:shadow-md transition-shadow">
+                                <CardContent className="p-4 flex items-start gap-4">
+                                    <div className="bg-primary/10 p-3 rounded-full text-primary shrink-0">
+                                        <MapPin className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Our Location</p>
+                                        <p className="text-base font-medium text-foreground leading-relaxed mt-1">
+                                            {webSettings.address}
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {pageData.content && (
+                        <div className="bg-card p-6 md:p-8 rounded-2xl shadow-sm border border-border/50">
+                            <article
+                            className="prose prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
+                                        prose-headings:font-headline prose-headings:text-foreground
+                                        prose-p:text-foreground/80 prose-p:leading-relaxed
+                                        prose-a:text-primary hover:prose-a:text-primary/80
+                                        prose-strong:text-foreground
+                                        prose-ul:list-disc prose-ol:list-decimal
+                                        prose-li:marker:text-primary"
+                            dangerouslySetInnerHTML={{ __html: pageData.content }}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Side: Contact Form */}
+                <div className="lg:col-span-7 order-1 lg:order-2">
+                    <div className="bg-card p-1 sm:p-2 rounded-2xl shadow-sm border border-border/50">
+                        <ContactUsForm />
+                    </div>
+                </div>
             </div>
-          </div>
+            </div>
         </div>
       </div>
     );

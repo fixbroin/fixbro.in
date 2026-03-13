@@ -1,15 +1,15 @@
-
 // src/app/careers/page.tsx
 import { adminDb } from '@/lib/firebaseAdmin';
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, PackageSearch } from "lucide-react";
+import { ArrowLeft, PackageSearch, Briefcase, UserPlus } from "lucide-react";
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
+import { Timestamp } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic'; 
 
@@ -30,20 +30,6 @@ async function getPageData(slug: string): Promise<ContentPage | null> {
   }
 }
 
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-    try {
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const docSnap = await settingsDocRef.get();
-        if (docSnap.exists) {
-            return docSnap.data() as GlobalWebSettings;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching global web settings for metadata:", error);
-        return null;
-    }
-}
-
 export async function generateMetadata(
   props: {},
   parent: ResolvingMetadata
@@ -52,7 +38,6 @@ export async function generateMetadata(
 
   const pageData = await getPageData(PAGE_SLUG);
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalWebsiteSettings();
   const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || "FixBro";
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const appBaseUrl = getBaseUrl(); 
@@ -61,24 +46,17 @@ export async function generateMetadata(
     return {
       title: `Page Not Found${defaultSuffix}`,
       description: "The page you are looking for does not exist.",
-      openGraph: {
-        title: `Page Not Found${defaultSuffix}`,
-        description: "The page you are looking for does not exist.",
-        siteName: siteName,
-      }
     };
   }
 
   const title = `${pageData.title}${defaultSuffix}`;
   const description = pageData.content?.substring(0, 160) || seoSettings.defaultMetaDescription || `Information about ${pageData.title}`;
-  const keywords = seoSettings.defaultMetaKeywords?.split(',').map(k => k.trim()).filter(k => k);
-  const ogImage = pageData.imageUrl || webSettings?.websiteIconUrl || webSettings?.logoUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const ogImage = pageData.imageUrl || `${appBaseUrl}/default-image.png`;
   const canonicalUrl = `${appBaseUrl}/${PAGE_SLUG}`;
 
   return {
     title: title,
     description: description,
-    keywords: keywords && keywords.length > 0 ? keywords : undefined,
     alternates: {
       canonical: canonicalUrl,
     },
@@ -120,57 +98,81 @@ export default async function CareersPage() {
     }
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="max-w-3xl mx-auto">
-          <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute left-0 hidden sm:block">
-              <Link href="/" passHref>
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
-                </Button>
-              </Link>
-            </div>
-            <h1 className="text-4xl font-headline font-semibold text-foreground text-center">
-              {pageData.title}
-            </h1>
-          </div>
-
-          {pageData.imageUrl && (
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-8 shadow-lg">
-                  <AppImage 
-                      src={pageData.imageUrl} 
-                      alt={pageData.title} 
-                      fill 
-                      priority
-                      className="object-cover"
-                      aiHint={pageData.imageHint || "careers banner"}
-                  />
-              </div>
-          )}
-
-          <div className="mb-4 text-center">
-            {pageData.updatedAt && (
-              <p className="text-sm text-muted-foreground">
-                Last updated: {pageData.updatedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </p>
-            )}
-          </div>
+      <div className="min-h-screen bg-muted/20 pb-16">
+        <div className="container mx-auto px-4 py-8">
+          <Breadcrumbs items={breadcrumbItems} />
           
-          {pageData.content ? (
-              <article
-              className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
-                        prose-headings:font-headline prose-headings:text-foreground
-                        prose-p:text-foreground/80
-                        prose-a:text-primary hover:prose-a:text-primary/80
-                        prose-strong:text-foreground
-                        prose-ul:list-disc prose-ol:list-decimal
-                        prose-li:marker:text-primary"
-              dangerouslySetInnerHTML={{ __html: pageData.content }}
-              />
-          ): (
-              <p className="text-muted-foreground">No content available for this page yet.</p>
-          )}
+          <div className="max-w-4xl mx-auto mt-6 bg-card rounded-2xl shadow-sm border border-border/50 overflow-hidden">
+            {pageData.imageUrl && (
+                <div className="relative w-full aspect-[21/9] overflow-hidden">
+                    <AppImage 
+                        src={pageData.imageUrl} 
+                        alt={pageData.title} 
+                        fill 
+                        priority
+                        className="object-cover hover:scale-105 transition-transform duration-700"
+                        aiHint={pageData.imageHint || "careers banner"}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6 md:p-10">
+                        <h1 className="text-3xl md:text-5xl font-headline font-bold text-white drop-shadow-md">
+                        {pageData.title}
+                        </h1>
+                    </div>
+                </div>
+            )}
+
+            <div className="p-6 md:p-10 lg:p-12">
+                {!pageData.imageUrl && (
+                    <div className="mb-8 border-b pb-6">
+                        <h1 className="text-4xl font-headline font-bold text-foreground">
+                        {pageData.title}
+                        </h1>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 mb-8 text-primary font-semibold text-sm uppercase tracking-wider">
+                    <Briefcase className="h-4 w-4" />
+                    <span>Join Our Growing Team</span>
+                </div>
+
+                {pageData.content ? (
+                    <article
+                    className="prose prose-lg prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
+                                prose-headings:font-headline prose-headings:text-foreground prose-headings:font-bold
+                                prose-p:text-foreground/80 prose-p:leading-relaxed
+                                prose-a:text-primary hover:prose-a:text-primary/80 prose-a:font-semibold
+                                prose-strong:text-foreground prose-strong:font-bold
+                                prose-ul:list-disc prose-ol:list-decimal
+                                prose-li:marker:text-primary"
+                    dangerouslySetInnerHTML={{ __html: pageData.content }}
+                    />
+                ): (
+                    <p className="text-muted-foreground italic text-center py-10">Content for this section is currently being updated. Please check back soon.</p>
+                )}
+
+                {pageData.updatedAt && (
+                    <div className="mt-12 pt-6 border-t border-border/50 text-right">
+                        <p className="text-xs text-muted-foreground">
+                            Last updated: {pageData.updatedAt instanceof Timestamp ? pageData.updatedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(pageData.updatedAt as any).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </p>
+                    </div>
+                )}
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto mt-12 bg-primary/10 rounded-2xl p-8 md:p-12 text-center border border-primary/20">
+              <div className="bg-primary/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <UserPlus className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-2xl font-headline font-bold text-foreground mb-3">Are you a professional provider?</h3>
+              <p className="text-muted-foreground mb-8 max-w-md mx-auto">Boost your business by joining our platform as a trusted partner. We're always looking for skilled experts!</p>
+              <Link href="/provider-registration" passHref>
+                  <Button size="lg" className="rounded-full px-10 shadow-lg shadow-primary/25 h-12 font-bold">
+                      Register as a Provider
+                  </Button>
+              </Link>
+          </div>
+
         </div>
       </div>
     );
