@@ -8,13 +8,16 @@ import { Input } from '@/components/ui/input';
 import AppImage from '@/components/ui/AppImage';
 import { XIcon, Mail, Loader2, User, Phone } from 'lucide-react'; 
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs, addDoc, Timestamp } from 'firebase/firestore'; 
-import type { FirestorePopup, PopupDisplayFrequency, InquirySource, InquiryStatus, FirestorePopupInquiry } from '@/types/firestore'; 
+import { collection, query, where, orderBy, getDocs, addDoc, Timestamp, limit } from 'firebase/firestore'; 
+import type { FirestorePopup, PopupDisplayFrequency, InquirySource, InquiryStatus, FirestorePopupInquiry, FirestoreNotification } from '@/types/firestore'; 
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth'; 
 import { getGuestId } from '@/lib/guestIdManager'; 
 import { useLoading } from '@/contexts/LoadingContext';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { triggerPushNotification } from '@/lib/fcmUtils';
+import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 
 const POPUP_SESSION_STORAGE_KEY_PREFIX = 'fixbroPopupShown_';
 const POPUP_DAY_STORAGE_KEY_PREFIX = 'fixbroPopupDayShown_'; 
@@ -35,11 +38,21 @@ export default function PopupDisplayManager() {
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const [showPromoCode, setShowPromoCode] = useState(false);
+  const { config: appConfig } = useApplicationConfig();
+  const countryCode = appConfig?.defaultOtpCountryCode || '+91';
 
   const popupShownThisLoadRef = useRef(false);
   const exitIntentListenerRef = useRef<(() => void) | null>(null);
   const scrollListenerRef = useRef<(() => void) | null>(null);
   const timerRefs = useRef<NodeJS.Timeout[]>([]);
+
+  const validateEmail = (email: string) => {
+    return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+  };
+
+  const validateMobile = (mobile: string) => {
+    return /^\d{10}$/.test(mobile);
+  };
 
   const checkFrequency = useCallback((popupId: string, frequency: PopupDisplayFrequency): boolean => {
     if (frequency === "always") return true;
@@ -269,18 +282,34 @@ export default function PopupDisplayManager() {
   
   const handleSubscribe = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (currentPopupToDisplay?.showEmailInput && (!emailForSubscription || !/^\S+@\S+\.\S+$/.test(emailForSubscription))) {
-        toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
-        return;
-    }
+    
     if (currentPopupToDisplay?.showNameInput && !nameForSubscription.trim()) {
         toast({ title: "Name Required", description: "Please enter your name.", variant: "destructive" });
         return;
     }
-    if (currentPopupToDisplay?.showMobileInput && (!mobileForSubscription.trim() || !/^\+?[1-9]\d{1,14}$/.test(mobileForSubscription))) {
-        toast({ title: "Invalid Mobile", description: "Please enter a valid mobile number.", variant: "destructive" });
-        return;
+
+    if (currentPopupToDisplay?.showEmailInput) {
+        if (!emailForSubscription) {
+            toast({ title: "Email Required", description: "Please enter your email address.", variant: "destructive" });
+            return;
+        }
+        if (!validateEmail(emailForSubscription)) {
+            toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
+            return;
+        }
     }
+
+    if (currentPopupToDisplay?.showMobileInput) {
+        if (!mobileForSubscription.trim()) {
+            toast({ title: "Mobile Required", description: "Please enter your mobile number.", variant: "destructive" });
+            return;
+        }
+        if (!validateMobile(mobileForSubscription)) {
+            toast({ title: "Invalid Mobile", description: "Please enter a valid 10-digit mobile number.", variant: "destructive" });
+            return;
+        }
+    }
+
     if (!currentPopupToDisplay) {
         toast({ title: "Error", description: "Popup data missing.", variant: "destructive"});
         return;
@@ -295,7 +324,9 @@ export default function PopupDisplayManager() {
     const capturedFormData: Record<string, any> = {};
     if (currentPopupToDisplay.showEmailInput && emailForSubscription) capturedFormData.email = emailForSubscription;
     if (currentPopupToDisplay.showNameInput && nameForSubscription) capturedFormData.name = nameForSubscription;
-    if (currentPopupToDisplay.showMobileInput && mobileForSubscription) capturedFormData.mobile = mobileForSubscription;
+    if (currentPopupToDisplay.showMobileInput && mobileForSubscription) {
+        capturedFormData.mobile = `${countryCode}${mobileForSubscription}`;
+    }
 
 
     const popupInquiryData: Omit<FirestorePopupInquiry, 'id'> = {
@@ -304,7 +335,7 @@ export default function PopupDisplayManager() {
         popupType: currentPopupToDisplay.popupType,
         email: (currentPopupToDisplay.showEmailInput && emailForSubscription) ? emailForSubscription : undefined,
         name: (currentPopupToDisplay.showNameInput && nameForSubscription) ? nameForSubscription : (user?.displayName || undefined),
-        phone: (currentPopupToDisplay.showMobileInput && mobileForSubscription) ? mobileForSubscription : undefined,
+        phone: (currentPopupToDisplay.showMobileInput && mobileForSubscription) ? `${countryCode}${mobileForSubscription}` : undefined,
         submittedAt: Timestamp.now(),
         status: 'new' as InquiryStatus,
         source: inquirySource,
@@ -312,7 +343,36 @@ export default function PopupDisplayManager() {
     };
 
     try {
-        await addDoc(collection(db, "popupSubmissions"), popupInquiryData);
+        const docRef = await addDoc(collection(db, "popupSubmissions"), popupInquiryData);
+
+        // --- ADMIN NOTIFICATION FOR NEW POPUP INQUIRY ---
+        try {
+          const adminQuery = query(collection(db, "users"), where("email", "==", ADMIN_EMAIL), limit(1));
+          const adminSnapshot = await getDocs(adminQuery);
+          if (!adminSnapshot.empty) {
+            const adminId = adminSnapshot.docs[0].id;
+            const adminNotification: Omit<FirestoreNotification, 'id'> = {
+              userId: adminId,
+              title: "New Popup Submission",
+              message: `From: ${popupInquiryData.name || popupInquiryData.email || "Unknown"} (Source: ${popupInquiryData.popupName})`,
+              type: "info",
+              href: `/admin/inquiries`,
+              read: false,
+              createdAt: Timestamp.now(),
+            };
+            await addDoc(collection(db, "userNotifications"), adminNotification);
+            triggerPushNotification({
+              userId: adminId,
+              title: adminNotification.title,
+              body: adminNotification.message,
+              href: adminNotification.href
+            }).catch(err => console.error("Error sending admin popup push:", err));
+          }
+        } catch (notifyErr) {
+          console.error("Error sending admin popup notifications:", notifyErr);
+        }
+        // --- END ADMIN NOTIFICATION ---
+
         toast({ title: "Submitted!", description: `Thank you for your submission.`, className:"bg-green-100 text-green-700 border-green-300" });
         
         if (['newsletter_signup', 'lead_capture', 'subscribe'].includes(currentPopupToDisplay?.popupType)) {
@@ -522,40 +582,55 @@ export default function PopupDisplayManager() {
             {(currentPopupToDisplay.showNameInput || currentPopupToDisplay.showEmailInput || currentPopupToDisplay.showMobileInput) && (
               <form onSubmit={handleSubscribe} className="flex flex-col gap-3 mt-2">
                 {currentPopupToDisplay.showNameInput && (
-                    <Input
-                        type="text"
-                        placeholder="Full Name"
-                        value={nameForSubscription}
-                        onChange={(e) => setNameForSubscription(e.target.value)}
-                        required={currentPopupToDisplay.showNameInput} 
-                        className="h-10 text-base"
-                        disabled={isSubscribing}
-                        aria-label="Full Name"
-                    />
+                    <div className="flex flex-col gap-1.5 text-left">
+                        <label className="text-xs font-medium text-muted-foreground ml-1">Full Name</label>
+                        <Input
+                            type="text"
+                            placeholder="Full Name"
+                            value={nameForSubscription}
+                            onChange={(e) => setNameForSubscription(e.target.value)}
+                            required={currentPopupToDisplay.showNameInput} 
+                            className="h-10 text-base"
+                            disabled={isSubscribing}
+                            aria-label="Full Name"
+                        />
+                    </div>
                 )}
                 {currentPopupToDisplay.showEmailInput && (
-                    <Input
-                        type="email"
-                        placeholder="Enter your email"
-                        value={emailForSubscription}
-                        onChange={(e) => setEmailForSubscription(e.target.value)}
-                        required={currentPopupToDisplay.showEmailInput}
-                        className="h-10 text-base"
-                        disabled={isSubscribing}
-                        aria-label="Email Address"
-                    />
+                    <div className="flex flex-col gap-1.5 text-left">
+                        <label className="text-xs font-medium text-muted-foreground ml-1">Email Address</label>
+                        <Input
+                            type="email"
+                            placeholder="you@example.com"
+                            value={emailForSubscription}
+                            onChange={(e) => setEmailForSubscription(e.target.value)}
+                            required={currentPopupToDisplay.showEmailInput}
+                            className="h-10 text-base"
+                            disabled={isSubscribing}
+                            aria-label="Email Address"
+                        />
+                    </div>
                 )}
                  {currentPopupToDisplay.showMobileInput && (
-                    <Input
-                        type="tel"
-                        placeholder="Mobile Number"
-                        value={mobileForSubscription}
-                        onChange={(e) => setMobileForSubscription(e.target.value)}
-                        required={currentPopupToDisplay.showMobileInput} 
-                        className="h-10 text-base"
-                        disabled={isSubscribing}
-                        aria-label="Mobile Number"
-                    />
+                    <div className="flex flex-col gap-1.5 text-left">
+                        <label className="text-xs font-medium text-muted-foreground ml-1">Mobile Number</label>
+                        <div className="flex gap-2">
+                            <div className="flex items-center justify-center px-3 bg-muted border rounded-md text-sm font-medium text-muted-foreground whitespace-nowrap">
+                                {countryCode}
+                            </div>
+                            <Input
+                                type="tel"
+                                placeholder="10-digit mobile number"
+                                value={mobileForSubscription}
+                                onChange={(e) => setMobileForSubscription(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                                required={currentPopupToDisplay.showMobileInput} 
+                                className="h-10 text-base"
+                                disabled={isSubscribing}
+                                aria-label="Mobile Number"
+                                maxLength={10}
+                            />
+                        </div>
+                    </div>
                 )}
                 <Button type="submit" className="w-full h-10" disabled={isSubscribing}>
                   {isSubscribing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4"/>}

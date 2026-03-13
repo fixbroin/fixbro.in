@@ -11,10 +11,12 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { User, Mail, Phone, MessageSquare, Loader2, Send } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import type { FirestoreContactUsInquiry, InquiryStatus } from '@/types/firestore';
+import { collection, addDoc, Timestamp, query, where, getDocs, limit } from 'firebase/firestore';
+import type { FirestoreContactUsInquiry, InquiryStatus, FirestoreNotification } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { useState } from 'react';
+import { triggerPushNotification } from '@/lib/fcmUtils';
+import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 
 const contactUsFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }).max(100, { message: "Name cannot exceed 100 characters."}),
@@ -55,7 +57,36 @@ export default function ContactUsForm() {
         status: 'new' as InquiryStatus,
         source: 'contact_form',
       };
-      await addDoc(collection(db, "contactUsSubmissions"), inquiryData);
+      const docRef = await addDoc(collection(db, "contactUsSubmissions"), inquiryData);
+      
+      // --- ADMIN NOTIFICATION FOR NEW INQUIRY ---
+      try {
+        const adminQuery = query(collection(db, "users"), where("email", "==", ADMIN_EMAIL), limit(1));
+        const adminSnapshot = await getDocs(adminQuery);
+        if (!adminSnapshot.empty) {
+          const adminId = adminSnapshot.docs[0].id;
+          const adminNotification: Omit<FirestoreNotification, 'id'> = {
+            userId: adminId,
+            title: "New Contact Inquiry",
+            message: `From ${data.name} (${data.email})`,
+            type: "info",
+            href: `/admin/inquiries`,
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), adminNotification);
+          triggerPushNotification({
+            userId: adminId,
+            title: adminNotification.title,
+            body: adminNotification.message,
+            href: adminNotification.href
+          }).catch(err => console.error("Error sending admin inquiry push:", err));
+        }
+      } catch (notifyErr) {
+        console.error("Error sending admin inquiry notifications:", notifyErr);
+      }
+      // --- END ADMIN NOTIFICATION ---
+
       toast({
         title: "Message Sent!",
         description: "Thank you for contacting us. We'll get back to you soon.",

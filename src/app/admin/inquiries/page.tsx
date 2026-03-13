@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from '@/components/ui/badge';
 import { Mail, MessageCircle, Phone, User, Edit, Trash2, CheckCircle, PackageSearch, Loader2, Send, AlertTriangle, Eye, MoreHorizontal, CheckCircle2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import type { FirestoreContactUsInquiry, FirestorePopupInquiry, InquiryStatus, AppSettings } from '@/types/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc } from 'firebase/firestore';
+import type { FirestoreContactUsInquiry, FirestorePopupInquiry, InquiryStatus, AppSettings, FirestoreNotification } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { triggerPushNotification } from '@/lib/fcmUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter as AlertDialogFooterComponent, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { sendInquiryReplyEmail, type InquiryReplyEmailInput } from '@/ai/flows/sendInquiryReplyEmailFlow';
@@ -124,6 +125,27 @@ export default function AdminInquiriesPage() {
       } else {
         toast({ title: "Email Failed", description: emailResult.message || "Could not send reply email. Check logs.", variant: "destructive", duration: 7000 });
       }
+
+      // --- USER NOTIFICATION FOR INQUIRY REPLY ---
+      if (selectedInquiryForReply.userId) {
+          const userNotification: Omit<FirestoreNotification, 'id'> = {
+            userId: selectedInquiryForReply.userId,
+            title: "Reply to Your Inquiry",
+            message: `FixBro Support replied to your inquiry: "${replyMessage.substring(0, 50)}${replyMessage.length > 50 ? '...' : ''}"`,
+            type: 'info',
+            href: '/', // Or a specific inquiries page if it exists for users
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), userNotification);
+          triggerPushNotification({
+            userId: selectedInquiryForReply.userId,
+            title: userNotification.title,
+            body: userNotification.message,
+            href: userNotification.href
+          }).catch(err => console.error("Error sending inquiry reply push:", err));
+      }
+      // --- END USER NOTIFICATION ---
 
       setIsReplyDialogOpen(false);
       setReplyMessage("");

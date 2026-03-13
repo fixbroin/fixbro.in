@@ -94,6 +94,15 @@ export const onForegroundMessage = () => {
   onMessage(messaging, (payload) => {
     console.log("FCM Utils: Message received in foreground: ", payload);
     
+    // Play custom sound based on notification type/data
+    try {
+      const soundFile = payload.data?.sound === 'order' ? '/sounds/order_sound.wav' : '/sounds/default-notification.mp3';
+      const audio = new Audio(soundFile);
+      audio.play().catch(e => console.warn("FCM Utils: Could not play notification sound:", e));
+    } catch (soundErr) {
+      console.error("FCM Utils: Sound play error:", soundErr);
+    }
+
     // If in a WebView, send the data to the native app
     if (isWebView()) {
       sendPushNotificationData(payload);
@@ -127,6 +136,7 @@ export const triggerPushNotification = async (params: {
   body: string;
   href?: string;
   icon?: string;
+  sound?: 'order' | 'default';
 }) => {
   try {
     const response = await fetch('/api/send-push', {

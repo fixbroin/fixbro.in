@@ -1,30 +1,43 @@
-
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, Globe2, PackageSearch, AlertTriangle, Trash2 as TrashIcon } from "lucide-react"; 
+import { 
+  Loader2, Globe2, PackageSearch, AlertTriangle, 
+  Trash2 as TrashIcon, TrendingUp, Users, MapPin, 
+  MousePointer2, Search, Filter, Monitor, Smartphone, Layout
+} from "lucide-react"; 
 import type { FirestoreVisitorInfoLog } from '@/types/firestore';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp, limit, startAfter, getDocs, writeBatch, type DocumentSnapshot } from "firebase/firestore";
+import { 
+  collection, query, orderBy, Timestamp, limit, startAfter, 
+  getDocs, writeBatch, type DocumentSnapshot 
+} from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from 'date-fns';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { formatDistanceToNow, format } from 'date-fns';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie
+} from 'recharts';
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDescriptionComponent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 50;
 
 const formatLogTimestamp = (timestamp?: Timestamp): string => {
   if (!timestamp) return 'N/A';
@@ -39,6 +52,18 @@ const formatDateForDisplay = (timestamp?: Timestamp): string => {
     });
 };
 
+const getBrowserIcon = (ua: string) => {
+    if (ua.includes('Chrome')) return <Monitor className="h-3 w-3 inline mr-1 text-blue-500" />;
+    if (ua.includes('Firefox')) return <Monitor className="h-3 w-3 inline mr-1 text-orange-500" />;
+    if (ua.includes('Safari') && !ua.includes('Chrome')) return <Monitor className="h-3 w-3 inline mr-1 text-blue-400" />;
+    return <Monitor className="h-3 w-3 inline mr-1 text-gray-500" />;
+};
+
+const getDeviceIcon = (ua: string) => {
+    if (/Mobile|Android|iPhone/i.test(ua)) return <Smartphone className="h-3 w-3 inline mr-1 text-green-500" />;
+    return <Monitor className="h-3 w-3 inline mr-1 text-indigo-500" />;
+};
+
 export default function AdminVisitorInfoPage() {
   const [visitorLogs, setVisitorLogs] = useState<FirestoreVisitorInfoLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,6 +71,7 @@ export default function AdminVisitorInfoPage() {
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const fetchInitialLogs = async () => {
@@ -151,104 +177,304 @@ export default function AdminVisitorInfoPage() {
     }
   };
 
+  // --- ANALYTICS CALCULATIONS ---
+  const analytics = useMemo(() => {
+      if (visitorLogs.length === 0) return null;
+
+      const topCountries: Record<string, number> = {};
+      const topCities: Record<string, number> = {};
+      const topPaths: Record<string, number> = {};
+      const trafficByDay: Record<string, number> = {};
+      const uniqueIPs = new Set();
+
+      visitorLogs.forEach(log => {
+          if (log.countryName) topCountries[log.countryName] = (topCountries[log.countryName] || 0) + 1;
+          if (log.city) topCities[log.city] = (topCities[log.city] || 0) + 1;
+          if (log.pathname) topPaths[log.pathname] = (topPaths[log.pathname] || 0) + 1;
+          if (log.ipAddress) uniqueIPs.add(log.ipAddress);
+          
+          if (log.timestamp) {
+              const day = format(log.timestamp.toDate(), 'MMM dd');
+              trafficByDay[day] = (trafficByDay[day] || 0) + 1;
+          }
+      });
+
+      const countryData = Object.entries(topCountries)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
+
+      const pathData = Object.entries(topPaths)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
+
+      const trendData = Object.entries(trafficByDay)
+          .map(([name, value]) => ({ name, value }))
+          .reverse();
+
+      return {
+          totalVisits: visitorLogs.length,
+          uniqueVisitors: uniqueIPs.size,
+          countryData,
+          pathData,
+          trendData,
+          topCity: Object.entries(topCities).sort((a,b) => b[1] - a[1])[0]?.[0] || 'N/A'
+      };
+  }, [visitorLogs]);
+
+  const filteredLogs = useMemo(() => {
+      if (!searchTerm) return visitorLogs;
+      const lowerSearch = searchTerm.toLowerCase();
+      return visitorLogs.filter(log => 
+          log.ipAddress?.toLowerCase().includes(lowerSearch) ||
+          log.city?.toLowerCase().includes(lowerSearch) ||
+          log.countryName?.toLowerCase().includes(lowerSearch) ||
+          log.pathname?.toLowerCase().includes(lowerSearch) ||
+          log.ispOrganization?.toLowerCase().includes(lowerSearch)
+      );
+  }, [visitorLogs, searchTerm]);
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
   const renderMobileCard = (log: FirestoreVisitorInfoLog) => (
-    <Card key={log.id} className="mb-4">
-      <CardContent className="p-4 space-y-2 text-sm">
-         <div><strong className="text-muted-foreground">When:</strong> <span className="text-foreground">{formatLogTimestamp(log.timestamp)}</span> <span className="text-xs text-muted-foreground/80">({formatDateForDisplay(log.timestamp)})</span></div>
-         <div><strong className="text-muted-foreground">IP Address:</strong> <span className="font-mono text-foreground">{log.ipAddress}</span></div>
-         <div><strong className="text-muted-foreground">Location:</strong> <span className="text-foreground">{log.city || 'N/A'}, {log.region || 'N/A'}, {log.countryName || 'N/A'}</span></div>
-         <div><strong className="text-muted-foreground">ISP:</strong> <span className="text-foreground break-words">{log.ispOrganization || 'N/A'}</span></div>
-         <div><strong className="text-muted-foreground">Path Visited:</strong> <span className="text-foreground break-words">{log.pathname}</span></div>
-         <div><strong className="text-muted-foreground">User Agent:</strong> <p className="text-foreground text-xs break-words">{log.userAgent}</p></div>
+    <Card key={log.id} className="mb-4 border-l-4 border-l-primary shadow-sm overflow-hidden">
+      <CardContent className="p-4 space-y-3 text-sm">
+         <div className="flex justify-between items-start">
+             <div className="flex items-center gap-2">
+                 <Badge variant="outline" className="bg-primary/5 text-[10px] py-0">{log.ipAddress}</Badge>
+                 <span className="text-[10px] text-muted-foreground">{formatLogTimestamp(log.timestamp)}</span>
+             </div>
+             <div className="flex items-center gap-1">
+                 {getDeviceIcon(log.userAgent)}
+                 {getBrowserIcon(log.userAgent)}
+             </div>
+         </div>
+         
+         <div className="grid grid-cols-2 gap-2 mt-2">
+             <div className="flex items-center gap-1.5 text-xs">
+                 <MapPin className="h-3 w-3 text-muted-foreground" />
+                 <span className="truncate">{log.city || 'N/A'}, {log.countryName || 'N/A'}</span>
+             </div>
+             <div className="flex items-center gap-1.5 text-xs justify-end">
+                 <Layout className="h-3 w-3 text-muted-foreground" />
+                 <span className="truncate font-medium">{log.pathname}</span>
+             </div>
+         </div>
+
+         <Separator className="my-1 opacity-50" />
+         
+         <div className="text-[10px] text-muted-foreground italic truncate">
+             ISP: {log.ispOrganization || 'N/A'}
+         </div>
       </CardContent>
     </Card>
   );
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <div>
-              <CardTitle className="text-2xl flex items-center">
-                <Globe2 className="mr-2 h-6 w-6 text-primary" /> Visitor Information Logs
-              </CardTitle>
-              <CardDescription>
-                Recent website visitor geolocation and technical data. Data from ipapi.co.
-              </CardDescription>
+      {/* Header Card */}
+      <Card className="border-none bg-primary/5 shadow-none">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary p-2.5 rounded-lg text-primary-foreground shadow-md">
+                 <TrendingUp className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-bold tracking-tight">Visitor Insights</CardTitle>
+                <CardDescription>Comprehensive analytics from your website traffic logs.</CardDescription>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Button onClick={fetchInitialLogs} variant="outline" size="sm" disabled={isLoading || isFetchingMore || isClearing} className="w-full sm:w-auto">
-                  <Loader2 className={`mr-2 h-4 w-4 ${isLoading && !isFetchingMore && !isClearing ? 'animate-spin' : 'hidden'}`} /> Refresh Logs
+            <div className="flex gap-2 w-full md:w-auto">
+              <Button onClick={fetchInitialLogs} variant="outline" size="sm" disabled={isLoading || isClearing} className="flex-1 md:flex-none">
+                  <Loader2 className={`mr-2 h-4 w-4 ${isLoading && !isFetchingMore ? 'animate-spin' : ''}`} /> Refresh
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={isLoading || isFetchingMore || isClearing || visitorLogs.length === 0} className="w-full sm:w-auto">
-                    {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
-                    Clear All Logs
+                  <Button variant="destructive" size="sm" disabled={isLoading || isClearing || visitorLogs.length === 0} className="flex-1 md:flex-none">
+                    <TrashIcon className="mr-2 h-4 w-4" /> Clear
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive"/>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescriptionComponent>
-                      This action will permanently delete ALL visitor logs. This cannot be undone.
-                    </AlertDialogDescriptionComponent>
+                    <AlertDialogTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive"/>Delete All Logs?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently erase all historical visitor data. This cannot be undone.
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAllLogs} disabled={isClearing} className="bg-destructive hover:bg-destructive/90">
-                      {isClearing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Yes, Clear All
-                    </AlertDialogAction>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllLogs} className="bg-destructive hover:bg-destructive/90">Confirm Delete</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-2">
-          {isLoading && visitorLogs.length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </Card>
+
+      {/* KPI Stats */}
+      {analytics && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="shadow-sm border-none bg-card hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-blue-100 text-blue-600"><Users className="h-4 w-4"/></div>
+                      <div><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Total Visits</p><p className="text-lg font-bold">{analytics.totalVisits}</p></div>
+                  </CardContent>
+              </Card>
+              <Card className="shadow-sm border-none bg-card hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-green-100 text-green-600"><Monitor className="h-4 w-4"/></div>
+                      <div><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Unique IPs</p><p className="text-lg font-bold">{analytics.uniqueVisitors}</p></div>
+                  </CardContent>
+              </Card>
+              <Card className="shadow-sm border-none bg-card hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-amber-100 text-amber-600"><MapPin className="h-4 w-4"/></div>
+                      <div><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Top Location</p><p className="text-lg font-bold truncate max-w-[80px]">{analytics.topCity}</p></div>
+                  </CardContent>
+              </Card>
+              <Card className="shadow-sm border-none bg-card hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-purple-100 text-purple-600"><MousePointer2 className="h-4 w-4"/></div>
+                      <div><p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Most Visited</p><p className="text-lg font-bold truncate max-w-[80px]">{analytics.pathData[0]?.name || '/'}</p></div>
+                  </CardContent>
+              </Card>
+          </div>
+      )}
+
+      {/* Charts Section */}
+      {analytics && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2 shadow-sm border-none">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-bold flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary"/>Traffic Trend (Last 50 Entries)</CardTitle></CardHeader>
+                  <CardContent className="h-[250px] pt-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.trendData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                              <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} />
+                              <YAxis fontSize={10} axisLine={false} tickLine={false} />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} 
+                                cursor={{ fill: '#f3f4f6' }}
+                              />
+                              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={30} />
+                          </BarChart>
+                      </ResponsiveContainer>
+                  </CardContent>
+              </Card>
+
+              <Card className="shadow-sm border-none">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-bold flex items-center gap-2"><Globe2 className="h-4 w-4 text-primary"/>Visitor Geolocation</CardTitle></CardHeader>
+                  <CardContent className="h-[250px] pt-4">
+                       <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                              <Pie
+                                  data={analytics.countryData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={60}
+                                  outerRadius={80}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                              >
+                                  {analytics.countryData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                              </Pie>
+                              <Tooltip />
+                          </PieChart>
+                      </ResponsiveContainer>
+                      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+                          {analytics.countryData.map((entry, index) => (
+                              <div key={index} className="flex items-center gap-1">
+                                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                  <span className="text-[10px] text-muted-foreground font-medium">{entry.name}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </CardContent>
+              </Card>
+          </div>
+      )}
+
+      {/* Main Table Section */}
+      <Card className="shadow-sm border-none">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <CardTitle className="text-lg font-bold">Activity Logs</CardTitle>
+            <div className="relative w-full md:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search by IP, city, path..." 
+                    className="pl-9 h-9 bg-muted/30 border-none focus-visible:ring-primary"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
             </div>
-          ) : visitorLogs.length === 0 ? (
-            <div className="text-center py-10">
-              <PackageSearch className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No visitor logs recorded yet.</p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading && visitorLogs.length === 0 ? (
+            <div className="flex flex-col justify-center items-center h-64 gap-3 text-muted-foreground">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="animate-pulse text-sm">Synchronizing logs...</p>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="text-center py-16">
+              <PackageSearch className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+              <p className="text-muted-foreground font-medium">No results found for "{searchTerm}"</p>
+              <Button variant="link" onClick={() => setSearchTerm("")} className="mt-2">Clear search</Button>
             </div>
           ) : (
             <>
-              {/* Desktop & Tablet View */}
-              <div className="hidden md:block overflow-x-auto">
+              {/* Desktop View */}
+              <div className="hidden lg:block">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[120px]">Timestamp</TableHead>
-                      <TableHead>IP Address</TableHead>
-                      <TableHead>City</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead>Country</TableHead>
-                      <TableHead>Postal</TableHead>
-                      <TableHead>ISP</TableHead>
-                      <TableHead>Path Visited</TableHead>
-                      <TableHead className="min-w-[150px]">User Agent</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Visitor / Device</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Location</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Path</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Network (ISP)</TableHead>
+                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-right">Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visitorLogs.map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="text-xs text-muted-foreground" title={formatDateForDisplay(log.timestamp)}>
-                            {formatLogTimestamp(log.timestamp)}
+                    {filteredLogs.map((log) => (
+                      <TableRow key={log.id} className="hover:bg-muted/10 transition-colors">
+                        <TableCell>
+                            <div className="flex flex-col">
+                                <span className="font-mono text-xs font-bold text-primary">{log.ipAddress}</span>
+                                <div className="flex items-center mt-1 text-[10px] text-muted-foreground">
+                                    {getDeviceIcon(log.userAgent)}
+                                    <span className="truncate max-w-[120px]" title={log.userAgent}>{log.userAgent.split(' ')[0]}...</span>
+                                </div>
+                            </div>
                         </TableCell>
-                        <TableCell className="text-xs font-mono">{log.ipAddress}</TableCell>
-                        <TableCell className="text-xs">{log.city || 'N/A'}</TableCell>
-                        <TableCell className="text-xs">{log.region || 'N/A'}</TableCell>
-                        <TableCell className="text-xs">{log.countryName || 'N/A'}</TableCell>
-                        <TableCell className="text-xs">{log.postalCode || 'N/A'}</TableCell>
-                        <TableCell className="text-xs truncate max-w-[100px]" title={log.ispOrganization}>{log.ispOrganization || 'N/A'}</TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]" title={log.pathname}>{log.pathname}</TableCell>
-                        <TableCell className="text-xs truncate max-w-[150px]" title={log.userAgent}>{log.userAgent}</TableCell>
+                        <TableCell>
+                            <div className="flex flex-col">
+                                <span className="text-xs font-medium">{log.city || 'Unknown City'}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{log.countryName || 'Global'}</span>
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0 bg-secondary/30">
+                                {log.pathname}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate" title={log.ispOrganization}>
+                            {log.ispOrganization || 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                             <div className="flex flex-col items-end">
+                                <span className="text-xs font-medium">{formatLogTimestamp(log.timestamp)}</span>
+                                <span className="text-[10px] text-muted-foreground opacity-60 font-mono">
+                                    {log.timestamp ? format(log.timestamp.toDate(), 'HH:mm:ss') : ''}
+                                </span>
+                            </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -256,29 +482,40 @@ export default function AdminVisitorInfoPage() {
               </div>
 
               {/* Mobile View */}
-              <div className="md:hidden">
-                {visitorLogs.map(renderMobileCard)}
+              <div className="lg:hidden">
+                {filteredLogs.map(renderMobileCard)}
               </div>
             </>
           )}
         </CardContent>
         {hasMore && (
-            <CardFooter className="pt-4 justify-center">
-                <Button onClick={handleLoadMore} disabled={isFetchingMore || isLoading || isClearing}>
-                    {isFetchingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                    Load More Logs
+            <CardFooter className="pt-4 justify-center border-t bg-muted/5">
+                <Button variant="ghost" size="sm" onClick={handleLoadMore} disabled={isFetchingMore || isLoading} className="text-xs font-bold text-primary">
+                    {isFetchingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <TrendingUp className="mr-2 h-4 w-4"/>}
+                    {isFetchingMore ? 'Fetching more data...' : 'Analyze More History'}
                 </Button>
             </CardFooter>
         )}
       </Card>
-       <Alert variant="default" className="mt-4 text-xs bg-muted/50">
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          <AlertDescription>
-            <strong>Note:</strong> IP-based geolocation can have inaccuracies and is subject to privacy considerations.
-            The "IP Address" shown is typically the visitor's public IP. Location data provided by <a href="https://ipapi.co/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">ipapi.co</a>.
-            This log does not track logged-in user actions specifically; use the "User Activity Feed" for that.
-          </AlertDescription>
-        </Alert>
+      
+      {/* Footer Info */}
+       <div className="bg-muted/30 rounded-xl p-4 flex items-start gap-3 border border-border/50">
+          <InfoIcon className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-[11px] leading-relaxed text-muted-foreground">
+             <strong>Privacy & Accuracy Note:</strong> IP-based geolocation provides approximate location data and is subject to provider (ipapi.co) accuracy. 
+             Browsers and devices are identified via User-Agent strings. This dashboard is designed for high-level traffic analysis and 
+             does not link specific actions to logged-in users. For individual user audit trails, refer to the 
+             <Link href="/admin/activity-feed" className="text-primary hover:underline ml-1 font-bold">Security Activity Feed</Link>.
+          </div>
+       </div>
     </div>
   );
 }
+
+const InfoIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+    </svg>
+);
+
+import Link from 'next/link';

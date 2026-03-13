@@ -29,6 +29,7 @@ import { defaultAppSettings } from '@/config/appDefaults';
 import AssignProviderModal from '@/components/admin/AssignProviderModal'; 
 import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
+import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 
 const statusOptions: BookingStatus[] = [
   "Pending Payment", "Confirmed", "AssignedToProvider", "ProviderAccepted", 
@@ -292,6 +293,28 @@ export default function AdminBookingsPage() {
       setIsUpdatingStatus(bookingId); const bookingDocRef = doc(db, "bookings", bookingId);
       try { const updatePayload: Record<string, any> = { status: newStatus, updatedAt: Timestamp.now() }; if (newStatus === "Completed" && booking.isReviewedByCustomer === undefined) { updatePayload.isReviewedByCustomer = false; } await updateDoc(bookingDocRef, updatePayload); toast({ title: "Success", description: `Booking status updated to ${newStatus}.` });
         const updatedBookingForNotifications = { ...booking, status: newStatus };
+
+        // --- USER NOTIFICATION FOR STATUS CHANGE ---
+        if (booking.userId && newStatus !== "Cancelled") { // Cancelled is already handled below
+           const userNotification: Omit<FirestoreNotification, 'id'> = {
+              userId: booking.userId,
+              title: `Booking Status: ${newStatus}`,
+              message: `Your booking ${booking.bookingId} status has been updated to ${newStatus}.`,
+              type: 'info',
+              href: '/my-bookings',
+              read: false,
+              createdAt: Timestamp.now(),
+           };
+           await addDoc(collection(db, "userNotifications"), userNotification);
+           triggerPushNotification({
+             userId: booking.userId,
+             title: userNotification.title,
+             body: userNotification.message,
+             href: userNotification.href
+           }).catch(err => console.error("Error sending user status push:", err));
+        }
+        // --- END USER NOTIFICATION ---
+
         if (newStatus === "Completed") {
             await prepareAndSendEmail(updatedBookingForNotifications, 'booking_completion');
             await handleReferralBonusOnCompletion(updatedBookingForNotifications); // Handle Referral
@@ -375,6 +398,28 @@ export default function AdminBookingsPage() {
     try { 
         await updateDoc(bookingDocRef, updatePayload); 
         toast({ title: "Success", description: `Booking marked as Completed. Payment via ${paymentReceivedMethodForDialog}.` });
+        
+        // --- USER NOTIFICATION FOR COMPLETION ---
+        if (bookingToUpdate.userId) {
+            const userNotification: Omit<FirestoreNotification, 'id'> = {
+                userId: bookingToUpdate.userId,
+                title: "Service Completed!",
+                message: `Your booking ${bookingToUpdate.bookingId} has been marked as completed. Thank you for choosing FixBro!`,
+                type: 'success',
+                href: '/my-bookings',
+                read: false,
+                createdAt: Timestamp.now(),
+            };
+            await addDoc(collection(db, "userNotifications"), userNotification);
+            triggerPushNotification({
+                userId: bookingToUpdate.userId,
+                title: userNotification.title,
+                body: userNotification.message,
+                href: userNotification.href
+            }).catch(err => console.error("Error sending user completion push:", err));
+        }
+        // --- END USER NOTIFICATION ---
+
         // Send email *after* successful database update
         await prepareAndSendEmail(updatedBookingForEmail, 'booking_completion', paymentReceivedMethodForDialog);
     } catch (error) { console.error("Error updating booking status and payment method: ", error); toast({ title: "Error", description: "Could not update booking.", variant: "destructive" });
@@ -513,8 +558,30 @@ export default function AdminBookingsPage() {
           userId: providerId,
           title: providerNotification.title,
           body: providerNotification.message,
-          href: providerNotification.href
+          href: providerNotification.href,
+          sound: 'order' // Play specific order sound for assignments
         });
+
+        // --- USER NOTIFICATION FOR PROVIDER ASSIGNMENT ---
+        if (currentBookingData.userId) {
+            const userNotification: Omit<FirestoreNotification, 'id'> = {
+                userId: currentBookingData.userId,
+                title: "Provider Assigned!",
+                message: `${providerName} has been assigned to your booking ${currentBookingData.bookingId}.`,
+                type: 'info',
+                href: '/my-bookings',
+                read: false,
+                createdAt: Timestamp.now(),
+            };
+            await addDoc(collection(db, "userNotifications"), userNotification);
+            triggerPushNotification({
+                userId: currentBookingData.userId,
+                title: userNotification.title,
+                body: userNotification.message,
+                href: userNotification.href
+            }).catch(err => console.error("Error sending user assignment push:", err));
+        }
+        // --- END USER NOTIFICATION ---
 
         setIsAssignModalOpen(false);
         setBookingToAssign(null);

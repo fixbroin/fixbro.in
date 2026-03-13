@@ -7,13 +7,16 @@ import { Facebook, Twitter, Instagram, Linkedin, Youtube, Phone, MapPin, Mail, A
 import { useGlobalSettings } from '@/hooks/useGlobalSettings'; 
 import { Skeleton } from '@/components/ui/skeleton'; 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, orderBy, query, limit as firestoreLimit, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, limit as firestoreLimit, addDoc, Timestamp, where, limit } from 'firebase/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLoading } from '@/contexts/LoadingContext'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { ADMIN_EMAIL } from '@/contexts/AuthContext';
+import { triggerPushNotification } from '@/lib/fcmUtils';
+import type { FirestoreNotification } from '@/types/firestore';
 
 interface FooterServiceLink {
   name: string;
@@ -100,7 +103,7 @@ const Footer = () => {
 
     setIsSubscribing(true);
     try {
-      await addDoc(collection(db, "popupSubmissions"), {
+      const docRef = await addDoc(collection(db, "popupSubmissions"), {
         popupName: "Footer Newsletter",
         popupType: "subscribe",
         email: subscribeEmail,
@@ -108,6 +111,35 @@ const Footer = () => {
         status: "new",
         source: "subscribe_popup",
       });
+
+      // --- ADMIN NOTIFICATION FOR NEWSLETTER ---
+      try {
+        const adminQuery = query(collection(db, "users"), where("email", "==", ADMIN_EMAIL), limit(1));
+        const adminSnapshot = await getDocs(adminQuery);
+        if (!adminSnapshot.empty) {
+          const adminId = adminSnapshot.docs[0].id;
+          const adminNotification: Omit<FirestoreNotification, 'id'> = {
+            userId: adminId,
+            title: "New Newsletter Subscriber",
+            message: `Email: ${subscribeEmail} (from Footer)`,
+            type: "info",
+            href: `/admin/inquiries`,
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), adminNotification);
+          triggerPushNotification({
+            userId: adminId,
+            title: adminNotification.title,
+            body: adminNotification.message,
+            href: adminNotification.href
+          }).catch(err => console.error("Error sending admin newsletter push:", err));
+        }
+      } catch (notifyErr) {
+        console.error("Error sending admin newsletter notifications:", notifyErr);
+      }
+      // --- END ADMIN NOTIFICATION ---
+
       toast({ 
         title: "Subscribed!", 
         description: "Thank you for joining our newsletter.",

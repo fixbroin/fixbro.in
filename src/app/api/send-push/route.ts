@@ -14,7 +14,7 @@ try {
 
 export async function POST(request: Request) {
   try {
-    const { userId, title, body, href, icon } = await request.json();
+    const { userId, title, body, href, icon, sound } = await request.json();
 
     if (!userId || !title || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       data: {
         click_action: href || '/',
         icon: icon || '/android-chrome-192x192.png',
+        sound: sound || 'default', // Pass internal sound identifier
       },
       // Essential for background handling in modern browsers
       webpush: {
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
           icon: icon || '/android-chrome-192x192.png',
           data: {
             url: href || '/',
+            sound: sound || 'default',
           }
         }
       }

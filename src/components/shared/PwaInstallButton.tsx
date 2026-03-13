@@ -1,9 +1,19 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X } from 'lucide-react';
+import { Download, X, Share, PlusSquare, Smartphone, Monitor, Info } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import AppImage from '@/components/ui/AppImage';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 // Extend Event type to include PWA-specific properties
 interface BeforeInstallPromptEvent extends Event {
@@ -20,12 +30,17 @@ const PwaInstallButton = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [showIosGuide, setShowIosInstruction] = useState(false);
+  const [isIos, setIsIos] = useState(false);
   
-  const DISMISS_KEY = 'pwa_install_banner_dismissed';
+  const isMobile = useIsMobile();
+  const DISMISS_KEY = 'pwa_install_prompt_dismissed_v2';
 
   useEffect(() => {
     setIsMounted(true);
-    if (sessionStorage.getItem(DISMISS_KEY) === 'true') {
+    
+    // Check if dismissed before
+    if (localStorage.getItem(DISMISS_KEY) === 'true') {
       setIsDismissed(true);
     }
     
@@ -33,6 +48,12 @@ const PwaInstallButton = () => {
     if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
       setIsAppInstalled(true);
     }
+
+    // Check if iOS
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+    setIsIos(isIosDevice);
+
   }, []);
 
   useEffect(() => {
@@ -51,50 +72,126 @@ const PwaInstallButton = () => {
   }, [isMounted]);
 
   const handleInstallClick = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent the main div click from firing
+    e.stopPropagation();
+    
+    if (isIos && !isAppInstalled) {
+        setShowIosInstruction(true);
+        return;
+    }
+
     if (!installPrompt) return;
 
     await installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
-      console.log('User accepted the PWA installation');
-      setIsAppInstalled(true); // Hide button after installation
-    } else {
-      console.log('User dismissed the PWA installation');
+      setIsAppInstalled(true);
     }
     setInstallPrompt(null);
   };
   
   const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Stop the event from propagating to the parent div
+    e.stopPropagation();
     setIsDismissed(true);
-    sessionStorage.setItem(DISMISS_KEY, 'true');
+    localStorage.setItem(DISMISS_KEY, 'true');
   };
 
-  if (!isMounted || !installPrompt || isDismissed || isAppInstalled) {
+  if (!isMounted || isAppInstalled || isDismissed) {
     return null;
   }
 
+  // Only show if we have a prompt (Android/Chrome) OR if it's iOS (for manual guide)
+  if (!installPrompt && !isIos) {
+      return null;
+  }
+
+  // --- MOBILE STICKY BANNER UI ---
+  if (isMobile) {
+      return (
+        <>
+            <div className="fixed bottom-20 left-4 right-4 z-[100] animate-in fade-in slide-in-from-bottom-10 duration-500">
+                <div className="bg-card border-2 border-primary/20 shadow-2xl rounded-2xl p-4 flex items-center gap-4 relative">
+                    <button 
+                        onClick={handleDismiss}
+                        className="absolute -top-2 -right-2 bg-muted text-muted-foreground rounded-full p-1 hover:bg-destructive hover:text-destructive-foreground transition-colors border"
+                    >
+                        <X size={14} />
+                    </button>
+
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border">
+                        <AppImage src="/pwa-192x192.png" alt="App Icon" width={40} height={40} className="rounded-lg shadow-sm" />
+                    </div>
+
+                    <div className="flex-grow min-w-0">
+                        <h4 className="text-sm font-bold text-foreground">Install FixBro App</h4>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">Faster booking & real-time updates</p>
+                    </div>
+
+                    <Button size="sm" onClick={handleInstallClick} className="rounded-full px-5 font-bold shadow-lg shadow-primary/20">
+                        {isIos ? "Setup" : "Install"}
+                    </Button>
+                </div>
+            </div>
+
+            {/* iOS Installation Guide */}
+            <Dialog open={showIosGuide} onOpenChange={setShowIosInstruction}>
+                <DialogContent className="max-w-[90vw] rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Smartphone className="h-5 w-5 text-primary" />
+                            Install on iPhone
+                        </DialogTitle>
+                        <DialogDescription className="text-left pt-2">
+                            To install the FixBro app on your iPhone, follow these simple steps:
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-start gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">1</div>
+                            <p className="text-sm">Tap the <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Share size={14} /> Share</span> button in Safari footer.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">2</div>
+                            <p className="text-sm">Scroll down and tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><PlusSquare size={14} /> Add to Home Screen</span>.</p>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">3</div>
+                            <p className="text-sm">Tap <span className="text-primary font-bold">Add</span> in the top right corner.</p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button onClick={() => setShowIosInstruction(false)} className="w-full rounded-xl">Got it!</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
+      );
+  }
+
+  // --- DESKTOP FLOATING TAB UI ---
   return (
     <div
+      className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden"
       onClick={handleInstallClick}
-      className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-primary text-primary-foreground shadow-lg rounded-l-lg cursor-pointer transition-all duration-300 ease-in-out w-10 hover:w-36 h-12"
-      aria-label="Install App"
-      title="Install App"
     >
-      <div className="flex items-center justify-between w-full h-full p-2">
-        <Download className="h-6 w-6 text-primary-foreground flex-shrink-0 group-hover:animate-bounce" />
-        <span className="text-sm font-medium whitespace-nowrap overflow-hidden transition-opacity duration-200 opacity-0 group-hover:opacity-100 ml-2">
-          Install App
-        </span>
+      <div className="flex items-center w-full h-full p-2.5">
+        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
+            <Download className="h-5 w-5 text-white" />
+        </div>
+        
+        <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Desktop App</p>
+          <p className="text-xs font-bold text-foreground">Install FixBro</p>
+        </div>
       </div>
-       <button
+
+      <button
           onClick={handleDismiss}
-          className="absolute -top-3 -left-3 h-6 w-6 rounded-full bg-secondary text-secondary-foreground border border-background/50 shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-destructive hover:text-destructive-foreground"
-          aria-label="Dismiss install button"
+          className="absolute top-1 right-1 h-4 w-4 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white flex items-center justify-center"
         >
-          <X className="h-4 w-4" />
-        </button>
+          <X size={10} />
+      </button>
     </div>
   );
 };

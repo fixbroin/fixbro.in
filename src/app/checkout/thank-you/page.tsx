@@ -324,6 +324,55 @@ export default function ThankYouPage() {
 
         const docRef = await addDoc(collection(db, "bookings"), newBookingData);
         
+        // --- SEND BOOKING NOTIFICATIONS (Push + In-App) ---
+        try {
+           // 1. Notify User
+           if (currentUser?.uid) {
+              const userNotification: Omit<FirestoreNotification, 'id'> = {
+                userId: currentUser.uid,
+                title: "Booking Confirmed!",
+                message: `Your booking ${newBookingId} has been successfully placed. We'll assign a provider shortly.`,
+                type: 'success',
+                href: '/my-bookings',
+                read: false,
+                createdAt: Timestamp.now(),
+              };
+              await addDoc(collection(db, "userNotifications"), userNotification);
+              triggerPushNotification({
+                userId: currentUser.uid,
+                title: userNotification.title,
+                body: userNotification.message,
+                href: userNotification.href
+              }).catch(err => console.error("Error sending user booking push:", err));
+           }
+
+           // 2. Notify Admin
+           const adminQuery = query(collection(db, "users"), where("email", "==", ADMIN_EMAIL), limit(1));
+           const adminSnapshot = await getDocs(adminQuery);
+           if (!adminSnapshot.empty) {
+              const adminId = adminSnapshot.docs[0].id;
+              const adminNotification: Omit<FirestoreNotification, 'id'> = {
+                userId: adminId,
+                title: "New Booking Received!",
+                message: `A new booking ${newBookingId} has been placed by ${customerName}.`,
+                type: 'info',
+                href: `/admin/bookings`,
+                read: false,
+                createdAt: Timestamp.now(),
+              };
+              await addDoc(collection(db, "userNotifications"), adminNotification);
+              triggerPushNotification({
+                userId: adminId,
+                title: adminNotification.title,
+                body: adminNotification.message,
+                href: adminNotification.href
+              }).catch(err => console.error("Error sending admin booking push:", err));
+           }
+        } catch (notifyError) {
+          console.error("Error sending booking notifications:", notifyError);
+        }
+        // --- END BOOKING NOTIFICATIONS ---
+
         // --- IMMEDIATELY PREPARE UI DATA AND SHOW SUCCESS SCREEN ---
         const servicesSummary = resolvedServiceItems.map(s => `${s.name} (x${s.quantity})`).join(', ');
         setBookingDetailsForDisplay({ 

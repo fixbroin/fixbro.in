@@ -15,6 +15,7 @@ import MarketingScriptsInjector from '@/components/layout/MarketingScriptsInject
 import { Roboto } from 'next/font/google';
 import PageViewTracker from '@/components/layout/PageViewTracker';
 import ThemeInjector from '@/components/layout/ThemeInjector';
+import DynamicManifest from '@/components/layout/DynamicManifest';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, hslStringToHex } from '@/lib/colorUtils';
 
 const roboto = Roboto({
@@ -126,6 +127,7 @@ export default function RootLayout({
         <Suspense fallback={<RootSuspenseLoader />}>
           <AuthProvider>
             <LoadingProvider>
+              <DynamicManifest />
               <MarketingScriptsInjector />
               <PageViewTracker />
               <AppLayout>

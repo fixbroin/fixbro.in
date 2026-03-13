@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
 import { Eye, Check, Trash2, Loader2, PackageSearch, Construction, Phone, CheckCircle2, MoreHorizontal } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import type { CustomServiceRequest, CustomRequestStatus } from '@/types/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc } from 'firebase/firestore';
+import type { CustomServiceRequest, CustomRequestStatus, FirestoreNotification } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { triggerPushNotification } from '@/lib/fcmUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter as AlertDialogFooterComponent, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AppImage from '@/components/ui/AppImage';
@@ -129,8 +130,31 @@ export default function CustomServiceAdminPage() {
     if (!requestId) return;
     setIsUpdating(requestId);
     try {
+      const requestToUpdate = requests.find(r => r.id === requestId);
       await updateDoc(doc(db, "customServiceRequests", requestId), { status: newStatus });
       toast({ title: "Status Updated", description: `Request marked as ${newStatus}.` });
+
+      // --- USER NOTIFICATION FOR CUSTOM SERVICE STATUS CHANGE ---
+      if (requestToUpdate?.userId) {
+          const userNotification: Omit<FirestoreNotification, 'id'> = {
+            userId: requestToUpdate.userId,
+            title: `Request Update: ${requestToUpdate.serviceTitle}`,
+            message: `Your custom service request "${requestToUpdate.serviceTitle}" status has been updated to ${newStatus}.`,
+            type: 'info',
+            href: '/custom-service',
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), userNotification);
+          triggerPushNotification({
+            userId: requestToUpdate.userId,
+            title: userNotification.title,
+            body: userNotification.message,
+            href: userNotification.href
+          }).catch(err => console.error("Error sending custom service status push:", err));
+      }
+      // --- END USER NOTIFICATION ---
+
     } catch (error) {
       toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
