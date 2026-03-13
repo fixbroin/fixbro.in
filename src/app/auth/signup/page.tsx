@@ -75,6 +75,7 @@ export default function SignupPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    // Only redirect if user is fully authenticated and NOT completing profile
     if (user && !authContextIsLoading) {
       const redirectPathFromQuery = searchParams.get('redirect');
       let finalRedirectPath = '/';

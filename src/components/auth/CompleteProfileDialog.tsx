@@ -26,7 +26,7 @@ const profileSchema = z.object({
   mobileNumber: z.string().optional(),
   email: z.string().optional(),
 }).superRefine((data, ctx) => {
-  // This refinement is conditional based on the provider, handled inside the component logic
+  // Logic handled in handleSubmit for specific provider requirements
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -83,8 +83,8 @@ export default function CompleteProfileDialog({
     try {
       await onSubmit({
         fullName: data.fullName,
-        email: data.email,
-        mobileNumber: mobileNumberForSubmit,
+        email: data.email || userCredential.user.email || undefined,
+        mobileNumber: mobileNumberForSubmit || userCredential.user.phoneNumber || undefined,
       });
     } catch (error) {
       toast({ title: "Error", description: "Could not save profile. Please try again.", variant: "destructive" });

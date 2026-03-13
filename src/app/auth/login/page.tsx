@@ -82,6 +82,7 @@ export default function LoginPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    // Only redirect if the user is fully authenticated and NOT in the middle of profile completion
     if (user && !authContextIsLoading) {
       const redirectPathFromQuery = searchParams.get('redirect');
       const finalRedirectPath = redirectPathFromQuery || (user.email === ADMIN_EMAIL ? '/admin' : '/');

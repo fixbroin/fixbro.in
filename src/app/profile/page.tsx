@@ -17,7 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { updateProfile, sendPasswordResetEmail, deleteUser, updateEmail, sendEmailVerification, RecaptchaVerifier, type ConfirmationResult, type User, linkWithPhoneNumber } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/types/firestore';
 import Link from 'next/link';
@@ -146,7 +146,7 @@ export default function ProfilePage() {
     setIsVerifyingOtp(true);
     try {
         await confirmationResult.confirm(data.otp);
-        await updateDoc(doc(db, "users", user.uid), { mobileNumberVerified: true });
+        await setDoc(doc(db, "users", user.uid), { mobileNumberVerified: true }, { merge: true });
         toast({ title: "Success!", description: "Your mobile number has been verified." });
         setIsOtpDialogOpen(false);
         otpForm.reset();
@@ -165,7 +165,7 @@ export default function ProfilePage() {
     setIsSubmittingName(true);
     try {
       await updateProfile(auth.currentUser, { displayName: values.displayName });
-      await updateDoc(doc(db, "users", user.uid), { displayName: values.displayName });
+      await setDoc(doc(db, "users", user.uid), { displayName: values.displayName }, { merge: true });
       toast({ title: "Success", description: "Your name has been updated." });
       setIsNameDialogOpen(false);
     } catch (error: any) {
@@ -180,7 +180,7 @@ export default function ProfilePage() {
     setIsSubmittingEmail(true);
     try {
       await updateEmail(auth.currentUser, values.email); 
-      await updateDoc(doc(db, "users", user.uid), { email: values.email });
+      await setDoc(doc(db, "users", user.uid), { email: values.email }, { merge: true });
       toast({ title: "Email Updated", description: "A verification link has been sent to your new email address." });
       setIsEmailDialogOpen(false);
     } catch (error: any) {
@@ -200,10 +200,10 @@ export default function ProfilePage() {
     const countryCode = appConfig?.defaultOtpCountryCode || '+91';
     const fullPhoneNumber = `${countryCode}${values.mobileNumber}`;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        mobileNumber: fullPhoneNumber,
-        mobileNumberVerified: false,
-      });
+      await setDoc(doc(db, "users", user.uid), {
+  mobileNumber: fullPhoneNumber,
+  mobileNumberVerified: false,
+}, { merge: true });
       toast({ title: "Success", description: "Your mobile number has been updated. Please verify it." });
       setIsMobileDialogOpen(false);
     } catch (error: any) {
@@ -245,24 +245,41 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!user || !auth.currentUser) return;
-    setIsDeletingAccount(true);
-    try {
-      await deleteDoc(doc(db, "users", user.uid));
-      await deleteUser(auth.currentUser);
-      toast({ title: "Account Deleted", description: "Your account has been successfully deleted." });
-      router.push('/');
-    } catch (error: any) {
-      if (error.code === 'auth/requires-recent-login') {
-        toast({ title: "Action Requires Recent Login", description: "Please log out and log back in to delete your account.", variant: "destructive", duration: 7000 });
-        await logOut();
-      } else {
-        toast({ title: "Error Deleting Account", description: error.message, variant: "destructive" });
-      }
-    } finally {
-      setIsDeletingAccount(false);
+  if (!user || !auth.currentUser) return;
+
+  setIsDeletingAccount(true);
+
+  try {
+    await deleteUser(auth.currentUser);
+
+    await deleteDoc(doc(db, "users", user.uid));
+
+    toast({
+      title: "Account Deleted",
+      description: "Your account has been successfully deleted."
+    });
+
+    router.push("/");
+  } catch (error: any) {
+    if (error.code === "auth/requires-recent-login") {
+      toast({
+        title: "Please login again",
+        description: "For security, logout and login again before deleting account.",
+        variant: "destructive"
+      });
+
+      await logOut();
+    } else {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive"
+      });
     }
-  };
+  } finally {
+    setIsDeletingAccount(false);
+  }
+};
 
   if (authIsLoading || isLoadingData || isLoadingAppSettings || !user) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
