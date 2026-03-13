@@ -63,7 +63,7 @@ export const LazySection = forwardRef<HTMLDivElement, LazySectionProps>(({
 
   return (
     <div ref={internalRef} className={className}>
-      {isVisible ? children : (fallback || <div className="min-h-[300px] w-full bg-muted/5 animate-pulse rounded-xl" />)}
+      {isVisible ? children : (fallback || <div className="min-h-[500px] w-full bg-muted/5 animate-pulse rounded-xl" />)}
     </div>
   );
 });

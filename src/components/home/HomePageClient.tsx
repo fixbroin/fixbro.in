@@ -33,6 +33,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { Badge } from '@/components/ui/badge';
 import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
+import CategoryCard from './CategoryCard';
 
 // Lazy load components
 const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then((mod) => mod.HeroCarousel), {
@@ -384,6 +385,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const [isLoadingPopular, setIsLoadingPopular] = useState(() => !initialData && !getCache('popularServices', true));
   const [isLoadingRecent, setIsLoadingRecent] = useState(() => !initialData && !getCache('recentServices', true));
   const [isLoadingCategoryWise, setIsLoadingCategoryWise] = useState(() => !initialData && !getCache('categoryWiseServices', true));
+  const [citiesWithAreas, setCitiesWithAreas] = useState<FirestoreCity[]>(() => initialData?.citiesWithAreas || getCache<FirestoreCity[]>('citiesWithAreas', true) || []);
 
   const fetchPageSpecificData = useCallback(async () => {
     const cachedH1 = getCache<string>('pageH1');

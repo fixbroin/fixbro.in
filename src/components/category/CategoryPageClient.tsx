@@ -194,9 +194,6 @@ export default function CategoryPageClient({
           return;
       }
 
-      setIsLoading(true);
-      setError(null);
-
       const cachedData = getCache<CategoryPageCache>(cacheKey, true);
       if (cachedData) {
         setCategory(cachedData.category);
@@ -208,8 +205,15 @@ export default function CategoryPageClient({
         if (cachedData.subCategories.length > 0 && !activeSubCategorySlug) {
             setActiveSubCategorySlug(cachedData.subCategories[0].slug);
         }
+        // Force-load visible ones from cache instantly
+        cachedData.subCategories.forEach(sc => {
+            if (sc.hasStartedLoading) loadSubCategoryServices(sc.id);
+        });
         return;
       }
+
+      setIsLoading(true);
+      setError(null);
 
 
       try {
