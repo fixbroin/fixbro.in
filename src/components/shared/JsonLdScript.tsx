@@ -23,7 +23,7 @@ const JsonLdScript: React.FC<JsonLdScriptProps> = ({ data, idSuffix }) => {
       id={scriptId}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-      strategy="afterInteractive" // Or "lazyOnload"
+      strategy="beforeInteractive" 
     />
   );
 };

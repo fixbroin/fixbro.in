@@ -71,8 +71,12 @@ export async function generateMetadata(
     title: title,
     description: description,
     keywords: keywords.length > 0 ? keywords : undefined,
+    robots: {
+      index: true,
+      follow: true,
+    },
     alternates: {
-      canonical: `/${citySlug}/category/${categorySlug}`,
+      canonical: `${appBaseUrl}/${citySlug}/category/${categorySlug}`,
     },
     openGraph: {
       title: title,

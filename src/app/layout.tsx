@@ -45,6 +45,17 @@ export async function generateMetadata(): Promise<Metadata> {
     description: defaultDescription,
     keywords: defaultKeywords.length > 0 ? defaultKeywords : undefined,
     manifest: '/manifest.json', // Default manifest
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     appleWebApp: {
       capable: true,
       statusBarStyle: 'default',

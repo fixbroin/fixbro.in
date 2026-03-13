@@ -79,8 +79,12 @@ export async function generateMetadata(
     title: title,
     description: description,
     keywords: keywords.length > 0 ? keywords : undefined,
+    robots: {
+      index: true,
+      follow: true,
+    },
     alternates: {
-      canonical: `/${citySlug}/${areaSlug}`,
+      canonical: `${appBaseUrl}/${citySlug}/${areaSlug}`,
     },
     openGraph: {
       title: title,
