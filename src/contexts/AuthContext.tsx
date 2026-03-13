@@ -160,7 +160,8 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 if (
   !docSnap.exists() ||
   !userData?.displayName ||
-  !userData?.mobileNumber
+  !userData?.mobileNumber ||
+  !userData?.email
 ) {
   // NEW USER OR INCOMPLETE PROFILE FLOW
   setUserCredentialForProfileCompletion(userCredential);
