@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { replacePlaceholders } from '@/lib/seoUtils';
-import { doc, getDoc, collection, query, where, limit, getDocs, orderBy, Timestamp, documentId } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, getDocs, orderBy, Timestamp, documentId, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { GlobalWebSettings, FirestoreSEOSettings, FirestoreCity, FirestoreArea, FeaturesConfiguration, FirestoreService, FirestoreCategory, HomepageAd, AdPlacement } from '@/types/firestore';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
@@ -18,13 +18,13 @@ import type { BreadcrumbItem } from '@/types/ui';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Star, Clock, ListChecks, Loader2, FileText, ShoppingCart, Users, Ban, Percent } from 'lucide-react';
 import AdBannerCard from '@/components/shared/AdBannerCard';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import { getCache, setCache } from '@/lib/client-cache';
 import Autoplay from "embla-carousel-autoplay";
 import * as React from "react";
-import ExploreByLocation from '@/components/shared/ExploreByLocation'; // New Import
 import QuantitySelector from '../shared/QuantitySelector';
 import { getCartEntries, saveCartEntries, syncCartToFirestore } from '@/lib/cartManager';
 import { useToast } from '@/hooks/use-toast';
@@ -32,14 +32,15 @@ import { getGuestId } from '@/lib/guestIdManager';
 import { logUserActivity } from '@/lib/activityLogger';
 import { Badge } from '@/components/ui/badge';
 import type { HomepageData } from '@/lib/homepageUtils';
+import { LazySection } from '@/components/shared/LazySection';
 
 // Lazy load components
 const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then((mod) => mod.HeroCarousel), {
   loading: () => <Skeleton className="h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px] w-full rounded-lg" />,
 });
 
-
 const HomeCategoriesSection = dynamic(() => import('@/components/home/HomeCategoriesSection'), {
+  ssr: true,
   loading: () => (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-4">
       {[...Array(6)].map((_, i) => (
@@ -84,6 +85,19 @@ const Testimonials = dynamic(() => import('@/components/home/Testimonials'), {
     </div>
   ),
 });
+
+const ExploreByLocation = dynamic(() => import('@/components/shared/ExploreByLocation'), {
+    loading: () => <Skeleton className="h-64 w-full rounded-xl" />
+});
+
+const SectionHeader: React.FC<{ title: string; icon?: React.ReactNode; subtitle?: string; centered?: boolean }> = ({ title, icon, subtitle, centered = true }) => (
+    <div className={cn("mb-8 md:mb-12", centered ? "text-center" : "text-left")}>
+        <h2 className={cn("text-2xl md:text-3xl font-headline font-semibold text-foreground flex items-center gap-2", centered ? "justify-center" : "justify-start")}>
+            {icon} {title}
+        </h2>
+        {subtitle && <p className="text-muted-foreground mt-2 text-sm md:text-base max-w-2xl mx-auto">{subtitle}</p>}
+    </div>
+);
 
 const FEATURES_CONFIG_COLLECTION = "webSettings";
 const FEATURES_CONFIG_DOC_ID = "featuresConfiguration";
@@ -354,22 +368,22 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
-  const [structuredData, setStructuredData] = useState<Record<string, any> | null>(() => getCache<Record<string, any>>('structuredData') || null);
-  const [seoSettings, setSeoSettings] = useState<FirestoreSEOSettings | null>(() => initialData?.seoSettings || getCache<FirestoreSEOSettings>('seoSettings') || null);
-  const [pageH1, setPageH1] = useState<string | undefined>(() => initialData?.seoSettings.homepageH1 || getCache<string>('pageH1') || undefined);
+  const [structuredData, setStructuredData] = useState<Record<string, any> | null>(() => getCache<Record<string, any>>('structuredData', true) || null);
+  const [seoSettings, setSeoSettings] = useState<FirestoreSEOSettings | null>(() => initialData?.seoSettings || getCache<FirestoreSEOSettings>('seoSettings', true) || null);
+  const [pageH1, setPageH1] = useState<string | undefined>(() => initialData?.seoSettings.homepageH1 || getCache<string>('pageH1', true) || undefined);
   const { showLoading } = useLoading();
 
-  const [featuresConfig, setFeaturesConfig] = useState<FeaturesConfiguration>(() => initialData?.featuresConfig || getCache<FeaturesConfiguration>('featuresConfig') || defaultFeaturesConfig);
-  const [popularServices, setPopularServices] = useState<FirestoreService[]>(() => initialData?.popularServices || getCache<FirestoreService[]>('popularServices') || []);
-  const [recentServices, setRecentServices] = useState<FirestoreService[]>(() => initialData?.recentServices || getCache<FirestoreService[]>('recentServices') || []);
-  const [categoryWiseServicesData, setCategoryWiseServicesData] = useState<Array<{category: FirestoreCategory, services: FirestoreService[] }>>(() => initialData?.categoryWiseServices || getCache<Array<{category: FirestoreCategory, services: FirestoreService[] }>>('categoryWiseServices') || []);
-  const [activeAds, setActiveAds] = useState<HomepageAd[]>(() => (initialData?.featuresConfig.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
+  const [featuresConfig, setFeaturesConfig] = useState<FeaturesConfiguration>(() => initialData?.featuresConfig || getCache<FeaturesConfiguration>('featuresConfig', true) || defaultFeaturesConfig);
+  const [popularServices, setPopularServices] = useState<FirestoreService[]>(() => initialData?.popularServices || getCache<FirestoreService[]>('popularServices', true) || []);
+  const [recentServices, setRecentServices] = useState<FirestoreService[]>(() => initialData?.recentServices || getCache<FirestoreService[]>('recentServices', true) || []);
+  const [categoryWiseServicesData, setCategoryWiseServicesData] = useState<Array<{category: FirestoreCategory, services: FirestoreService[] }>>(() => initialData?.categoryWiseServices || getCache<Array<{category: FirestoreCategory, services: FirestoreService[] }>>('categoryWiseServices', true) || []);
+  const [activeAds, setActiveAds] = useState<HomepageAd[]>(() => (initialData?.featuresConfig.ads || getCache<FeaturesConfiguration>('featuresConfig', true)?.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
   
-  const [isLoadingPageData, setIsLoadingPageData] = useState(() => !initialData && !getCache('pageH1'));
-  const [isLoadingFeaturesConfig, setIsLoadingFeaturesConfig] = useState(() => !initialData && !getCache('featuresConfig'));
-  const [isLoadingPopular, setIsLoadingPopular] = useState(() => !initialData && !getCache('popularServices'));
-  const [isLoadingRecent, setIsLoadingRecent] = useState(() => !initialData && !getCache('recentServices'));
-  const [isLoadingCategoryWise, setIsLoadingCategoryWise] = useState(() => !initialData && !getCache('categoryWiseServices'));
+  const [isLoadingPageData, setIsLoadingPageData] = useState(() => !initialData && !getCache('pageH1', true));
+  const [isLoadingFeaturesConfig, setIsLoadingFeaturesConfig] = useState(() => !initialData && !getCache('featuresConfig', true));
+  const [isLoadingPopular, setIsLoadingPopular] = useState(() => !initialData && !getCache('popularServices', true));
+  const [isLoadingRecent, setIsLoadingRecent] = useState(() => !initialData && !getCache('recentServices', true));
+  const [isLoadingCategoryWise, setIsLoadingCategoryWise] = useState(() => !initialData && !getCache('categoryWiseServices', true));
 
   const fetchPageSpecificData = useCallback(async () => {
     const cachedH1 = getCache<string>('pageH1');
@@ -505,134 +519,112 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     }
   }, [citySlug, areaSlug, initialData, seoSettings]);
 
-  const fetchFeaturesConfigAndData = useCallback(async () => {
-    if (initialData) {
-        setIsLoadingFeaturesConfig(false);
-        setIsLoadingPopular(false);
-        setIsLoadingRecent(false);
-        setIsLoadingCategoryWise(false);
-        return;
+  const setupRealtimeListeners = useCallback(() => {
+    if (initialData && isMounted) {
+        // Even if we have initialData, we might want to start listeners after first render
+        // but let's keep initialData logic simple for now and only start listeners if not already active
     }
 
-    let currentFeaturesConfig = getCache<FeaturesConfiguration>('featuresConfig');
-    if (!currentFeaturesConfig) setIsLoadingFeaturesConfig(true);
-    let fetchedFromFirestore = false;
-
-    if (!currentFeaturesConfig) {
-      try {
-        const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
-        const docSnap = await getDoc(configDocRef);
-        if (docSnap.exists()) {
-          currentFeaturesConfig = { ...defaultFeaturesConfig, ...(docSnap.data() as Partial<FeaturesConfiguration>) };
-        } else {
-          currentFeaturesConfig = defaultFeaturesConfig;
-        }
-        setFeaturesConfig(currentFeaturesConfig);
-        setCache('featuresConfig', currentFeaturesConfig);
-        fetchedFromFirestore = true;
-      } catch (error) {
-        console.error("Error loading features configuration:", error);
-        currentFeaturesConfig = defaultFeaturesConfig;
-        setFeaturesConfig(currentFeaturesConfig);
-      } finally {
+    // 1. Features Config Listener
+    const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
+    const unsubscribeConfig = onSnapshot(configDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const config = { ...defaultFeaturesConfig, ...(docSnap.data() as Partial<FeaturesConfiguration>) };
+        setFeaturesConfig(config);
+        setCache('featuresConfig', config, true);
+        setActiveAds((config.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
         setIsLoadingFeaturesConfig(false);
       }
-    }
-    setActiveAds((currentFeaturesConfig.ads || []).filter(ad => ad.isActive).sort((a, b) => a.order - b.order));
+    }, (error) => console.error("Error listening to features config:", error));
 
-    const fetchServiceData = async (
-      shouldFetch: boolean, 
-      cacheKey: string, 
-      queryFn: () => any, // Firestore query
-      setter: React.Dispatch<React.SetStateAction<any>>,
-      setLoading: React.Dispatch<React.SetStateAction<boolean>>
-    ) => {
-      if (!shouldFetch) return;
-      const cachedData = getCache(cacheKey);
-      if (cachedData) {
-        setter(cachedData);
-        setLoading(false);
-        return;
-      }
-      if (!fetchedFromFirestore) setLoading(true); // only show loading if data isn't already there.
-      try {
-        const snapshot = await getDocs(queryFn());
-        const data = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FirestoreService, 'id'>) } as FirestoreService));
-        setter(data);
-        setCache(cacheKey, data);
-      } catch (e) { console.error(`Error fetching ${cacheKey}:`, e); }
-      if (!fetchedFromFirestore) setLoading(false);
+    // 2. Popular Services Listener
+    const popularQuery = query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("rating", "desc"), orderBy("reviewCount", "desc"), limit(10));
+    const unsubscribePopular = onSnapshot(popularQuery, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FirestoreService, 'id'>) } as FirestoreService));
+      setPopularServices(data);
+      setCache('popularServices', data, true);
+      setIsLoadingPopular(false);
+    }, (error) => console.error("Error listening to popular services:", error));
+
+    // 3. Recent Services Listener
+    const recentQuery = query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("createdAt", "desc"), limit(10));
+    const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Omit<FirestoreService, 'id'>) } as FirestoreService));
+      setRecentServices(data);
+      setCache('recentServices', data, true);
+      setIsLoadingRecent(false);
+    }, (error) => console.error("Error listening to recent services:", error));
+
+    return () => {
+      unsubscribeConfig();
+      unsubscribePopular();
+      unsubscribeRecent();
     };
-
-    fetchServiceData(currentFeaturesConfig.showRecentlyAddedServices, 'recentServices', () => query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("createdAt", "desc"), limit(10)), setRecentServices, setIsLoadingRecent);
-    fetchServiceData(currentFeaturesConfig.showMostPopularServices, 'popularServices', () => query(collection(db, "adminServices"), where("isActive", "==", true), orderBy("rating", "desc"), orderBy("reviewCount", "desc"), limit(10)), setPopularServices, setIsLoadingPopular);
-
-    if (currentFeaturesConfig.showCategoryWiseServices) {
-      const cachedCategoryData = getCache<any>('categoryWiseServices');
-      if (cachedCategoryData) {
-        setCategoryWiseServicesData(cachedCategoryData);
-        setIsLoadingCategoryWise(false);
-      } else {
-        if (!fetchedFromFirestore) setIsLoadingCategoryWise(true);
-        try {
-            const enabledCategoryIds = Object.entries(currentFeaturesConfig.homepageCategoryVisibility || {})
-                .filter(([, isVisible]) => isVisible)
-                .map(([catId]) => catId);
-
-            if (enabledCategoryIds.length > 0) {
-              const categoriesQuery = query(collection(db, "adminCategories"), where(documentId(), "in", enabledCategoryIds), where("isActive", "==", true), orderBy("order", "asc"));
-                const categoriesSnapshot = await getDocs(categoriesQuery);
-                const enabledCategories = categoriesSnapshot.docs.map(d => ({...d.data(), id: d.id } as FirestoreCategory));
-                
-                const categoryServicesPromises = enabledCategories.map(async (cat) => {
-                     const subCategoriesSnapshot = await getDocs(query(collection(db, "adminSubCategories"), where("parentId", "==", cat.id), where("isActive", "==", true)));
-                    const subCategoryIds = subCategoriesSnapshot.docs.map(subDoc => subDoc.id);
-
-                    let servicesForCategory: FirestoreService[] = [];
-                    if (subCategoryIds.length > 0) {
-                         const servicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), where("subCategoryId", "in", subCategoryIds), orderBy("name", "asc"), limit(10));
-                         const servicesSnapshot = await getDocs(servicesQuery);
-                         servicesForCategory = servicesSnapshot.docs.map(sDoc => ({...sDoc.data() as Omit<FirestoreService, 'id'>, id: sDoc.id} as FirestoreService));
-                    }
-                    return { category: cat, services: servicesForCategory };
-                });
-                const resolvedCategoryServices = (await Promise.all(categoryServicesPromises)).filter(cs => cs.services.length > 0);
-                setCategoryWiseServicesData(resolvedCategoryServices);
-                setCache('categoryWiseServices', resolvedCategoryServices);
-            } else {
-                setCategoryWiseServicesData([]);
-            }
-        } catch (e) { console.error("Error fetching category-wise services:", e); }
-        if (!fetchedFromFirestore) setIsLoadingCategoryWise(false);
-      }
-    }
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
     setIsMounted(true);
     if (initialData) {
-      setCache('featuresConfig', initialData.featuresConfig);
-      setCache('popularServices', initialData.popularServices);
-      setCache('recentServices', initialData.recentServices);
-      setCache('categoryWiseServices', initialData.categoryWiseServices);
-      setCache('seoSettings', initialData.seoSettings);
-      setCache('citiesWithAreas', initialData.citiesWithAreas);
+      setCache('featuresConfig', initialData.featuresConfig, true);
+      setCache('popularServices', initialData.popularServices, true);
+      setCache('recentServices', initialData.recentServices, true);
+      setCache('categoryWiseServices', initialData.categoryWiseServices, true);
+      setCache('seoSettings', initialData.seoSettings, true);
+      setCache('citiesWithAreas', initialData.citiesWithAreas, true);
     }
+    
     if (!isLoadingAppSettings) {
       fetchPageSpecificData();
-      fetchFeaturesConfigAndData();
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchFeaturesConfigAndData();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const cleanupListeners = setupRealtimeListeners();
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (cleanupListeners) cleanupListeners();
     };
-  }, [isLoadingAppSettings, initialData, fetchPageSpecificData, fetchFeaturesConfigAndData]);
+  }, [isLoadingAppSettings, initialData, fetchPageSpecificData, setupRealtimeListeners]);
+
+  // CATEGORY WISE SERVICES (Still manual fetch as it involves complex multi-step queries)
+  const fetchCategoryWiseData = useCallback(async (currentFeaturesConfig: FeaturesConfiguration) => {
+    if (!currentFeaturesConfig.showCategoryWiseServices) return;
+    
+    try {
+        const enabledCategoryIds = Object.entries(currentFeaturesConfig.homepageCategoryVisibility || {})
+            .filter(([, isVisible]) => isVisible)
+            .map(([catId]) => catId);
+
+        if (enabledCategoryIds.length > 0) {
+            const categoriesQuery = query(collection(db, "adminCategories"), where(documentId(), "in", enabledCategoryIds), where("isActive", "==", true), orderBy("order", "asc"));
+            const categoriesSnapshot = await getDocs(categoriesQuery);
+            const enabledCategories = categoriesSnapshot.docs.map(d => ({...d.data(), id: d.id } as FirestoreCategory));
+            
+            const categoryServicesPromises = enabledCategories.map(async (cat) => {
+                    const subCategoriesSnapshot = await getDocs(query(collection(db, "adminSubCategories"), where("parentId", "==", cat.id), where("isActive", "==", true)));
+                const subCategoryIds = subCategoriesSnapshot.docs.map(subDoc => subDoc.id);
+
+                let servicesForCategory: FirestoreService[] = [];
+                if (subCategoryIds.length > 0) {
+                        const servicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), where("subCategoryId", "in", subCategoryIds), orderBy("name", "asc"), limit(10));
+                        const servicesSnapshot = await getDocs(servicesQuery);
+                        servicesForCategory = servicesSnapshot.docs.map(sDoc => ({...sDoc.data() as Omit<FirestoreService, 'id'>, id: sDoc.id} as FirestoreService));
+                }
+                return { category: cat, services: servicesForCategory };
+            });
+            const resolvedCategoryServices = (await Promise.all(categoryServicesPromises)).filter(cs => cs.services.length > 0);
+            setCategoryWiseServicesData(resolvedCategoryServices);
+            setCache('categoryWiseServices', resolvedCategoryServices, true);
+        } else {
+            setCategoryWiseServicesData([]);
+        }
+    } catch (e) { console.error("Error fetching category-wise services:", e); }
+    setIsLoadingCategoryWise(false);
+  }, []);
+
+  useEffect(() => {
+      if (featuresConfig) {
+          fetchCategoryWiseData(featuresConfig);
+      }
+  }, [featuresConfig, fetchCategoryWiseData]);
 
   const handleSimpleNavigation = useCallback((intendedHref: string) => {
     showLoading();
@@ -745,14 +737,10 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
 
         <section className="py-8 md:py-10 bg-secondary/30">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-8 md:mb-12">
-              <h1 className="text-xl md:text-3xl font-headline font-semibold text-foreground">
-                {finalH1}
-              </h1>
-              <p className="text-muted-foreground mt-2 text-sm md:text-base">
-                Discover a wide range of services to meet your needs{citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}{areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.
-              </p>
-            </div>
+            <SectionHeader 
+                title={finalH1} 
+                subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
+            />
             <HomeCategoriesSection />
             
             <div className="text-center mt-8 md:mt-12">
@@ -767,59 +755,72 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
           </div>
         </section>
         
-        {featuresConfig.showMostPopularServices && renderServiceSection("Most Popular Services", popularServices, <Star className="mr-2 h-6 w-6 text-yellow-500" />, isLoadingPopular, 'AFTER_POPULAR_SERVICES')}
-        {featuresConfig.showRecentlyAddedServices && renderServiceSection("Recently Added Services", recentServices, <Clock className="mr-2 h-6 w-6 text-blue-500" />, isLoadingRecent, 'AFTER_RECENTLY_ADDED_SERVICES')}
+        {featuresConfig.showMostPopularServices && (
+            <LazySection>
+                {renderServiceSection("Most Popular Services", popularServices, <Star className="h-6 w-6 text-yellow-500" />, isLoadingPopular, 'AFTER_POPULAR_SERVICES')}
+            </LazySection>
+        )}
+        {featuresConfig.showRecentlyAddedServices && (
+            <LazySection>
+                {renderServiceSection("Recently Added Services", recentServices, <Clock className="h-6 w-6 text-blue-500" />, isLoadingRecent, 'AFTER_RECENTLY_ADDED_SERVICES')}
+            </LazySection>
+        )}
         
         {featuresConfig.showCategoryWiseServices && (
-            <>
-            <section className="py-8 md:py-10">
-                <div className="container mx-auto px-4">
-                     <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 md:mb-12 text-foreground flex items-center justify-center">
-                        <ListChecks className="mr-2 h-6 w-6 text-green-500" /> Services By Category
-                    </h2>
-                    {(isLoadingCategoryWise && categoryWiseServicesData.length === 0) ? (
-                         <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-                    ) : categoryWiseServicesData.length > 0 ? (
-                          categoryWiseServicesData.map(catGroup => (
-                            <div key={catGroup.category.id} className="mb-8">
-                                <h3 className="text-xl font-semibold mb-4 text-left text-foreground">{catGroup.category.name}</h3>
-                                {catGroup.services.length > 0 ? (
-                                    <HomepageServiceCarousel services={catGroup.services} />
-                                ) : ( <p className="text-sm text-muted-foreground">No services currently available in this category.</p> )}
-                            </div>
-                          ))
-                    ) : (<p className="text-center text-muted-foreground">No category-specific services to display currently.</p>)}
-                </div>
-            </section>
-            {renderAdsByPlacement('AFTER_CATEGORY_SECTIONS')}
-            </>
+            <LazySection>
+                <section className="py-8 md:py-10">
+                    <div className="container mx-auto px-4">
+                        <SectionHeader title="Services By Category" icon={<ListChecks className="h-6 w-6 text-green-500" />} />
+                        
+                        {(isLoadingCategoryWise && categoryWiseServicesData.length === 0) ? (
+                            <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                        ) : categoryWiseServicesData.length > 0 ? (
+                            categoryWiseServicesData.map(catGroup => (
+                                <div key={catGroup.category.id} className="mb-8">
+                                    <h3 className="text-xl font-semibold mb-4 text-left text-foreground border-l-4 border-primary pl-3">{catGroup.category.name}</h3>
+                                    {catGroup.services.length > 0 ? (
+                                        <HomepageServiceCarousel services={catGroup.services} />
+                                    ) : ( <p className="text-sm text-muted-foreground ml-4">No services currently available in this category.</p> )}
+                                </div>
+                            ))
+                        ) : (<p className="text-center text-muted-foreground">No category-specific services to display currently.</p>)}
+                    </div>
+                </section>
+                {renderAdsByPlacement('AFTER_CATEGORY_SECTIONS')}
+            </LazySection>
         )}
 
-        <section className="py-8 md:py-10">
-          <div className="container mx-auto px-4">
-            <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 md:mb-12 text-foreground">
-              Why Choose Fixbro?
-            </h2>
-            <WhyChooseUs />
-          </div>
-        </section>
+        <LazySection>
+            <section className="py-8 md:py-10">
+            <div className="container mx-auto px-4">
+                <SectionHeader title="Why Choose Fixbro?" />
+                <WhyChooseUs />
+            </div>
+            </section>
+        </LazySection>
 
-        <section className="py-8 md:py-10 bg-secondary/30">
-          <div className="container mx-auto px-4">
-            <h2 className="text-2xl md:text-3xl font-headline font-semibold text-center mb-8 md:mb-12 text-foreground">
-              What Our Customers Say
-            </h2>
-            <Testimonials />
-          </div>
-        </section>
+        <LazySection>
+            <section className="py-8 md:py-10 bg-secondary/30">
+            <div className="container mx-auto px-4">
+                <SectionHeader title="What Our Customers Say" />
+                <Testimonials />
+            </div>
+            </section>
+        </LazySection>
         
-        {featuresConfig.showBlogSection && <HomeBlogSection />}
+        {featuresConfig.showBlogSection && (
+            <LazySection>
+                <HomeBlogSection />
+            </LazySection>
+        )}
         
         {/* New "Explore by Location" Section */}
-        <ExploreByLocation 
-            initialData={initialData?.citiesWithAreas} 
-            categories={initialData?.allCategories}
-        />
+        <LazySection>
+            <ExploreByLocation 
+                initialData={initialData?.citiesWithAreas} 
+                categories={initialData?.allCategories}
+            />
+        </LazySection>
         
         {renderAdsByPlacement('BEFORE_FOOTER_CTA')}
         <section className="py-8 md:py-10 text-center bg-primary text-primary-foreground">

@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 const WEB_SETTINGS_DOC_ID = "global";
 const WEB_SETTINGS_COLLECTION = "webSettings";
 
-const loaderTypes: LoaderType[] = ["pulse", "typing", "bars", "gradient", "orbit", "dots", "progress", "cube", "shine", "bounce", "ring", "flip", "wave", "heart", "matrix"];
+const loaderTypes: LoaderType[] = ["logo-pulse", "pulse", "typing", "bars", "gradient", "orbit", "dots", "progress", "cube", "shine", "bounce", "ring", "flip", "wave", "heart", "matrix"];
 
 interface ColorSettingConfig {
   id: keyof ThemePalette;
@@ -55,7 +55,7 @@ export default function ThemeSettingsPage() {
       const docSnap = await getDoc(settingsDocRef);
       if (docSnap.exists()) {
         const globalSettings = docSnap.data() as GlobalWebSettings;
-        setSelectedLoader(globalSettings.loaderType || 'pulse');
+        setSelectedLoader(globalSettings.loaderType || 'logo-pulse');
         const loadedLightHexColors: Record<string, string> = {};
         const loadedDarkHexColors: Record<string, string> = {};
 
@@ -78,7 +78,7 @@ export default function ThemeSettingsPage() {
       console.error("Error loading theme settings:", error);
       toast({ title: "Error", description: "Could not load theme settings.", variant: "destructive" });
       resetToDefaultColorsState();
-      setSelectedLoader('pulse');
+      setSelectedLoader('logo-pulse');
     } finally {
       setIsLoading(false);
     }
@@ -184,12 +184,12 @@ export default function ThemeSettingsPage() {
             light: { ...DEFAULT_LIGHT_THEME_COLORS_HSL },
             dark: { ...DEFAULT_DARK_THEME_COLORS_HSL },
         },
-        loaderType: 'pulse',
+        loaderType: 'logo-pulse',
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
       resetToDefaultColorsState();
-      setSelectedLoader('pulse');
+      setSelectedLoader('logo-pulse');
       toast({ title: "All Themes & Loader Reset", description: "All theme colors and the loader have been reset to their defaults." });
     } catch (error) {
       console.error("Error resetting all themes:", error);

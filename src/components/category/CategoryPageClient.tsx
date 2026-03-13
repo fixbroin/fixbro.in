@@ -21,7 +21,7 @@ import { getOverriddenCategoryName } from '@/lib/adminDataOverrides';
 import { Skeleton } from '@/components/ui/skeleton';
 import AppImage from '@/components/ui/AppImage';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import StickyCartContinueButton from '@/components/category/StickyCartContinueButton';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,10 +36,12 @@ import { useFeaturesConfig } from '@/hooks/useFeaturesConfig';
 import SubCategoryCard from '@/components/category/SubCategoryCard';
 import SubCategoryFloatingButton from '@/components/category/SubCategoryFloatingButton';
 import type { FullCategoryData } from '@/lib/homepageUtils';
+import { LazySection } from '@/components/shared/LazySection';
 
 interface EnrichedSubCategory extends FirestoreSubCategory {
   services: FirestoreService[];
   isLoadingServices: boolean;
+  hasStartedLoading?: boolean;
 }
 
 interface CategoryPageCache {
@@ -76,25 +78,27 @@ export default function CategoryPageClient({
 
   const cacheKey = `category-data-${categorySlug}-${citySlug || 'none'}-${areaSlug || 'none'}`;
 
-  const [category, setCategory] = useState<FirestoreCategory | null>(() => initialData?.category || getCache<CategoryPageCache>(cacheKey)?.category || null);
+  const [category, setCategory] = useState<FirestoreCategory | null>(() => initialData?.category || getCache<CategoryPageCache>(cacheKey, true)?.category || null);
   const [subCategoriesWithServices, setSubCategoriesWithServices] = useState<EnrichedSubCategory[]>(() => {
     if (initialData) {
-        return initialData.subCategories.map(sc => ({ ...sc, isLoadingServices: false }));
+        return initialData.subCategories.map(sc => ({ ...sc, isLoadingServices: false, hasStartedLoading: true }));
     }
-    return getCache<CategoryPageCache>(cacheKey)?.subCategories || [];
+    return getCache<CategoryPageCache>(cacheKey, true)?.subCategories || [];
   });
-  const [activeSubCategorySlug, setActiveSubCategorySlug] = useState<string | null>(() => initialData?.subCategories[0]?.slug || null);
-  const [breadcrumbItems, setBreadcrumbItems] = useState<BreadcrumbItem[]>(initialBreadcrumbItems || getCache<CategoryPageCache>(cacheKey)?.breadcrumbs || []);
+  const [activeSubCategorySlug, setActiveSubCategorySlug] = useState<string | null>(() => initialData?.subCategories[0]?.slug || getCache<CategoryPageCache>(cacheKey, true)?.subCategories[0]?.slug || null);
+  const [breadcrumbItems, setBreadcrumbItems] = useState<BreadcrumbItem[]>(initialBreadcrumbItems || getCache<CategoryPageCache>(cacheKey, true)?.breadcrumbs || []);
   
-  const [isLoading, setIsLoading] = useState(() => !initialData && !getCache(cacheKey));
+  const [isLoading, setIsLoading] = useState(() => !initialData && !getCache(cacheKey, true));
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [manuallyAwakenedSubCats, setManuallyAwakenedSubCats] = useState<Set<string>>(new Set());
 
-  const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey)?.h1 || null);
-  const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey)?.displayH1 || null);
+  const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.h1 || null);
+  const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.displayH1 || null);
 
   const subCategoryRefs = useRef<Record<string, HTMLElement | null>>({});
   const stickyNavRef = useRef<HTMLDivElement | null>(null);
+  const [loadingSubCats, setLoadingSubCats] = useState<Set<string>>(new Set());
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
@@ -102,16 +106,56 @@ export default function CategoryPageClient({
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const lastScrollY = useRef(0);
 
+  const loadSubCategoryServices = useCallback(async (subCategoryId: string) => {
+    if (loadingSubCats.has(subCategoryId)) return;
+    
+    // Check if already has data or is loading
+    const currentSubCat = subCategoriesWithServices.find(sc => sc.id === subCategoryId);
+    if (currentSubCat && (currentSubCat.services.length > 0 || currentSubCat.hasStartedLoading)) return;
+
+    setLoadingSubCats(prev => new Set(prev).add(subCategoryId));
+    
+    try {
+        const servicesRef = collection(db, "adminServices");
+        const qServices = query(servicesRef, where("subCategoryId", "==", subCategoryId), where("isActive", "==", true), orderBy("name", "asc"));
+        const snapshot = await getDocs(qServices);
+        const services = snapshot.docs.map(serviceDoc => ({ id: serviceDoc.id, ...serviceDoc.data() } as FirestoreService));
+        
+        setSubCategoriesWithServices(prevSubCats => {
+            const updated = prevSubCats.map(subCat => 
+                subCat.id === subCategoryId 
+                    ? { ...subCat, services, isLoadingServices: false, hasStartedLoading: true }
+                    : subCat
+            );
+            
+            // Auto-update cache for instant back-navigation
+            const currentCache = getCache<CategoryPageCache>(cacheKey, true);
+            if (currentCache) {
+                setCache(cacheKey, { ...currentCache, subCategories: updated }, true);
+            }
+            return updated;
+        });
+    } catch (error) {
+        console.error(`Error loading services for ${subCategoryId}:`, error);
+    } finally {
+        setLoadingSubCats(prev => {
+            const next = new Set(prev);
+            next.delete(subCategoryId);
+            return next;
+        });
+    }
+  }, [cacheKey, subCategoriesWithServices, loadingSubCats]);
+
   useEffect(() => {
     setIsMounted(true);
     if (initialData) {
       setCache(cacheKey, {
         category: initialData.category,
-        subCategories: initialData.subCategories.map(sc => ({ ...sc, isLoadingServices: false })),
+        subCategories: initialData.subCategories.map(sc => ({ ...sc, isLoadingServices: false, hasStartedLoading: true })),
         h1: initialData.category.h1_title || null,
         displayH1: initialData.category.h1_title || null,
         breadcrumbs: initialBreadcrumbItems || []
-      });
+      }, true);
     }
   }, [initialData, cacheKey, initialBreadcrumbItems]);
   
@@ -137,32 +181,6 @@ export default function CategoryPageClient({
 
 
   useEffect(() => {
-    const fetchServicesForSubCategory = async (subCategoryId: string) => {
-        try {
-            const servicesRef = collection(db, "adminServices");
-            const qServices = query(servicesRef, where("subCategoryId", "==", subCategoryId), where("isActive", "==", true), orderBy("name", "asc"));
-            const servicesSnapshot = await getDocs(qServices);
-            const services = servicesSnapshot.docs.map(serviceDoc => ({ id: serviceDoc.id, ...serviceDoc.data() } as FirestoreService));
-            
-            setSubCategoriesWithServices(prevSubCats => 
-                prevSubCats.map(subCat => 
-                    subCat.id === subCategoryId 
-                        ? { ...subCat, services, isLoadingServices: false }
-                        : subCat
-                )
-            );
-        } catch (error) {
-            console.error(`Error fetching services for sub-category ${subCategoryId}:`, error);
-            setSubCategoriesWithServices(prevSubCats => 
-                prevSubCats.map(subCat => 
-                    subCat.id === subCategoryId 
-                        ? { ...subCat, isLoadingServices: false } // Stop loading on error too
-                        : subCat
-                )
-            );
-        }
-    };
-    
     const fetchCategoryAndSubcategories = async () => {
       if (!categorySlug || !isMounted) {
         setIsLoading(true);
@@ -171,15 +189,15 @@ export default function CategoryPageClient({
 
       if (initialData) {
           setIsLoading(false);
-          // If initialData exists, we already initialized state. 
-          // We can still optionally run city/area logic if needed, but for now we skip to avoid redundant work.
+          // Pre-load first subcategory services if not already there
+          if (initialData.subCategories.length > 0) loadSubCategoryServices(initialData.subCategories[0].id);
           return;
       }
 
       setIsLoading(true);
       setError(null);
 
-      const cachedData = getCache<CategoryPageCache>(cacheKey);
+      const cachedData = getCache<CategoryPageCache>(cacheKey, true);
       if (cachedData) {
         setCategory(cachedData.category);
         setSubCategoriesWithServices(cachedData.subCategories);
@@ -190,9 +208,6 @@ export default function CategoryPageClient({
         if (cachedData.subCategories.length > 0 && !activeSubCategorySlug) {
             setActiveSubCategorySlug(cachedData.subCategories[0].slug);
         }
-        cachedData.subCategories.forEach(sc => {
-            if (sc.isLoadingServices) fetchServicesForSubCategory(sc.id);
-        });
         return;
       }
 
@@ -217,7 +232,7 @@ export default function CategoryPageClient({
         const subCategoriesSnapshot = await getDocs(qSubCategories);
         
         const initialSubCats: EnrichedSubCategory[] = subCategoriesSnapshot.docs
-          .map(doc => ({ ...(doc.data() as FirestoreSubCategory), id: doc.id, services: [], isLoadingServices: true }))
+          .map(doc => ({ ...(doc.data() as FirestoreSubCategory), id: doc.id, services: [], isLoadingServices: true, hasStartedLoading: false }))
           .filter(subCat => subCat.isActive !== false);
 
         setSubCategoriesWithServices(initialSubCats);
@@ -286,10 +301,12 @@ export default function CategoryPageClient({
             h1: baseH1,
             displayH1: finalDisplayH1,
             breadcrumbs: dynamicBreadcrumbs,
-        });
+        }, true);
 
-        // Fetch services for each subcategory
-        initialSubCats.forEach(subCat => fetchServicesForSubCategory(subCat.id));
+        // Fetch services for the first subcategory immediately
+        if (initialSubCats.length > 0) {
+            loadSubCategoryServices(initialSubCats[0].id);
+        }
         
       } catch (err: any) {
         console.error("Error fetching category data:", err);
@@ -299,23 +316,32 @@ export default function CategoryPageClient({
     };
     
     fetchCategoryAndSubcategories();
-  }, [categorySlug, citySlug, areaSlug, isMounted, toast, initialBreadcrumbItems, cacheKey, activeSubCategorySlug, initialData]);
+  }, [categorySlug, citySlug, areaSlug, isMounted, toast, initialBreadcrumbItems, cacheKey, initialData, loadSubCategoryServices]);
 
   const handleSubCategoryClick = useCallback((slug: string) => {
     setActiveSubCategorySlug(slug);
+    
+    // Pre-emptively awaken the subcategory if it's not loaded
+    const subCat = subCategoriesWithServices.find(sc => sc.slug === slug);
+    if (subCat && !subCat.hasStartedLoading) {
+        setManuallyAwakenedSubCats(prev => new Set(prev).add(subCat.id));
+        loadSubCategoryServices(subCat.id);
+    }
+
     const element = subCategoryRefs.current[slug];
     if (element) {
         const headerOffset = 64; 
-        const subNavHeight = stickyNavRef.current?.offsetHeight || 80;
+        const subNavHeight = 80;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - headerOffset - subNavHeight;
         window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
     }
+
     const subCatIndex = subCategoriesWithServices.findIndex(sc => sc.slug === slug);
     if (carouselApi && subCatIndex > -1) {
       carouselApi.scrollTo(subCatIndex, false);
     }
-  }, [carouselApi, subCategoriesWithServices]);
+  }, [carouselApi, subCategoriesWithServices, loadSubCategoryServices]);
   
   const handleAuthRequiredNav = (e: React.MouseEvent<any>, intendedHref?: string, action?: () => void) => {
     e.preventDefault();
@@ -453,34 +479,46 @@ export default function CategoryPageClient({
           )}
 
             {subCategoriesWithServices.map((subCat) => (
-              <section
-                key={subCat.id}
-                id={`section-${subCat.slug}`}
-                ref={(el) => { subCategoryRefs.current[subCat.slug] = el; }}
+              <LazySection 
+                key={subCat.id} 
                 className="scroll-mt-40 md:scroll-mt-32 pt-2"
+                rootMargin="200px"
+                threshold={0.01}
+                forceVisible={manuallyAwakenedSubCats.has(subCat.id)}
+                ref={(el) => { subCategoryRefs.current[subCat.slug] = el; }}
               >
-                <div className="flex items-center mb-6">
-                  {subCat.imageUrl ? (
-                     <div className="w-10 h-10 relative rounded-md overflow-hidden mr-3 shadow">
-                         <AppImage src={subCat.imageUrl} alt={subCat.name} fill sizes="40px" className="w-full h-full object-cover" data-ai-hint={subCat.imageHint || "sub-category title"}/>
-                     </div>
-                  ) : null }
-                  <h3 className="text-2xl font-headline font-medium text-foreground">{subCat.name}</h3>
-                </div>
-                {subCat.isLoadingServices ? (
-                    <div className="grid grid-cols-1 gap-4">
-                      {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-36 w-full" />)}
+                <div 
+                    id={`section-${subCat.slug}`}
+                    ref={(el) => { 
+                        // Trigger the loading when the section becomes visible
+                        if (el && !subCat.hasStartedLoading) {
+                            loadSubCategoryServices(subCat.id);
+                        }
+                    }}
+                >
+                    <div className="flex items-center mb-6">
+                    {subCat.imageUrl ? (
+                        <div className="w-10 h-10 relative rounded-md overflow-hidden mr-3 shadow">
+                            <AppImage src={subCat.imageUrl} alt={subCat.name} fill sizes="40px" className="w-full h-full object-cover" data-ai-hint={subCat.imageHint || "sub-category title"}/>
+                        </div>
+                    ) : null }
+                    <h3 className="text-2xl font-headline font-medium text-foreground">{subCat.name}</h3>
                     </div>
-                ) : subCat.services.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4">
-                    {subCat.services.map((service, serviceIndex) => (
-                      <ServiceCard key={service.id} service={service} priority={serviceIndex < 4} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-4">No services available in this sub-category yet.</p>
-                )}
-              </section>
+                    {subCat.isLoadingServices ? (
+                        <div className="grid grid-cols-1 gap-4">
+                        {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-36 w-full" />)}
+                        </div>
+                    ) : subCat.services.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4">
+                        {subCat.services.map((service, serviceIndex) => (
+                        <ServiceCard key={service.id} service={service} priority={serviceIndex < 4} />
+                        ))}
+                    </div>
+                    ) : (
+                    <p className="text-muted-foreground text-center py-4">No services available in this sub-category yet.</p>
+                    )}
+                </div>
+              </LazySection>
             ))}
           </div>
         </>

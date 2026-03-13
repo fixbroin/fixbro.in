@@ -16,6 +16,7 @@ import { Roboto } from 'next/font/google';
 import PageViewTracker from '@/components/layout/PageViewTracker';
 import ThemeInjector from '@/components/layout/ThemeInjector';
 import DynamicManifest from '@/components/layout/DynamicManifest';
+import ScrollMemory from '@/components/layout/ScrollMemory';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, hslStringToHex } from '@/lib/colorUtils';
 
 const roboto = Roboto({
@@ -139,6 +140,7 @@ export default function RootLayout({
           <AuthProvider>
             <LoadingProvider>
               <DynamicManifest />
+              <ScrollMemory />
               <MarketingScriptsInjector />
               <PageViewTracker />
               <AppLayout>

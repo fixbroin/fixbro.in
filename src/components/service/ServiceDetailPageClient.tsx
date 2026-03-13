@@ -29,6 +29,7 @@ import { getCache, setCache } from '@/lib/client-cache';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from '@/lib/utils';
+import { LazySection } from '@/components/shared/LazySection';
 
 interface ServiceDetailPageClientProps {
   serviceSlug: string;
@@ -130,27 +131,29 @@ export default function ServiceDetailPageClient({
   
   const cacheKey = `service-data-${serviceSlug}`;
 
-  const [service, setService] = useState<ClientServiceData | null>(initialServiceData || getCache<ServicePageCache>(cacheKey)?.service || null);
-  const [h1Title, setH1Title] = useState<string | null>(initialH1Title || (initialServiceData ? (initialServiceData.h1_title || initialServiceData.name) : (getCache<ServicePageCache>(cacheKey)?.h1Title || null)));
+  const [service, setService] = useState<ClientServiceData | null>(initialServiceData || getCache<ServicePageCache>(cacheKey, true)?.service || null);
+  const [h1Title, setH1Title] = useState<string | null>(initialH1Title || (initialServiceData ? (initialServiceData.h1_title || initialServiceData.name) : (getCache<ServicePageCache>(cacheKey, true)?.h1Title || null)));
   const [quantity, setQuantity] = useState(0);
-  const [isLoading, setIsLoading] = useState(!getCache(cacheKey));
-  const [serviceReviews, setServiceReviews] = useState<FirestoreReview[]>(() => getCache<ServicePageCache>(cacheKey)?.reviews || []);
-  const [isLoadingReviews, setIsLoadingReviews] = useState(() => !getCache<ServicePageCache>(cacheKey)?.reviews);
-  const [breadcrumbItems, setBreadcrumbItems] = useState<BreadcrumbItem[]>([]);
+  const [isLoading, setIsLoading] = useState(() => !initialServiceData && !getCache(cacheKey, true));
+  const [serviceReviews, setServiceReviews] = useState<FirestoreReview[]>(() => getCache<ServicePageCache>(cacheKey, true)?.reviews || []);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(() => !getCache<ServicePageCache>(cacheKey, true)?.reviews);
+  const [breadcrumbItems, setBreadcrumbItems] = useState<BreadcrumbItem[]>(() => getCache<ServicePageCache>(cacheKey, true)?.breadcrumbs || []);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
     if (initialServiceData) {
+        const crumbs: BreadcrumbItem[] = [
+            { label: "Home", href: "/" },
+            ...(initialServiceData.parentCategoryName && initialServiceData.parentCategorySlug ? [{ label: initialServiceData.parentCategoryName, href: `/category/${initialServiceData.parentCategorySlug}` }] : []),
+            { label: initialServiceData.name }
+        ];
+        setBreadcrumbItems(crumbs);
         setCache(cacheKey, {
             service: initialServiceData,
             h1Title: initialH1Title || initialServiceData.name,
-            breadcrumbs: [
-                { label: "Home", href: "/" },
-                ...(initialServiceData.parentCategoryName && initialServiceData.parentCategorySlug ? [{ label: initialServiceData.parentCategoryName, href: `/category/${initialServiceData.parentCategorySlug}` }] : []),
-                { label: initialServiceData.name }
-            ],
-        });
+            breadcrumbs: crumbs,
+        }, true);
     }
   }, [initialServiceData, cacheKey, initialH1Title]);
 
@@ -239,9 +242,9 @@ export default function ServiceDetailPageClient({
       const fetchedReviews = reviewsSnapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreReview));
       setServiceReviews(fetchedReviews);
       
-      const cachedData = getCache<ServicePageCache>(cacheKey);
+      const cachedData = getCache<ServicePageCache>(cacheKey, true);
       if (cachedData) {
-        setCache(cacheKey, {...cachedData, reviews: fetchedReviews });
+        setCache(cacheKey, {...cachedData, reviews: fetchedReviews }, true);
       }
 
     } catch (error) {
@@ -275,11 +278,11 @@ export default function ServiceDetailPageClient({
             service: initialServiceData,
             h1Title: initialH1Title || initialServiceData.name,
             breadcrumbs: crumbs,
-        });
+        }, true);
         return;
     }
 
-    const cachedData = getCache<ServicePageCache>(cacheKey);
+    const cachedData = getCache<ServicePageCache>(cacheKey, true);
     if(cachedData) {
         setService(cachedData.service);
         setH1Title(cachedData.h1Title);
@@ -327,7 +330,7 @@ export default function ServiceDetailPageClient({
             service: processedServiceData,
             h1Title: finalH1,
             breadcrumbs: crumbs,
-        });
+        }, true);
 
         fetchReviewsForService(processedServiceData.id);
       } else {
@@ -472,12 +475,12 @@ export default function ServiceDetailPageClient({
   return (
     <div className="container mx-auto px-2 sm:px-4 py-6 sm:py-8 pb-24">
       {breadcrumbItems.length > 0 && <Breadcrumbs items={breadcrumbItems} />}
-      <nav className="mb-4 sm:mb-6 flex items-center justify-between">
-        <Button variant="outline" onClick={() => router.back()} className="flex items-center text-xs sm:text-sm hidden md:flex">
+      <nav className="mb-4 sm:mb-6 hidden md:flex items-center justify-between">
+        <Button variant="outline" onClick={() => router.back()} className="flex items-center text-xs sm:text-sm">
           <ArrowLeft className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Back
         </Button>
         <Link href="/" passHref>
-           <Button variant="ghost" className="text-xs sm:text-sm text-muted-foreground hover:text-primary hidden md:flex">
+           <Button variant="outline" className="flex items-center text-xs sm:text-sm">
              <HomeIcon className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Home
            </Button>
         </Link>
@@ -662,90 +665,94 @@ export default function ServiceDetailPageClient({
 
       {/* FAQ SECTION */}
       {service.serviceFaqs && service.serviceFaqs.length > 0 && (
-        <Card className="shadow-lg border-none bg-card mt-8 sm:mt-12 overflow-hidden">
-          <CardHeader className="p-4 sm:p-6 bg-primary/5">
-            <CardTitle className="text-2xl sm:text-3xl font-headline font-bold flex items-center">
-              <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            <Accordion type="single" collapsible className="w-full">
-              {service.serviceFaqs.map((faq, index) => (
-                <AccordionItem value={`faq-${index}`} key={faq.id || `s-faq-item-${index}`} className="border-b last:border-0 border-muted">
-                  <AccordionTrigger className="text-left text-base sm:text-lg font-bold py-4 hover:no-underline hover:text-primary transition-colors">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-sm sm:text-base text-muted-foreground whitespace-pre-wrap leading-relaxed pb-6">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </CardContent>
-        </Card>
+        <LazySection>
+            <Card className="shadow-lg border-none bg-card mt-8 sm:mt-12 overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 bg-primary/5">
+                <CardTitle className="text-2xl sm:text-3xl font-headline font-bold flex items-center">
+                <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6">
+                <Accordion type="single" collapsible className="w-full">
+                {service.serviceFaqs.map((faq, index) => (
+                    <AccordionItem value={`faq-${index}`} key={faq.id || `s-faq-item-${index}`} className="border-b last:border-0 border-muted">
+                    <AccordionTrigger className="text-left text-base sm:text-lg font-bold py-4 hover:no-underline hover:text-primary transition-colors">
+                        {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-sm sm:text-base text-muted-foreground whitespace-pre-wrap leading-relaxed pb-6">
+                        {faq.answer}
+                    </AccordionContent>
+                    </AccordionItem>
+                ))}
+                </Accordion>
+            </CardContent>
+            </Card>
+        </LazySection>
       )}
 
       {/* REVIEWS SECTION - Vertical Scrollable Layout based on user image */}
       {(serviceReviews.length > 0 || isLoadingReviews) && (
-        <Card className="shadow-lg border border-border bg-card mt-8 sm:mt-12 overflow-hidden">
-            <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-2xl font-headline font-bold flex items-center text-foreground/90">
-                    <MessageSquare className="mr-2 h-6 w-6 text-primary"/> Customer Reviews
-                </CardTitle>
-                {serviceReviews.length > 0 && (
-                  <p className="text-sm sm:text-base text-primary font-medium mt-1">
-                    {serviceReviews.length} review(s) for this service.
-                  </p>
-                )}
-            </CardHeader>
-            <CardContent className="p-2 pt-2">
-              {/* Simulated Input field as per reference image */}
-              <div className="mb-6 p-3 border border-border rounded-md bg-muted/5 text-muted-foreground text-sm">
-                great experience.
-              </div>
-
-              {isLoadingReviews ? (
-                <div className="space-y-4">
-                  {[...Array(2)].map((_, i) => ( 
-                    <div key={i} className="p-4 border rounded-xl animate-pulse">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="h-6 w-1/3 bg-muted rounded"></div>
-                        <div className="h-4 w-12 bg-muted rounded"></div>
-                      </div>
-                      <div className="h-4 w-full bg-muted rounded mb-2"></div>
-                    </div>
-                  ))}
+        <LazySection>
+            <Card className="shadow-lg border border-border bg-card mt-8 sm:mt-12 overflow-hidden">
+                <CardHeader className="p-6 pb-2">
+                    <CardTitle className="text-2xl font-headline font-bold flex items-center text-foreground/90">
+                        <MessageSquare className="mr-2 h-6 w-6 text-primary"/> Customer Reviews
+                    </CardTitle>
+                    {serviceReviews.length > 0 && (
+                    <p className="text-sm sm:text-base text-primary font-medium mt-1">
+                        {serviceReviews.length} review(s) for this service.
+                    </p>
+                    )}
+                </CardHeader>
+                <CardContent className="p-2 pt-2">
+                {/* Simulated Input field as per reference image */}
+                <div className="mb-6 p-3 border border-border rounded-md bg-muted/5 text-muted-foreground text-sm">
+                    great experience.
                 </div>
-              ) : serviceReviews.length > 0 ? (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-4 pb-4">
-                    {serviceReviews.map(review => (
-                      <div key={review.id} className="p-4 border border-border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
+
+                {isLoadingReviews ? (
+                    <div className="space-y-4">
+                    {[...Array(2)].map((_, i) => ( 
+                        <div key={i} className="p-4 border rounded-xl animate-pulse">
                         <div className="flex items-center justify-between mb-2">
-                            <p className="font-bold text-sm sm:text-base text-foreground/90">{review.userName}</p>
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <Star 
-                                  key={i} 
-                                  className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30'}`}
-                                />
-                              ))}
+                            <div className="h-6 w-1/3 bg-muted rounded"></div>
+                            <div className="h-4 w-12 bg-muted rounded"></div>
+                        </div>
+                        <div className="h-4 w-full bg-muted rounded mb-2"></div>
+                        </div>
+                    ))}
+                    </div>
+                ) : serviceReviews.length > 0 ? (
+                    <ScrollArea className="h-[400px]">
+                    <div className="space-y-4 pb-4">
+                        {serviceReviews.map(review => (
+                        <div key={review.id} className="p-4 border border-border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="font-bold text-sm sm:text-base text-foreground/90">{review.userName}</p>
+                                <div className="flex items-center">
+                                {[...Array(5)].map((_, i) => (
+                                    <Star 
+                                    key={i} 
+                                    className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30'}`}
+                                    />
+                                ))}
+                                </div>
+                            </div>
+                            <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed">{review.comment}</p>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium mt-2">
+                                <ShieldCheckIcon className="h-3.5 w-3.5 text-green-500" />
+                                <span>Verified Customer</span>
                             </div>
                         </div>
-                        <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed">{review.comment}</p>
-                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium mt-2">
-                            <ShieldCheckIcon className="h-3.5 w-3.5 text-green-500" />
-                            <span>Verified Customer</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              ) : ( 
-                <p className="text-muted-foreground text-center py-8 text-base">No reviews yet for this service.</p> 
-              )}
-            </CardContent>
-        </Card>
+                        ))}
+                    </div>
+                    </ScrollArea>
+                ) : ( 
+                    <p className="text-muted-foreground text-center py-8 text-base">No reviews yet for this service.</p> 
+                )}
+                </CardContent>
+            </Card>
+        </LazySection>
       )}
 
       <StickyCartContinueButton />

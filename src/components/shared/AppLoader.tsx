@@ -1,7 +1,5 @@
-
-"use client";
-
 import { useGlobalSettings } from "@/hooks/useGlobalSettings";
+import AppImage from "@/components/ui/AppImage";
 
 interface AppLoaderProps {
   text?: string;
@@ -13,20 +11,28 @@ export default function AppLoader({ text }: AppLoaderProps) {
   const appName =
     globalSettings?.websiteName ||
     process.env.NEXT_PUBLIC_WEBSITE_NAME ||
-    "Loading";
+    "FixBro";
   
   // Use the loaderType from settings, or a default if settings are not loaded yet
-  const loaderType = isLoading ? "pulse" : (globalSettings?.loaderType || "pulse");
+  const loaderType = isLoading ? "logo-pulse" : (globalSettings?.loaderType || "logo-pulse");
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md transition-all duration-300">
       {/* ---------- ALL LOADER TYPES ---------- */}
 
-      {loaderType === "pulse" && (
+      {(loaderType === "pulse" || loaderType === "logo-pulse") && (
         <div className="flex flex-col items-center">
-          <div className="pulse-ring"></div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-          {text && <p className="mt-2 text-muted-foreground">{text}</p>}
+          <div className="relative flex items-center justify-center">
+            <div className="pulse-ring absolute"></div>
+            <div className="pulse-ring-outer absolute"></div>
+            {loaderType === "logo-pulse" && (
+                <div className="relative z-10 w-20 h-20 bg-background rounded-full p-2 border-2 border-primary/20 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-500">
+                    <AppImage src="/default-image.png" alt="Loading..." width={80} height={80} className="object-contain" />
+                </div>
+            )}
+          </div>
+          <span className="mt-8 text-xl font-bold tracking-tight text-foreground animate-pulse">{appName}</span>
+          {text && <p className="mt-2 text-sm font-medium text-muted-foreground">{text}</p>}
         </div>
       )}
 
@@ -108,79 +114,30 @@ export default function AppLoader({ text }: AppLoaderProps) {
         </div>
       )}
 
-      {loaderType === "bounce" && (
-        <div className="flex flex-col items-center">
-          <div className="bounce-loader">
-            <div></div>
-            <div></div>
-            <div></div>
-          </div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-          {text && <p className="mt-2 text-muted-foreground">{text}</p>}
-        </div>
-      )}
-
-      {loaderType === "ring" && (
-        <div className="flex flex-col items-center">
-          <div className="ring-loader"></div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-          {text && <p className="mt-2 text-muted-foreground">{text}</p>}
-        </div>
-      )}
-
-      {loaderType === "flip" && (
-        <div className="flex flex-col items-center">
-          <div className="flip-loader"></div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-          {text && <p className="mt-2 text-muted-foreground">{text}</p>}
-        </div>
-      )}
-
-      {loaderType === "wave" && (
-        <div className="flex flex-col items-center">
-          <div className="wave-loader">
-            {[...Array(6)].map((_, i) => (
-              <span key={i}></span>
-            ))}
-          </div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-        </div>
-      )}
-
-      {loaderType === "heart" && (
-        <div className="flex flex-col items-center">
-          <div className="heart-loader"></div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-        </div>
-      )}
-
-      {loaderType === "matrix" && (
-        <div className="flex flex-col items-center">
-          <div className="matrix-loader">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <span key={i}>|</span>
-            ))}
-          </div>
-          <span className="mt-6 text-2xl font-semibold">{appName}</span>
-        </div>
-      )}
-
       {/* ---------- STYLES ---------- */}
       <style jsx>{`
         .pulse-ring {
-          width: 60px;
-          height: 60px;
-          border: 4px solid hsl(var(--primary));
+          width: 90px;
+          height: 90px;
+          border: 3px solid hsl(var(--primary));
           border-radius: 50%;
-          animation: pulse 1.5s ease-out infinite;
+          animation: pulse 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        .pulse-ring-outer {
+          width: 110px;
+          height: 110px;
+          border: 2px solid hsl(var(--primary) / 0.3);
+          border-radius: 50%;
+          animation: pulse 1.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+          animation-delay: 0.3s;
         }
         @keyframes pulse {
           0% {
-            transform: scale(0.9);
-            opacity: 1;
+            transform: scale(0.8);
+            opacity: 0.8;
           }
           100% {
-            transform: scale(1.3);
+            transform: scale(1.5);
             opacity: 0;
           }
         }
@@ -375,151 +332,6 @@ export default function AppLoader({ text }: AppLoaderProps) {
           }
           100% {
             background-position: -200% center;
-          }
-        }
-
-        .bounce-loader {
-          display: flex;
-          gap: 10px;
-          justify-content: center;
-        }
-        .bounce-loader div {
-          width: 14px;
-          height: 14px;
-          background-color: hsl(var(--primary));
-          border-radius: 50%;
-          animation: bounce-up 1.2s infinite ease-in-out;
-        }
-        .bounce-loader div:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-        .bounce-loader div:nth-child(3) {
-          animation-delay: 0.4s;
-        }
-        @keyframes bounce-up {
-          0%,
-          80%,
-          100% {
-            transform: translateY(0);
-          }
-          40% {
-            transform: translateY(-15px);
-          }
-        }
-
-        .ring-loader {
-          border: 4px solid hsl(var(--primary) / 0.2);
-          border-top-color: hsl(var(--primary));
-          border-radius: 50%;
-          width: 60px;
-          height: 60px;
-          animation: spin 1s linear infinite;
-        }
-
-        .flip-loader {
-          width: 40px;
-          height: 40px;
-          background-color: hsl(var(--primary));
-          animation: flip 1.2s infinite ease-in-out;
-          perspective: 120px;
-        }
-        @keyframes flip {
-          0% {
-            transform: rotateY(0deg) rotateX(0deg);
-          }
-          50% {
-            transform: rotateY(180deg) rotateX(0deg);
-          }
-          100% {
-            transform: rotateY(180deg) rotateX(180deg);
-          }
-        }
-
-        .wave-loader {
-          display: flex;
-          gap: 5px;
-          align-items: flex-end;
-        }
-        .wave-loader span {
-          width: 6px;
-          height: 20px;
-          background: hsl(var(--primary));
-          animation: wave-motion 1.2s infinite ease-in-out;
-        }
-        .wave-loader span:nth-child(odd) {
-          animation-delay: 0.2s;
-        }
-        @keyframes wave-motion {
-          0%,
-          100% {
-            height: 10px;
-          }
-          50% {
-            height: 30px;
-          }
-        }
-
-        .heart-loader {
-          width: 40px;
-          height: 40px;
-          background-color: hsl(var(--primary));
-          position: relative;
-          transform: rotate(-45deg);
-          animation: heartbeat 1s infinite;
-        }
-        .heart-loader:before,
-        .heart-loader:after {
-          content: "";
-          position: absolute;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background-color: hsl(var(--primary));
-        }
-        .heart-loader:before {
-          top: -20px;
-          left: 0;
-        }
-        .heart-loader:after {
-          left: 20px;
-          top: 0;
-        }
-        @keyframes heartbeat {
-          0%,
-          100% {
-            transform: scale(1) rotate(-45deg);
-          }
-          50% {
-            transform: scale(1.2) rotate(-45deg);
-          }
-        }
-
-        .matrix-loader {
-          display: grid;
-          grid-template-columns: repeat(10, 6px);
-          gap: 4px;
-          transform: skewY(-15deg);
-        }
-        .matrix-loader span {
-          color: hsl(var(--primary));
-          opacity: 0;
-          animation: fall 1.5s linear infinite;
-        }
-        .matrix-loader span:nth-child(odd) {
-          animation-delay: -0.5s;
-        }
-        @keyframes fall {
-          0% {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          30%, 70% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-          100% {
-            opacity: 0;
-            transform: translateY(20px);
           }
         }
       `}</style>

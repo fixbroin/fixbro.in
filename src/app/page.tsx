@@ -7,7 +7,7 @@ import { getBaseUrl } from '@/lib/config';
 import { getHomepageData, getAggregateRating } from '@/lib/homepageUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600; // Revalidate every hour
 
 async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
   try {
