@@ -13,7 +13,7 @@ import type { FirestoreReview, FirestoreService, ReviewStatus } from "@/types/fi
 import { useEffect, useState } from "react";
 import { Loader2, Star } from "lucide-react";
 
-const reviewStatusOptions: ReviewStatus[] = ["Pending", "Approved", "Rejected", "Flagged"];
+const reviewStatusOptions: [string, ...string[]] = ["Pending", "Approved", "Rejected", "Flagged"];
 
 const reviewFormSchema = z.object({
   serviceId: z.string({ required_error: "Please select a service." }),

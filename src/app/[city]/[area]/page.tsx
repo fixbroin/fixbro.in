@@ -14,7 +14,7 @@ import JsonLdScript from '@/components/shared/JsonLdScript';
 export const dynamic = 'force-dynamic';
 
 interface AreaPageProps {
-  params: { city: string; area: string };
+  params: Promise<{ city: string; area: string }>;
 }
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next'];

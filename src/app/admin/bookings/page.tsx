@@ -338,12 +338,14 @@ export default function AdminBookingsPage() {
             await prepareAndSendEmail(updatedBookingForNotifications, 'booking_cancelled_by_admin', undefined, undefined, "Cancelled due to operational reasons.");
             
             // Trigger Push Notification for user
-            triggerPushNotification({
-              userId: booking.userId,
-              title: "Booking Cancelled",
-              body: `Your booking ${booking.bookingId} has been cancelled by an administrator.`,
-              href: '/my-bookings'
-            });
+            if (booking.userId) {
+                triggerPushNotification({
+                  userId: booking.userId,
+                  title: "Booking Cancelled",
+                  body: `Your booking ${booking.bookingId} has been cancelled by an administrator.`,
+                  href: '/my-bookings'
+                });
+            }
 
             if (marketingConfig?.isWhatsAppEnabled && marketingConfig.whatsAppOnBookingCancelled?.enabled && marketingConfig.whatsAppOnBookingCancelled.templateName) {
                  try {

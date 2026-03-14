@@ -124,6 +124,7 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
   const handleSubmit = async (formData: AreaFormData) => {
     await onSubmitProp({
       ...formData,
+      slug: formData.slug || "",
       id: initialData?.id,
     });
   };

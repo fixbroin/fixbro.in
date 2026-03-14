@@ -3,11 +3,11 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
-import type { UserOptions } from 'jspdf-autotable';
-import type { FirestoreQuotation, CompanyDetailsForPdf, Timestamp } from '@/types/firestore'; // Added Timestamp
+import type { UserOptions, CellWidthType } from 'jspdf-autotable';
+import { FirestoreQuotation, CompanyDetailsForPdf, Timestamp } from '@/types/firestore'; // Added Timestamp
 
-interface ExtendedHeadCellDef extends UserOptions { 
-    cellWidth?: 'auto' | number | string;
+interface ExtendedHeadCellDef { 
+    cellWidth?: CellWidthType;
     halign?: 'left' | 'center' | 'right';
 }
 

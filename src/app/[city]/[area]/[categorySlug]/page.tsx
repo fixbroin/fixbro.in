@@ -12,7 +12,7 @@ import JsonLdScript from '@/components/shared/JsonLdScript';
 export const dynamic = 'force-dynamic';
 
 interface AreaCategoryPageProps {
-  params: { city: string; area: string; categorySlug: string };
+  params: Promise<{ city: string; area: string; categorySlug: string }>;
 }
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next'];

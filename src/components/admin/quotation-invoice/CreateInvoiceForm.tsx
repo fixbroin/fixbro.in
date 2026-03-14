@@ -34,8 +34,8 @@ const invoiceItemSchema = z.object({
   total: z.number().optional(),
 });
 
-const paymentStatusOptions: InvoicePaymentStatus[] = ['Pending', 'Paid', 'Partial', 'Overdue', 'Cancelled'];
-const paymentModeOptions: InvoicePaymentMode[] = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Online Gateway', 'Other'];
+const paymentStatusOptions: [string, ...string[]] = ['Pending', 'Paid', 'Partial', 'Overdue', 'Cancelled'];
+const paymentModeOptions: [string, ...string[]] = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Online Gateway', 'Other'];
 
 const createInvoiceFormSchema = z.object({
   userId: z.string().optional().or(z.literal('')),
@@ -224,7 +224,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
         taxPercent: data.taxPercent || 0,
         taxAmount: taxAmount,
         totalAmount: grandTotal,
-        paymentStatus: data.paymentStatus,
+        paymentStatus: data.paymentStatus as InvoicePaymentStatus,
         updatedAt: Timestamp.now(),
         amountPaid: data.amountPaid || 0,
         amountDue: grandTotal - (data.amountPaid || 0),
@@ -235,7 +235,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
       if (data.customerMobile && data.customerMobile.trim() !== "") invoiceDataForFirestore.customerMobile = data.customerMobile;
       if (data.dueDate) invoiceDataForFirestore.dueDate = Timestamp.fromDate(data.dueDate);
       if (data.serviceDescription && data.serviceDescription.trim() !== "") invoiceDataForFirestore.serviceDescription = data.serviceDescription;
-      if (data.paymentMode) invoiceDataForFirestore.paymentMode = data.paymentMode;
+      if (data.paymentMode) invoiceDataForFirestore.paymentMode = data.paymentMode as InvoicePaymentMode;
       if (data.paymentNotes && data.paymentNotes.trim() !== "") invoiceDataForFirestore.paymentNotes = data.paymentNotes;
       if (data.additionalNotes && data.additionalNotes.trim() !== "") invoiceDataForFirestore.additionalNotes = data.additionalNotes;
 

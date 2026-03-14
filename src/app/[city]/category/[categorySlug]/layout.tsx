@@ -8,7 +8,7 @@ import { getBaseUrl } from '@/lib/config';
 export const dynamic = 'force-dynamic';
 
 interface CityCategoryPageLayoutProps {
-  params: { city: string; categorySlug: string };
+  params: Promise<{ city: string; categorySlug: string }>;
   children: React.ReactNode;
 }
 

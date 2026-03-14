@@ -299,8 +299,11 @@ function WithdrawalPageContent() {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
-  const getStatusBadgeVariant = (status: WithdrawalStatus) => ({'pending': 'secondary', 'approved': 'default', 'processing': 'default', 'completed': 'default', 'rejected': 'destructive', 're_submit': 'destructive'})[status] || 'outline';
-  const getStatusBadgeClass = (status: WithdrawalStatus) => ({'approved': 'bg-blue-500 hover:bg-blue-600', 'completed': 'bg-green-500 hover:bg-green-600'})[status] || '';
+  const getStatusBadgeVariant = (status: WithdrawalStatus): any => ({'pending': 'secondary', 'approved': 'default', 'processing': 'default', 'completed': 'default', 'rejected': 'destructive', 're_submit': 'destructive'})[status] || 'outline';
+  const getStatusBadgeClass = (status: WithdrawalStatus): string => {
+    const classes: Record<string, string> = {'approved': 'bg-blue-500 hover:bg-blue-600', 'completed': 'bg-green-500 hover:bg-green-600'};
+    return classes[status] || '';
+  };
 
   return (
     <div className="space-y-6 container mx-auto py-8">

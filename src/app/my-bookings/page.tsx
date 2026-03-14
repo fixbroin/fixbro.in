@@ -9,8 +9,8 @@ import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getDoc } from "firebase/firestore"; // Added getDoc
-import type { FirestoreBooking, BookingStatus, GlobalWebSettings, ProviderApplication } from '@/types/firestore'; 
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getDoc, addDoc, getDocs, limit } from "firebase/firestore"; 
+import type { FirestoreBooking, BookingStatus, GlobalWebSettings, ProviderApplication, FirestoreNotification } from '@/types/firestore'; 
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { generateInvoicePdf } from '@/lib/InvoicePdfForDownload'; 
@@ -20,9 +20,11 @@ import { useRouter } from "next/navigation";
 import { useLoading } from '@/contexts/LoadingContext';
 import { sendUserCancellationEmail, type UserCancellationEmailInput } from '@/ai/flows/sendUserCancellationEmailFlow';
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Added Avatar components
-import { Separator } from "@/components/ui/separator"; // Added Separator
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; 
+import { Separator } from "@/components/ui/separator"; 
 import AppImage from "@/components/ui/AppImage";
+import { triggerPushNotification } from "@/lib/fcmUtils";
+import { ADMIN_EMAIL } from "@/contexts/AuthContext";
 
 
 // Enriched booking type to include provider details
@@ -254,7 +256,7 @@ export default function MyBookingsPage() {
     }
     
     const proceedWithCancellation = async () => {
-        if (!booking.id) return;
+        if (!booking.id || !user) return;
         setIsCancelling(booking.id);
         const bookingDocRef = doc(db, "bookings", booking.id);
         try {
@@ -317,14 +319,18 @@ export default function MyBookingsPage() {
                 paidAmount: booking.paymentMethod === 'Online' ? booking.totalAmount : 0,
                 cancellationFee: feeAmount,
                 refundableAmount: finalRefundAmount,
-                siteName: globalCompanySettings?.websiteName,
+                siteName: globalCompanySettings?.websiteName || "FixBro",
                 smtpHost: appConfig.smtpHost,
                 smtpPort: appConfig.smtpPort,
                 smtpUser: appConfig.smtpUser,
                 smtpPass: appConfig.smtpPass,
                 senderEmail: appConfig.senderEmail,
             };
-            await sendUserCancellationEmail(emailInput);
+            try {
+  await sendUserCancellationEmail(emailInput);
+                    } catch (emailError) {
+  console.error("Cancellation email failed:", emailError);
+   }
 
         } catch (error) {
             toast({ title: "Error", description: "Could not cancel booking.", variant: "destructive" });

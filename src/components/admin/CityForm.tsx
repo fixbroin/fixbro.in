@@ -124,6 +124,7 @@ export default function CityForm({ onSubmit: onSubmitProp, initialData, onCancel
   const handleSubmit = async (formData: CityFormData) => {
     await onSubmitProp({
       ...formData,
+      slug: formData.slug || "",
       id: initialData?.id,
     });
   };

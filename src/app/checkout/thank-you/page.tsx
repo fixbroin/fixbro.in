@@ -288,7 +288,7 @@ export default function ThankYouPage() {
         
         let baseVisitingChargeForBooking = 0; 
         const subtotalForVcPolicyCheck = sumOfDisplayedItemPrices - (bookingDiscountAmount || 0);
-        if (appConfig.enableMinimumBookingPolicy && typeof appConfig.minimumBookingAmount === 'number' && typeof appConfig.visitingChargeAmount === 'number') { if (subtotalForVcPolicyCheck > 0 && subtotalForVcPolicyCheck < appConfig.minimumBookingAmount) { baseVisitingChargeForBooking = getBasePriceForInvoice(appConfig.visitingChargeAmount, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent); } }
+        if (appConfig.enableMinimumBookingPolicy && typeof appConfig.minimumBookingAmount === 'number' && typeof appConfig.visitingChargeAmount === 'number') { if (subtotalForVcPolicyCheck > 0 && subtotalForVcPolicyCheck < appConfig.minimumBookingAmount) { baseVisitingChargeForBooking = getBasePriceForInvoice(appConfig.visitingChargeAmount, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent); } }
         
         let totalItemTax = resolvedServiceItems.reduce((sum, item) => sum + (item.taxAmountForItem || 0), 0);
         let visitingChargeTax = 0; if (appConfig.enableTaxOnVisitingCharge && baseVisitingChargeForBooking > 0 && (appConfig.visitingChargeTaxPercent || 0) > 0) { visitingChargeTax = baseVisitingChargeForBooking * ((appConfig.visitingChargeTaxPercent || 0) / 100); }
@@ -387,7 +387,7 @@ export default function ThankYouPage() {
             discountCode: newBookingData.discountCode, 
             discountAmount: newBookingData.discountAmount, 
             appliedPlatformFees: newBookingData.appliedPlatformFees 
-        });
+        } as any);
         setIsLoadingPage(false); // Stop loading early
         toast({ title: "Booking Confirmed!", description: `Your booking ID is ${newBookingId}.`});
 

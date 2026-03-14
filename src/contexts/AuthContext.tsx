@@ -59,7 +59,7 @@ interface AuthContextType {
   handleSuccessfulAuth: (userCredential: UserCredential) => Promise<void>;
   isCompletingProfile: boolean;
   userCredentialForProfileCompletion: UserCredential | null;
-  completeProfileSetup: (details: { fullName: string; email: string; mobileNumber: string }) => Promise<void>;
+  completeProfileSetup: (details: { fullName: string; email?: string; mobileNumber?: string }) => Promise<void>;
   cancelProfileCompletion: () => void;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
@@ -214,7 +214,7 @@ if (
     setUser(null);
   }, []);
 
-  const completeProfileSetup = useCallback(async (details: { fullName: string; email: string; mobileNumber: string }) => {
+  const completeProfileSetup = useCallback(async (details: { fullName: string; email?: string; mobileNumber?: string }) => {
     if (!userCredentialForProfileCompletion) return;
     setIsLoading(true);
     const { user } = userCredentialForProfileCompletion;

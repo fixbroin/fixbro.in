@@ -104,6 +104,9 @@ export default function OptionalDocTypeManager() {
       const newOption: OptionalDocumentTypeOption = {
         id: nanoid(),
         ...data,
+        isActive: true,
+        isRequired: false,
+        imageCount: 1,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };

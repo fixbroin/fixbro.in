@@ -14,7 +14,7 @@ import { Loader2, Send, AlertTriangle, PackageSearch, History } from "lucide-rea
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, runTransaction, getDoc, addDoc, doc, Timestamp, getDocs, limit } from "firebase/firestore";
-import type { WithdrawalSettings, WithdrawalRequest, WithdrawalMethodType, WithdrawalStatus, FirestoreNotification, FirestoreUser } from '@/types/firestore';
+import type { WithdrawalSettings, WithdrawalRequest, WithdrawalMethodType, WithdrawalStatus, FirestoreNotification, FirestoreUser, WithdrawalTabProps } from '@/types/firestore';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -133,6 +133,9 @@ export default function WithdrawalTab({ settings }: WithdrawalTabProps) {
             userId: user.uid,
             userName: firestoreUser.displayName || "N/A",
             userEmail: firestoreUser.email || "N/A",
+            providerId: 'referral_system', // Mandatory field in interface
+            providerName: firestoreUser.displayName || "N/A",
+            providerEmail: firestoreUser.email || "N/A",
             amount: data.amount,
             method: data.method as WithdrawalMethodType,
             details: data.details,

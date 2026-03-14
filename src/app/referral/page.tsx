@@ -119,7 +119,7 @@ function ReferralPageContent() {
             <WalletTab />
           </TabsContent>
           <TabsContent value="withdraw">
-            <WithdrawalTab settings={withdrawalSettings} />
+            {withdrawalSettings && <WithdrawalTab settings={withdrawalSettings} />}
           </TabsContent>
         </Tabs>
       </div>

@@ -11,7 +11,7 @@ import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
 interface PageProps {
-  params: { city: string; categorySlug: string };
+  params: Promise<{ city: string; categorySlug: string }>;
 }
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next'];

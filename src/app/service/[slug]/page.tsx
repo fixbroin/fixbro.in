@@ -9,7 +9,7 @@ import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 
 interface ServicePageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 async function getServiceData(slug: string): Promise<ClientServiceData | null> {
@@ -55,30 +55,35 @@ async function getServiceData(slug: string): Promise<ClientServiceData | null> {
         }
     }
 
+    const { createdAt, updatedAt, ...restOfServiceData } = serviceDocData;
+
     const clientData: ClientServiceData = {
-      ...serviceDocData, 
+      ...restOfServiceData, 
       id: serviceId, 
       parentCategoryName,
       parentCategorySlug,
       parentCategoryId,
-      taskTimeValue: serviceDocData.taskTimeValue,
-      taskTimeUnit: serviceDocData.taskTimeUnit,
-      includedItems: serviceDocData.includedItems,
-      excludedItems: serviceDocData.excludedItems,
-      allowPayLater: serviceDocData.allowPayLater,
-      serviceFaqs: serviceDocData.serviceFaqs,
+      taskTimeValue: restOfServiceData.taskTimeValue,
+      taskTimeUnit: restOfServiceData.taskTimeUnit,
+      includedItems: restOfServiceData.includedItems,
+      excludedItems: restOfServiceData.excludedItems,
+      allowPayLater: restOfServiceData.allowPayLater,
+      serviceFaqs: restOfServiceData.serviceFaqs,
+      metaTitle: restOfServiceData.seo_title, // Map seo_title to metaTitle for ClientServiceData
+      metaDescription: restOfServiceData.seo_description,
+      metaKeywords: restOfServiceData.seo_keywords,
     };
     
-    if (serviceDocData.createdAt && serviceDocData.createdAt instanceof Timestamp) {
-      clientData.createdAt = serviceDocData.createdAt.toDate().toISOString();
-    } else if (serviceDocData.createdAt) {
-      clientData.createdAt = String(serviceDocData.createdAt);
+    if (createdAt && createdAt instanceof Timestamp) {
+      clientData.createdAt = createdAt.toDate().toISOString();
+    } else if (createdAt) {
+      clientData.createdAt = String(createdAt);
     }
 
-    if (serviceDocData.updatedAt && serviceDocData.updatedAt instanceof Timestamp) {
-      clientData.updatedAt = serviceDocData.updatedAt.toDate().toISOString();
-    } else if (serviceDocData.updatedAt) {
-      clientData.updatedAt = String(serviceDocData.updatedAt);
+    if (updatedAt && updatedAt instanceof Timestamp) {
+      clientData.updatedAt = updatedAt.toDate().toISOString();
+    } else if (updatedAt) {
+      clientData.updatedAt = String(updatedAt);
     }
 
     return clientData;

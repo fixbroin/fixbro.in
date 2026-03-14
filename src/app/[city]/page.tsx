@@ -14,7 +14,7 @@ import JsonLdScript from '@/components/shared/JsonLdScript';
 export const dynamic = 'force-dynamic';
 
 interface CityPageProps {
-  params: { city: string };
+  params: Promise<{ city: string }>;
 }
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next', 'favicon.ico'];

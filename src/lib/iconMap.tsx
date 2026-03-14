@@ -9,9 +9,9 @@ import {
   LocateFixed, Info, IndianRupee, Landmark, Wallet, Download, ListOrdered, Building, AirVent, Refrigerator, Shirt,
   Hammer, PlaySquare, Settings2, HelpCircle, AlertTriangle, FileText // Added FileText
 } from 'lucide-react';
-import type { Icon as LucideIconComponent } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-export const iconMap: { [key: string]: LucideIconComponent } = {
+export const iconMap: { [key: string]: LucideIcon } = {
   Car,
   Droplets,
   Home,
@@ -66,7 +66,7 @@ export const iconMap: { [key: string]: LucideIconComponent } = {
   Default: PackageSearch, // Fallback icon
 };
 
-export const getIconComponent = (iconName?: string): LucideIconComponent => {
+export const getIconComponent = (iconName?: string): LucideIcon => {
   if (!iconName) {
     // console.warn("Icon name not provided, using default.");
     return iconMap.Default;

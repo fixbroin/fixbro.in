@@ -27,8 +27,8 @@ const isValidImageSrc = (url: string | null | undefined): url is string => {
     return url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/');
 };
 
-const adActionTypes: AdActionType[] = ['url', 'category', 'service'];
-const adPlacements: AdPlacement[] = [
+const adActionTypes: [string, ...string[]] = ['url', 'category', 'service'];
+const adPlacements: [string, ...string[]] = [
     'AFTER_HERO_CAROUSEL', 'AFTER_POPULAR_SERVICES', 'AFTER_RECENTLY_ADDED_SERVICES', 'AFTER_CATEGORY_SECTIONS', 'BEFORE_FOOTER_CTA'
 ];
 

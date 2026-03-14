@@ -127,9 +127,10 @@ export default function AdminInquiriesPage() {
       }
 
       // --- USER NOTIFICATION FOR INQUIRY REPLY ---
-      if (selectedInquiryForReply.userId) {
+      const inquiryWithUserId = selectedInquiryForReply as any;
+      if (inquiryWithUserId.userId) {
           const userNotification: Omit<FirestoreNotification, 'id'> = {
-            userId: selectedInquiryForReply.userId,
+            userId: inquiryWithUserId.userId,
             title: "Reply to Your Inquiry",
             message: `FixBro Support replied to your inquiry: "${replyMessage.substring(0, 50)}${replyMessage.length > 50 ? '...' : ''}"`,
             type: 'info',
@@ -139,7 +140,7 @@ export default function AdminInquiriesPage() {
           };
           await addDoc(collection(db, "userNotifications"), userNotification);
           triggerPushNotification({
-            userId: selectedInquiryForReply.userId,
+            userId: inquiryWithUserId.userId,
             title: userNotification.title,
             body: userNotification.message,
             href: userNotification.href
@@ -217,8 +218,8 @@ export default function AdminInquiriesPage() {
                   {inquiry.phone && <div className="text-muted-foreground flex items-center mt-0.5"><Phone size={14} className="mr-1"/>{inquiry.phone}</div>}
                 </TableCell>
                 <TableCell className="text-xs max-w-sm">
-                  <div className="truncate" title={inquiry.message || JSON.stringify((inquiry as FirestorePopupInquiry).formData)}>
-                    {inquiry.message || (type === 'popup' ? `Form Data: ${Object.entries((inquiry as FirestorePopupInquiry).formData || {}).map(([k,v]) => `${k}: ${v}`).join(', ')}` : 'N/A')}
+                  <div className="truncate" title={(inquiry as any).message || JSON.stringify((inquiry as FirestorePopupInquiry).formData)}>
+                    {(inquiry as any).message || (type === 'popup' ? `Form Data: ${Object.entries((inquiry as FirestorePopupInquiry).formData || {}).map(([k,v]) => `${k}: ${v}`).join(', ')}` : 'N/A')}
                   </div>
                   {type === 'popup' && (inquiry as FirestorePopupInquiry).popupName && (
                       <div className="text-muted-foreground text-[10px] mt-0.5">
@@ -298,7 +299,7 @@ export default function AdminInquiriesPage() {
           </div>
       </CardHeader>
       <CardContent className="p-4 text-sm space-y-2">
-          {inquiry.message && <p className="text-muted-foreground line-clamp-3 italic">"{inquiry.message}"</p>}
+          {(inquiry as any).message && <p className="text-muted-foreground line-clamp-3 italic">"{(inquiry as any).message}"</p>}
           {type === 'popup' && (inquiry as FirestorePopupInquiry).popupName && (
               <p className="text-[10px] text-muted-foreground">Source: {(inquiry as FirestorePopupInquiry).popupName}</p>
           )}

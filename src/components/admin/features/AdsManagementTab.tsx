@@ -25,6 +25,7 @@ const defaultFeaturesConfig: FeaturesConfiguration = {
   showMostPopularServices: true,
   showRecentlyAddedServices: true,
   showCategoryWiseServices: true,
+  showBlogSection: true,
   homepageCategoryVisibility: {},
   ads: [],
 };
@@ -126,9 +127,9 @@ export default function AdsManagementTab({ allCategories, allServices, isLoading
       name: formData.name,
       imageUrl: formData.imageUrl || "", // Assuming imageUrl from form is final (uploaded or manual URL)
       imageHint: formData.imageHint,
-      actionType: formData.actionType,
+      actionType: formData.actionType as AdActionType,
       targetValue: formData.targetValue,
-      placement: formData.placement,
+      placement: formData.placement as AdPlacement,
       order: formData.order,
       isActive: formData.isActive,
       createdAt: adId ? (currentAds.find(ad => ad.id === adId)?.createdAt || Timestamp.now()) : Timestamp.now(),

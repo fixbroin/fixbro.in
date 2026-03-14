@@ -49,8 +49,6 @@ export default function NewBookingAdminPopup({
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(false); }}>
       <AlertDialogContent 
-        onInteractOutside={(e) => e.preventDefault()} 
-        onEscapeKeyDown={(e) => e.preventDefault()}
         className="max-w-md"
       >
         <AlertDialogHeader>

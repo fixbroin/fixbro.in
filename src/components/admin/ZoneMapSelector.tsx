@@ -86,7 +86,7 @@ const ZoneMapSelector: React.FC<ZoneMapSelectorProps> = ({ apiKey, center, radiu
   }, [center, radiusKm, onCenterChange]);
 
   const handleLocateMe = useCallback(() => {
-    const locateButton = document.getElementById('zone-locate-me-button');
+    const locateButton = document.getElementById('zone-locate-me-button') as HTMLButtonElement | null;
     if (!locateButton) return;
 
     if (navigator.geolocation && mapInstanceRef.current) {

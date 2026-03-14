@@ -3,14 +3,14 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
-import type { UserOptions } from 'jspdf-autotable'; // Keep if ExtendedHeadCellDef relies on it
-import type { FirestoreInvoice, CompanyDetailsForPdf } from '@/types/firestore'; // Updated to FirestoreInvoice & new CompanyDetails type
+import type { UserOptions, CellWidthType } from 'jspdf-autotable'; // Keep if ExtendedHeadCellDef relies on it
+import { FirestoreInvoice, CompanyDetailsForPdf, Timestamp } from '@/types/firestore'; // Updated to FirestoreInvoice & new CompanyDetails type
 
 // Define ExtendedHeadCellDef if not globally available, or import if it is
 // For this example, assuming it's implicitly handled by UserOptions or not strictly needed
 // If you have custom cell definitions beyond UserOptions, define them here.
-interface ExtendedHeadCellDef extends UserOptions { // This is a basic extension, adjust as needed
-    cellWidth?: 'auto' | number | string;
+interface ExtendedHeadCellDef {
+    cellWidth?: CellWidthType;
     halign?: 'left' | 'center' | 'right';
 }
 

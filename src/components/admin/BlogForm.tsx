@@ -248,10 +248,11 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
     
     const payload = { 
       ...restOfFormData,
+      content: restOfFormData.content || "",
       coverImageUrl: finalImageUrl, 
       id: initialData?.id,
-      categoryId: finalCategoryId,
-      categoryName: finalCategoryName,
+      categoryId: finalCategoryId as string | undefined,
+      categoryName: finalCategoryName as string | undefined,
       tags: processedTags,
     };
     await onSubmitProp(payload);

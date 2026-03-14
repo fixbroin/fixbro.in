@@ -89,13 +89,13 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
       setFilteredAreas(newFilteredAreas);
       if (!initialData || (initialData && initialData.cityId !== watchedCityId)) {
         if (!newFilteredAreas.find(a => a.id === form.getValues('areaId'))) {
-          form.setValue('areaId', undefined, { shouldValidate: true });
+          form.setValue('areaId', "", { shouldValidate: true });
         }
       }
     } else {
       setFilteredAreas([]);
       if (!initialData) {
-          form.setValue('areaId', undefined, { shouldValidate: true });
+          form.setValue('areaId', "", { shouldValidate: true });
       }
     }
   }, [watchedCityId, areas, form, initialData]);

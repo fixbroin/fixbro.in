@@ -123,7 +123,7 @@ export default function AdminReviewsPage() {
       userName: data.userName,
       rating: data.rating,
       comment: data.comment,
-      status: data.status,
+      status: data.status as ReviewStatus,
       adminCreated: data.adminCreated,
     };
 

@@ -219,8 +219,8 @@ export default function WebSettingsPage() {
     loadGlobalSettings();
     const unsubscribeContentPages = loadContentPages();
     return () => {
-      if (typeof unsubscribeContentPages === 'function') {
-        unsubscribeContentPages();
+      if (unsubscribeContentPages && typeof unsubscribeContentPages === 'function') {
+        (unsubscribeContentPages as any)();
       }
     };
   }, [loadGlobalSettings, loadContentPages]);
@@ -884,7 +884,9 @@ export default function WebSettingsPage() {
                                         {...field}
                                         ref={(e) => {
                                             field.ref(e);
-                                            textareaRef.current = e;
+                                            // Fix: textareaRef.current is managed by ref={field.ref} usually, 
+                                            // but if manual assignment is needed:
+                                            (textareaRef as any).current = e;
                                         }}
                                         placeholder="Write your page content here... Use the toolbar above or write custom HTML."
                                         rows={22}

@@ -85,7 +85,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
     }
     setIsSubmittingReview(true);
     try {
-      const reviewData: Omit<FirestoreReview, 'id' | 'createdAt' | 'updatedAt'> & {userAvatarUrl?: string} = { // Make userAvatarUrl optional here for construction
+      const reviewData: Omit<FirestoreReview, 'id' | 'updatedAt'> & {userAvatarUrl?: string} = { // Include createdAt
         serviceId: serviceToReview.id,
         serviceName: serviceToReview.name,
         bookingId: booking.bookingId, // Use the human-readable bookingId
@@ -103,7 +103,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
         reviewData.userAvatarUrl = user.photoURL;
       }
 
-      await addDoc(collection(db, "adminReviews"), reviewData as Omit<FirestoreReview, 'id' | 'createdAt' | 'updatedAt'>); // Cast back to expected type for addDoc
+      await addDoc(collection(db, "adminReviews"), reviewData as Omit<FirestoreReview, 'id'>); // Cast back to expected type for addDoc
       
       const bookingDocRef = doc(db, "bookings", booking.id); // Use Firestore document ID of booking
       await updateDoc(bookingDocRef, { isReviewedByCustomer: true, updatedAt: Timestamp.now() });

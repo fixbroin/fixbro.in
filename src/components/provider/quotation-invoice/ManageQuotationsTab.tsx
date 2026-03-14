@@ -112,7 +112,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
             <div>
                 <p className="text-xs text-muted-foreground mb-1">Status</p>
                 <Select value={quotation.status} onValueChange={(s) => handleUpdateStatus(quotation.id!, s as QuotationStatus)} disabled={isUpdating === quotation.id || isSending === quotation.id || isDownloading === quotation.id}>
-                    <SelectTrigger className="h-9 text-xs"><Badge variant={getStatusBadgeVariant(quotation.status)} className={`capitalize ${quotation.status === 'Accepted' ? 'bg-green-500' : ''}`}>{quotation.status}</Badge></SelectTrigger>
+                    <SelectTrigger className="h-9 text-xs"><Badge variant={getStatusBadgeVariant(quotation.status) as any} className={`capitalize ${quotation.status === 'Accepted' ? 'bg-green-500' : ''}`}>{quotation.status}</Badge></SelectTrigger>
                     <SelectContent>{quotationStatusOptions.map(s => (<SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>))}</SelectContent>
                 </Select>
             </div>
@@ -167,7 +167,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
                     <TableCell>
                     <Select value={quotation.status} onValueChange={(s) => handleUpdateStatus(quotation.id!, s as QuotationStatus)} disabled={isUpdating === quotation.id || isSending === quotation.id || isDownloading === quotation.id}>
                         <SelectTrigger className="h-8 text-xs min-w-[120px]">
-                            <Badge variant={getStatusBadgeVariant(quotation.status)} className={`capitalize ${quotation.status === 'Accepted' ? 'bg-green-500' : ''}`}>{quotation.status}</Badge>
+                            <Badge variant={getStatusBadgeVariant(quotation.status) as any} className={`capitalize ${quotation.status === 'Accepted' ? 'bg-green-500' : ''}`}>{quotation.status}</Badge>
                         </SelectTrigger>
                         <SelectContent>{quotationStatusOptions.map(s => (<SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>))}</SelectContent>
                     </Select>

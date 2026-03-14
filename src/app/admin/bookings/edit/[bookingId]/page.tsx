@@ -9,7 +9,7 @@ export async function generateStaticParams(): Promise<{ bookingId: string }[]> {
 }
 
 interface PageProps {
-  params: { bookingId: string };
+  params: Promise<{ bookingId: string }>;
 }
 
 // No data fetching here, client component handles it

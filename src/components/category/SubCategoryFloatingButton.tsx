@@ -90,18 +90,18 @@ export default function SubCategoryFloatingButton({
         {/* Content */}
         <div
           className={cn(
-            "z-10 bg-card rounded-lg shadow-xl w-[90%] max-w-md flex flex-col transition-all duration-300 ease-in-out",
+            "z-10 bg-card rounded-xl shadow-2xl w-[95%] sm:max-w-2xl lg:max-w-4xl flex flex-col transition-all duration-300 ease-in-out",
             isModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
           )}
         >
-          <div className="flex items-center justify-between p-4 border-b bg-primary text-primary-foreground rounded-t-lg">
-            <h2 className="text-lg font-semibold">Jump to Sub-Category</h2>
-            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="h-7 w-7">
-              <X className="h-4 w-4" />
+          <div className="flex items-center justify-between p-5 border-b bg-primary text-primary-foreground rounded-t-xl">
+            <h2 className="text-xl font-bold">Jump to Sub-Category</h2>
+            <Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)} className="h-8 w-8 hover:bg-white/20">
+              <X className="h-5 w-5" />
             </Button>
           </div>
-          <ScrollArea className="h-96">
-            <div className="p-4 grid grid-cols-3 gap-2">
+          <ScrollArea className="h-[70vh] sm:h-[60vh]">
+            <div className="p-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-4">
               {subCategories.map((subCat) => (
                 <SubCategoryCard 
                     key={subCat.id}

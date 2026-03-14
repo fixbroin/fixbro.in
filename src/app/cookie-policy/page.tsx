@@ -29,7 +29,7 @@ async function getPageData(slug: string): Promise<ContentPage | null> {
     // Fallback for global settings if dedicated page doesn't exist
     const settingsDocRef = adminDb.collection("webSettings").doc("global");
     const settingsSnap = await settingsDocRef.get();
-    if (settingsSnap.exists()) {
+    if (settingsSnap.exists) {
         const settings = settingsSnap.data() as GlobalWebSettings;
         if (settings.cookiePolicyContent) {
             return {

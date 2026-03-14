@@ -50,7 +50,7 @@ export default function WithdrawalRequestsTab() {
   const handleUpdateStatus = async (request: WithdrawalRequest, newStatus: WithdrawalStatus) => {
     if (!request.id) return;
     setIsUpdating(request.id);
-    const userDocRef = doc(db, "users", request.userId);
+    const userDocRef = doc(db, "users", request.userId || "unknown");
     const requestDocRef = doc(db, "withdrawalRequests", request.id);
 
     try {
@@ -91,7 +91,7 @@ export default function WithdrawalRequestsTab() {
         
         // Create notification for user
         const notification: Omit<FirestoreNotification, 'id'> = {
-            userId: request.userId,
+            userId: request.userId || "unknown",
             title: `Withdrawal Request ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`,
             message: notificationMessage,
             type: notificationType,

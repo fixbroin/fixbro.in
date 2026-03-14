@@ -14,7 +14,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { sendPasswordResetEmail, deleteUser, updateEmail, sendEmailVerification, RecaptchaVerifier, type ConfirmationResult } from "firebase/auth";
+import { sendPasswordResetEmail, deleteUser, updateEmail, sendEmailVerification, RecaptchaVerifier, type ConfirmationResult, linkWithPhoneNumber } from "firebase/auth";
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
@@ -111,7 +111,7 @@ export default function ProfilePage() {
     setIsSendingOtp(true);
     try {
         const verifier = await setupAndRenderRecaptcha();
-        const confirmation = await auth.currentUser?.linkWithPhoneNumber(mobileNumber, verifier);
+        const confirmation = await linkWithPhoneNumber(auth.currentUser!, mobileNumber, verifier);
         setConfirmationResult(confirmation!);
         setIsOtpDialogOpen(true);
         toast({ title: "OTP Sent", description: `An OTP has been sent to ${mobileNumber}.` });

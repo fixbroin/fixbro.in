@@ -300,7 +300,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <Avatar className="h-10 w-10 border-2 border-primary/20">
-                    <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email} />
+                    <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email || ""} />
                     <AvatarFallback className="bg-primary/5 text-primary font-bold">
                         {selectedUser.displayName ? selectedUser.displayName.charAt(0).toUpperCase() : <UserCircle size={20}/>}
                     </AvatarFallback>

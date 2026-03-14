@@ -9,7 +9,7 @@ import { getBaseUrl } from '@/lib/config'; // Import the helper
 export const dynamic = 'force-dynamic'; // Ensure metadata is fetched on each request
 
 interface CategoryPageLayoutProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
   children: React.ReactNode;
 }
 

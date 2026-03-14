@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         // Optional: set cache control for public assets
         cacheControl: 'public, max-age=31536000', 
       },
-    });
+    } as any);
 
     // Make the file public (if it's intended for public access)
     const uploadedFile = bucket.file(destinationPath);

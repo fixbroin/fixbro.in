@@ -3,8 +3,13 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
-import type {  UserOptions } from 'jspdf-autotable';
+import type { UserOptions, CellWidthType } from 'jspdf-autotable';
 import type { FirestoreBooking, BookingServiceItem, AppliedPlatformFeeItem } from '@/types/firestore';
+
+interface ExtendedHeadCellDef {
+  cellWidth?: CellWidthType;
+  halign?: 'left' | 'center' | 'right';
+}
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -175,4 +180,5 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
   doc.text("This is a computer generated invoice and does not require a signature.", 105, pageHeight - 10, { align: "center" });
 
   doc.save(`invoice-${booking.bookingId}.pdf`); 
+  return "success";
 };

@@ -1,6 +1,8 @@
 
 import type { Icon as LucideIconType } from 'lucide-react';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
+
+export { Timestamp };
 
 declare global {
   interface Window {
@@ -21,6 +23,9 @@ export interface FirestoreCategory {
   seo_title?: string; // SEO: Meta title for the category page
   seo_description?: string; // SEO: Meta description
   seo_keywords?: string; // SEO: Meta keywords (comma-separated)
+  metaTitle?: string; // Legacy/Alternative SEO meta title
+  metaDescription?: string; // Legacy/Alternative SEO meta description
+  metaKeywords?: string; // Legacy/Alternative SEO meta keywords
   createdAt?: Timestamp;
 }
 
@@ -33,6 +38,7 @@ export interface FirestoreSubCategory {
   isActive?: boolean; // New field
   imageUrl?: string;
   imageHint?: string;
+  h1_title?: string;
   createdAt?: Timestamp;
 }
 
@@ -103,6 +109,9 @@ export interface ClientServiceData extends Omit<FirestoreService, 'createdAt' | 
   parentCategoryName?: string; // Added for breadcrumbs
   parentCategorySlug?: string; // Added for breadcrumbs
   parentCategoryId?: string; // Added for fetching related services
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
 }
 
 export interface CartEntry {
@@ -132,6 +141,7 @@ export type BookingStatus =
 export interface BookingServiceItem {
   serviceId: string;
   name: string;
+  imageUrl?: string; // Added imageUrl property
   quantity: number;
   pricePerUnit: number; // DISPLAYED pricePerUnit at the time of booking
   discountedPricePerUnit?: number; // DISPLAYED discountedPricePerUnit
@@ -305,7 +315,8 @@ export interface ThemeColors {
   dark?: Partial<ThemePalette>;
 }
 
-export type LoaderType = 
+export type LoaderType =
+  | "logo-pulse"
   | "pulse"
   | "typing"
   | "bars"
@@ -501,6 +512,8 @@ export interface AppSettings {
   cancellationFeeType?: 'fixed' | 'percentage';
   cancellationFeeValue?: number;
   
+  chatNotificationSoundUrl?: string; // New: default sound for chat notifications
+  isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
   maxProviderRadiusKm?: number; // New for provider work area
   
@@ -516,6 +529,8 @@ export interface AppSettings {
   // Provider Fee Settings
   providerFeeType?: ProviderFeeType;
   providerFeeValue?: number;
+
+  loaderType?: string; // Added for compatibility with appDefaults.ts
 
   updatedAt?: Timestamp; // For tracking updates in Firestore
 }
@@ -590,6 +605,11 @@ export interface FirestoreSEOSettings {
   areaCategoryPageKeywordsPattern?: string;
   areaCategoryPageH1Pattern?: string;
 
+  cityPageTitlePattern?: string;
+  cityPageDescriptionPattern?: string;
+  cityPageKeywordsPattern?: string;
+  cityPageH1Pattern?: string;
+
   servicePageTitlePattern?: string;
   servicePageDescriptionPattern?: string; // Corrected this to pattern for consistency
   servicePageKeywordsPattern?: string;
@@ -621,10 +641,15 @@ export interface FirestoreCity {
   name: string;
   slug: string;
   isActive: boolean;
+  imageUrl?: string;
+  imageHint?: string;
   // SEO specific fields
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string; // comma-separated
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
   h1_title?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -637,10 +662,15 @@ export interface FirestoreArea {
   cityId: string; // Foreign key to FirestoreCity.id
   cityName: string; // Denormalized parent city name for display
   isActive: boolean;
+  imageUrl?: string;
+  imageHint?: string;
   // SEO specific fields
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string; // comma-separated
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
   h1_title?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -669,6 +699,7 @@ export interface FirebaseClientConfig {
 export interface MarketingSettings {
   id?: string; // Should be "marketingConfiguration"
   // Google
+  googleTagId?: string; // New: Primary Google Tag ID (G-XXXXXXX)
   googleTagManagerId?: string;
   googleAnalyticsId?: string;
   googleAdsConversionId?: string;
@@ -738,7 +769,8 @@ export type UserActivityEventType =
   | 'newBooking'
   | 'checkoutStep'
   | 'adminAction'
-  | 'search'; // Added search event type
+  | 'search' // Added search event type
+  | 'timeOnPage';
 
 export interface UserActivityEventData {
   pageUrl?: string;
@@ -1106,8 +1138,8 @@ export interface LanguageOption {
   updatedAt?: Timestamp;
 }
 
-export interface AdditionalDocumentTypeOption {
-  id: string;
+export interface OptionalDocumentTypeOption {
+  id: string; // e.g., "voter_id", "driving_license"
   label: string; // e.g., "Voter ID", "Driving License"
   description?: string;
   order: number;
@@ -1121,6 +1153,8 @@ export interface AdditionalDocumentTypeOption {
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
+
+export type AdditionalDocumentTypeOption = OptionalDocumentTypeOption;
 
 export interface ProviderControlOptions {
   categories: FirestoreCategory[];
@@ -1318,7 +1352,7 @@ export interface Referral {
   id?: string; // Firestore document ID
   referrerId: string; // User who referred
   referredUserId: string; // User who was referred
-  referredUserEmail: string; // Email of the user who was referred
+  referredUserEmail?: string; // Email of the user who was referred
   bookingId?: string; // ID of the first qualifying booking
   status: ReferralStatus;
   referrerBonus: number;
@@ -1356,6 +1390,9 @@ export interface WithdrawalRequest {
   providerId: string;
   providerName: string; // Denormalized
   providerEmail: string; // Denormalized
+  userId?: string; // For referral withdrawal compatibility
+  userName?: string;
+  userEmail?: string;
   amount: number;
   method: WithdrawalMethodType;
   details: {
@@ -1371,6 +1408,10 @@ export interface WithdrawalRequest {
   requestedAt: Timestamp;
   processedAt?: Timestamp;
   adminNotes?: string; // For rejection reasons
+}
+
+export interface WithdrawalTabProps {
+  settings: WithdrawalSettings;
 }
 
 

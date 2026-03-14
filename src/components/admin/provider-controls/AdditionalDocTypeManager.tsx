@@ -118,11 +118,23 @@ export default function AdditionalDocTypeManager() {
     setIsSubmitting(true);
     let updatedOptionsArray: AdditionalDocumentTypeOption[];
     if (editingOption) {
-      updatedOptionsArray = options.map(opt => opt.id === editingOption.id ? { ...editingOption, ...data, updatedAt: Timestamp.now() } : opt);
+      updatedOptionsArray = options.map(opt => opt.id === editingOption.id ? { 
+        ...editingOption, 
+        ...data, 
+        docNumberMinLength: data.docNumberMinLength ?? undefined,
+        docNumberMaxLength: data.docNumberMaxLength ?? undefined,
+        updatedAt: Timestamp.now() 
+      } : opt);
     } else {
       const newOption: AdditionalDocumentTypeOption = {
         id: nanoid(),
         ...data,
+        docNumberType: data.docNumberType as any || 'any',
+        docNumberMinLength: data.docNumberMinLength ?? undefined,
+        docNumberMaxLength: data.docNumberMaxLength ?? undefined,
+        isActive: true,
+        isRequired: false,
+        imageCount: 1,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };

@@ -105,7 +105,7 @@ export default function AdminProviderApplicationsPage() {
       // Send email to provider
       if (appConfig.smtpHost && appConfig.senderEmail && appToUpdate.email && appToUpdate.userId) {
         let emailMessageAction = "";
-        let notificationType: "success" | "error" | "warning" = "info";
+        let notificationType: "success" | "error" | "warning" = "warning";
         let notificationLink = `/provider-registration`; 
 
         switch(newStatus) {

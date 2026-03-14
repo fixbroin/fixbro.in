@@ -22,7 +22,18 @@ import { useToast } from "@/hooks/use-toast";
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import type { FirestoreNotification } from '@/types/firestore';
 
-const statusOptions: BookingStatus[] = ["Pending Payment", "Confirmed", "Processing", "Completed", "Cancelled", "Rescheduled"];
+const statusOptions: [string, ...string[]] = [
+  "Pending Payment",
+  "Confirmed",
+  "Processing",
+  "Completed",
+  "Cancelled",
+  "Rescheduled",
+  "AssignedToProvider",
+  "ProviderAccepted",
+  "ProviderRejected",
+  "InProgressByProvider"
+];
 
 const timeSlots = {
   morning: ["09:00 AM", "10:00 AM", "11:00 AM"],
@@ -166,6 +177,7 @@ export default function EditBookingPageClient() {
       
       const updateData: Partial<FirestoreBooking> = {
         ...data,
+        status: data.status as BookingStatus,
         latitude: data.latitude === null ? undefined : data.latitude, // Ensure nulls become undefined for Firestore
         longitude: data.longitude === null ? undefined : data.longitude,
         updatedAt: Timestamp.now(),
@@ -174,8 +186,8 @@ export default function EditBookingPageClient() {
       await updateDoc(bookingDocRef, updateData);
 
       // Create notification for the user
-      const userNotificationData: FirestoreNotification = {
-        userId: booking.userId,
+      const userNotificationData: Omit<FirestoreNotification, 'id'> = {
+        userId: booking.userId || "anonymous",
         title: `Booking Update: ${data.status}`,
         message: `Your booking ${booking.bookingId} has been updated to ${data.status}.`,
         type: data.status === 'Completed' ? 'success' : (data.status === 'Cancelled' ? 'error' : 'info'),
@@ -186,12 +198,14 @@ export default function EditBookingPageClient() {
       await addDoc(collection(db, "userNotifications"), userNotificationData);
 
       // Trigger Push Notification
-      triggerPushNotification({
-        userId: booking.userId,
-        title: userNotificationData.title,
-        body: userNotificationData.message,
-        href: userNotificationData.href
-      });
+      if (booking.userId) {
+        triggerPushNotification({
+            userId: booking.userId,
+            title: userNotificationData.title,
+            body: userNotificationData.message,
+            href: userNotificationData.href
+        });
+      }
 
       toast({ title: "Success", description: "Booking updated successfully." });
       router.push('/admin/bookings');

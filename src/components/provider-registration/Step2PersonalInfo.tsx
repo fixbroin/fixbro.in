@@ -83,7 +83,7 @@ export default function Step2PersonalInfo({
       email: initialData?.email || firestoreUser?.email || user?.email || "",
       mobileNumber: initialData?.mobileNumber || firestoreUser?.mobileNumber || user?.phoneNumber || "",
       address: initialData?.address || "",
-      age: initialData?.age ?? '', 
+      age: initialData?.age ?? undefined, 
       qualificationId: initialData?.qualificationId || undefined,
       alternateMobile: initialData?.alternateMobile || "",
       languagesSpokenIds: initialData?.languagesSpokenIds || [],
@@ -134,7 +134,7 @@ export default function Step2PersonalInfo({
             email: initialData.email || firestoreUser?.email || user?.email || "",
             mobileNumber: initialData.mobileNumber || firestoreUser?.mobileNumber || user?.phoneNumber || "",
             address: initialData.address || "",
-            age: initialData.age ?? '', 
+            age: initialData.age ?? undefined, 
             qualificationId: initialData.qualificationId || undefined,
             alternateMobile: initialData.alternateMobile || "",
             languagesSpokenIds: initialData.languagesSpokenIds || [],
@@ -217,7 +217,7 @@ export default function Step2PersonalInfo({
     const applicationStepData: Partial<ProviderApplication> = {
       ...data,
       age: Number(data.age) || undefined, 
-      profilePhotoUrl: finalPhotoUrl,
+      profilePhotoUrl: (finalPhotoUrl as string | undefined) || undefined,
       qualificationLabel: qualification?.label,
       languagesSpokenLabels: languages?.map(l => l.label),
     };

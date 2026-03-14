@@ -12,7 +12,7 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 export const dynamic = 'force-dynamic';
 
 interface CategoryPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 async function getCategoryDataForPage(slug: string): Promise<{category: FirestoreCategory, aggregateRating?: any} | null> {

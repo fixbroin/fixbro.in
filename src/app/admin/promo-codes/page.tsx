@@ -195,10 +195,10 @@ export default function AdminPromoCodesPage() {
                       <TableCell className="text-center">{code.usesCount} / {code.maxUses || "∞"}</TableCell>
                       <TableCell className="text-center">{code.maxUsesPerUser || "∞"}</TableCell>
                       <TableCell className="text-center text-xs">
-                        {code.validFrom ? formatDateForIndia(code.validFrom) : <XCircle className="h-4 w-4 text-muted-foreground/70 mx-auto" title="Not set"/>}
+                        {code.validFrom ? formatDateForIndia(code.validFrom) : <span title="Not set"><XCircle className="h-4 w-4 text-muted-foreground/70 mx-auto" /></span>}
                       </TableCell>
                       <TableCell className="text-center text-xs">
-                        {code.validUntil ? formatDateForIndia(code.validUntil) : <XCircle className="h-4 w-4 text-muted-foreground/70 mx-auto" title="Not set"/>}
+                        {code.validUntil ? formatDateForIndia(code.validUntil) : <span title="Not set"><XCircle className="h-4 w-4 text-muted-foreground/70 mx-auto" /></span>}
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch
@@ -209,7 +209,7 @@ export default function AdminPromoCodesPage() {
                         />
                       </TableCell>
                        <TableCell className="text-center">
-                        {code.isHidden ? <EyeOff className="h-5 w-5 text-muted-foreground mx-auto" title="Hidden"/> : <Eye className="h-5 w-5 text-green-500 mx-auto" title="Visible"/>}
+                        {code.isHidden ? <span title="Hidden"><EyeOff className="h-5 w-5 text-muted-foreground mx-auto" /></span> : <span title="Visible"><Eye className="h-5 w-5 text-green-500 mx-auto" /></span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">

@@ -3,8 +3,13 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
-import type { UserOptions } from 'jspdf-autotable';
+import type { UserOptions, CellWidthType } from 'jspdf-autotable';
 import type { FirestoreBooking, BookingServiceItem, AppliedPlatformFeeItem } from '@/types/firestore';
+
+interface ExtendedHeadCellDef {
+  cellWidth?: CellWidthType;
+  halign?: 'left' | 'center' | 'right';
+}
 
 declare module 'jspdf' {
   interface jsPDF {

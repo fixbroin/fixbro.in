@@ -104,7 +104,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                   <div className="absolute inset-0">
                     <AdminUserListForChat 
                       onSelectUser={setSelectedChatUser} 
-                      selectedUserId={selectedChatUser?.id}
+                      selectedUserId={(selectedChatUser as any)?.id || ""}
                       scrollAreaHeightClass="h-[calc(100vh-64px)]"
                     />
                   </div>

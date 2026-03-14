@@ -32,6 +32,7 @@ const subCategoryFormSchema = z.object({
   isActive: z.boolean().default(true),
   imageUrl: z.string().url({ message: "Must be a valid URL if provided." }).optional().or(z.literal('')),
   imageHint: z.string().max(50, { message: "Image hint should be max 50 characters."}).optional().or(z.literal('')),
+  h1_title: z.string().max(100, "H1 title too long.").optional().or(z.literal('')),
 });
 
 type SubCategoryFormData = z.infer<typeof subCategoryFormSchema>;
@@ -222,17 +223,17 @@ export default function SubCategoryForm({ onSubmit: onSubmitProp, initialData, o
       } else {
            setStatusMessage(initialData ? "Saving changes..." : "Creating sub-category...");
       }
-
-      await onSubmitProp({
-        name: formData.name,
-        slug: formData.slug,
-        parentId: formData.parentId,
-        order: formData.order,
-        isActive: formData.isActive,
-        imageUrl: finalImageUrl,
-        imageHint: formData.imageHint,
-        id: initialData?.id,
-      });
+await onSubmitProp({
+  name: formData.name,
+  slug: formData.slug || "",
+  parentId: formData.parentId,
+  order: formData.order,
+  isActive: formData.isActive,
+  imageUrl: finalImageUrl,
+  imageHint: formData.imageHint,
+  h1_title: formData.h1_title,
+  id: initialData?.id,
+});
       
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";

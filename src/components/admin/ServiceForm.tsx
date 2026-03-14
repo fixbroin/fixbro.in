@@ -56,11 +56,7 @@ const serviceFormSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters." }).max(200, { message: "Description must be 200 characters or less."}),
   shortDescription: z.string().max(300, {message: "Short description max 300 chars."}).optional().nullable(),
   fullDescription: z.string().optional().nullable(),
-  serviceHighlights: z.array(
-    z.string()
-      .min(5, { message: "Highlight must be at least 5 characters." })
-      .max(150, { message: "Highlight must be 150 characters or less." })
-  ).optional(),
+  serviceHighlights: z.array(z.object({ value: z.string().min(5, "Highlight must be at least 5 characters.").max(150, "Highlight too long.") })).optional(),
   imageUrl: z.string().url({ message: "Must be a valid URL if provided." }).optional().or(z.literal('')),
   imageHint: z.string().max(50, { message: "Image hint should be max 50 characters."}).optional().or(z.literal('')),
   rating: z.coerce.number().min(0).max(5).default(0),
@@ -75,8 +71,8 @@ const serviceFormSchema = z.object({
   seo_keywords: z.string().optional().or(z.literal('')),
   taskTimeValue: z.coerce.number().nonnegative("Task time must be non-negative.").optional().nullable(),
   taskTimeUnit: z.enum(['hours', 'minutes']).optional().nullable(),
-  includedItems: z.array(z.string().min(3, "Included item must be at least 3 chars.").max(200, "Included item too long.")).optional(),
-  excludedItems: z.array(z.string().min(3, "Excluded item must be at least 3 chars.").max(200, "Excluded item too long.")).optional(),
+  includedItems: z.array(z.object({ value: z.string().min(3, "Included item must be at least 3 characters.").max(200, "Included item too long.") })).optional(),
+  excludedItems: z.array(z.object({ value: z.string().min(3, "Excluded item must be at least 3 characters.").max(200, "Excluded item too long.") })).optional(),
   allowPayLater: z.boolean().default(true),
   serviceFaqs: z.array(serviceFaqItemSchema).optional(),
   membersRequired: z.coerce.number().int().min(1, "At least 1 member is required.").optional().nullable(),
@@ -179,18 +175,15 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
       }
 
       form.reset({
-        name: initialData.name || "",
-        slug: initialData.slug || "",
-        parentCategoryId: initialParentCategoryId || undefined,
-        subCategoryId: initialData.subCategoryId || undefined,
-        price: initialData.price || 0,
+        ...initialData,
+        parentCategoryId: initialParentCategoryId || "",
+        subCategoryId: initialData.subCategoryId || "",
         discountedPrice: initialData.discountedPrice === undefined || initialData.discountedPrice === null ? null : initialData.discountedPrice,
         hasPriceVariants: initialData.hasPriceVariants || false,
         priceVariants: initialData.priceVariants?.map(v => ({...v, id: v.id || nanoid()})) || [],
         description: initialData.description || "",
         shortDescription: initialData.shortDescription || "",
         fullDescription: initialData.fullDescription || "",
-        serviceHighlights: initialData.serviceHighlights || [],
         imageUrl: initialData.imageUrl || "",
         imageHint: initialData.imageHint || "",
         rating: initialData.rating || 0,
@@ -205,8 +198,9 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         seo_keywords: initialData.seo_keywords || "",
         taskTimeValue: initialData.taskTimeValue === undefined ? null : initialData.taskTimeValue,
         taskTimeUnit: initialData.taskTimeUnit === undefined ? null : initialData.taskTimeUnit,
-        includedItems: initialData.includedItems || [],
-        excludedItems: initialData.excludedItems || [],
+        serviceHighlights: initialData.serviceHighlights?.map(val => ({ value: val })) || [],
+        includedItems: initialData.includedItems?.map(val => ({ value: val })) || [],
+        excludedItems: initialData.excludedItems?.map(val => ({ value: val })) || [],
         allowPayLater: initialData.allowPayLater === undefined ? true : initialData.allowPayLater,
         serviceFaqs: initialData.serviceFaqs?.map(faq => ({ ...faq, id: faq.id || nanoid() })) || [],
         membersRequired: initialData.membersRequired === undefined ? null : initialData.membersRequired,
@@ -237,6 +231,18 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
     }
   }, [initialData, form, subCategories]);
 
+  const onSubmit = async (data: ServiceFormDataInternal) => {
+    const { serviceHighlights, includedItems, excludedItems, isTaxInclusive, discountedPrice, ...rest } = data;
+    const formattedData = {
+      ...rest,
+      isTaxInclusive: isTaxInclusive === "true",
+      serviceHighlights: serviceHighlights?.map(h => h.value).filter(v => v.trim() !== "") || [],
+      includedItems: includedItems?.map(i => i.value).filter(v => v.trim() !== "") || [],
+      excludedItems: excludedItems?.map(e => e.value).filter(v => v.trim() !== "") || [],
+      discountedPrice: discountedPrice === null ? undefined : discountedPrice,
+    };
+    await onSubmitProp(formattedData as any);
+  };
 
   useEffect(() => {
     if (watchedName && !initialData && !form.getFieldState('slug').isDirty) {
@@ -254,13 +260,13 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
       if (currentSubCatId && !newFiltered.find(sc => sc.id === currentSubCatId)) {
         if (!initialData || initialData.subCategoryId !== currentSubCatId ||
             (initialData && initialData.subCategoryId === currentSubCatId && subCategories.find(sc => sc.id === currentSubCatId)?.parentId !== currentParentId )) {
-             form.setValue('subCategoryId', undefined, { shouldValidate: true });
+             form.setValue('subCategoryId', "", { shouldValidate: true });
         }
       }
     } else {
       setFilteredSubCategories([]);
       if (!initialData) {
-        form.setValue('subCategoryId', undefined, { shouldValidate: true });
+        form.setValue('subCategoryId', "", { shouldValidate: true });
       }
     }
   }, [watchedParentCategoryId, subCategories, form, initialData]);
@@ -338,9 +344,9 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         form.setValue('shortDescription', result.fullDescription, { shouldValidate: true });
         form.setValue('fullDescription', result.pleaseNote?.join('\n') || '', { shouldValidate: true });
         form.setValue('imageHint', result.imageHint, { shouldValidate: true });
-        replaceHighlights(result.serviceHighlights.map(h => h) || []);
-        replaceIncluded(result.includedItems.map(i => i) || []);
-        replaceExcluded(result.excludedItems.map(e => e) || []);
+        replaceHighlights(result.serviceHighlights.map(h => ({ value: h })) || []);
+        replaceIncluded(result.includedItems.map(i => ({ value: i })) || []);
+        replaceExcluded(result.excludedItems.map(e => ({ value: e })) || []);
         form.setValue('taskTimeValue', result.taskTime.value, { shouldValidate: true });
         form.setValue('taskTimeUnit', result.taskTime.unit, { shouldValidate: true });
         const faqsWithIds = result.serviceFaqs.map(faq => ({...faq, id: nanoid() }));
@@ -419,7 +425,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         description: formData.description,
         shortDescription: formData.shortDescription === null ? undefined : formData.shortDescription,
         fullDescription: formData.fullDescription === null ? undefined : formData.fullDescription,
-        serviceHighlights: formData.serviceHighlights || [],
+        serviceHighlights: formData.serviceHighlights?.map(h => h.value).filter(v => v.trim() !== "") || [],
         imageUrl: finalImageUrl,
         imageHint: formData.imageHint,
         rating: formData.rating,
@@ -434,8 +440,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         id: initialData?.id,
         taskTimeValue: formData.taskTimeValue === null ? undefined : formData.taskTimeValue,
         taskTimeUnit: formData.taskTimeUnit === null ? undefined : formData.taskTimeUnit,
-        includedItems: formData.includedItems || [],
-        excludedItems: formData.excludedItems || [],
+        includedItems: formData.includedItems?.map(i => i.value).filter(v => v.trim() !== "") || [],
+        excludedItems: formData.excludedItems?.map(e => e.value).filter(v => v.trim() !== "") || [],
         allowPayLater: formData.allowPayLater,
         serviceFaqs: formData.serviceFaqs?.map(faq => ({ question: faq.question, answer: faq.answer })) || [],
         membersRequired: formData.membersRequired === null ? undefined : formData.membersRequired,
@@ -534,20 +540,20 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         <Separator />
         <div>
             <FormLabel className="text-md font-semibold text-muted-foreground">What's Included (Optional)</FormLabel> <FormDescription className="mb-2 text-xs">List items or tasks included in this service.</FormDescription>
-            {includedFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`includedItems.${index}`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Included item ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeIncluded(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
-            <Button type="button" variant="outline" size="sm" onClick={() => appendIncluded("")} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Included Item</Button>
+            {includedFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`includedItems.${index}.value`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Included item ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeIncluded(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
+            <Button type="button" variant="outline" size="sm" onClick={() => appendIncluded({ value: "" })} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Included Item</Button>
         </div>
         <Separator />
         <div>
             <FormLabel className="text-md font-semibold text-muted-foreground">What's Not Included (Optional)</FormLabel> <FormDescription className="mb-2 text-xs">List items or tasks explicitly excluded from this service.</FormDescription>
-            {excludedFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`excludedItems.${index}`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Excluded item ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeExcluded(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
-            <Button type="button" variant="outline" size="sm" onClick={() => appendExcluded("")} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Excluded Item</Button>
+            {excludedFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`excludedItems.${index}.value`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Excluded item ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeExcluded(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
+            <Button type="button" variant="outline" size="sm" onClick={() => appendExcluded({ value: "" })} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Excluded Item</Button>
         </div>
         <Separator />
         <div>
           <FormLabel className="text-md font-semibold text-muted-foreground">Service Highlights (Optional)</FormLabel><FormDescription className="mb-2 text-xs">Key benefits or features. Max 150 chars each.</FormDescription>
-          {highlightFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`serviceHighlights.${index}`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Highlight ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeHighlight(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
-          <Button type="button" variant="outline" size="sm" onClick={() => appendHighlight("")} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Highlight</Button>
+          {highlightFields.map((item, index) => (<FormField key={item.id} control={form.control} name={`serviceHighlights.${index}.value`} render={({ field: itemField }) => (<FormItem className="flex items-center gap-2 mb-2"><FormControl><Input placeholder={`Highlight ${index + 1}`} {...itemField} disabled={effectiveIsSubmitting} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeHighlight(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4 text-destructive" /></Button><FormMessage /></FormItem>)}/>))}
+          <Button type="button" variant="outline" size="sm" onClick={() => appendHighlight({ value: "" })} disabled={effectiveIsSubmitting} className="mt-2"><PlusCircle className="mr-2 h-4 w-4" /> Add Highlight</Button>
         </div>
         <Separator />
         <div>

@@ -243,7 +243,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
 
       await onSubmitProp({
         name: formData.name,
-        slug: formData.slug,
+        slug: formData.slug || "",
         order: formData.order,
         isActive: formData.isActive,
         imageUrl: finalImageUrl,

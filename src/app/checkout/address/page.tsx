@@ -253,7 +253,7 @@ export default function AddressPage() {
         toast({ title: "Area Not Serviceable", description: "Sorry, we're not available in your area yet. We're expanding soon!", variant: "destructive", duration: 7000 });
       }
     } else {
-      toast({ title: "No Address Selected", description: "Please select or add a delivery address.", variant: "destructive" });
+      toast({ title: "No Address Selected", description: "Please select or add a service address.", variant: "destructive" });
     }
   };
 
@@ -280,7 +280,7 @@ export default function AddressPage() {
       <CheckoutStepper currentStepId="address" />
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="text-xl sm:text-2xl font-headline text-center">Select Delivery Address</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl font-headline text-center">Select Service Address</CardTitle>
           <CardDescription className="text-center text-sm sm:text-base">Where should we send our professionals?</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

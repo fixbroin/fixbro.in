@@ -35,7 +35,7 @@ const quotationItemSchema = z.object({
   total: z.number().optional(),
 });
 
-const quotationStatusOptions: QuotationStatus[] = ['Draft', 'Sent', 'Accepted', 'Rejected', 'ConvertedToInvoice'];
+const quotationStatusOptions: [string, ...string[]] = ['Draft', 'Sent', 'Accepted', 'Rejected', 'ConvertedToInvoice'];
 
 const createQuotationFormSchema = z.object({
   userId: z.string().optional().or(z.literal('')),
@@ -191,7 +191,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
         quotationDate: Timestamp.fromDate(data.quotationDate),
         customerName: data.customerName,
         serviceTitle: data.serviceTitle,
-        status: data.status,
+        status: data.status as QuotationStatus,
         items: data.items.map(item => ({
           itemName: item.itemName,
           quantity: item.quantity,

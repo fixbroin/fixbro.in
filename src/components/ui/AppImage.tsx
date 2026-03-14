@@ -15,6 +15,11 @@ interface AppImageProps {
   className?: string
   objectPosition?: "top" | "center" | "bottom" | "left" | "right" | string
   "data-ai-hint"?: string
+  aiHint?: string
+  fallbackSrc?: string
+  loading?: "eager" | "lazy"
+  onError?: (event: any) => void
+  unoptimized?: boolean
 }
 
 export default function AppImage({
@@ -27,14 +32,24 @@ export default function AppImage({
   priority = false,
   className,
   objectPosition = "center",
-  "data-ai-hint": aiHint
+  "data-ai-hint": aiHintData,
+  aiHint,
+  fallbackSrc,
+  loading,
+  onError,
+  unoptimized
 }: AppImageProps) {
 
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
 
   const isDefaultImage = !src || error
-  const imageSrc = isDefaultImage ? "/default-image.png" : src
+  const imageSrc = isDefaultImage ? (fallbackSrc || "/default-image.png") : src
+
+  const handleOnError = (e: any) => {
+    setError(true);
+    if (onError) onError(e);
+  };
 
   return (
     <div className={cn("relative overflow-hidden", fill ? "w-full h-full" : "inline-block", className)}>
@@ -58,10 +73,11 @@ export default function AppImage({
         height={!fill ? height : undefined}
         sizes={sizes}
         priority={priority}
-        loading={priority ? "eager" : "lazy"}
+        loading={loading}
         onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
-        data-ai-hint={aiHint}
+        onError={handleOnError}
+        data-ai-hint={aiHint || aiHintData}
+        unoptimized={unoptimized}
         className={cn(
           "transition-opacity duration-300",
           isDefaultImage ? "object-contain bg-muted" : "object-cover",

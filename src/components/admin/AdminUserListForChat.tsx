@@ -193,7 +193,7 @@ export default function AdminUserListForChat({
                             "h-10 w-10 border-2 transition-colors duration-200",
                             isSelected ? "border-primary-foreground/30" : "border-transparent"
                           )}>
-                            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email} />
+                            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || ""} />
                             <AvatarFallback className={cn(isSelected ? "bg-primary-foreground/10" : "")}>
                                 {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle size={20}/>}
                             </AvatarFallback>

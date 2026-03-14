@@ -322,7 +322,7 @@ export default function AdminActivityFeedPage() {
             <p className="text-xs font-bold truncate tracking-tight">{name}</p>
             {!isGuest && <ShieldCheck className="h-3 w-3 text-blue-500" />}
           </div>
-          <p className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]" title={activity.userId || activity.guestId}>
+          <p className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]" title={activity.userId || activity.guestId || ""}>
             {activity.userId || activity.guestId}
           </p>
         </div>
@@ -364,7 +364,7 @@ export default function AdminActivityFeedPage() {
               </p>
               {activity.userId && <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />}
             </div>
-            <p className="text-[10px] text-muted-foreground font-mono truncate break-all" title={activity.userId || activity.guestId}>
+            <p className="text-[10px] text-muted-foreground font-mono truncate break-all" title={activity.userId || activity.guestId || ""}>
               {activity.userId || activity.guestId}
             </p>
           </div>

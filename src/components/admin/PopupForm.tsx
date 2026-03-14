@@ -29,9 +29,9 @@ import { Progress } from "@/components/ui/progress";
 
 const generateRandomHexString = (length: number) => Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
-const popupTypes: PopupType[] = ["newsletter_signup", "promotional", "welcome", "exit_intent", "marketing_modal", "lead_capture", "subscribe", "video"];
-const displayRuleTypes: PopupDisplayRuleType[] = ["on_page_load", "on_exit_intent", "after_x_seconds", "on_scroll_percentage"];
-const displayFrequencies: PopupDisplayFrequency[] = ["once_per_session", "once_per_day", "always"];
+const popupTypes: [string, ...string[]] = ["newsletter_signup", "promotional", "welcome", "exit_intent", "marketing_modal", "lead_capture", "subscribe", "video"];
+const displayRuleTypes: [string, ...string[]] = ["on_page_load", "on_exit_intent", "after_x_seconds", "on_scroll_percentage"];
+const displayFrequencies: [string, ...string[]] = ["once_per_session", "once_per_day", "always"];
 
 const popupFormSchema = z.object({
   name: z.string().min(2, "Internal Name is required.").max(100, "Name too long."),
@@ -173,7 +173,7 @@ export default function PopupForm({ onSubmit: onSubmitProp, initialData, onCance
           uploadTask.on('state_changed',
             (snapshot) => { const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100; setUploadProgress(p); setStatusMessage(`Uploading: ${Math.round(p)}%`); },
             (error) => reject(new Error(`Image upload failed: ${error.message}`)),
-            async () => { try { resolve(await getDownloadURL(uploadTask.snapshot.ref)); } catch (error) { reject(new Error(`Failed to get URL: ${error.message}`)); } }
+            async () => { try { resolve(await getDownloadURL(uploadTask.snapshot.ref)); } catch (error: any) { reject(new Error(`Failed to get URL: ${error.message}`)); } }
           );
         });
         setUploadProgress(100); setStatusMessage("Image uploaded. Saving...");
@@ -187,7 +187,7 @@ export default function PopupForm({ onSubmit: onSubmitProp, initialData, onCance
 
       const payload: Omit<FirestorePopup, 'id' | 'createdAt' | 'updatedAt'> & { id?: string } = { 
         name: formData.name,
-        popupType: formData.popupType,
+        popupType: formData.popupType as PopupType,
         title: formData.title || "",
         displayText: formData.displayText || "",
         imageUrl: finalImageUrl,
@@ -199,9 +199,9 @@ export default function PopupForm({ onSubmit: onSubmitProp, initialData, onCance
         promoCode: formData.promoCode || "",
         promoCodeConditionFieldsRequired: formData.promoCode?.trim() ? (formData.promoCodeConditionFieldsRequired ?? 0) : 0,
         targetUrl: formData.targetUrl || "",
-        displayRuleType: formData.displayRuleType,
+        displayRuleType: formData.displayRuleType as PopupDisplayRuleType,
         displayRuleValue: formData.displayRuleValue === undefined || formData.displayRuleValue === null ? null : formData.displayRuleValue,
-        displayFrequency: formData.displayFrequency,
+        displayFrequency: formData.displayFrequency as PopupDisplayFrequency,
         showCloseButton: formData.showCloseButton,
         isActive: formData.isActive,
         targetPages: targetPages,
