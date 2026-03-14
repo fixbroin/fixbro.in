@@ -70,7 +70,7 @@ export default function AdminUsersPage() {
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
-  const [selectedFields, setSelectedFields] = useState<Record<SelectableUserField, boolean>>({
+  const [selectedFields, setSelectedFields] = useState<Partial<Record<SelectableUserField, boolean>>>({
     displayName: true, email: true, mobileNumber: true, fullAddress: false, 
     walletBalance: false, isActive: true, createdAt: false, lastLoginAt: false,
     id: false, uid: false,
@@ -237,7 +237,7 @@ export default function AdminUsersPage() {
         <div className="flex items-center gap-3 text-left">
           <div className="relative">
             <Avatar className="h-12 w-12 border-2 border-primary/10 shadow-sm">
-              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email} />
+              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || undefined} />
               <AvatarFallback className="bg-primary/5 text-primary font-black uppercase">
                 {user.displayName ? user.displayName.charAt(0) : <UserCircle size={24}/>}
               </AvatarFallback>
@@ -398,7 +398,7 @@ export default function AdminUsersPage() {
                         <motion.tr key={user.id} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: idx < 15 ? idx * 0.03 : 0 }} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
                           <TableCell className="pl-8">
                             <Avatar className="h-10 w-10 border shadow-sm group-hover:scale-110 transition-transform">
-                              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email} />
+                              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || undefined} />
                               <AvatarFallback className="text-xs font-black bg-primary/10 text-primary">{user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
                             </Avatar>
                           </TableCell>
