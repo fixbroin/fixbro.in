@@ -3,14 +3,14 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown } from "lucide-react";
+import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronRight, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2 } from "lucide-react";
 import type { FirestoreUser, Address } from '@/types/firestore';
 import { db, auth } from '@/lib/firebase'; 
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
@@ -18,15 +18,32 @@ import { updateProfile } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import UserDetailsModal from '@/components/admin/UserDetailsModal'; 
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import AppImage from '@/components/ui/AppImage';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const formatUserTimestamp = (timestamp?: Timestamp): string => {
   if (!timestamp) return 'N/A';
   return timestamp.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
+
+const StatusBadge = ({ isActive, isLoading }: { isActive: boolean, isLoading: boolean }) => (
+  <div className={cn(
+    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-bold text-[10px] uppercase tracking-wider transition-all duration-300 shadow-sm",
+    isActive 
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
+      : "bg-destructive/10 text-destructive border-destructive/20"
+  )}>
+    {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : (isActive ? <ShieldCheck className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />)}
+    <span>{isActive ? 'Active' : 'Disabled'}</span>
+  </div>
+);
 
 type SelectableUserField = keyof Omit<FirestoreUser, 'addresses' | 'fcmTokens' | 'marketingStatus' | 'roles' | 'photoURL'> | 'fullAddress';
 
@@ -51,13 +68,13 @@ export default function AdminUsersPage() {
 
   const [selectedUserForModal, setSelectedUserForModal] = useState<FirestoreUser | null>(null);
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const [selectedFields, setSelectedFields] = useState<Record<SelectableUserField, boolean>>({
     displayName: true, email: true, mobileNumber: true, fullAddress: false, 
     walletBalance: false, isActive: true, createdAt: false, lastLoginAt: false,
-    id: false, uid: false, // Ensure non-selectable fields are here
+    id: false, uid: false,
   });
-
 
   useEffect(() => {
     setIsLoading(true);
@@ -80,56 +97,53 @@ export default function AdminUsersPage() {
     return () => unsubscribe();
   }, [toast]);
 
+  const stats = useMemo(() => {
+    return {
+      total: users.length,
+      active: users.filter(u => u.isActive).length,
+      disabled: users.filter(u => !u.isActive).length,
+      newToday: users.filter(u => {
+        if (!u.createdAt) return false;
+        const today = new Date();
+        const created = u.createdAt.toDate();
+        return created.getDate() === today.getDate() && 
+               created.getMonth() === today.getMonth() && 
+               created.getFullYear() === today.getFullYear();
+      }).length
+    };
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
-    if (!searchTerm) {
-      return users;
-    }
+    if (!searchTerm) return users;
     const lowercasedTerm = searchTerm.toLowerCase();
     return users.filter(user =>
       user.displayName?.toLowerCase().includes(lowercasedTerm) ||
       user.email?.toLowerCase().includes(lowercasedTerm) ||
-      user.mobileNumber?.includes(searchTerm) // Keep phone search exact or startsWith
+      user.mobileNumber?.includes(searchTerm)
     );
   }, [users, searchTerm]);
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
-    if (!userId) {
-        toast({title: "Error", description: "User ID is missing.", variant: "destructive"});
-        return;
-    }
+    if (!userId) return;
     setIsUpdatingStatus(userId);
-    const userDocRef = doc(db, "users", userId);
     try {
-      await updateDoc(userDocRef, { 
-        isActive: !currentStatus,
-      });
-      toast({ title: "Success", description: `User status updated to ${!currentStatus ? 'Active' : 'Disabled'}.` });
-      
-      if (!currentStatus === false) { 
-        console.warn(`User ${userId} marked as inactive in Firestore. Consider disabling in Firebase Auth via Admin SDK for full effect.`);
-      }
+      await updateDoc(doc(db, "users", userId), { isActive: !currentStatus });
+      toast({ title: "Status Updated", description: `User is now ${!currentStatus ? 'Active' : 'Disabled'}.` });
     } catch (error) {
-      console.error("Error updating user status: ", error);
-      toast({ title: "Error", description: "Could not update user status.", variant: "destructive" });
+      toast({ title: "Update Failed", variant: "destructive" });
     } finally {
       setIsUpdatingStatus(null);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!userId) {
-      toast({ title: "Error", description: "User ID is missing for delete.", variant: "destructive" });
-      return;
-    }
+    if (!userId) return;
     setIsDeleting(userId);
     try {
-      const userDocRef = doc(db, "users", userId);
-      await deleteDoc(userDocRef);
-      toast({ title: "User Deleted (Firestore)", description: `User ${userId} document deleted from Firestore. Auth record still exists.` });
-      console.warn(`User ${userId} document deleted from Firestore. Implement Firebase Auth user deletion via Admin SDK.`);
+      await deleteDoc(doc(db, "users", userId));
+      toast({ title: "User Deleted", description: "The record has been removed from Firestore." });
     } catch (error) {
-      console.error("Error deleting user document: ", error);
-      toast({ title: "Error", description: "Could not delete user document from Firestore.", variant: "destructive" });
+      toast({ title: "Delete Failed", variant: "destructive" });
     } finally {
       setIsDeleting(null);
     }
@@ -141,39 +155,14 @@ export default function AdminUsersPage() {
   };
 
   const handleUpdateUserFromModal = async (updatedUserData: Partial<FirestoreUser>) => {
-    if (!selectedUserForModal || !selectedUserForModal.id) {
-        toast({ title: "Error", description: "No user selected for update.", variant: "destructive" });
-        return false;
-    }
-
-    const userDocRef = doc(db, "users", selectedUserForModal.id);
-    let firebaseAuthProfileUpdatePromise: Promise<void> | null = null;
-
+    if (!selectedUserForModal?.id) return false;
     try {
-        const firestoreUpdateData: Partial<FirestoreUser> = {
-            ...(updatedUserData.displayName !== undefined && { displayName: updatedUserData.displayName }),
-            ...(updatedUserData.email !== undefined && { email: updatedUserData.email }), 
-            ...(updatedUserData.mobileNumber !== undefined && { mobileNumber: updatedUserData.mobileNumber }),
-        };
-
-        await updateDoc(userDocRef, firestoreUpdateData);
-
-        if (updatedUserData.displayName && auth.currentUser && auth.currentUser.uid === selectedUserForModal.uid) {
-            firebaseAuthProfileUpdatePromise = updateProfile(auth.currentUser, { displayName: updatedUserData.displayName });
-        } else if (updatedUserData.displayName && selectedUserForModal.uid) {
-            console.warn(`Admin updated displayName for ${selectedUserForModal.uid} in Firestore. Auth profile displayName may need Admin SDK to sync if this user is not the current admin.`);
-        }
-        
-        if (firebaseAuthProfileUpdatePromise) {
-            await firebaseAuthProfileUpdatePromise;
-        }
-        
-        toast({ title: "Success", description: "User details updated successfully." });
+        await updateDoc(doc(db, "users", selectedUserForModal.id), updatedUserData);
+        toast({ title: "Updated", description: "User details synchronized." });
         setIsUserDetailsModalOpen(false);
         return true;
     } catch (error) {
-        console.error("Error updating user:", error);
-        toast({ title: "Error", description: (error as Error).message || "Could not update user details.", variant: "destructive" });
+        toast({ title: "Update Failed", variant: "destructive" });
         return false;
     }
   };
@@ -194,38 +183,28 @@ export default function AdminUsersPage() {
   const processDataForDownload = () => {
     const headers = availableFields.filter(f => selectedFields[f.key]).map(f => f.label);
     const keys = availableFields.filter(f => selectedFields[f.key]).map(f => f.key);
-
     return {
       headers,
-      data: filteredUsers.map(user => {
-        return keys.map(key => {
-          if (key === 'fullAddress') {
-            const primaryAddress = user.addresses?.find(a => a.isDefault) || user.addresses?.[0];
-            return primaryAddress ? formatAddress(primaryAddress) : "N/A";
-          }
-          if (key === 'createdAt' || key === 'lastLoginAt') {
-            const timestamp = user[key];
-            return timestamp ? formatUserTimestamp(timestamp as Timestamp) : "N/A";
-          }
-          if (key === 'isActive') {
-            return user.isActive ? "Active" : "Disabled";
-          }
-          return user[key as keyof FirestoreUser] ?? 'N/A';
-        });
-      })
+      data: filteredUsers.map(user => keys.map(key => {
+        if (key === 'fullAddress') {
+          const primaryAddress = user.addresses?.find(a => a.isDefault) || user.addresses?.[0];
+          return primaryAddress ? formatAddress(primaryAddress) : "N/A";
+        }
+        if (key === 'createdAt' || key === 'lastLoginAt') {
+          const timestamp = user[key];
+          return timestamp ? formatUserTimestamp(timestamp as Timestamp) : "N/A";
+        }
+        if (key === 'isActive') return user.isActive ? "Active" : "Disabled";
+        return user[key as keyof FirestoreUser] ?? 'N/A';
+      }))
     };
   };
 
   const handleDownload = (format: 'csv' | 'excel' | 'pdf') => {
     const { headers, data } = processDataForDownload();
-    if (data.length === 0) {
-      toast({ title: "No Data", description: "No users to download.", variant: "default" });
-      return;
-    }
-
+    if (data.length === 0) return;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `users_export_${timestamp}`;
-
     if (format === 'csv') {
       const csvContent = [headers.join(','), ...data.map(row => row.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -240,261 +219,241 @@ export default function AdminUsersPage() {
       XLSX.writeFile(workbook, `${filename}.xlsx`);
     } else if (format === 'pdf') {
       const doc = new jsPDF();
-      doc.text("User List", 14, 16);
-      (doc as any).autoTable({
-        head: [headers],
-        body: data,
-        startY: 20,
-      });
+      doc.text("User Directory Export", 14, 16);
+      (doc as any).autoTable({ head: [headers], body: data, startY: 20 });
       doc.save(`${filename}.pdf`);
     }
   };
 
-  // Function to render a single user card for mobile view
-  const renderUserCard = (user: FirestoreUser) => (
-    <Card key={user.id} className="mb-4">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || "U"} />
-            <AvatarFallback className="text-sm">
-              {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email ? user.email.charAt(0).toUpperCase() : <UserCircle size={18}/>}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-semibold text-foreground break-words">{user.displayName || 'N/A'}</p>
-            <p className="text-xs text-muted-foreground break-all" title={user.uid}>ID: {user.uid}</p>
+  const renderUserCard = (user: FirestoreUser, idx: number) => (
+    <motion.div 
+      key={user.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+      className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors"
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-3 text-left">
+          <div className="relative">
+            <Avatar className="h-12 w-12 border-2 border-primary/10 shadow-sm">
+              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email} />
+              <AvatarFallback className="bg-primary/5 text-primary font-black uppercase">
+                {user.displayName ? user.displayName.charAt(0) : <UserCircle size={24}/>}
+              </AvatarFallback>
+            </Avatar>
+            <div className={cn("absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 border-2 border-background rounded-full", user.isActive ? "bg-emerald-500" : "bg-destructive")} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-black text-sm text-foreground truncate tracking-tight">{user.displayName || 'Anonymous User'}</p>
+            <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[150px]">ID: {user.uid}</p>
           </div>
         </div>
-        <div className="text-sm space-y-1 pl-1">
-           <p className="text-xs text-muted-foreground break-all"><strong>Email:</strong> {user.email || 'N/A'}</p>
-           <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground"><strong>Mobile:</strong> {user.mobileNumber || 'N/A'}</p>
-                {user.mobileNumber && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} title="Chat on WhatsApp">
-                    <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={16} height={16} />
-                    <span className="sr-only">Chat on WhatsApp</span>
-                    </Button>
-                )}
-            </div>
-           <p className="text-xs text-muted-foreground"><strong>Joined:</strong> {formatUserTimestamp(user.createdAt)}</p>
-           <div className="flex items-center justify-between pt-2">
-            <div>
-              <strong>Status:</strong>
-              <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleToggleUserStatus(user.id, user.isActive)}
-                  disabled={isUpdatingStatus === user.id}
-                  title={user.isActive ? "Deactivate User" : "Activate User"}
-                  className="px-2 h-auto"
-              >
-                {isUpdatingStatus === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                  user.isActive ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <ShieldAlert className="h-5 w-5 text-red-500" />
-                }
-                <span className="ml-2 text-xs">{user.isActive ? "Active" : "Disabled"}</span>
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleViewDetails(user)} title="View/Edit Details">
-                <Eye className="h-4 w-4" /><span className="sr-only">View/Edit Details</span>
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="icon" className="h-8 w-8" title="Delete User" disabled={isDeleting === user.id || !user.id}>
-                    {isDeleting === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}<span className="sr-only">Delete User</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This will delete Firestore data for {user.displayName || user.email}.</AlertDialogDescription></AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteUser(user.id!)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-           </div>
+        <StatusBadge isActive={user.isActive} isLoading={isUpdatingStatus === user.id} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 mb-5">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Mail className="h-3.5 w-3.5 text-primary/60" />
+          <span className="truncate">{user.email || 'N/A'}</span>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Phone className="h-3.5 w-3.5 text-primary/60" />
+            <span>{user.mobileNumber || 'No Phone'}</span>
+          </div>
+          {user.mobileNumber && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)}>
+              <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+              <span className="text-[10px] font-black uppercase">WhatsApp</span>
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5 text-primary/60" />
+          <span>Joined {formatUserTimestamp(user.createdAt)}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-2 border-t border-dashed">
+        <Button 
+          variant="outline" 
+          className="flex-grow h-10 rounded-xl font-bold text-xs uppercase tracking-wider shadow-sm border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-300" 
+          onClick={() => handleViewDetails(user)}
+        >
+          <Eye className="h-4 w-4 mr-2" /> View Details
+        </Button>
+        <Button 
+          variant="ghost"
+          className={cn(
+            "h-10 px-3 rounded-xl shadow-sm transition-all duration-300",
+            user.isActive 
+              ? "bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white" 
+              : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white"
+          )}
+          onClick={() => handleToggleUserStatus(user.id, user.isActive)}
+          disabled={isUpdatingStatus === user.id}
+        >
+          {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" className="h-10 px-3 rounded-xl bg-destructive/5 text-destructive border border-destructive/10 hover:bg-destructive hover:text-destructive-foreground transition-all duration-300 shadow-sm" disabled={isDeleting === user.id || !user.id}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-[2.5rem]">
+            <AlertDialogHeader>
+              <div className="bg-destructive/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-4"><ShieldAlert className="h-6 w-6 text-destructive" /></div>
+              <AlertDialogTitle className="text-xl font-black tracking-tight uppercase">Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription className="font-medium text-sm">Remove <span className="text-destructive font-black underline">{user.displayName || user.email}</span> from system?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6">
+              <AlertDialogCancel className="rounded-xl border-none bg-muted">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleDeleteUser(user.id!)} className="bg-destructive hover:bg-destructive/90 rounded-xl px-6">Confirm Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </motion.div>
   );
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center">
-            <Users className="mr-2 h-6 w-6 text-primary" /> Manage Users
-          </CardTitle>
-          <CardDescription>
-            View and manage registered users. Toggle active status or delete user records.
-          </CardDescription>
-          <div className="pt-4 flex items-center justify-start gap-2">
-            <div className="relative flex-grow max-w-xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"/>
-              <Input
-                  placeholder="Search by name, email, mobile..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-10"
-              />
+    <div className="space-y-8 pb-10">
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2 text-primary">
+            <Users className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Community Database</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tight">User Directory</h1>
+          <p className="text-muted-foreground text-sm font-medium">Manage and audit your registered user ecosystem.</p>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-card border shadow-sm p-2 rounded-[2rem]">
+          {[
+            { label: 'Total', value: stats.total, color: 'text-primary', icon: Users },
+            { label: 'Active', value: stats.active, color: 'text-emerald-600', icon: UserCheck },
+            { label: 'Disabled', value: stats.disabled, color: 'text-destructive', icon: UserX },
+            { label: 'Today', value: `+${stats.newToday}`, color: 'text-primary', icon: UserPlus },
+          ].map((s) => (
+            <div key={s.label} className="px-4 py-2 text-center border-r last:border-none border-dashed">
+              <p className="text-[9px] font-black uppercase text-muted-foreground mb-0.5 tracking-tighter">{s.label}</p>
+              <p className={cn("text-lg font-black leading-none", s.color)}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      </header>
+
+      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+        <CardHeader className="p-8 pb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="relative flex-grow w-full max-w-2xl group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors"/>
+              <Input placeholder="Search name, email, or mobile..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-14 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded-[1.25rem] font-medium transition-all shadow-inner" />
               {searchTerm && (
-                  <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setSearchTerm('')}>
+                  <Button variant="ghost" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary" onClick={() => setSearchTerm('')}>
                       <XCircle className="h-5 w-5 text-muted-foreground"/>
                   </Button>
               )}
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-10">
-                    <Download className="mr-2 h-4 w-4" /> Download
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Select Fields to Download</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {availableFields.map(field => (
-                  <DropdownMenuCheckboxItem
-                    key={field.key}
-                    checked={selectedFields[field.key]}
-                    onCheckedChange={(checked) => setSelectedFields(prev => ({...prev, [field.key]: checked}))}
-                    onSelect={(e) => e.preventDefault()} // Prevents menu from closing on check
-                  >
-                    {field.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <FileDown className="mr-2 h-4 w-4"/>
-                    Export as...
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuItem onClick={() => handleDownload('pdf')}>PDF</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownload('excel')}>Excel (XLSX)</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownload('csv')}>CSV</DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button 
+              className="h-14 px-6 rounded-[1.25rem] bg-primary text-primary-foreground font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all duration-300"
+              onClick={() => setIsExportDialogOpen(true)}
+            >
+                <Download className="mr-2.5 h-4 w-4" /> Export Data
+            </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-2">
+
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] animate-pulse">Scanning Registry...</p>
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-10">
-              <PackageSearch className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">{searchTerm ? `No users found matching "${searchTerm}".` : "No users found yet."}</p>
+            <div className="text-center py-32 bg-muted/5">
+              <PackageSearch className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
+              <p className="text-xl font-bold tracking-tight text-foreground">Zero Matches Found</p>
+              <p className="text-muted-foreground text-sm mt-1">{searchTerm ? "Adjust your search filters." : "No users currently registered."}</p>
             </div>
           ) : (
             <>
-              {/* Desktop and Tablet View */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">Avatar</TableHead>
-                      <TableHead>User ID (UID)</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Mobile</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent border-none">
+                      <TableHead className="w-[80px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Profile</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Legal Name & UID</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Communications</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Registered</TableHead>
+                      <TableHead className="text-center text-[10px] font-black uppercase tracking-widest text-foreground">Live Status</TableHead>
+                      <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest text-foreground">Management</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || "U"} />
-                            <AvatarFallback className="text-xs">
-                              {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email ? user.email.charAt(0).toUpperCase() : <UserCircle size={16}/>}
-                            </AvatarFallback>
-                          </Avatar>
-                        </TableCell>
-                        <TableCell className="font-medium text-xs break-all">{user.uid}</TableCell>
-                        <TableCell>{user.displayName || "N/A"}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span>{user.mobileNumber || "N/A"}</span>
-                            {user.mobileNumber && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)}
-                                title="Chat on WhatsApp"
-                              >
-                                <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={18} height={18} />
-                                <span className="sr-only">Chat on WhatsApp</span>
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{formatUserTimestamp(user.createdAt)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleToggleUserStatus(user.id, user.isActive)}
-                              disabled={isUpdatingStatus === user.id}
-                              title={user.isActive ? "Deactivate User" : "Activate User"}
-                              className="px-2"
-                          >
-                            {isUpdatingStatus === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                              user.isActive ? <ShieldCheck className="h-5 w-5 text-green-500" /> : <ShieldAlert className="h-5 w-5 text-red-500" />
-                            }
-                            <span className="ml-2 text-xs">{user.isActive ? "Active" : "Disabled"}</span>
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                            <Button variant="outline" size="icon" onClick={() => handleViewDetails(user)} title="View/Edit Details">
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View/Edit Details</span>
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" title="Delete User" disabled={isDeleting === user.id || !user.id}>
-                                  {isDeleting === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                  <span className="sr-only">Delete User</span>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action will delete the user's data from Firestore. Deleting from Firebase Authentication requires Admin SDK.
-                                    This action cannot be undone for the Firestore record of <span className="font-semibold">{user.displayName || user.email}</span>.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel disabled={isDeleting === user.id}>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)} disabled={isDeleting === user.id} className="bg-destructive hover:bg-destructive/90">
-                                    {isDeleting === user.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Yes, delete user record
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    <AnimatePresence initial={false}>
+                      {filteredUsers.map((user, idx) => (
+                        <motion.tr key={user.id} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: idx < 15 ? idx * 0.03 : 0 }} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
+                          <TableCell className="pl-8">
+                            <Avatar className="h-10 w-10 border shadow-sm group-hover:scale-110 transition-transform">
+                              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email} />
+                              <AvatarFallback className="text-xs font-black bg-primary/10 text-primary">{user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+                            </Avatar>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-foreground">{user.displayName || "Unset Name"}</span>
+                              <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-tighter" title={user.uid}>{user.uid.substring(0,14)}...</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground truncate max-w-[200px]"><Mail className="h-3 w-3 text-primary/60 shrink-0" /> {user.email}</div>
+                              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                <Phone className="h-3 w-3 text-primary/60 shrink-0" /> <span>{user.mobileNumber || "No Contact"}</span>
+                                {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors"><AppImage src="/whatsapp.png" alt="WA" width={14} height={14} /></button>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-black text-muted-foreground uppercase tracking-tighter">{formatUserTimestamp(user.createdAt)}</TableCell>
+                          <TableCell className="text-center">
+                            <button onClick={() => handleToggleUserStatus(user.id, user.isActive)} className="focus:outline-none" disabled={isUpdatingStatus === user.id}>
+                              <StatusBadge isActive={user.isActive} isLoading={isUpdatingStatus === user.id} />
+                            </button>
+                          </TableCell>
+                          <TableCell className="pr-8 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm border border-primary/10" onClick={() => handleViewDetails(user)}><Eye className="h-4 w-4" /></Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-destructive hover:text-destructive-foreground transition-all duration-300 shadow-sm border border-destructive/10" disabled={isDeleting === user.id || !user.id}><Trash2 className="h-4 w-4" /></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-[2.5rem] p-8 border-none shadow-2xl bg-card">
+                                  <AlertDialogHeader>
+                                    <div className="bg-destructive/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-4"><ShieldAlert className="h-6 w-6 text-destructive" /></div>
+                                    <AlertDialogTitle className="text-2xl font-black tracking-tight uppercase text-foreground">User Expulsion</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-base font-medium text-muted-foreground">This will permanently erase <span className="text-destructive font-black underline">{user.displayName || user.email}</span> from the Firestore database.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter className="mt-8 gap-3">
+                                    <AlertDialogCancel className="rounded-xl border-none bg-muted hover:bg-muted/80 text-foreground">Retain</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteUser(user.id!)} className="rounded-xl bg-destructive hover:bg-destructive/90 px-8 text-white">Confirm Erase</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
                   </TableBody>
                 </Table>
               </div>
-
-              {/* Mobile View */}
               <div className="md:hidden">
-                {filteredUsers.map(renderUserCard)}
+                <AnimatePresence initial={false}>
+                  {filteredUsers.map((user, idx) => renderUserCard(user, idx))}
+                </AnimatePresence>
               </div>
             </>
           )}
@@ -503,15 +462,59 @@ export default function AdminUsersPage() {
 
       {selectedUserForModal && (
         <Dialog open={isUserDetailsModalOpen} onOpenChange={setIsUserDetailsModalOpen}>
-          <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] flex flex-col p-0">
-            <UserDetailsModal
-              user={selectedUserForModal}
-              onClose={() => setIsUserDetailsModalOpen(false)}
-              onUpdateUser={handleUpdateUserFromModal}
-            />
+          <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+            <UserDetailsModal user={selectedUserForModal} onClose={() => setIsUserDetailsModalOpen(false)} onUpdateUser={handleUpdateUserFromModal} />
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Export Pop-up */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="max-w-md w-[95vw] border-none shadow-2xl rounded-[2.5rem] p-8 bg-card">
+          <DialogHeader>
+            <div className="bg-primary/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
+              <Download className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-2xl font-black tracking-tight uppercase text-foreground">Export Directory</DialogTitle>
+            <DialogDescription className="text-sm font-medium text-muted-foreground">Select the data columns you wish to include in your document.</DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6">
+            <div className="grid grid-cols-2 gap-4">
+              {availableFields.map(field => (
+                <div key={field.key} className="flex items-center space-x-3 p-3 rounded-xl border bg-muted/20 hover:bg-primary/5 transition-colors">
+                  <Checkbox 
+                    id={`field-${field.key}`} 
+                    checked={selectedFields[field.key]} 
+                    onCheckedChange={(checked) => setSelectedFields(prev => ({...prev, [field.key]: !!checked}))}
+                    className="h-5 w-5 rounded-md border-primary/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  />
+                  <Label htmlFor={`field-${field.key}`} className="text-xs font-bold cursor-pointer flex-grow py-1 text-foreground">{field.label}</Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-col gap-3">
+            <div className="grid grid-cols-1 gap-2 w-full">
+              <Button onClick={() => { handleDownload('pdf'); setIsExportDialogOpen(false); }} className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all duration-300">
+                <FilePdfIcon className="mr-2 h-4 w-4" /> Download PDF Document
+              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={() => { handleDownload('excel'); setIsExportDialogOpen(false); }} variant="outline" className="h-12 rounded-xl border-2 border-accent/20 text-accent font-bold text-xs uppercase tracking-widest hover:bg-accent hover:text-accent-foreground transition-all duration-300">
+                  <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+                </Button>
+                <Button onClick={() => { handleDownload('csv'); setIsExportDialogOpen(false); }} variant="outline" className="h-12 rounded-xl border-2 border-primary/20 text-primary font-bold text-xs uppercase tracking-widest hover:bg-primary hover:text-primary-foreground transition-all duration-300">
+                  <FileDown className="mr-2 h-4 w-4" /> CSV Raw
+                </Button>
+              </div>
+            </div>
+            <Button variant="ghost" onClick={() => setIsExportDialogOpen(false)} className="w-full h-11 rounded-xl bg-destructive/5 text-destructive font-black text-[10px] uppercase tracking-[0.2em] mt-2 border border-destructive/10 hover:bg-destructive hover:text-white transition-all duration-300">
+              Cancel Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

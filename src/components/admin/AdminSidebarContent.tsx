@@ -12,9 +12,10 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote } from 'lucide-react';
+import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutGrid },
@@ -106,21 +107,23 @@ export default function AdminSidebarContent() {
 
   return (
     <>
-      <SidebarHeader className="p-4 border-b">
+      <SidebarHeader className="p-6 border-b bg-card">
         <Logo
           logoUrl={globalSettings?.logoUrl}
           websiteName={globalSettings?.websiteName}
-          size="normal"
           href="/admin"
         />
       </SidebarHeader>
-      <SidebarContent className="pb-4">
-        <SidebarMenu>
+      <SidebarContent className="pb-8">
+        <SidebarMenu className="gap-1 px-2 pt-4">
           {navItems.map((item, index) => {
             if (item.type === 'separator') {
               return (
-                <div key={`sep-${index}`} className="px-2 py-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</span>
+                <div key={`sep-${index}`} className="px-4 py-4 mt-4 mb-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] whitespace-nowrap">{item.label}</span>
+                    <div className="h-px w-full bg-accent/20" />
+                  </div>
                 </div>
               );
             }
@@ -137,12 +140,18 @@ export default function AdminSidebarContent() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={isActiveRoute}
                 tooltip={{ children: item.label, side: 'right', align: 'center' }}
+                className={cn(
+                  "h-11 transition-all duration-300 rounded-xl px-4 group mb-1 border shadow-sm",
+                  isActiveRoute 
+                    ? "bg-primary text-primary-foreground font-bold shadow-lg border-primary !opacity-100 hover:bg-primary hover:text-primary-foreground" 
+                    : "bg-muted/30 text-slate-700 dark:text-slate-300 hover:bg-muted/60 hover:text-primary hover:translate-x-1 opacity-90 hover:opacity-100 border-border/40 hover:border-primary/20"
+                )}
               >
-                <Link href={item.href!} onClick={handleLinkClick}>
-                  {IconComponent && <IconComponent />} 
-                  <span>{item.label}</span>
+                <Link href={item.href!} onClick={handleLinkClick} className="flex items-center w-full">
+                  {IconComponent && <IconComponent className={cn("h-4 w-4 shrink-0 transition-transform duration-300", isActiveRoute ? "text-primary-foreground scale-110" : "text-slate-500 dark:text-slate-400 group-hover:text-primary group-hover:scale-110")} />} 
+                  <span className="ml-3 truncate flex-grow">{item.label}</span>
+                  {isActiveRoute && <ChevronRight className="h-3 w-3 text-primary-foreground opacity-80" />}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

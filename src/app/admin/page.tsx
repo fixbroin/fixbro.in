@@ -1,19 +1,26 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, DollarSign, ShoppingBag, Users, Loader2, AlertTriangle, UserPlus, TagIcon, History, HandCoins, Search } from "lucide-react";
+import { 
+  BarChart, DollarSign, ShoppingBag, Users, Loader2, AlertTriangle, 
+  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight
+} from "lucide-react";
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, where, Timestamp, orderBy, limit, getDocs } from "firebase/firestore";
 import type { FirestoreBooking, FirestoreUser, UserActivity, FirestoreService } from '@/types/firestore';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import AppImage from '@/components/ui/AppImage';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import PwaInstallButton from '@/components/shared/PwaInstallButton';
+import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingServiceCard';
 
 interface DashboardStats {
   completedRevenue: number;
@@ -51,6 +58,43 @@ const calculateProviderFee = (bookingAmount: number, feeType?: 'fixed' | 'percen
     return 0;
 };
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  }
+};
+
+const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: { title: string, value: string | number, icon: any, colorClass: string, subtitle?: string }) => (
+  <Card className="overflow-hidden border-none shadow-xl rounded-3xl group transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-card">
+    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-6">
+      <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+      <div className={cn("p-2.5 rounded-2xl transition-colors duration-300", colorClass)}>
+        <Icon className="h-4 w-4" />
+      </div>
+    </CardHeader>
+    <CardContent className="p-6 pt-0">
+      <div className="text-3xl font-black tracking-tight">{value}</div>
+      {subtitle && <p className="text-[10px] font-bold text-muted-foreground uppercase mt-2">{subtitle}</p>}
+    </CardContent>
+    <div className="h-1.5 w-full bg-muted/30">
+      <div className={cn("h-full w-full", colorClass.replace('bg-', 'bg-').replace('/10', ''))} />
+    </div>
+  </Card>
+);
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     completedRevenue: 0,
@@ -71,6 +115,12 @@ export default function AdminDashboardPage() {
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const { config: appConfig } = useApplicationConfig();
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  }, []);
 
   useEffect(() => {
     setIsLoading(true);
@@ -109,7 +159,7 @@ export default function AdminDashboardPage() {
       bookingsStatsLoaded = true;
       checkLoadingDone();
     }, (err) => {
-      console.error("Error fetching bookings for dashboard stats:", err);
+      console.error("Error fetching bookings stats:", err);
       setError("Could not load booking data.");
       bookingsStatsLoaded = true;
       checkLoadingDone();
@@ -117,10 +167,8 @@ export default function AdminDashboardPage() {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoTimestamp = Timestamp.fromDate(thirtyDaysAgo);
 
-    const usersQuery = query(usersColRef);
-    const unsubscribeUsersStats = onSnapshot(usersQuery, (snapshot) => {
+    const unsubscribeUsersStats = onSnapshot(usersColRef, (snapshot) => {
       let currentActiveUsers = 0;
       let currentNewSignups = 0;
       snapshot.forEach((doc) => {
@@ -140,7 +188,7 @@ export default function AdminDashboardPage() {
       usersStatsLoaded = true;
       checkLoadingDone();
     }, (err) => {
-      console.error("Error fetching users for dashboard stats:", err);
+      console.error("Error fetching users stats:", err);
       setError((prevError) => prevError ? `${prevError} Could not load user data.` : "Could not load user data.");
       usersStatsLoaded = true;
       checkLoadingDone();
@@ -159,7 +207,7 @@ export default function AdminDashboardPage() {
     const combineAndSetActivities = () => {
         const combined = [...fetchedBookingsActivities, ...fetchedUsersActivities];
         combined.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-        setRecentActivities(combined.slice(0, 7)); // Show top 7 overall recent activities
+        setRecentActivities(combined.slice(0, 7)); 
         setIsActivitiesLoading(false);
     };
     
@@ -174,8 +222,8 @@ export default function AdminDashboardPage() {
           type: 'new_booking',
           timestamp: booking.createdAt,
           title: 'New Booking',
-          description: `Booking ID: ${booking.bookingId.substring(0,12)}... by ${booking.customerName}`,
-          icon: <TagIcon className="h-5 w-5 text-primary" />,
+          description: `ID: ${booking.bookingId.substring(0,8)} • ${booking.customerName}`,
+          icon: <TagIcon className="h-4 w-4 text-primary" />,
           href: `/admin/bookings/edit/${docSnap.id}`,
         };
       });
@@ -183,7 +231,6 @@ export default function AdminDashboardPage() {
       if (usersLoadedForActivity) combineAndSetActivities();
     }, (err) => {
       console.error("Error fetching recent bookings:", err);
-      setActivitiesError((prev) => prev ? `${prev} Failed to load recent bookings.` : "Failed to load recent bookings.");
       bookingsLoadedForActivity = true; 
       if (usersLoadedForActivity) combineAndSetActivities(); 
     });
@@ -196,16 +243,15 @@ export default function AdminDashboardPage() {
           type: 'new_user_signup',
           timestamp: user.createdAt,
           title: 'New User Signup',
-          description: `${user.displayName || user.email} just joined.`,
-          icon: <UserPlus className="h-5 w-5 text-accent" />,
-          href: `/admin/users`, // General link to users page
+          description: `${user.displayName || user.email}`,
+          icon: <UserPlus className="h-4 w-4 text-emerald-500" />,
+          href: `/admin/users`, 
         };
       });
       usersLoadedForActivity = true;
       if (bookingsLoadedForActivity) combineAndSetActivities();
     }, (err) => {
       console.error("Error fetching recent users:", err);
-      setActivitiesError((prev) => prev ? `${prev} Failed to load recent users.` : "Failed to load recent users.");
       usersLoadedForActivity = true;
       if (bookingsLoadedForActivity) combineAndSetActivities();
     });
@@ -214,11 +260,9 @@ export default function AdminDashboardPage() {
     const fetchAnalytics = async () => {
         setIsAnalyticsLoading(true);
         try {
-            // Fetch all services first to get their details
             const servicesSnapshot = await getDocs(collection(db, "adminServices"));
             const servicesDataMap = new Map(servicesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FirestoreService]));
 
-            // Top Services
             const bookingsSnapshot = await getDocs(collection(db, "bookings"));
             const serviceCounts: { [key: string]: number } = {};
             bookingsSnapshot.forEach(doc => {
@@ -236,18 +280,27 @@ export default function AdminDashboardPage() {
                 .filter((item): item is FirestoreService & { count: number } => item !== null)
                 .sort((a, b) => b.count - a.count);
 
-            // Top Search Terms
-            const searchActivitiesSnapshot = await getDocs(query(collection(db, "userActivities"), where("eventType", "==", "search"), limit(500)));
+            const searchActivitiesQuery = query(collection(db, "userActivities"), where("eventType", "==", "search"), limit(500));
+            const persistentSearchQuery = query(collection(db, "searchAnalytics"), limit(1000));
+            
+            const [searchActivitiesSnapshot, persistentSearchSnapshot] = await Promise.all([
+                getDocs(searchActivitiesQuery),
+                getDocs(persistentSearchQuery)
+            ]);
+
             const searchCounts: { [key: string]: number } = {};
             searchActivitiesSnapshot.forEach(doc => {
                 const activity = doc.data() as UserActivity;
                 const term = activity.eventData?.searchQuery?.toLowerCase().trim();
-                if (term) {
-                    searchCounts[term] = (searchCounts[term] || 0) + 1;
-                }
+                if (term) searchCounts[term] = (searchCounts[term] || 0) + 1;
             });
-            const topSearchTerms = Object.entries(searchCounts).sort(([, a], [, b]) => b - a).map(([term, count]) => ({ term, count }));
+            persistentSearchSnapshot.forEach(doc => {
+                const data = doc.data();
+                const term = data.term?.toLowerCase().trim();
+                if (term) searchCounts[term] = (searchCounts[term] || 0) + 1;
+            });
 
+            const topSearchTerms = Object.entries(searchCounts).sort(([, a], [, b]) => b - a).map(([term, count]) => ({ term, count }));
             setAnalytics({ topServices, topSearchTerms });
 
         } catch(e) {
@@ -264,196 +317,217 @@ export default function AdminDashboardPage() {
       unsubscribeRecentBookings();
       unsubscribeRecentUsers();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appConfig]); // Re-run if appConfig changes to recalculate commission
+  }, [appConfig]);
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">Dashboard Overview</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium h-5 w-24 bg-muted rounded animate-pulse"></CardTitle>
-                <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold h-8 w-32 bg-muted rounded animate-pulse"></div>
-                <div className="text-xs text-muted-foreground h-4 w-20 bg-muted rounded mt-1 animate-pulse"></div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-         <Card>
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center"><History className="mr-2 h-5 w-5 text-muted-foreground" />Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="h-64 flex justify-center items-center">
-             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </CardContent>
-        </Card>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">Initializing Control Center...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="space-y-6 text-center">
-        <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-semibold">Error Loading Dashboard Stats</h2>
-        <p className="text-destructive">{error}</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 max-w-md mx-auto">
+        <div className="p-4 bg-destructive/10 rounded-full">
+          <AlertTriangle className="h-12 w-12 text-destructive" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight">System Sync Failed</h2>
+        <p className="text-muted-foreground">{error}</p>
+        <Button onClick={() => window.location.reload()} variant="outline">Retry Synchronization</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold">Dashboard Overview</h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{stats.completedRevenue.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Earned Commission</CardTitle>
-            <HandCoins className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{stats.earnedCommission.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalBookings}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeUsers}</div>
-          </CardContent>
-        </Card>
-         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Signups (Last 30d)</CardTitle>
-            <BarChart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+{stats.newSignups}</div>
-          </CardContent>
-        </Card>
+    <motion.div 
+      initial="hidden" 
+      animate="visible" 
+      variants={containerVariants}
+      className="space-y-8 pb-10"
+    >
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2 text-primary">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Real-time Insights</span>
+          </div>
+          <h1 className="text-4xl font-black tracking-tight">{greeting}, Admin</h1>
+          <div className="flex items-center space-x-2 text-muted-foreground text-sm font-medium">
+             <Calendar className="h-4 w-4" />
+             <span>{format(new Date(), 'EEEE, MMMM do yyyy')}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <PwaInstallButton />
+          <Link href="/admin/bookings" passHref>
+            <Button className="rounded-2xl h-12 px-6 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
+              <Plus className="mr-2 h-4 w-4" /> Create Booking
+            </Button>
+          </Link>
+          <Button variant="outline" className="rounded-2xl h-12 w-12 p-0 border-primary/20 text-primary">
+            <ArrowUpRight className="h-5 w-5" />
+          </Button>
+        </div>
+      </header>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+        <motion.div variants={itemVariants}>
+          <StatCard 
+            title="Revenue" 
+            value={`₹${stats.completedRevenue.toLocaleString()}`} 
+            icon={DollarSign} 
+            colorClass="bg-blue-500/10 text-blue-500" 
+            subtitle="Total Completed Sales"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard 
+            title="Earnings" 
+            value={`₹${stats.earnedCommission.toLocaleString(undefined, {maximumFractionDigits: 0})}`} 
+            icon={HandCoins} 
+            colorClass="bg-primary/10 text-primary" 
+            subtitle="Net Platform Profit"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard 
+            title="Orders" 
+            value={stats.totalBookings} 
+            icon={ShoppingBag} 
+            colorClass="bg-amber-500/10 text-amber-500" 
+            subtitle="Total System Bookings"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard 
+            title="Active Base" 
+            value={stats.activeUsers} 
+            icon={Users} 
+            colorClass="bg-emerald-500/10 text-emerald-500" 
+            subtitle="Verified Active Users"
+          />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard 
+            title="Growth" 
+            value={`+${stats.newSignups}`} 
+            icon={UserPlus} 
+            colorClass="bg-indigo-500/10 text-indigo-500" 
+            subtitle="New signups (30d)"
+          />
+        </motion.div>
       </div>
 
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center">
-              <History className="mr-2 h-5 w-5 text-muted-foreground" />Recent Activity
-            </CardTitle>
-            <CardDescription>Latest bookings and user signups.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isActivitiesLoading ? (
-              <div className="flex justify-center items-center h-48">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="grid gap-8 grid-cols-1 lg:grid-cols-3">
+        <motion.div variants={itemVariants} className="lg:col-span-2">
+          <Card className="h-full border-none shadow-xl rounded-3xl overflow-hidden bg-card">
+            <CardHeader className="p-8 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-black tracking-tight flex items-center">
+                    <History className="mr-3 h-6 w-6 text-primary" /> Live Activity
+                  </CardTitle>
+                  <CardDescription className="font-medium">Real-time system events and interactions</CardDescription>
+                </div>
+                <Link href="/admin/activity-feed" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">View All</Link>
               </div>
-            ) : activitiesError ? (
-              <div className="text-center py-6 text-destructive">
-                  <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
-                  <p>Could not load recent activities: {activitiesError}</p>
-              </div>
-            ) : recentActivities.length === 0 ? (
-              <p className="text-muted-foreground text-center py-6">No recent activity to display.</p>
-            ) : (
-              <ul className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <li key={activity.id} className="flex items-start space-x-3 p-3 border rounded-md shadow-sm hover:bg-muted/50 transition-colors">
-                    <span className="flex-shrink-0 mt-1">{activity.icon}</span>
-                    <div className="flex-grow">
-                      <div className="flex justify-between items-center">
-                          <p className="text-sm font-medium">{activity.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(activity.timestamp.toDate(), { addSuffix: true })}
-                          </p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{activity.description}</p>
-                      {activity.href && (
-                        <Link href={activity.href} passHref>
-                          <Button variant="link" size="sm" className="text-xs p-0 h-auto mt-1">View Details</Button>
-                        </Link>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-        
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center"><ShoppingBag className="mr-2 h-5 text-primary"/>Top Trending Services</CardTitle>
             </CardHeader>
-            <CardContent>
-              {isAnalyticsLoading ? (
-                <div className="h-40 flex items-center justify-center"><Loader2 className="animate-spin"/></div>
-              ) : analytics.topServices.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No booking data available.</p>
+            <CardContent className="p-8 pt-4">
+              {isActivitiesLoading ? (
+                <div className="flex flex-col justify-center items-center h-64 space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary/30" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase">Syncing Feed...</p>
+                </div>
               ) : (
-                <ScrollArea className="h-96">
-                  <div className="space-y-4 pr-4">
-                    {analytics.topServices.map(service => (
-                      <Card key={service.id} className="overflow-hidden flex items-center gap-3 p-2">
-                        <div className="relative w-16 h-16 bg-muted rounded-md flex-shrink-0">
-                          <AppImage src={service.imageUrl || '/default-image.png'} alt={service.name} fill sizes="64px" className="object-cover" />
+                <div className="relative space-y-8">
+                  <div className="absolute left-6 top-2 bottom-2 w-0.5 bg-muted/50" />
+                  {recentActivities.map((activity) => (
+                    <Link key={activity.id} href={activity.href || '#'} className="relative flex items-center group">
+                      <div className="z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-card border-2 border-muted shadow-sm group-hover:border-primary/50 group-hover:scale-110 transition-all duration-300">
+                        {activity.icon}
+                      </div>
+                      <div className="ml-6 flex-grow p-4 rounded-2xl bg-muted/30 border border-border/40 group-hover:bg-primary/[0.03] group-hover:border-primary/10 transition-all duration-300 shadow-sm">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="text-sm font-bold tracking-tight">{activity.title}</p>
+                          <span className="text-[10px] font-black text-muted-foreground uppercase bg-background/80 px-2 py-0.5 rounded-full border shadow-sm">
+                            {formatDistanceToNow(activity.timestamp.toDate(), { addSuffix: true })}
+                          </span>
                         </div>
-                        <div className="flex-grow min-w-0">
-                          <p className="font-medium text-xs line-clamp-2">{service.name}</p>
-                          <p className="text-sm text-muted-foreground font-bold">{service.count} <span className="font-normal">booked</span></p>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </ScrollArea>
+                        <p className="text-xs text-muted-foreground font-medium">{activity.description}</p>
+                      </div>
+                      <ChevronRight className="ml-4 h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                    </Link>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader><CardTitle className="text-lg flex items-center"><Search className="mr-2 h-5 text-primary"/>Keyword Search Analytics</CardTitle></CardHeader>
-            <CardContent>
-               {isAnalyticsLoading ? <div className="h-40 flex items-center justify-center"><Loader2 className="animate-spin"/></div> :
-                analytics.topSearchTerms.length === 0 ? <p className="text-sm text-muted-foreground">No search data available.</p> :
-                <ScrollArea className="h-96">
-                    <ol className="space-y-2 text-sm list-decimal list-inside pr-4">
-                        {analytics.topSearchTerms.map(s => (
-                            <li key={s.term} className="flex justify-between">
-                            <span className="truncate pr-2">"{s.term}"</span>
-                            <span className="font-semibold whitespace-nowrap">{s.count} searches</span>
-                            </li>
-                        ))}
-                    </ol>
-                </ScrollArea>
-              }
-            </CardContent>
-          </Card>
-        </div>
+        </motion.div>
+        
+        <div className="space-y-8">
+          <motion.div variants={itemVariants}>
+            <Card className="border-none shadow-xl rounded-3xl bg-card">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-xl font-black tracking-tight flex items-center">
+                  <TrendingUp className="mr-3 h-5 w-5 text-primary"/> Trending Services
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-8 pt-0">
+                {isAnalyticsLoading ? (
+                  <div className="h-40 flex items-center justify-center"><Loader2 className="animate-spin text-primary/30"/></div>
+                ) : (
+                  <ScrollArea className="h-[400px]">
+                    <div className="flex flex-col gap-3 pr-4 pb-4">
+                      {analytics.topServices.map((service, idx) => (
+                        <DashboardTrendingServiceCard 
+                          key={service.id} 
+                          service={service} 
+                          rank={idx + 1} 
+                          maxCount={analytics.topServices[0]?.count || 1} 
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
+          <motion.div variants={itemVariants}>
+            <Card className="border-none shadow-xl rounded-3xl bg-card">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-xl font-black tracking-tight flex items-center">
+                  <Search className="mr-3 h-5 w-5 text-primary"/> Search Hotspots
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-8 pt-0">
+                {isAnalyticsLoading ? (
+                  <div className="h-40 flex items-center justify-center"><Loader2 className="animate-spin text-primary/30"/></div>
+                ) : (
+                  <ScrollArea className="h-[300px]">
+                    <div className="flex flex-wrap gap-2 pr-4">
+                      {analytics.topSearchTerms.map((s, idx) => (
+                        <div 
+                          key={s.term} 
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all cursor-default",
+                            idx === 0 ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 hover:bg-muted"
+                          )}
+                        >
+                          {s.term} <span className="ml-1 opacity-50">• {s.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2, XCircle, Image as ImageIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 import type { FirestoreService } from '@/types/firestore';
 import Link from 'next/link';
 import NextImage from 'next/image';
@@ -73,6 +73,18 @@ export default function SearchPopup({ isOpen, onClose }: SearchPopupProps) {
           user?.uid,
           !user ? getGuestId() : null
         );
+
+        // Persistent analytics logging
+        try {
+          addDoc(collection(db, "searchAnalytics"), {
+            term: searchTerm.trim().toLowerCase(),
+            createdAt: serverTimestamp(),
+            userId: user?.uid || null,
+            guestId: !user ? getGuestId() : null
+          });
+        } catch (e) {
+          console.error("Error logging persistent search:", e);
+        }
       }
 
       const lowerCaseSearchTerm = searchTerm.toLowerCase();

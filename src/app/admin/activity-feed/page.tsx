@@ -4,7 +4,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, Clock } from "lucide-react";
+import { 
+  Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
+  Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
+  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User
+} from "lucide-react";
 import type { UserActivity, FirestoreUser } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, Timestamp, limit, getDocs, writeBatch, where, documentId, startAfter, type DocumentSnapshot } from "firebase/firestore";
@@ -26,21 +30,33 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const EventIcon = ({ eventType }: { eventType: UserActivity['eventType'] }) => {
-  switch (eventType) {
-    case 'newUser': return <UserPlus className="h-5 w-5 text-green-500" />;
-    case 'userLogin': return <UserCircle className="h-5 w-5 text-blue-500" />;
-    case 'userLogout': return <LogOut className="h-5 w-5 text-red-500" />;
-    case 'pageView': return <Home className="h-5 w-5 text-indigo-500" />;
-    case 'addToCart': return <ShoppingCart className="h-5 w-5 text-orange-500" />;
-    case 'removeFromCart': return <TrashIcon className="h-5 w-5 text-pink-500" />;
-    case 'newBooking': return <Tag className="h-5 w-5 text-teal-500" />;
-    case 'checkoutStep': return <Zap className="h-5 w-5 text-purple-500" />;
-    case 'adminAction': return <CalendarCheck2 className="h-5 w-5 text-gray-500" />;
-    case 'timeOnPage': return <Clock className="h-5 w-5 text-gray-500" />;
-    default: return <Activity className="h-5 w-5 text-gray-400" />;
-  }
+const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => {
+  const configs: Record<string, { icon: any, color: string, bg: string, label: string }> = {
+    newUser: { icon: UserPlus, color: 'text-green-600', bg: 'bg-green-500/10', label: 'New User' },
+    userLogin: { icon: UserCircle, color: 'text-blue-600', bg: 'bg-blue-500/10', label: 'Login' },
+    userLogout: { icon: LogOut, color: 'text-red-600', bg: 'bg-red-500/10', label: 'Logout' },
+    pageView: { icon: Home, color: 'text-indigo-600', bg: 'bg-indigo-500/10', label: 'Page View' },
+    addToCart: { icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-500/10', label: 'Cart Add' },
+    removeFromCart: { icon: TrashIcon, color: 'text-pink-600', bg: 'bg-pink-500/10', label: 'Cart Remove' },
+    newBooking: { icon: Tag, color: 'text-teal-600', bg: 'bg-teal-500/10', label: 'Booking' },
+    checkoutStep: { icon: Zap, color: 'text-purple-600', bg: 'bg-purple-500/10', label: 'Checkout' },
+    adminAction: { icon: CalendarCheck2, color: 'text-slate-600', bg: 'bg-slate-500/10', label: 'Admin' },
+    timeOnPage: { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/5', label: 'Time Spent' },
+  };
+
+  const config = configs[eventType] || { icon: Activity, color: 'text-gray-500', bg: 'bg-gray-500/10', label: eventType };
+  const Icon = config.icon;
+
+  return (
+    <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-transparent font-bold text-[10px] uppercase tracking-wider shadow-sm", config.bg, config.color)}>
+      <Icon className="h-3 w-3" />
+      <span>{config.label}</span>
+    </div>
+  );
 };
 
 const formatTimestamp = (timestamp?: Timestamp): string => {
@@ -51,7 +67,6 @@ const formatTimestamp = (timestamp?: Timestamp): string => {
 const ITEMS_PER_PAGE = 25;
 const AUTO_REFRESH_TOGGLE_STORAGE_KEY = 'fixbro_admin_activity_auto_refresh_enabled';
 const AUTO_REFRESH_INTERVAL_STORAGE_KEY = 'fixbro_admin_activity_refresh_interval';
-
 
 export default function AdminActivityFeedPage() {
   const [activities, setActivities] = useState<UserActivity[]>([]);
@@ -75,7 +90,7 @@ export default function AdminActivityFeedPage() {
   const [refreshInterval, setRefreshInterval] = useState(() => {
     if (typeof window !== 'undefined') {
       const storedInterval = localStorage.getItem(AUTO_REFRESH_INTERVAL_STORAGE_KEY);
-      return storedInterval ? Number(storedInterval) : 5; // Default to 5 seconds if not set
+      return storedInterval ? Number(storedInterval) : 5; 
     }
     return 5;
   });
@@ -133,7 +148,7 @@ export default function AdminActivityFeedPage() {
 
     if (isAutoRefreshEnabled) {
       intervalId = setInterval(() => {
-        fetchInitialActivities(true); // Pass true for silent auto-refresh
+        fetchInitialActivities(true); 
       }, refreshInterval * 1000);
     }
 
@@ -255,186 +270,264 @@ export default function AdminActivityFeedPage() {
     const data = activity.eventData;
     switch (activity.eventType) {
       case 'pageView':
-        return <Link href={data.pageUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline text-blue-600 break-all" title={data.pageUrl}>{data.pageUrl || 'N/A'}</Link>;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{data.pageUrl || 'N/A'}</span>
+            <Link href={data.pageUrl || '#'} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-primary/10 rounded-md transition-colors">
+              <ExternalLink className="h-3 w-3 text-primary" />
+            </Link>
+          </div>
+        );
       case 'timeOnPage':
-        return <span className="text-xs">{data.pageUrl || 'A page'} for {data.durationSeconds}s</span>;
+        return <span className="text-xs font-medium">Spent <span className="text-primary">{data.durationSeconds}s</span> on {data.pageUrl || 'a page'}</span>;
       case 'addToCart':
-        return <span className="text-xs">{data.serviceName || 'Unknown Service'} (Qty: {data.quantity || 1})</span>;
+        return <span className="text-xs font-medium">Added <span className="text-orange-600">{data.serviceName}</span> (Qty: {data.quantity})</span>;
       case 'removeFromCart':
-        return <span className="text-xs">Removed: {data.serviceName || 'Unknown Service'} (Qty: {data.quantity || 1})</span>;
+        return <span className="text-xs font-medium text-pink-600">Removed {data.serviceName}</span>;
       case 'newBooking':
-        return <span className="text-xs">ID: <Link href={`/admin/bookings/edit/${data.bookingDocId || '#'}`} className="hover:underline text-blue-600">{data.bookingId || 'N/A'}</Link>, Total: ₹{data.totalAmount?.toFixed(2) || 'N/A'}</span>;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-teal-600">₹{data.totalAmount?.toFixed(2)}</span>
+            <Link href={`/admin/bookings/edit/${data.bookingDocId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline flex items-center">
+              {data.bookingId} <ChevronRight className="h-3 w-3 ml-0.5" />
+            </Link>
+          </div>
+        );
       case 'newUser':
-        return <span className="text-xs">Email: {data.email || 'N/A'}, Name: {data.fullName || 'N/A'}</span>;
+        return <span className="text-xs font-bold text-green-600">{data.email}</span>;
       case 'userLogin':
-        return <span className="text-xs">Email: {data.email || 'N/A'}</span>;
+        return <span className="text-xs font-medium">via {data.email}</span>;
       case 'userLogout':
-        return <span className="text-xs">User logged out. Method: {data.logoutMethod || 'Unknown'}</span>;
+        return <span className="text-xs text-muted-foreground italic">Logout ({data.logoutMethod})</span>;
       case 'checkoutStep':
-        return <span className="text-xs">Step: {data.checkoutStepName || 'Unknown'} ({data.pageUrl || 'N/A'})</span>;
+        return <span className="text-xs font-bold text-purple-600 uppercase tracking-tighter">{data.checkoutStepName}</span>;
       default:
-        return <code className="text-xs bg-muted p-1 rounded block overflow-x-auto whitespace-pre-wrap break-all">{JSON.stringify(data, null, 2)}</code>;
+        return <code className="text-[10px] bg-muted/50 p-1 px-2 rounded font-mono text-muted-foreground break-all">{JSON.stringify(data)}</code>;
     }
   };
 
-  const renderMobileCard = (activity: UserActivity) => (
-    <Card key={activity.id} className="mb-4">
-      <CardContent className="p-4 space-y-2">
-        <div className="flex items-center gap-3">
-          <EventIcon eventType={activity.eventType} />
-          <div>
-            <p className="font-semibold capitalize">{activity.eventType.replace(/([A-Z])/g, ' $1').trim()}</p>
-            <p className="text-xs text-muted-foreground">{formatTimestamp(activity.timestamp)}</p>
+  const renderUserCell = (activity: UserActivity) => {
+    const isGuest = !activity.userId;
+    const name = activity.userId ? (usersData[activity.userId]?.fullName || 'Loading...') : 'Guest User';
+    
+    return (
+      <div className="flex items-center gap-3">
+        <Avatar className="h-8 w-8 border shadow-sm shrink-0">
+          <AvatarFallback className={cn("text-[10px] font-black uppercase", isGuest ? "bg-slate-100 text-slate-500" : "bg-primary/10 text-primary")}>
+            {isGuest ? <User className="h-4 w-4" /> : name.charAt(0)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-bold truncate tracking-tight">{name}</p>
+            {!isGuest && <ShieldCheck className="h-3 w-3 text-blue-500" />}
           </div>
+          <p className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]" title={activity.userId || activity.guestId}>
+            {activity.userId || activity.guestId}
+          </p>
         </div>
-        <div className="pl-8 text-sm space-y-1">
-          <div>
-            <strong className="text-muted-foreground">User:</strong>
-            <div className="text-foreground break-words">
-              {activity.userId ? (
-                <>
-                  <p>{usersData[activity.userId]?.fullName || 'Registered User'}</p>
-                  <p className="text-xs text-muted-foreground/80 break-all" title={activity.userId}>ID: {activity.userId}</p>
-                </>
-              ) : (
-                <>
-                  <p>Guest</p>
-                  <p className="text-xs text-muted-foreground/80 break-all" title={activity.guestId || undefined}>ID: {activity.guestId}</p>
-                </>
-              )}
+      </div>
+    );
+  };
+
+  const renderMobileCard = (activity: UserActivity, idx: number) => (
+    <motion.div
+      key={activity.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+      className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors"
+    >
+      <div className="flex justify-between items-start mb-4">
+        <EventBadge eventType={activity.eventType} />
+        <div className="text-right">
+          <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+            {formatTimestamp(activity.timestamp)}
+          </p>
+          <p className="text-[9px] text-muted-foreground font-medium">
+            {activity.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-2xl border border-dashed border-muted-foreground/20">
+          <Avatar className="h-10 w-10 border shadow-sm shrink-0">
+            <AvatarFallback className={cn("text-xs font-black uppercase", !activity.userId ? "bg-slate-100 text-slate-500" : "bg-primary/10 text-primary")}>
+              {!activity.userId ? <User className="h-4 w-4" /> : (activity.userId ? (usersData[activity.userId]?.fullName || 'U').charAt(0) : 'U')}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-bold truncate tracking-tight">
+                {activity.userId ? (usersData[activity.userId]?.fullName || 'Loading...') : 'Guest User'}
+              </p>
+              {activity.userId && <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />}
             </div>
-          </div>
-          <div>
-            <strong className="text-muted-foreground">Details:</strong>
-            <div className="text-foreground break-words">{renderEventData(activity)}</div>
+            <p className="text-[10px] text-muted-foreground font-mono truncate break-all" title={activity.userId || activity.guestId}>
+              {activity.userId || activity.guestId}
+            </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="p-4 rounded-2xl bg-primary/[0.03] border border-primary/5">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">Interaction Details</span>
+          </div>
+          <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {renderEventData(activity)}
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle className="text-2xl flex items-center">
-                <Activity className="mr-2 h-6 w-6 text-primary" /> User Activity Feed
-              </CardTitle>
-              <CardDescription>
-                Latest activities happening on your platform.
-              </CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                <div className="flex items-center space-x-2">
-                    <Switch id="auto-refresh-switch" checked={isAutoRefreshEnabled} onCheckedChange={handleAutoRefreshToggle} />
-                    <Label htmlFor="auto-refresh-switch">Auto-Refresh</Label>
-                </div>
-                <Select value={String(refreshInterval)} onValueChange={handleIntervalChange} disabled={!isAutoRefreshEnabled}>
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder="Set Interval" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="5">Every 5 seconds</SelectItem>
-                        <SelectItem value="10">Every 10 seconds</SelectItem>
-                        <SelectItem value="30">Every 30 seconds</SelectItem>
-                    </SelectContent>
-                </Select>
-                <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={isLoading || isClearing || activities.length === 0}>
-                    {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
-                    Clear All
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-destructive"/>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action will permanently delete ALL user activities. This cannot be undone.
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAllActivities} disabled={isClearing} className="bg-destructive hover:bg-destructive/90">
-                        {isClearing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Yes, Clear All
-                    </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-                </AlertDialog>
-            </div>
+    <div className="space-y-8 pb-10">
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2 border-b">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2 text-primary">
+            <div className={cn("h-2 w-2 rounded-full", isAutoRefreshEnabled ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.6)]" : "bg-muted")} />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Live System Monitor</span>
           </div>
-        </CardHeader>
-        <CardContent className="pt-2">
+          <h1 className="text-4xl font-black tracking-tight flex items-center">
+            Activity Feed <RefreshCcw className={cn("ml-4 h-6 w-6 text-muted-foreground/30", isAutoRefreshEnabled && "animate-spin")} />
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium">Real-time stream of all platform events and user interactions.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 bg-card border shadow-sm p-2 rounded-2xl">
+          <div className="flex items-center space-x-3 px-3 py-1.5 border-r border-dashed mr-1">
+            <Switch id="auto-refresh-switch" checked={isAutoRefreshEnabled} onCheckedChange={handleAutoRefreshToggle} className="scale-90" />
+            <Label htmlFor="auto-refresh-switch" className="text-[10px] font-black uppercase tracking-wider">Live Refresh</Label>
+          </div>
+          
+          <Select value={String(refreshInterval)} onValueChange={handleIntervalChange} disabled={!isAutoRefreshEnabled}>
+            <SelectTrigger className="h-9 border-none bg-muted/50 focus:ring-0 text-xs font-bold w-[140px] rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-none shadow-xl">
+              <SelectItem value="5" className="text-xs font-bold uppercase tracking-tighter">Every 5s</SelectItem>
+              <SelectItem value="10" className="text-xs font-bold uppercase tracking-tighter">Every 10s</SelectItem>
+              <SelectItem value="30" className="text-xs font-bold uppercase tracking-tighter">Every 30s</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive font-bold text-xs" disabled={isLoading || isClearing || activities.length === 0}>
+                {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
+                Purge All
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-3xl p-8">
+              <AlertDialogHeader>
+                <div className="bg-destructive/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-4">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
+                </div>
+                <AlertDialogTitle className="text-2xl font-bold tracking-tight text-destructive uppercase">Confirm Full Purge</AlertDialogTitle>
+                <AlertDialogDescription className="text-base font-medium">
+                  This will permanently wipe ALL recorded user activities from the system. This operation cannot be reversed.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="mt-8 gap-3">
+                <AlertDialogCancel className="rounded-xl border-none bg-muted hover:bg-muted/80">Keep Data</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearAllActivities} className="rounded-xl bg-destructive hover:bg-destructive/90 px-8">
+                  Erase Everything
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </header>
+
+      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+        <CardContent className="p-0">
           {isLoading && activities.length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Scanning Events...</p>
             </div>
           ) : activities.length === 0 ? (
-            <div className="text-center py-10">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No user activities recorded yet.</p>
+            <div className="text-center py-32 bg-muted/5">
+              <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
+              <p className="text-xl font-bold tracking-tight">No Events Detected</p>
+              <p className="text-muted-foreground text-sm mt-1">Activities will appear here as they happen.</p>
             </div>
           ) : (
             <>
-              {/* Desktop and Tablet View: Table */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">Event</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead className="whitespace-nowrap">Type</TableHead>
-                      <TableHead>Details</TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Timestamp</TableHead>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow className="hover:bg-transparent border-none">
+                      <TableHead className="w-[180px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
+                      <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activities.map((activity) => (
-                      <TableRow key={activity.id}>
-                        <TableCell><EventIcon eventType={activity.eventType} /></TableCell>
-                        <TableCell>
-                          {activity.userId ? (
-                            <div>
-                              <div className="font-medium">{usersData[activity.userId]?.fullName || 'Registered User'}</div>
-                              <div className="text-xs text-muted-foreground truncate max-w-[150px]" title={activity.userId}>
-                                ID: {activity.userId}
-                              </div>
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="font-medium">Guest</div>
-                              <div className="text-xs text-muted-foreground truncate max-w-[150px]" title={activity.guestId || undefined}>
-                                ID: {activity.guestId}
-                              </div>
-                            </div>
+                    <AnimatePresence initial={false}>
+                      {activities.map((activity, idx) => (
+                        <motion.tr
+                          key={activity.id}
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+                          className={cn(
+                            "group border-b border-muted/40 transition-all hover:bg-primary/[0.02]",
+                            idx === 0 && isAutoRefreshEnabled && "bg-primary/[0.03]"
                           )}
-                        </TableCell>
-                        <TableCell className="text-xs capitalize whitespace-nowrap">{activity.eventType.replace(/([A-Z])/g, ' $1').trim()}</TableCell>
-                        <TableCell>{renderEventData(activity)}</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">{formatTimestamp(activity.timestamp)}</TableCell>
-                      </TableRow>
-                    ))}
+                        >
+                          <TableCell className="pl-8 py-4">
+                            <EventBadge eventType={activity.eventType} />
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                            {renderEventData(activity)}
+                          </TableCell>
+                          <TableCell>
+                            {renderUserCell(activity)}
+                          </TableCell>
+                          <TableCell className="text-right pr-8">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                                {formatTimestamp(activity.timestamp)}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground font-medium">
+                                {activity.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
                   </TableBody>
                 </Table>
               </div>
 
               {/* Mobile View: Cards */}
               <div className="md:hidden">
-                {activities.map(renderMobileCard)}
+                <AnimatePresence initial={false}>
+                  {activities.map((activity, idx) => renderMobileCard(activity, idx))}
+                </AnimatePresence>
               </div>
             </>
           )}
         </CardContent>
         {hasMore && (
-            <CardFooter className="pt-4 justify-center">
-                <Button onClick={handleLoadMore} disabled={isFetchingMore || isLoading}>
-                    {isFetchingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                    Load More Activities
-                </Button>
-            </CardFooter>
+          <CardFooter className="py-10 bg-muted/10 justify-center">
+            <Button 
+              onClick={handleLoadMore} 
+              disabled={isFetchingMore || isLoading}
+              variant="outline"
+              className="rounded-2xl px-10 h-12 border-2 border-primary/20 text-primary font-bold shadow-sm hover:bg-primary hover:text-primary-foreground transition-all"
+            >
+              {isFetchingMore ? <Loader2 className="mr-3 h-5 w-5 animate-spin"/> : null}
+              Load Older Events
+            </Button>
+          </CardFooter>
         )}
       </Card>
     </div>
