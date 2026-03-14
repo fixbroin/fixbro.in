@@ -4,59 +4,73 @@
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageCircle, Users, Settings, Send } from 'lucide-react';
+import { MessageSquare, Settings, Send, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import ChatSettingsForm from '@/components/admin/ChatSettingsForm';
-import AdminUserListForChat from '@/components/admin/AdminUserListForChat';
-import AdminChatMessageArea from '@/components/admin/AdminChatMessageArea';
 import AdminGlobalMessageForm from '@/components/admin/AdminGlobalMessageForm';
-import type { FirestoreUser } from '@/types/firestore';
 
 export default function AdminChatPage() {
-  const [selectedChatUser, setSelectedChatUser] = useState<FirestoreUser | null>(null);
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center">
-            <MessageCircle className="mr-2 h-6 w-6 text-primary" /> Chat Management
-          </CardTitle>
-          <CardDescription>
-            Configure chat settings, manage user conversations, and send global popup messages.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+    <div className="max-w-7xl mx-auto space-y-8 pb-10 px-2 sm:px-4">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2 text-primary">
+            <MessageSquare className="h-5 w-5" />
+            <span className="text-xs font-bold uppercase tracking-wider">Communication Hub</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Chat Management</h1>
+          <p className="text-muted-foreground text-sm max-w-3xl">
+            Configure your real-time support channels, AI assistant behavior, and broadcast global announcements to all active users.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 bg-primary/5 px-4 py-2 rounded-2xl border border-primary/10">
+          <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+          <span className="text-[10px] font-bold uppercase">System Active</span>
+        </div>
+      </header>
 
       <Tabs defaultValue="settings" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="settings"><Settings className="mr-2 h-4 w-4"/>Settings</TabsTrigger>
-          <TabsTrigger value="user_chats"><Users className="mr-2 h-4 w-4"/>User Chats</TabsTrigger>
-          <TabsTrigger value="global_popup"><Send className="mr-2 h-4 w-4"/>Global Popup</TabsTrigger>
-        </TabsList>
+        <div className="flex justify-center mb-8">
+          <TabsList className="grid w-full max-w-lg grid-cols-2 p-1 bg-muted/50 rounded-2xl h-14 border shadow-inner">
+            <TabsTrigger 
+              value="settings" 
+              className={cn(
+                "rounded-xl transition-all duration-300 font-bold text-xs uppercase tracking-wider",
+                "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg",
+                "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/40"
+              )}
+            >
+              <div className="flex items-center justify-center py-1">
+                <Settings className="mr-2 h-4 w-4 shrink-0"/> 
+                <span>System Settings</span>
+              </div>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="global_popup" 
+              className={cn(
+                "rounded-xl transition-all duration-300 font-bold text-xs uppercase tracking-wider",
+                "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg",
+                "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/40"
+              )}
+            >
+              <div className="flex items-center justify-center py-1">
+                <Send className="mr-2 h-4 w-4 shrink-0"/> 
+                <span>Global Broadcast</span>
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="settings">
-          <ChatSettingsForm />
+        <TabsContent value="settings" className="focus-visible:outline-none focus-visible:ring-0">
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <ChatSettingsForm />
+          </div>
         </TabsContent>
 
-        <TabsContent value="user_chats">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Conversations</CardTitle>
-              <CardDescription>Select a user to view and manage their chat history.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1">
-                <AdminUserListForChat onSelectUser={setSelectedChatUser} selectedUserId={selectedChatUser?.id} />
-              </div>
-              <div className="md:col-span-2 h-[600px]"> {/* Explicit height for chat area container */}
-                <AdminChatMessageArea selectedUser={selectedChatUser} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="global_popup">
-          <AdminGlobalMessageForm />
+        <TabsContent value="global_popup" className="focus-visible:outline-none focus-visible:ring-0">
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <AdminGlobalMessageForm />
+          </div>
         </TabsContent>
       </Tabs>
     </div>

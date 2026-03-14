@@ -4,12 +4,13 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { XIcon, Users, MessageSquareText, ChevronLeft } from 'lucide-react';
+import { XIcon, Users, ChevronLeft, Minimize2, Maximize2 } from 'lucide-react';
 import AdminUserListForChat from './AdminUserListForChat';
 import AdminChatMessageArea from './AdminChatMessageArea';
 import type { FirestoreUser } from '@/types/firestore';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FloatingAdminChatWindowProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface FloatingAdminChatWindowProps {
 export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdminChatWindowProps) {
   const [selectedChatUser, setSelectedChatUser] = useState<FirestoreUser | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -31,125 +33,139 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
     }
   }, [isOpen]);
 
-  if (!isMounted || !isOpen) {
-    return null;
-  }
-  
-  if (isMobile) {
-    return (
-        <div className="fixed inset-0 z-[100] bg-background flex flex-col h-full w-full">
-             <header className="p-3 border-b flex-shrink-0 flex items-center justify-between">
-                 <div className="flex items-center space-x-2">
-                    {selectedChatUser ? (
-                        <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-7 w-7">
-                            <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                    ) : (
-                         <Users className="h-5 w-5 text-primary" />
-                    )}
-                    <h2 className="text-base font-semibold truncate">
-                        {selectedChatUser ? `Chat with ${selectedChatUser.displayName || 'User'}` : "Select User"}
-                    </h2>
-                 </div>
-                 <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
-                    <XIcon className="h-4 w-4" />
-                </Button>
-             </header>
-             <div className="flex-grow overflow-hidden flex">
-                <div className={cn("flex-shrink-0 w-full transition-transform duration-300 ease-in-out", {
-                    '-translate-x-full': selectedChatUser
-                })}>
-                    <AdminUserListForChat 
-                        onSelectUser={setSelectedChatUser} 
-                        selectedUserId={selectedChatUser?.id}
-                        scrollAreaHeightClass="h-[calc(100vh-theme(spacing.16))] md:h-auto"
-                    />
-                </div>
-                <div className={cn("absolute inset-0 top-16 transition-transform duration-300 ease-in-out", {
-                    'translate-x-full': !selectedChatUser
-                })}>
-                    {selectedChatUser && <AdminChatMessageArea selectedUser={selectedChatUser} />}
-                </div>
-             </div>
-        </div>
-    )
-  }
+  if (!isMounted) return null;
+
+  const windowVariants = {
+    hidden: { 
+      opacity: 0, 
+      y: 20, 
+      scale: 0.95,
+      transformOrigin: isMobile ? 'center' : 'bottom right'
+    },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      transition: { type: 'spring', damping: 25, stiffness: 300 }
+    },
+    exit: { 
+      opacity: 0, 
+      y: 20, 
+      scale: 0.95,
+      transition: { duration: 0.2 }
+    }
+  };
 
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-40 flex items-center justify-center",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-      )}
-      data-state={isOpen ? "open" : "closed"}
-      onClick={onClose}
-    >
-        <Card
-  onClick={(e) => e.stopPropagation()}
-  className={cn(
-    // Mobile
-    "w-[100vw] max-w-full h-[90vh]",
-
-    // Tablet (sm = ≥640px)
-    "sm:w-[90vw] sm:max-w-[900px] sm:h-[85vh]",
-
-    // Desktop (md = ≥768px)
-    "md:w-[85vw] md:max-w-[1100px] md:h-[80vh]",
-
-    // Large Desktop (lg = ≥1024px)
-    "lg:w-[80vw] lg:max-w-[1300px]",
-
-    // Extra-large desktop (xl = ≥1280px)
-    "xl:w-[75vw] xl:max-w-[1500px]",
-
-    "z-50 bg-card border shadow-xl rounded-lg flex flex-col",
-    "data-[state=open]:animate-in data-[state=closed]:animate-out",
-    "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-  )}
-  data-state={isOpen ? "open" : "closed"}
->
-            <CardHeader className="p-3 border-b flex flex-row items-center justify-between">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          variants={windowVariants}
+          className={cn(
+            "fixed z-40 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
+            isMobile 
+              ? "inset-0 bg-background h-full w-full" 
+              : cn(
+                  "border bg-card rounded-2xl",
+                  isMaximized 
+                    ? "inset-6 w-auto h-auto" 
+                    : "bottom-24 right-6 w-[850px] h-[650px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)]"
+                )
+          )}
+        >
+          {isMobile ? (
+            /* Mobile View Layout */
+            <div className="flex flex-col h-full w-full">
+              <header className="p-3 border-b flex-shrink-0 flex items-center justify-between bg-card">
                 <div className="flex items-center space-x-2">
-                {selectedChatUser ? (
-                    <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-7 w-7">
-                    <Users className="h-4 w-4" />
+                  {selectedChatUser ? (
+                    <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-8 w-8 rounded-full">
+                      <ChevronLeft className="h-5 w-5" />
                     </Button>
-                ) : (
-                    <Users className="h-5 w-5 text-primary" />
-                )}
-                <CardTitle className="text-base">
-                    {selectedChatUser ? `Chat with ${selectedChatUser.displayName || selectedChatUser.email}` : "Select User to Chat"}
-                </CardTitle>
+                  ) : (
+                    <div className="bg-primary/10 p-1.5 rounded-lg">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                  )}
+                  <h2 className="text-base font-semibold truncate max-w-[200px]">
+                    {selectedChatUser ? (selectedChatUser.displayName || 'Chat') : "Admin Messages"}
+                  </h2>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
-                <XIcon className="h-4 w-4" />
-                <span className="sr-only">Close chat</span>
+                <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
+                  <XIcon className="h-5 w-5" />
                 </Button>
-            </CardHeader>
+              </header>
+              
+              <div className="flex-grow overflow-hidden relative">
+                {!selectedChatUser ? (
+                  <div className="absolute inset-0">
+                    <AdminUserListForChat 
+                      onSelectUser={setSelectedChatUser} 
+                      selectedUserId={selectedChatUser?.id}
+                      scrollAreaHeightClass="h-[calc(100vh-64px)]"
+                    />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0">
+                    <AdminChatMessageArea selectedUser={selectedChatUser} />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Desktop View Layout */
+            <Card className="h-full flex flex-col border-0 shadow-none rounded-none">
+              <CardHeader className="p-4 border-b flex flex-row items-center justify-between bg-card shrink-0">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary/10 p-2 rounded-xl">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-bold">
+                      {selectedChatUser ? `Chat with ${selectedChatUser.displayName || selectedChatUser.email}` : "Customer Support Chat"}
+                    </CardTitle>
+                    {!selectedChatUser && <p className="text-xs text-muted-foreground">Manage your conversations with users</p>}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsMaximized(!isMaximized)} 
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={onClose} 
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <XIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              </CardHeader>
 
-            <CardContent className="p-0 flex-grow overflow-hidden flex">
-                <div
-  className="
-    w-[100%]                 // mobile full width
-    sm:w-[260px]             // tablet
-    md:w-[300px]             // small desktop
-    lg:w-[350px]             // desktop
-    xl:w-[380px]             // large desktop
-    flex-shrink-0 border-r
-  "
->
-                <AdminUserListForChat
-                    onSelectUser={(user) => setSelectedChatUser(user)}
+              <CardContent className="p-0 flex-grow overflow-hidden flex bg-muted/5">
+                <div className="w-[320px] shrink-0 border-r bg-card/50 backdrop-blur-sm">
+                  <AdminUserListForChat
+                    onSelectUser={setSelectedChatUser}
                     selectedUserId={selectedChatUser?.id}
-                    scrollAreaHeightClass="h-[calc(80vh-60px)]"
-                />
+                    scrollAreaHeightClass={isMaximized ? "h-[calc(100vh-160px)]" : "h-[560px]"}
+                  />
                 </div>
-                <div className="flex-grow flex flex-col">
-                <AdminChatMessageArea selectedUser={selectedChatUser} />
+                <div className="flex-grow flex flex-col bg-background">
+                  <AdminChatMessageArea selectedUser={selectedChatUser} />
                 </div>
-            </CardContent>
-        </Card>
-    </div>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

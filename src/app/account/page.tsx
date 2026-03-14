@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import ThemeToggle from '@/components/shared/ThemeToggle';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useFeaturesConfig } from '@/hooks/useFeaturesConfig';
+import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 
 interface AccountLinkProps {
   href: string;
@@ -39,6 +40,7 @@ function AccountPageContent() {
   const [referralSettings, setReferralSettings] = useState<ReferralSettings | null>(null);
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
   const { featuresConfig, isLoading: isLoadingFeaturesConfig } = useFeaturesConfig();
+  const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
 
 
   useEffect(() => {
@@ -53,20 +55,20 @@ function AccountPageContent() {
     return () => unsubscribe();
   }, []);
 
-  const handleNav = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+  const handleNav = (e: React.MouseEvent, href: string) => {
     e.preventDefault();
     showLoading();
     router.push(href);
   };
   
-  const handleLogout = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleLogout = (e: React.MouseEvent) => {
     e.preventDefault();
     showLoading();
     logOut();
   };
 
   const AccountLink = ({ href, icon: Icon, label, badgeCount, isLogout = false }: AccountLinkProps) => {
-    const action = isLogout ? handleLogout : (e: React.MouseEvent) => handleNav(e as React.MouseEvent<HTMLAnchorElement>, href);
+    const action = isLogout ? handleLogout : (e: React.MouseEvent) => handleNav(e, href);
 
     const content = (
       <div
@@ -115,7 +117,7 @@ function AccountPageContent() {
     { href: '/my-address', label: 'My Addresses', icon: MapPin },
     { href: '/referral', label: 'Refer & Earn', icon: Handshake, condition: () => !isLoadingAppConfig && !!referralSettings?.isReferralSystemEnabled },
     { href: '/notifications', label: 'Notifications', icon: Bell, badgeCount: unreadNotificationsCount },
-    { href: '/chat', label: 'Chat with Support', icon: MessageSquare, isProtected: true },
+    { href: '/chat', label: 'Chat with Support', icon: MessageSquare, isProtected: true, condition: () => !isLoadingGlobalSettings && !!globalSettings?.isChatEnabled },
   ];
 
   const extraPagesItems = [
@@ -132,7 +134,7 @@ function AccountPageContent() {
      { href: '/damage-and-claims-policy', label: 'Damage & Claims Policy', icon: FileText },
   ];
 
-  if (authIsLoading || !user || !firestoreUser) {
+  if (authIsLoading || !user || !firestoreUser || isLoadingGlobalSettings) {
     return (
         <div className="flex justify-center items-center h-[calc(100vh-8rem)]">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
