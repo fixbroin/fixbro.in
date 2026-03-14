@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -8,12 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, UserCircle, MessageSquareText, Loader2, Trash2 as TrashIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Send, UserCircle, MessageSquareText, Loader2, Trash2 as TrashIcon, Bot } from 'lucide-react';
 import type { FirestoreUser, ChatMessage, ChatSession, FirestoreNotification } from '@/types/firestore';
 import { Timestamp, doc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, setDoc, serverTimestamp, getDoc, getDocs, limit, writeBatch, deleteDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-// Removed useGlobalSettings as sound playback is now global in AdminLayout
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import {
@@ -48,10 +47,11 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   const [newMessage, setNewMessage] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isClearingChat, setIsClearingChat] = useState(false);
+  const [isAiActive, setIsAiActive] = useState(true);
+  const [isUpdatingAi, setIsUpdatingAi] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const { user: loggedInAdminUser } = useAuth();
   const { toast } = useToast();
-  // Removed audioRef and related useEffect as sound is handled by AdminLayout
 
   const [supportAdminProfile, setSupportAdminProfile] = useState<{displayName?: string | null, photoURL?: string | null, uid: string | null}>({
     displayName: "Support", photoURL: null, uid: null
@@ -93,6 +93,16 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   useEffect(() => {
     if (currentChatSessionId && selectedUser && !isLoadingSupportAdminProfile) {
       setIsLoadingMessages(true);
+      
+      // Listen to chat session for AI status
+      const sessionDocRef = doc(db, 'chats', currentChatSessionId);
+      const unsubSession = onSnapshot(sessionDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+              const data = docSnap.data() as ChatSession;
+              setIsAiActive(data.aiAgentActive !== false); // Default to true if not specified
+          }
+      });
+
       const messagesRef = collection(db, 'chats', currentChatSessionId, 'messages');
       const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
@@ -101,7 +111,6 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         setMessages(fetchedMessages);
         setIsLoadingMessages(false);
 
-        // Mark messages as read by admin for this specific chat session
         const batch = writeBatch(db);
         let messagesMarkedRead = false;
         for (const msg of fetchedMessages) {
@@ -115,12 +124,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
           await batch.commit();
         }
 
-        // Update session: adminUnreadCount to 0 as admin is viewing this chat
-        const sessionDocRef = doc(db, 'chats', currentChatSessionId);
-        const sessionSnap = await getDoc(sessionDocRef);
-        if (sessionSnap.exists()) {
-            await updateDoc(sessionDocRef, { adminUnreadCount: 0, updatedAt: serverTimestamp() });
-        } else if (selectedUser && supportAdminProfile.uid) { // Should rarely happen if session is created on first message
+        if (selectedUser && supportAdminProfile.uid) {
             await setDoc(sessionDocRef, {
                 userId: selectedUser.id,
                 adminId: supportAdminProfile.uid,
@@ -135,7 +139,10 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         setIsLoadingMessages(false);
       });
 
-      return () => unsubscribe();
+      return () => {
+          unsubscribe();
+          unsubSession();
+      };
     } else {
       setMessages([]);
       if (!isLoadingSupportAdminProfile) setIsLoadingMessages(false);
@@ -151,6 +158,24 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
     }
   }, [messages, isLoadingMessages]);
 
+  const handleToggleAi = async (checked: boolean) => {
+      if (!currentChatSessionId) return;
+      setIsUpdatingAi(true);
+      try {
+          const sessionDocRef = doc(db, 'chats', currentChatSessionId);
+          await updateDoc(sessionDocRef, { aiAgentActive: checked, updatedAt: serverTimestamp() });
+          toast({ 
+              title: checked ? "AI Agent Enabled" : "AI Agent Disabled", 
+              description: `The bot is now ${checked ? 'managing' : 'paused for'} this conversation.` 
+          });
+      } catch (error) {
+          console.error("Error toggling AI status:", error);
+          toast({ title: "Update Failed", description: "Could not update bot status.", variant: "destructive" });
+      } finally {
+          setIsUpdatingAi(false);
+      }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedUser || !loggedInAdminUser || !currentChatSessionId || !supportAdminProfile.uid) {
@@ -163,7 +188,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       senderType: 'admin',
       text: newMessage,
       timestamp: Timestamp.now(),
-      isReadByUser: false, // New message from admin, not yet read by user
+      isReadByUser: false, 
     };
 
     const tempNewMessage = newMessage;
@@ -172,7 +197,6 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       const messagesRef = collection(db, 'chats', currentChatSessionId, 'messages');
       await addDoc(messagesRef, messageData);
 
-      // Update chat session metadata and disable AI agent
       const sessionDocRef = doc(db, 'chats', currentChatSessionId);
       const sessionSnap = await getDoc(sessionDocRef);
       const currentSessionData = sessionSnap.exists() ? sessionSnap.data() as ChatSession : undefined;
@@ -189,26 +213,24 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         lastMessageTimestamp: messageData.timestamp,
         lastMessageSenderId: supportAdminProfile.uid,
         participants: [selectedUser.id, supportAdminProfile.uid].filter(p => p !== null && p !== undefined),
-        userUnreadCount: currentUserUnreadCount + 1, // Increment user's unread count
-        adminUnreadCount: 0, // Admin has just sent/seen this chat
-        aiAgentActive: false, // Admin has joined, disable AI
+        userUnreadCount: currentUserUnreadCount + 1,
+        adminUnreadCount: 0,
+        aiAgentActive: false, // Explicitly set to false on manual message
         updatedAt: messageData.timestamp,
-        ...(currentSessionData ? {} : { createdAt: messageData.timestamp }) // Set createdAt only if new session
+        ...(currentSessionData ? {} : { createdAt: messageData.timestamp })
       }, { merge: true });
       
-      // Create notification for the user
       const userNotificationData: FirestoreNotification = {
         userId: selectedUser.id,
         title: `New Message from ${supportAdminProfile.displayName || "Support"}`,
         message: `You have a new chat message: "${tempNewMessage.substring(0, 30)}${tempNewMessage.length > 30 ? "..." : ""}"`,
-        type: 'info', // Or a more specific chat notification type
-        href: '/chat', // Link to the main chat page for the user
+        type: 'info',
+        href: '/chat',
         read: false,
         createdAt: Timestamp.now(),
       };
       await addDoc(collection(db, "userNotifications"), userNotificationData);
 
-      // Trigger actual Push Notification for user from Admin
       triggerPushNotification({
         userId: selectedUser.id,
         title: `Message from ${supportAdminProfile.displayName || "Support"}`,
@@ -218,7 +240,6 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
     } catch (error) {
       console.error("AdminChatMessageArea: Error sending message:", error);
-      // Optionally re-set newMessage if send failed, or show error toast
     }
   };
 
@@ -237,14 +258,13 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         batch.delete(docSnapshot.ref);
       });
 
-      // Also update the session document to reflect clearance
       const sessionDocRef = doc(db, 'chats', currentChatSessionId);
       batch.update(sessionDocRef, {
         lastMessageText: "Chat cleared by admin.",
         lastMessageTimestamp: serverTimestamp(),
-        lastMessageSenderId: supportAdminProfile.uid || null, // Use the determined support admin UID
-        userUnreadCount: 0, // Reset user's unread count for this session
-        adminUnreadCount: 0, // Admin's unread count is 0
+        lastMessageSenderId: supportAdminProfile.uid || null,
+        userUnreadCount: 0,
+        adminUnreadCount: 0,
         updatedAt: serverTimestamp()
       });
 
@@ -279,39 +299,59 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       <CardHeader className="p-4 border-b">
         <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-                <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email?.charAt(0) || 'U'} />
-                <AvatarFallback>
-                    {selectedUser.displayName ? selectedUser.displayName.charAt(0).toUpperCase() : selectedUser.email ? selectedUser.email.charAt(0).toUpperCase() : <UserCircle size={20}/>}
-                </AvatarFallback>
-            </Avatar>
-            <div>
-                <CardTitle className="text-md">{selectedUser.displayName || selectedUser.email}</CardTitle>
+              <Avatar className="h-10 w-10">
+                  <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email?.charAt(0) || 'U'} />
+                  <AvatarFallback>
+                      {selectedUser.displayName ? selectedUser.displayName.charAt(0).toUpperCase() : selectedUser.email ? selectedUser.email.charAt(0).toUpperCase() : <UserCircle size={20}/>}
+                  </AvatarFallback>
+              </Avatar>
+              <div>
+                  <CardTitle className="text-md">{selectedUser.displayName || selectedUser.email}</CardTitle>
+                  <div className="flex items-center space-x-2 mt-1">
+                      <div className={`h-2 w-2 rounded-full ${isAiActive ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight">
+                        {isAiActive ? 'Bot Assistant Active' : 'Admin Mode Only'}
+                      </span>
+                  </div>
+              </div>
             </div>
+
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2 bg-muted/50 px-3 py-1.5 rounded-full border">
+                <Bot className={`h-4 w-4 ${isAiActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                <Label htmlFor="ai-toggle" className="text-xs font-semibold cursor-pointer select-none">AI Agent</Label>
+                <Switch 
+                  id="ai-toggle" 
+                  checked={isAiActive} 
+                  onCheckedChange={handleToggleAi} 
+                  disabled={isUpdatingAi}
+                />
+              </div>
+
+              <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" disabled={isClearingChat || isLoadingMessages || messages.length === 0}>
+                  {isClearingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
+                  <span className="ml-2 hidden lg:inline">Clear</span>
+                  </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Clear Chat</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Are you sure you want to permanently delete all messages with {selectedUser.displayName || selectedUser.email}?
+                  </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isClearingChat}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearChat} disabled={isClearingChat} className="bg-destructive hover:bg-destructive/90">
+                      {isClearingChat && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Yes, Clear Chat
+                  </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+              </AlertDialog>
             </div>
-            <AlertDialog>
-            <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isClearingChat || isLoadingMessages || messages.length === 0}>
-                {isClearingChat ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
-                Clear Chat
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Clear Chat</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Are you sure you want to permanently delete all messages in this chat with {selectedUser.displayName || selectedUser.email}? This action cannot be undone.
-                </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                <AlertDialogCancel disabled={isClearingChat}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearChat} disabled={isClearingChat} className="bg-destructive hover:bg-destructive/90">
-                    {isClearingChat && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Yes, Clear Chat
-                </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-            </AlertDialog>
         </div>
       </CardHeader>
       <CardContent className="p-0 flex-grow overflow-hidden">
@@ -341,21 +381,20 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
                   )}
                    {msg.senderType === 'ai' && (
                     <Avatar className="h-7 w-7">
-                      <AvatarImage src={"/default-image.png"} />
-                      <AvatarFallback>AI</AvatarFallback>
+                      <AvatarFallback className="bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold">
+                        <Bot className="h-3 w-3" />
+                      </AvatarFallback>
                     </Avatar>
                   )}
                   <div
-                    className={`max-w-[70%] p-2.5 rounded-lg shadow-sm ${
+                    className={`max-w-[75%] p-2.5 rounded-lg shadow-sm ${
                       msg.senderType === 'admin'
                         ? 'bg-primary text-primary-foreground rounded-br-none'
-                        : msg.senderType === 'ai'
-                        ? 'bg-secondary text-secondary-foreground rounded-bl-none'
-                        : 'bg-card border rounded-bl-none'
+                        : 'bg-secondary text-secondary-foreground border border-border/40 rounded-bl-none'
                     }`}
                   >
                     {msg.text && <p className="text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: linkify(msg.text) }}></p>}
-                    <p className="text-xs text-muted-foreground/80 mt-1 text-right">
+                    <p className={`text-[10px] mt-1 text-right ${msg.senderType === 'admin' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                       {msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>

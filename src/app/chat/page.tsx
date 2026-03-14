@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRouter } from 'next/navigation';
@@ -8,7 +7,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import Breadcrumbs from "@/components/shared/Breadcrumbs";
 import type { BreadcrumbItem } from "@/types/ui";
 import { Button } from "@/components/ui/button";
-import { Home as HomeIcon } from "lucide-react";
+import { Home as HomeIcon, ArrowLeft } from "lucide-react";
 import { useLoading } from '@/contexts/LoadingContext';
 
 export default function FullPageChat() {
@@ -22,25 +21,41 @@ export default function FullPageChat() {
 
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Home", href: "/" },
-    { label: "Chat with Support" },
+    { label: "Support Chat" },
   ];
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto px-2 sm:px-4 py-6 sm:py-8">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="flex justify-between items-center mb-4 sm:mb-6">
-            <h1 className="text-2xl sm:text-3xl font-headline font-semibold text-foreground">
-            Chat with Support
-            </h1>
-            <Link href="/" passHref>
-                 <Button variant="outline" size="sm" onClick={() => showLoading()}>
-                   <HomeIcon className="mr-2 h-4 w-4" /> Back to Home
-                 </Button>
-            </Link>
-        </div>
-        <div className="h-[calc(100vh-15rem)] sm:h-[calc(100vh-16rem)] md:h-[calc(100vh-18rem)]"> {/* Adjust height as needed */}
-          <ChatWindow onClose={handleCloseChatWindow} />
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-6 sm:py-10 max-w-4xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div className="space-y-1">
+              <Breadcrumbs items={breadcrumbItems} />
+              <h1 className="text-3xl sm:text-4xl font-headline font-bold text-foreground tracking-tight">
+                Support Chat
+              </h1>
+              <p className="text-muted-foreground text-sm">We usually respond within a few minutes.</p>
+            </div>
+            
+            {/* High-contrast button: Dark in Light mode, Light in Dark mode with primary hover */}
+            <div className="hidden sm:block">
+              <Link href="/" passHref>
+                   <Button
+  variant="default"
+  size="sm"
+  onClick={() => showLoading()}
+  className="rounded-full px-6 transition-all duration-300 shadow-lg active:scale-95 font-medium group"
+>
+  <ArrowLeft className="mr-2 h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" />
+  Back to Home
+</Button>
+              </Link>
+            </div>
+          </div>
+          
+          <div className="h-[calc(100vh-10rem)] sm:h-[calc(100vh-18rem)] relative">
+            <ChatWindow onClose={handleCloseChatWindow} />
+          </div>
         </div>
       </div>
     </ProtectedRoute>

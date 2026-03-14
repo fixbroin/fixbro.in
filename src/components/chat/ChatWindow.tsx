@@ -1,14 +1,13 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Paperclip, UserCircle, MessageSquareText, XIcon, Loader2 } from 'lucide-react';
-import type { ChatMessage, ChatSession, FirestoreNotification, GlobalWebSettings } from '@/types/firestore';
+import { Send, UserCircle, MessageSquareText, XIcon, Loader2, Check, CheckCheck, Bot } from 'lucide-react';
+import type { ChatMessage, ChatSession, FirestoreNotification } from '@/types/firestore';
 import { Timestamp, doc, collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, setDoc, serverTimestamp, getDoc, getDocs, limit } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +15,7 @@ import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { chatWithAgent, type ChatHistoryItem } from '@/ai/flows/chatWithAgentFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
+import { cn } from '@/lib/utils';
 
 interface ChatWindowProps {
   onClose: () => void;
@@ -29,7 +29,7 @@ const linkify = (text: string) => {
     const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
     return text.replace(urlRegex, (url) => {
         const fullUrl = url.startsWith('www.') ? `http://${url}` : url;
-        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary underline hover:text-primary/80">${url}</a>`;
+        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary font-medium underline hover:text-primary/80 transition-colors">${url}</a>`;
     });
 };
 
@@ -105,10 +105,8 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
     setIsLoadingMessages(true);
     const messagesRef = collection(db, 'chats', chatSessionId, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
-    let soundPlayedThisSnapshot = false;
 
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      soundPlayedThisSnapshot = false;
       const fetchedMessages = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ChatMessage));
       
       let newAdminMessageReceived = false;
@@ -239,58 +237,60 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
         setIsAiTyping(true);
         // Correctly format history for the AI
         const MAX_HISTORY = 16;
-const trimmed = messages.slice(-MAX_HISTORY);
+        const trimmed = messages.slice(-MAX_HISTORY);
 
-const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
-  role: msg.senderType === 'user' ? 'user' : 'model',
-  content: [{ text: msg.text || '' }]
-}));
+        const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
+          role: msg.senderType === 'user' ? 'user' : 'model',
+          content: [{ text: msg.text || '' }]
+        }));
 
         const aiResponse = await chatWithAgent({
-  history: historyForAi,
-  message: tempNewMessage,
-  userId: currentUser.uid, // VERY IMPORTANT
-});
+          history: historyForAi,
+          message: tempNewMessage,
+          userId: currentUser.uid, // VERY IMPORTANT
+        });
         setIsAiTyping(false);
 
-        const aiMessageData: Omit<ChatMessage, 'id'> = {
-          chatSessionId: chatSessionId,
-          senderId: 'ai_agent',
-          senderType: 'ai',
-          text: aiResponse.response,
-          timestamp: Timestamp.now(),
-          isReadByUser: false,
-        };
-        // The onSnapshot listener will pick this up automatically.
-        await addDoc(messagesRef, aiMessageData);
-        
-        // Create notification for the user for AI response
-        const aiNotificationData: FirestoreNotification = {
-          userId: currentUser.uid,
-          title: `New Message from ${adminProfile.displayName || "Support"} AI`,
-          message: `${aiResponse.response.substring(0, 30)}${aiResponse.response.length > 30 ? "..." : ""}`,
-          type: 'info',
-          href: '/chat',
-          read: false,
-          createdAt: Timestamp.now(),
-        };
-        await addDoc(collection(db, "userNotifications"), aiNotificationData);
+        if (aiResponse.response && aiResponse.isSilent !== true) {
+          const aiMessageData: Omit<ChatMessage, 'id'> = {
+            chatSessionId: chatSessionId,
+            senderId: 'ai_agent',
+            senderType: 'ai',
+            text: aiResponse.response,
+            timestamp: Timestamp.now(),
+            isReadByUser: false,
+          };
+          // The onSnapshot listener will pick this up automatically.
+          await addDoc(messagesRef, aiMessageData);
+          
+          // Create notification for the user for AI response
+          const aiNotificationData: FirestoreNotification = {
+            userId: currentUser.uid,
+            title: `New Message from ${adminProfile.displayName || "Support"} AI`,
+            message: `${aiResponse.response.substring(0, 30)}${aiResponse.response.length > 30 ? "..." : ""}`,
+            type: 'info',
+            href: '/chat',
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), aiNotificationData);
 
-        // Trigger actual Push Notification for user from AI
-        triggerPushNotification({
-          userId: currentUser.uid,
-          title: `Support AI: ${adminProfile.displayName || "Support"}`,
-          body: aiResponse.response,
-          href: '/chat'
-        });
+          // Trigger actual Push Notification for user from AI
+          triggerPushNotification({
+            userId: currentUser.uid,
+            title: `Support AI: ${adminProfile.displayName || "Support"}`,
+            body: aiResponse.response,
+            href: '/chat'
+          });
 
-        await updateDoc(sessionDocRef, {
-            lastMessageText: aiResponse.response.substring(0, 50),
-            lastMessageTimestamp: aiMessageData.timestamp,
-            lastMessageSenderId: 'ai_agent',
-            userUnreadCount: (currentSessionData?.userUnreadCount || 0) + 1,
-            updatedAt: aiMessageData.timestamp,
-        });
+          await updateDoc(sessionDocRef, {
+              lastMessageText: aiResponse.response.substring(0, 50),
+              lastMessageTimestamp: aiMessageData.timestamp,
+              lastMessageSenderId: 'ai_agent',
+              userUnreadCount: (currentSessionData?.userUnreadCount || 0) + 1,
+              updatedAt: aiMessageData.timestamp,
+          });
+        }
       }
 
     } catch (error) {
@@ -301,16 +301,23 @@ const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
 
   if (!currentUser) {
     return (
-      <Card className="h-full flex flex-col shadow-md rounded-lg">
-        <CardHeader className="p-3 border-b flex flex-row items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <UserCircle className="h-8 w-8 text-muted-foreground" />
-            <CardTitle className="text-base">Chat Support</CardTitle>
+      <Card className="h-full flex flex-col shadow-xl rounded-2xl border-none overflow-hidden bg-background">
+        <CardHeader className="p-4 border-b bg-primary/5 flex flex-row items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-primary/10 rounded-full">
+              <UserCircle className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-lg font-headline font-semibold">Chat Support</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7"><XIcon className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors">
+            <XIcon className="h-5 w-5" />
+          </Button>
         </CardHeader>
-        <CardContent className="flex-grow flex items-center justify-center">
-          <p className="text-muted-foreground text-sm">Please login to chat.</p>
+        <CardContent className="flex-grow flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+             <MessageSquareText className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">Please login to start a conversation with our support team.</p>
         </CardContent>
       </Card>
     );
@@ -318,32 +325,45 @@ const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
 
   if (isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid) {
      return (
-      <Card className="h-full flex flex-col shadow-md rounded-lg">
-        <CardHeader className="p-3 border-b flex flex-row items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Loader2 className="h-8 w-8 animate-spin" />
-            <CardTitle className="text-base">Loading Chat...</CardTitle>
+      <Card className="h-full flex flex-col shadow-xl rounded-2xl border-none overflow-hidden bg-background">
+        <CardHeader className="p-4 border-b bg-primary/5 flex flex-row items-center justify-between">
+          <div className="flex items-center space-x-3">
+             <div className="h-10 w-10 bg-muted animate-pulse rounded-full" />
+             <div className="space-y-2">
+                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7"><XIcon className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+            <XIcon className="h-5 w-5" />
+          </Button>
         </CardHeader>
         <CardContent className="flex-grow flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground animate-pulse">Initializing secure connection...</p>
+          </div>
         </CardContent>
       </Card>
      );
   }
-   if (!adminProfile.uid || adminProfile.uid === 'fallback_admin_uid' || adminProfile.uid === 'admin_master_id') {
+
+  if (!adminProfile.uid || adminProfile.uid === 'fallback_admin_uid' || adminProfile.uid === 'admin_master_id') {
     return (
-      <Card className="h-full flex flex-col shadow-md rounded-lg">
-        <CardHeader className="p-3 border-b flex flex-row items-center justify-between">
-          <div className="flex items-center space-x-2">
-             <MessageSquareText className="h-8 w-8 text-destructive" />
-            <CardTitle className="text-base">Chat Support Not Configured</CardTitle>
+      <Card className="h-full flex flex-col shadow-xl rounded-2xl border-none overflow-hidden bg-background">
+        <CardHeader className="p-4 border-b bg-destructive/5 flex flex-row items-center justify-between">
+          <div className="flex items-center space-x-3">
+             <MessageSquareText className="h-6 w-6 text-destructive" />
+            <CardTitle className="text-lg font-headline font-semibold">Support Unavailable</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7"><XIcon className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><XIcon className="h-5 w-5" /></Button>
         </CardHeader>
-        <CardContent className="flex-grow flex items-center justify-center p-4">
-          <p className="text-destructive text-sm text-center">The support chat is currently unavailable as the admin account (ADMIN_EMAIL) could not be found or is not set up. Please contact support through other means.</p>
+        <CardContent className="flex-grow flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
+            <XIcon className="h-8 w-8 text-destructive" />
+          </div>
+          <p className="text-destructive font-medium mb-2">Configuration Error</p>
+          <p className="text-muted-foreground text-sm max-w-xs">The support chat is currently unavailable. Our team is working to resolve this. Please try again later.</p>
         </CardContent>
       </Card>
     );
@@ -351,81 +371,125 @@ const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
 
 
   return (
-    <Card className="h-full flex flex-col shadow-md rounded-lg border">
-      <CardHeader className="p-3 border-b flex flex-row items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={adminProfile.photoURL || undefined} />
-            <AvatarFallback>{adminProfile.displayName?.charAt(0) || ADMIN_FALLBACK_AVATAR_INITIAL}</AvatarFallback>
-          </Avatar>
-          <CardTitle className="text-base">{adminProfile.displayName || ADMIN_FALLBACK_NAME}</CardTitle>
+    <Card className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border">
+      <CardHeader className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <Avatar className="h-10 w-10 border-2 border-primary/10 ring-2 ring-background">
+              <AvatarImage src={adminProfile.photoURL || undefined} />
+              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                {adminProfile.displayName?.charAt(0) || ADMIN_FALLBACK_AVATAR_INITIAL}
+              </AvatarFallback>
+            </Avatar>
+            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
+          </div>
+          <div className="flex flex-col">
+            <CardTitle className="text-base font-headline font-bold leading-tight">
+              {adminProfile.displayName || ADMIN_FALLBACK_NAME}
+            </CardTitle>
+            <span className="text-[10px] text-green-600 font-semibold uppercase tracking-wider flex items-center">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />
+              Online Support
+            </span>
+          </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7"><XIcon className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-destructive/10 hover:text-destructive transition-all duration-200">
+          <XIcon className="h-5 w-5" />
+        </Button>
       </CardHeader>
-      <CardContent className="p-0 flex-grow overflow-hidden">
-        <ScrollArea className="h-full p-3" ref={scrollAreaRootRef}>
+
+      <CardContent className="p-0 flex-grow overflow-hidden relative bg-background">
+       
+        
+        <ScrollArea className="h-full px-4 py-6" ref={scrollAreaRootRef}>
           {isLoadingMessages ? (
-            <div className="flex justify-center items-center h-full">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="flex flex-col justify-center items-center h-full space-y-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
+                <p className="text-xs text-muted-foreground">Syncing conversation...</p>
             </div>
           ) : messages.length === 0 && !isAiTyping ? (
-             <div className="flex justify-center items-center h-full">
-                <p className="text-muted-foreground text-sm">No messages yet. Say hello!</p>
+             <div className="flex flex-col justify-center items-center h-full text-center space-y-4 px-6 mt-10">
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in zoom-in duration-500">
+                  <Bot className="h-10 w-10 text-primary mb-2 mx-auto" />
+                  <h3 className="text-sm font-semibold text-foreground">Welcome to FixBro Support!</h3>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">How can we help you with your bookings or services today?</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+                    <Button variant="outline" size="sm" className="text-[10px] h-auto py-2 rounded-xl" onClick={() => setNewMessage("Hello! I need help with my booking.")}>Help with booking</Button>
+                    <Button variant="outline" size="sm" className="text-[10px] h-auto py-2 rounded-xl" onClick={() => setNewMessage("Can you tell me more about services?")}>Service info</Button>
+                </div>
              </div>
           ) : (
-            <div className="space-y-3">
-              {messages.map((msg, index) => (
-                <div
-                  key={msg.id || `msg-${index}`}
-                  className={`flex items-end space-x-2 ${
-                    msg.senderType === 'user' ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  {msg.senderType === 'admin' && (
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={adminProfile.photoURL || undefined} />
-                      <AvatarFallback>{adminProfile.displayName?.charAt(0) || ADMIN_FALLBACK_AVATAR_INITIAL}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  {msg.senderType === 'ai' && (
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={"/default-image.png"} />
-                      <AvatarFallback>AI</AvatarFallback>
-                    </Avatar>
-                  )}
+            <div className="space-y-6">
+              {messages.map((msg, index) => {
+                const isUser = msg.senderType === 'user';
+                const isAi = msg.senderType === 'ai';
+                
+                return (
                   <div
-                    className={`max-w-[75%] p-2 rounded-lg shadow-sm text-sm ${
-                      msg.senderType === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-br-none'
-                        : msg.senderType === 'ai'
-                        ? 'bg-secondary text-secondary-foreground rounded-bl-none'
-                        : 'bg-muted text-foreground rounded-bl-none'
-                    }`}
+                    key={msg.id || `msg-${index}`}
+                    className={cn(
+                      "flex items-start gap-2.5 group animate-in slide-in-from-bottom-2 duration-300",
+                      isUser ? "flex-row-reverse" : "flex-row"
+                    )}
                   >
-                    {msg.text && <p className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: linkify(msg.text) }}></p>}
-                    <p className={`text-xs mt-1 text-right ${msg.senderType === 'user' ? 'text-primary-foreground/70' : msg.senderType === 'ai' ? 'text-secondary-foreground/70' : 'text-muted-foreground/70'}`}>
-                      {msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    {!isUser && (
+  <Avatar className="h-8 w-8 mt-1 border shadow-sm flex-shrink-0">
+    <AvatarImage src={isAi ? "/default-image.png" : adminProfile.photoURL || undefined} />
+    <AvatarFallback className={isAi ? "bg-background text-foreground" : "bg-primary/10 text-primary"}>
+      {isAi ? <Bot className="h-4 w-4" /> : adminProfile.displayName?.charAt(0) || ADMIN_FALLBACK_AVATAR_INITIAL}
+    </AvatarFallback>
+  </Avatar>
+)}
+                    
+                    <div className={cn("flex flex-col space-y-1 max-w-[75%]", isUser ? "items-end" : "items-start")}>
+                      <div
+                        className={cn(
+                          "relative px-3 py-2 rounded-lg text-sm shadow-sm transition-all",
+                          isUser 
+                            ? "bg-primary text-primary-foreground rounded-br-none" 
+                            : "bg-secondary text-secondary-foreground rounded-bl-none border border-border/40"
+                        )}
+                      >
+                        {msg.text && (
+                          <div 
+                            className="whitespace-pre-wrap leading-relaxed" 
+                            dangerouslySetInnerHTML={{ __html: linkify(msg.text) }} 
+                          />
+                        )}
+                      </div>
+                      
+                      <div className={cn("flex items-center space-x-1 px-1", isUser ? "flex-row-reverse" : "flex-row")}>
+                        <p className="text-[10px] font-medium text-muted-foreground/60">
+                          {msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {isUser && (
+                          <div className="ml-1">
+                            {msg.isReadByAdmin ? (
+                              <CheckCheck className="h-3 w-3 text-blue-500" />
+                            ) : (
+                              <Check className="h-3 w-3 text-muted-foreground/40" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  {msg.senderType === 'user' && (
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={currentUser?.photoURL || undefined} />
-                      <AvatarFallback>{currentUser?.displayName?.charAt(0) || 'U'}</AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))}
+                );
+              })}
+              
               {isAiTyping && (
-                <div className="flex items-end space-x-2 justify-start">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={"/default-image.png"} />
-                    <AvatarFallback>AI</AvatarFallback>
-                  </Avatar>
-                  <div className="max-w-[75%] p-2 rounded-lg shadow-sm text-sm bg-secondary text-secondary-foreground rounded-bl-none">
-                    <div className="flex items-center space-x-1">
-                      <span className="h-1.5 w-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                      <span className="h-1.5 w-1.5 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                      <span className="h-1.5 w-1.5 bg-muted-foreground rounded-full animate-bounce"></span>
+                <div className="flex items-start gap-2.5 animate-in fade-in duration-300">
+                  <Avatar className="h-8 w-8 mt-1 border shadow-sm flex-shrink-0 ring-1 ring-border">
+  <AvatarFallback className="bg-background text-foreground">
+    <Bot className="h-4 w-4" />
+  </AvatarFallback>
+</Avatar>
+                  <div className="bg-secondary text-secondary-foreground border border-border/40 rounded-lg rounded-bl-none px-3 py-2.5 shadow-sm">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="h-1.5 w-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                      <span className="h-1.5 w-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                      <span className="h-1.5 w-1.5 bg-muted-foreground/60 rounded-full animate-bounce"></span>
                     </div>
                   </div>
                 </div>
@@ -434,18 +498,36 @@ const historyForAi: ChatHistoryItem[] = trimmed.map(msg => ({
           )}
         </ScrollArea>
       </CardContent>
-      <CardFooter className="p-3 border-t">
-        <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <Input
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-grow h-9 text-sm"
-            autoComplete="off"
-            disabled={isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}
-          />
-          <Button type="submit" size="icon" className="h-9 w-9" disabled={!newMessage.trim() || isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}>
-            <Send className="h-4 w-4" />
+
+      <CardFooter className="p-4 border-t bg-background">
+        <form onSubmit={handleSendMessage} className="flex w-full items-center gap-3">
+          <div className="relative flex-grow group">
+            <Input
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message here..."
+              className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12"
+              autoComplete="off"
+              disabled={isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 group-focus-within:opacity-100 transition-opacity">
+              <MessageSquareText className="h-4 w-4" />
+            </div>
+          </div>
+          <Button 
+            type="submit" 
+            size="icon" 
+            className={cn(
+              "h-12 w-12 rounded-2xl shadow-lg transition-all duration-200 active:scale-95",
+              !newMessage.trim() || isAiTyping ? "opacity-50" : "hover:bg-primary/90"
+            )} 
+            disabled={!newMessage.trim() || isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}
+          >
+            {isAiTyping ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5 ml-0.5" />
+            )}
           </Button>
         </form>
       </CardFooter>
