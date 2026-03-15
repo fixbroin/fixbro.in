@@ -66,150 +66,32 @@ export default function SchedulePage() {
 
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   
-  const [timeSlotLimits, setTimeSlotLimits] = useState<Record<string, TimeSlotCategoryLimit>>({});
-  const [allServices, setAllServices] = useState<Record<string, FirestoreService>>({});
-  const [allSubCategories, setAllSubCategories] = useState<Record<string, FirestoreSubCategory>>({});
-  const [bookingsForSelectedDate, setBookingsForSelectedDate] = useState<FirestoreBooking[]>([]);
-  const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
-  const [cartCategoryIds, setCartCategoryIds] = useState<string[]>([]);
   const [totalCartDuration, setTotalCartDuration] = useState(0); 
 
-  const slotIntervalMinutes = useMemo(() => appConfig.timeSlotSettings?.slotIntervalMinutes || DEFAULT_SLOT_INTERVAL_MINUTES, [appConfig]);
-  const breakTimeMinutes = useMemo(() => appConfig.timeSlotSettings?.breakTimeMinutes || 0, [appConfig]);
-  const enableLimitLateBookings = useMemo(() => appConfig.enableLimitLateBookings ?? DEFAULT_ENABLE_LIMIT_LATE_BOOKINGS, [appConfig]);
-  const limitLateBookingHours = useMemo(() => enableLimitLateBookings ? (appConfig.limitLateBookingHours ?? DEFAULT_HOURS_WHEN_LIMIT_ENABLED) : 0, [appConfig, enableLimitLateBookings]);
-  const weeklyAvailability = useMemo(() => appConfig.timeSlotSettings?.weeklyAvailability || defaultAppSettings.timeSlotSettings.weeklyAvailability, [appConfig]);
+  const fetchAvailableSlots = useCallback(async (date: Date) => {
+    try {
+        const cartEntries = getCartEntries();
+        const response = await fetch('/api/checkout/available-slots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                selectedDate: date.toISOString(),
+                cartEntries: cartEntries
+            })
+        });
 
+        if (!response.ok) {
+            throw new Error('Failed to fetch slots');
+        }
 
-  const parseTimeToMinutes = (timeStr: string): number => {
-    if (!timeStr || !timeStr.includes(':')) return 0;
-    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-    if (timeMatch) {
-      let hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const period = timeMatch[3].toUpperCase();
-      if (period === 'PM' && hours < 12) hours += 12;
-      if (period === 'AM' && hours === 12) hours = 0;
-      return hours * 60 + minutes;
+        const data = await response.json();
+        setTotalCartDuration(data.totalCartDuration);
+        return data.availableTimeSlots;
+    } catch (error) {
+        console.error("Error fetching available slots from API:", error);
+        throw error;
     }
-    // Fallback for HH:MM format
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-  
-  const formatTimeFromMinutes = (totalMinutes: number): string => {
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const period = hours >= 12 && hours < 24 ? 'PM' : 'AM';
-    let displayHours = hours % 12;
-    if (displayHours === 0) displayHours = 12;
-    return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
-  };
-
-  const getDayName = (date: Date): keyof AppSettings['timeSlotSettings']['weeklyAvailability'] => {
-    const dayIndex = date.getDay();
-    const days: (keyof AppSettings['timeSlotSettings']['weeklyAvailability'])[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    return days[dayIndex];
-  };
-
-  const calculateSlotsForDay = useCallback(async (date: Date): Promise<{ slot: string; remainingCapacity: number }[]> => {
-    const dateISO = date.toLocaleDateString('en-CA');
-    const bookingsQuery = query(collection(db, "bookings"), where("scheduledDate", "==", dateISO));
-    const bookingsSnap = await getDocs(bookingsQuery);
-    const bookingsForDay = bookingsSnap.docs.map(doc => doc.data() as FirestoreBooking);
-
-    const dayName = getDayName(date);
-    const dayAvailability = weeklyAvailability[dayName];
-    if (!dayAvailability.isEnabled) return [];
-    
-    const now = new Date();
-    const effectiveDelayHours = enableLimitLateBookings ? (limitLateBookingHours || 0) : 0;
-    const earliestBookableAbsoluteTime = new Date(now.getTime() + (effectiveDelayHours * 60 * 60 * 1000));
-    
-    const fullCycleDuration = slotIntervalMinutes + breakTimeMinutes;
-    const periodStartTimeMinutes = parseTimeToMinutes(dayAvailability.startTime);
-    const periodEndTimeMinutes = parseTimeToMinutes(dayAvailability.endTime);
-    
-    const availableSlots: { slot: string; remainingCapacity: number }[] = [];
-
-    const busySlotMap = new Map<number, { count: number; categoryIds: Set<string> }>();
-    bookingsForDay.forEach(booking => {
-      const bookingStartMinutes = parseTimeToMinutes(booking.scheduledTimeSlot);
-      let bookingDuration = 0;
-      const bookingCategoryIds = new Set<string>();
-
-      booking.services.forEach(item => {
-        const serviceDetail = allServices[item.serviceId];
-        if (serviceDetail) {
-          bookingDuration += getServiceDurationInMinutes(serviceDetail) * item.quantity;
-          const subCat = allSubCategories[serviceDetail.subCategoryId];
-          if (subCat?.parentId) bookingCategoryIds.add(subCat.parentId);
-        }
-      });
-      
-      const bookingSlotsCount = Math.max(1, Math.ceil(bookingDuration / slotIntervalMinutes));
-
-      for (let i = 0; i < bookingSlotsCount; i++) {
-        const busySlotTime = bookingStartMinutes + (i * slotIntervalMinutes);
-        const slotInfo = busySlotMap.get(busySlotTime) || { count: 0, categoryIds: new Set() };
-        slotInfo.count++;
-        bookingCategoryIds.forEach(catId => slotInfo.categoryIds.add(catId));
-        busySlotMap.set(busySlotTime, slotInfo);
-      }
-    });
-
-    let potentialStartTimeMinutes = periodStartTimeMinutes;
-    while (potentialStartTimeMinutes < periodEndTimeMinutes) {
-        const slotString = formatTimeFromMinutes(potentialStartTimeMinutes);
-        const slotDateTime = new Date(date);
-        slotDateTime.setHours(Math.floor(potentialStartTimeMinutes / 60), potentialStartTimeMinutes % 60, 0, 0);
-        
-        if (slotDateTime < earliestBookableAbsoluteTime) {
-            potentialStartTimeMinutes += fullCycleDuration;
-            continue;
-        }
-
-        const estimatedEndTimeMinutes = potentialStartTimeMinutes + totalCartDuration;
-        if (estimatedEndTimeMinutes > periodEndTimeMinutes) {
-            potentialStartTimeMinutes += fullCycleDuration;
-            continue;
-        }
-
-        let isSlotAvailable = true;
-        let minRemainingCapacityInBlock = Infinity;
-        const requiredSlotsCount = Math.max(1, Math.ceil(totalCartDuration / slotIntervalMinutes));
-
-        for (let i = 0; i < requiredSlotsCount; i++) {
-            const checkTimeMinutes = potentialStartTimeMinutes + (i * slotIntervalMinutes);
-            const slotInfo = busySlotMap.get(checkTimeMinutes);
-            
-            for (const cartCatId of cartCategoryIds) {
-                const limitConfig = timeSlotLimits[cartCatId];
-                const limit = limitConfig ? limitConfig.maxConcurrentBookings : 1;
-                const currentBookingsInSlotForCat = slotInfo?.categoryIds.has(cartCatId) ? (slotInfo?.count || 0) : 0;
-                
-                const remainingCapacityForThisCat = limit - currentBookingsInSlotForCat;
-                minRemainingCapacityInBlock = Math.min(minRemainingCapacityInBlock, remainingCapacityForThisCat);
-                
-                if (remainingCapacityForThisCat <= 0) {
-                    isSlotAvailable = false;
-                    break;
-                }
-            }
-            if (!isSlotAvailable) break;
-        }
-
-        if (isSlotAvailable) {
-            availableSlots.push({ slot: slotString, remainingCapacity: minRemainingCapacityInBlock });
-        }
-
-        potentialStartTimeMinutes += fullCycleDuration;
-    }
-    return availableSlots;
-  }, [
-    weeklyAvailability, enableLimitLateBookings, limitLateBookingHours, slotIntervalMinutes, breakTimeMinutes,
-    allServices, allSubCategories, totalCartDuration, cartCategoryIds, timeSlotLimits
-  ]);
+  }, []);
 
 
   useEffect(() => {
@@ -219,38 +101,6 @@ export default function SchedulePage() {
       setIsLoadingSlotsAndConfig(true);
       setDataFetchError(null);
       try {
-        const [limitsSnap, servicesSnap, subCatsSnap] = await Promise.all([
-          getDocs(collection(db, "timeSlotCategoryLimits")),
-          getDocs(collection(db, "adminServices")),
-          getDocs(collection(db, "adminSubCategories")),
-        ]);
-
-        const limitsData = Object.fromEntries(limitsSnap.docs.map(doc => [doc.data().categoryId, { id: doc.id, ...doc.data() } as TimeSlotCategoryLimit]));
-        const servicesData = Object.fromEntries(servicesSnap.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FirestoreService]));
-        const subCatsData = Object.fromEntries(subCatsSnap.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FirestoreSubCategory]));
-        
-        setTimeSlotLimits(limitsData);
-        setAllServices(servicesData);
-        setAllSubCategories(subCatsData);
-
-        const currentCartEntries = getCartEntries();
-        setCartEntries(currentCartEntries);
-
-        const uniqueCartCategoryIds = new Set<string>();
-        let currentTotalCartDuration = 0;
-        currentCartEntries.forEach(entry => {
-          const service = servicesData[entry.serviceId];
-          if (service) {
-            currentTotalCartDuration += getServiceDurationInMinutes(service) * entry.quantity;
-            const subCat = subCatsData[service.subCategoryId];
-            if (subCat?.parentId) {
-              uniqueCartCategoryIds.add(subCat.parentId);
-            }
-          }
-        });
-        setCartCategoryIds(Array.from(uniqueCartCategoryIds));
-        setTotalCartDuration(currentTotalCartDuration); 
-        
         const savedDateStr = localStorage.getItem('fixbroScheduledDate');
         const now = new Date();
         let initialDateToDisplay = new Date(now); 
@@ -283,38 +133,55 @@ export default function SchedulePage() {
     if (!selectedDate || isSearchingForNextDay) return;
     
     const runSlotCalculation = async () => {
-        const slots = await calculateSlotsForDay(selectedDate);
-        setAvailableTimeSlots(slots);
+        try {
+            const slots = await fetchAvailableSlots(selectedDate);
+            setAvailableTimeSlots(slots);
 
-        // If today has no slots, and we're not already searching, find the next available day
-        if (new Date(selectedDate).toDateString() === new Date().toDateString() && slots.length === 0 && !isSearchingForNextDay) {
-            setIsSearchingForNextDay(true);
-            let nextDay = new Date(selectedDate);
-            let found = false;
-            for (let i = 0; i < 30; i++) { // Search up to 30 days ahead
-                nextDay.setDate(nextDay.getDate() + 1);
-                const nextDaySlots = await calculateSlotsForDay(nextDay);
-                if (nextDaySlots.length > 0) {
-                    const nextAvailableDate = new Date(nextDay);
-                    setSelectedDate(nextAvailableDate);
-                    setDisplayMonth(nextAvailableDate); // Sync display month
-                    toast({
-                        variant: "destructive",
-                        title: "No Slots Today",
-                        description: `Showing first available slots for ${nextDay.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
-                    });
-                    found = true;
-                    break;
+            // If selected day has no slots, find the next available day
+            if (slots.length === 0 && !isSearchingForNextDay) {
+                // 1. Show Red Toast for "No Slots" on selected date
+                toast({
+                    variant: "destructive",
+                    title: "No Slots Available",
+                    description: `Sorry, there are no slots available for ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                    duration: 6000,
+                });
+
+                setIsSearchingForNextDay(true);
+                let nextDay = new Date(selectedDate);
+                let found = false;
+
+                // Small delay before searching and showing next toast to let user process the first one
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                for (let i = 0; i < 30; i++) {
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    const nextDaySlots = await fetchAvailableSlots(nextDay);
+                    if (nextDaySlots.length > 0) {
+                        const nextAvailableDate = new Date(nextDay);
+                        setSelectedDate(nextAvailableDate);
+                        setDisplayMonth(nextAvailableDate); 
+                        setAvailableTimeSlots(nextDaySlots);
+                        
+                        // 2. Show Green Toast for "Found Slots" on next date
+                        toast({
+                            variant: "success" as any,
+                            title: "Available Slots Found!",
+                            description: `We found slots for you on ${nextDay.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                            duration: 8000,
+                        });
+                        found = true;
+                        break;
+                    }
                 }
+                setIsSearchingForNextDay(false);
             }
-            if (!found) {
-              // No slots found in the next 30 days
-            }
-            setIsSearchingForNextDay(false);
+        } catch (error) {
+            setDataFetchError("Failed to load available slots. Please try again.");
         }
     };
     runSlotCalculation();
-  }, [selectedDate, calculateSlotsForDay, isSearchingForNextDay, toast]);
+  }, [selectedDate, fetchAvailableSlots, isSearchingForNextDay, toast]);
 
 
   const handleDateSelect = async (date: Date | undefined) => {
