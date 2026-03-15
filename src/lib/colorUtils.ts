@@ -166,6 +166,24 @@ export const DEFAULT_DARK_THEME_COLORS_HSL: Required<ThemePalette> = {
 // Deriving keys from an actual object helps with static analysis
 export const THEME_PALETTE_KEYS = Object.keys(DEFAULT_LIGHT_THEME_COLORS_HSL) as Array<keyof ThemePalette>;
 
+/**
+ * Generates CSS variable declarations for a given theme palette.
+ * @param palette The (potentially partial) theme palette from Firestore.
+ * @param defaultPalette The fallback default HSL palette.
+ * @returns A string of CSS variable declarations.
+ */
+export const generatePaletteCssVariables = (palette: Partial<ThemePalette> | undefined, defaultPalette: Required<ThemePalette>): string => {
+  let cssText = "";
+  (Object.keys(defaultPalette) as Array<keyof ThemePalette>).forEach(key => {
+    const cssVarName = `--${key}`;
+    const hslValue = palette?.[key] || defaultPalette[key];
+    if (hslValue) {
+      cssText += `  ${cssVarName}: ${hslValue};\n`;
+    }
+  });
+  return cssText;
+};
+
 // Keys for the admin theme settings UI (the core customizable ones)
 export const CORE_THEME_PALETTE_KEYS: Array<keyof Pick<ThemePalette, 'primary' | 'foreground' | 'accent' | 'background' | 'secondary' | 'card' | 'border' | 'destructive' | 'input' | 'ring' | 'primary-foreground' | 'secondary-foreground' | 'card-foreground' | 'popover' | 'popover-foreground' | 'muted' | 'muted-foreground' | 'accent-foreground' | 'destructive-foreground' >> = [
   'background', 'foreground', 'card', 'card-foreground', 'popover', 'popover-foreground', 

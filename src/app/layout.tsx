@@ -17,7 +17,8 @@ import PageViewTracker from '@/components/layout/PageViewTracker';
 import ThemeInjector from '@/components/layout/ThemeInjector';
 import DynamicManifest from '@/components/layout/DynamicManifest';
 import ScrollMemory from '@/components/layout/ScrollMemory';
-import { DEFAULT_LIGHT_THEME_COLORS_HSL, hslStringToHex } from '@/lib/colorUtils';
+import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, hslStringToHex, generatePaletteCssVariables } from '@/lib/colorUtils';
+import { getGlobalWebSettings } from '@/lib/webServerUtils';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -79,7 +80,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export async function generateViewport(): Promise<Viewport> {
-  const themeColorValue = hslStringToHex(DEFAULT_LIGHT_THEME_COLORS_HSL.primary!);
+  const webSettings = await getGlobalWebSettings();
+  const themeColorValue = hslStringToHex(webSettings.themeColors?.light?.primary || DEFAULT_LIGHT_THEME_COLORS_HSL.primary!);
 
   return {
     themeColor: themeColorValue,
@@ -94,14 +96,27 @@ const RootSuspenseLoader = () => (
 );
 
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const webSettings = await getGlobalWebSettings();
+  
+  // Pre-generate the CSS variables for server injection to eliminate flicker
+  const serverThemeStyles = `
+    :root {
+      ${generatePaletteCssVariables(webSettings.themeColors?.light, DEFAULT_LIGHT_THEME_COLORS_HSL)}
+    }
+    .dark {
+      ${generatePaletteCssVariables(webSettings.themeColors?.dark, DEFAULT_DARK_THEME_COLORS_HSL)}
+    }
+  `;
+
   return (
     <html lang="en" className={`${roboto.variable}`} suppressHydrationWarning>
       <head>
+        <style id="fixbro-dynamic-theme-styles" dangerouslySetInnerHTML={{ __html: serverThemeStyles }} />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -110,10 +125,8 @@ export default function RootLayout({
                   try {
                     const storedTheme = localStorage.getItem('fixbro-theme');
                     if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
-                    if (typeof window.matchMedia === 'function') {
-                        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                    }
-                    return 'light'; // Default if matchMedia is not available (older browsers, SSR in some tests)
+                    // ALWAYS default to light on first visit for brand consistency
+                    return 'light';
                   } catch (e) { return 'light'; }
                 })();
                 if (theme === 'dark') {
@@ -122,7 +135,6 @@ export default function RootLayout({
                   document.documentElement.classList.remove('dark');
                 }
                 // Persist the determined theme back to localStorage if it wasn't already there or differs
-                // This helps if it was derived from matchMedia or if localStorage was somehow cleared
                 try {
                     if (localStorage.getItem('fixbro-theme') !== theme) {
                         localStorage.setItem('fixbro-theme', theme);

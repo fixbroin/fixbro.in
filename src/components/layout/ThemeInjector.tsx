@@ -5,27 +5,11 @@ import { useEffect } from 'react';
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { GlobalWebSettings, ThemeColors, ThemePalette } from '@/types/firestore';
-import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, THEME_PALETTE_KEYS } from '@/lib/colorUtils';
+import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, THEME_PALETTE_KEYS, generatePaletteCssVariables } from '@/lib/colorUtils';
 
 const WEB_SETTINGS_DOC_ID = "global";
 const WEB_SETTINGS_COLLECTION = "webSettings";
 const THEME_STYLE_TAG_ID = "fixbro-dynamic-theme-styles";
-
-// Simplified function to generate CSS variable declarations for a palette
-const generatePaletteCssVariables = (palette: Partial<ThemePalette> | undefined, defaultPalette: Required<ThemePalette>): string => {
-  let cssText = "";
-  (Object.keys(defaultPalette) as Array<keyof ThemePalette>).forEach(key => {
-    // The keys in THEME_PALETTE_KEYS are already kebab-case
-    const cssVarName = `--${key}`;
-    const hslValue = palette?.[key] || defaultPalette[key];
-    
-    if (hslValue) {
-      cssText += `  ${cssVarName}: ${hslValue};\n`;
-    }
-  });
-  return cssText;
-};
-
 
 const ThemeInjector = () => {
   useEffect(() => {

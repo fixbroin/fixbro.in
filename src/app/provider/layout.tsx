@@ -211,7 +211,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
               <SidebarTrigger className="hidden md:inline-flex text-muted-foreground hover:text-primary transition-colors" />
               <div className="md:hidden flex items-center">
                  <SidebarTrigger className="mr-2 text-muted-foreground hover:text-primary" />
-                 <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} size="small" />
+                 <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} size="normal" />
               </div>
               <h1 className="hidden sm:block text-lg font-bold tracking-tight">Provider Panel</h1>
             </div>

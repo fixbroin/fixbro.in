@@ -8,33 +8,25 @@ import { Moon, Sun } from 'lucide-react';
 const THEME_STORAGE_KEY = 'fixbro-theme';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Initial default
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null); // Start with null to indicate loading
 
-  // Effect to set initial theme from localStorage or system preference
+  // Effect to set initial theme from localStorage
   useEffect(() => {
     let initialTheme: 'light' | 'dark' = 'light'; // Fallback default
     try {
       const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as 'light' | 'dark' | null;
       if (storedTheme === 'light' || storedTheme === 'dark') {
         initialTheme = storedTheme;
-      } else {
-        // No valid theme in localStorage, check system preference
-        if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          initialTheme = 'dark';
-        }
-        // If no stored theme and system prefers light (or matchMedia not supported), it remains 'light'
       }
     } catch (e) {
-      console.warn('ThemeToggle: Error accessing localStorage or matchMedia for initial theme.', e);
-      // Keep default 'light' if error occurs
+      console.warn('ThemeToggle: Error accessing localStorage for initial theme.', e);
     }
     setTheme(initialTheme);
-  }, []); // Runs once on mount
+  }, []);
 
   // Effect to apply theme changes to DOM and localStorage
   useEffect(() => {
-    // Ensure this effect only runs client-side after initial state is determined
-    if (typeof window === 'undefined') return;
+    if (!theme || typeof window === 'undefined') return; // Don't run until initialTheme is loaded
 
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -51,11 +43,14 @@ export default function ThemeToggle() {
     } catch (e) {
       console.warn('ThemeToggle: Error dispatching themeChanged event.', e);
     }
-  }, [theme]); // Runs whenever 'theme' state changes
+  }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    setTheme(prevTheme => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
+
+  // Render a placeholder or nothing while theme is initializing to avoid flicker
+  if (!theme) return <div className="h-10 w-10" />;
 
   return (
     <Button 
