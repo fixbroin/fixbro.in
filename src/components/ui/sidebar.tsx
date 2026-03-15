@@ -212,12 +212,9 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <SheetHeader className="border-b p-4">
-              <SheetTitle>Admin Menu</SheetTitle>
-            </SheetHeader>
+            <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex h-full flex-1 flex-col overflow-y-auto">{children}</div>
-          </SheetContent>
-        </Sheet>
+          </SheetContent>        </Sheet>
       )
     }
 

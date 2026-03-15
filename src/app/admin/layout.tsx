@@ -250,27 +250,25 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2 px-2 py-1.5 bg-muted/30 rounded-full border border-border/40 shadow-inner">
-                  <ThemeToggle />
-                  
-                  {isAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="relative rounded-full h-9 w-9 bg-background/50 hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm"
-                      aria-label="Admin Notifications"
-                      onClick={navigateToAdminNotifications}
-                    >
-                      <Bell className="h-4 w-4" />
-                      {!isLoadingAdminNotifications && unreadAdminNotificationsCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white border-2 border-background animate-in zoom-in duration-300">
-                          {unreadAdminNotificationsCount > 9 ? '9+' : unreadAdminNotificationsCount}
-                        </span>
-                      )}
-                    </Button>
-                  )}
-                </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative rounded-full h-10 w-10 bg-muted/50 hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-none"
+                    aria-label="Admin Notifications"
+                    onClick={navigateToAdminNotifications}
+                  >
+                    <Bell className="h-5 w-5" />
+                    {!isLoadingAdminNotifications && unreadAdminNotificationsCount > 0 && (
+                      <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white border-2 border-background animate-in zoom-in duration-300">
+                        {unreadAdminNotificationsCount > 9 ? '9+' : unreadAdminNotificationsCount}
+                      </span>
+                    )}
+                  </Button>
+                )}
 
                 {adminUser && (
                   <DropdownMenu>

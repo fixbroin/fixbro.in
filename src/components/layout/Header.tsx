@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, Construction, Handshake } from 'lucide-react'; // Added Handshake
+import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, Construction, Handshake, ChevronDown } from 'lucide-react'; // Added Handshake
 import Logo from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -353,11 +353,14 @@ const Header = () => {
                {user && (
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-primary/20 p-0 hover:border-primary transition-colors">
-                        <Avatar className="h-full w-full">
-                          <AvatarImage src={user.photoURL || undefined} alt={firestoreUser?.displayName || user.displayName || user.email || "User"} />
-                          <AvatarFallback className="bg-primary/10 text-primary font-bold">{firestoreUser?.displayName?.charAt(0).toUpperCase() || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                        </Avatar>
+                      <Button variant="ghost" className="relative flex items-center gap-1.5 h-10 px-2 rounded-full bg-muted/50 hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all duration-300 shadow-none group">
+                        <div className="h-7 w-7 rounded-full border border-primary/20 p-0 group-hover:border-primary transition-colors overflow-hidden">
+                          <Avatar className="h-full w-full">
+                            <AvatarImage src={user.photoURL || undefined} alt={firestoreUser?.displayName || user.displayName || user.email || "User"} />
+                            <AvatarFallback className="bg-primary/10 text-primary font-bold text-[10px]">{firestoreUser?.displayName?.charAt(0).toUpperCase() || user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-64 mt-2 rounded-2xl p-2 shadow-2xl border-border/40" align="end" forceMount>
