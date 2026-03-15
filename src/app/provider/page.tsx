@@ -75,6 +75,11 @@ const ProviderJobCard: React.FC<{
       </CardHeader>
       <CardContent className="text-sm space-y-1">
         <p><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)} at {job.scheduledTimeSlot}</p>
+        {job.estimatedEndTime && (
+          <p className="text-green-600 font-medium">
+            <strong>Ends:</strong> {new Date(job.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} {new Date(job.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+          </p>
+        )}
         <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
         <div className="flex items-center gap-2">
             <strong>Contact:</strong>

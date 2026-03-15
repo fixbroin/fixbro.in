@@ -126,6 +126,11 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <div><strong>Status:</strong> <Badge variant={booking.status === "Completed" ? "default" : booking.status === "Confirmed" ? "default" : "outline"} className={ booking.status === "Confirmed" ? "bg-green-500 text-white hover:bg-green-600" : booking.status === "Completed" ? "bg-blue-500 text-white hover:bg-blue-600" : booking.status === "Cancelled" ? "bg-red-500 text-white hover:bg-red-600" : ""}>{booking.status}</Badge></div>
             <p><strong>Scheduled Date:</strong> {booking.scheduledDate}</p>
             <p><strong>Scheduled Time:</strong> {booking.scheduledTimeSlot}</p>
+            {booking.estimatedEndTime && (
+              <p className="text-green-600 font-bold">
+                <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+              </p>
+            )}
             <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
             {booking.razorpayPaymentId && <p><strong>Razorpay Payment ID:</strong> <span className="text-xs">{booking.razorpayPaymentId}</span></p>}
             {booking.razorpayOrderId && <p><strong>Razorpay Order ID:</strong> <span className="text-xs">{booking.razorpayOrderId}</span></p>}

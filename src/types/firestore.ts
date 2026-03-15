@@ -191,6 +191,7 @@ export interface FirestoreBooking {
   razorpaySignature?: string;
   status: BookingStatus;
   notes?: string; // Any special instructions from customer
+  estimatedEndTime?: string; // Work-only completion time (ISO string)
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   isReviewedByCustomer?: boolean;

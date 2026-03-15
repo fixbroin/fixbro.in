@@ -640,6 +640,11 @@ export default function AdminBookingsPage() {
       <CardContent className="p-4 pt-0 text-sm space-y-2 flex-grow">
         <p><strong>Services:</strong> <span className="text-muted-foreground">{booking.services.map(s => `${s.name} (x${s.quantity})`).join(', ')}</span></p>
         <p><strong>Date & Time:</strong> <span className="text-muted-foreground">{formatDateForDisplay(booking.scheduledDate)} at {booking.scheduledTimeSlot}</span></p>
+        {booking.estimatedEndTime && (
+          <p className="text-xs text-green-700 font-medium">
+            <strong>Ends:</strong> {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+          </p>
+        )}
         <p><strong>Amount:</strong> <span className="font-semibold">₹{booking.totalAmount.toLocaleString()}</span></p>
         <div>
           <Select value={booking.status} onValueChange={(newStatus) => handleStatusChange(booking, newStatus as BookingStatus)} disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}>
@@ -771,8 +776,15 @@ export default function AdminBookingsPage() {
                           <div className="font-medium">{booking.customerName}</div>
                           <div className="text-xs text-muted-foreground">{booking.customerEmail}</div>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{formatDateForDisplay(booking.scheduledDate)}</TableCell>
-                        <TableCell className="whitespace-nowrap">{booking.scheduledTimeSlot}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <div>{formatDateForDisplay(booking.scheduledDate)}</div>
+                          <div className="text-xs text-muted-foreground">{booking.scheduledTimeSlot}</div>
+                          {booking.estimatedEndTime && (
+                            <div className="text-[10px] text-green-600 font-medium mt-1">
+                              Ends: {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="max-w-[200px] truncate text-xs">{booking.services.map(s => s.name).join(', ')}</TableCell>
                         <TableCell className="text-right whitespace-nowrap font-bold">₹{booking.totalAmount.toLocaleString()}</TableCell>
                       </TableRow>

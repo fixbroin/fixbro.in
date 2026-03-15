@@ -51,7 +51,7 @@ const getServiceDurationInMinutes = (service: FirestoreService): number => {
 export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [displayMonth, setDisplayMonth] = useState<Date>(new Date()); // State for calendar's month view
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<{ slot: string; remainingCapacity: number }[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<{ slot: string; remainingCapacity: number; endDateTime: string }[]>([]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | undefined>();
   const [isMounted, setIsMounted] = useState(false);
   const [isLoadingSlotsAndConfig, setIsLoadingSlotsAndConfig] = useState(true); 
@@ -67,6 +67,10 @@ export default function SchedulePage() {
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   
   const [totalCartDuration, setTotalCartDuration] = useState(0); 
+
+  const selectedSlotData = useMemo(() => {
+    return availableTimeSlots.find(s => s.slot === selectedTimeSlot);
+  }, [availableTimeSlots, selectedTimeSlot]);
 
   const fetchAvailableSlots = useCallback(async (date: Date) => {
     try {
@@ -199,10 +203,11 @@ export default function SchedulePage() {
   }, []);
 
   const handleProceed = () => {
-    if (typeof window !== 'undefined' && selectedDate && selectedTimeSlot) {
+    if (typeof window !== 'undefined' && selectedDate && selectedTimeSlot && selectedSlotData) {
       showLoading();
       localStorage.setItem('fixbroScheduledDate', selectedDate.toLocaleDateString('en-CA'));
       localStorage.setItem('fixbroScheduledTimeSlot', selectedTimeSlot);
+      localStorage.setItem('fixbroEstimatedEndTime', selectedSlotData.endDateTime);
       router.push('/checkout/address');
     }
   };
@@ -374,18 +379,36 @@ export default function SchedulePage() {
                              <motion.div 
                                initial={{ opacity: 0, scale: 0.95 }}
                                animate={{ opacity: 1, scale: 1 }}
-                               className="mt-6 p-4 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between"
+                               className="mt-6 p-4 rounded-xl bg-primary/5 border border-primary/10 flex flex-col gap-4"
                              >
+                               <div className="flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                   <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+                                     <CheckCircle2 className="h-6 w-6" />
+                                   </div>
+                                   <div>
+                                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Start Schedule</p>
+                                     <p className="text-sm font-bold">{formatDateForDisplay(selectedDate)} at {selectedTimeSlot}</p>
+                                   </div>
+                                 </div>
+                                 <Badge className="bg-primary text-primary-foreground">Confirmed</Badge>
+                               </div>
+
+                               <Separator className="bg-primary/10" />
+
                                <div className="flex items-center gap-3">
-                                 <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
-                                   <CheckCircle2 className="h-6 w-6" />
+                                 <div className="h-10 w-10 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm">
+                                   <Clock className="h-6 w-6" />
                                  </div>
                                  <div>
-                                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Selected Schedule</p>
-                                   <p className="text-sm font-bold">{formatDateForDisplay(selectedDate)} at {selectedTimeSlot}</p>
+                                   <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Estimated Completion</p>
+                                   <p className="text-sm font-bold">
+                                     {selectedSlotData && (
+                                       `Ends on ${new Date(selectedSlotData.endDateTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at ${new Date(selectedSlotData.endDateTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`
+                                     )}
+                                   </p>
                                  </div>
                                </div>
-                               <Badge className="bg-primary text-primary-foreground">Confirmed</Badge>
                              </motion.div>
                           )}
                         </div>

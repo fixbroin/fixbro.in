@@ -189,6 +189,11 @@ export default function ProviderBookingDetailsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <p><strong>Date:</strong> {formatDateForDisplay(booking.scheduledDate)}</p>
               <p><strong>Time Slot:</strong> {booking.scheduledTimeSlot}</p>
+              {booking.estimatedEndTime && (
+                <p className="text-green-600 font-bold sm:col-span-2 mt-2">
+                  <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </p>
+              )}
             </div>
           </section>
           <Separator />

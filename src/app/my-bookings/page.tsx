@@ -453,7 +453,7 @@ export default function MyBookingsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {myBookings.map((booking) => (
+            {myBookings.map((booking, index) => (
               <Card key={booking.id} className="shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                 <div className="flex flex-col md:flex-row">
                   {/* Service Image Section */}
@@ -462,6 +462,7 @@ export default function MyBookingsPage() {
                       src={booking.services[0]?.imageUrl || "/default-image.png"} 
                       alt={booking.services[0]?.name || "Service Image"}
                       fill
+                      priority={index === 0}
                       className="object-cover"
                     />
                   </div>
@@ -487,6 +488,14 @@ export default function MyBookingsPage() {
                     <p className="text-muted-foreground">Time Slot</p>
                     <p className="font-medium">{booking.scheduledTimeSlot}</p>
                   </div>
+                  {booking.estimatedEndTime && (
+                    <div>
+                      <p className="text-muted-foreground text-green-600 font-semibold">Estimated Completion</p>
+                      <p className="font-medium text-green-700">
+                        {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-muted-foreground">Total Amount</p>
                     <p className="font-medium">₹{booking.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>

@@ -63,6 +63,7 @@ const clearLocalStorageItems = (uid?: string) => {
         window.dispatchEvent(new StorageEvent('storage', { key: 'fixbroUserCart' }));
         localStorage.removeItem('fixbroScheduledDate');
         localStorage.removeItem('fixbroScheduledTimeSlot');
+        localStorage.removeItem('fixbroEstimatedEndTime');
         localStorage.removeItem('fixbroCustomerAddress');
         localStorage.removeItem('razorpayPaymentId');
         localStorage.removeItem('razorpayOrderId');
@@ -244,11 +245,13 @@ export default function ThankYouPage() {
         let latitude: number | undefined, longitude: number | undefined;
         let bookingDiscountCode: string | undefined, bookingDiscountAmount: number | undefined, appliedPromoCodeId: string | undefined;
         let storedAppliedPlatformFees: AppliedPlatformFeeItem[] = [];
+        let estimatedEndTime: string | undefined;
 
         if (typeof window !== 'undefined') {
           customerEmail = localStorage.getItem('fixbroCustomerEmail') || customerEmail;
           scheduledDateStored = localStorage.getItem('fixbroScheduledDate') || scheduledDateStored; 
           scheduledTimeSlot = localStorage.getItem('fixbroScheduledTimeSlot') || scheduledTimeSlot;
+          estimatedEndTime = localStorage.getItem('fixbroEstimatedEndTime') || undefined;
           bookingDiscountCode = localStorage.getItem('fixbroBookingDiscountCode') || undefined;
           const discountAmountStr = localStorage.getItem('fixbroBookingDiscountAmount');
           bookingDiscountAmount = discountAmountStr ? parseFloat(discountAmountStr) : undefined;
@@ -307,6 +310,7 @@ export default function ThankYouPage() {
           ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
           scheduledDate: scheduledDateStored,
           scheduledTimeSlot, 
+          estimatedEndTime,
           services: resolvedServiceItems.map(({ _basePriceForBooking, ...rest }) => rest),
           subTotal: baseSubTotalForBooking,
           ...(baseVisitingChargeForBooking > 0 && { visitingCharge: baseVisitingChargeForBooking }),
@@ -483,6 +487,11 @@ export default function ThankYouPage() {
             <div className="sm:col-span-2"><strong>Service(s):</strong> {bookingDetailsForDisplay.servicesSummary}</div>
             <div><strong>Date:</strong> {bookingDetailsForDisplay.scheduledDateDisplay}</div>
             <div><strong>Time:</strong> {bookingDetailsForDisplay.scheduledTimeSlot}</div>
+            {bookingDetailsForDisplay.estimatedEndTime && (
+              <div className="sm:col-span-2 text-green-700 font-medium">
+                <strong>Estimated Completion:</strong> {new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+              </div>
+            )}
             <div className="sm:col-span-2"><strong>Address:</strong> {`${bookingDetailsForDisplay.addressLine1}${bookingDetailsForDisplay.addressLine2 ? ', ' + bookingDetailsForDisplay.addressLine2 : ''}, ${bookingDetailsForDisplay.city}, ${bookingDetailsForDisplay.state} - ${bookingDetailsForDisplay.pincode}`}</div>
           
             <div><strong>Items Total (Base):</strong> ₹{(bookingDetailsForDisplay.subTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
