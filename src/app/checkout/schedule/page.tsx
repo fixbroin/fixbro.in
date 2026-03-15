@@ -315,7 +315,7 @@ export default function SchedulePage() {
                   <h3 className="text-lg font-bold">Available Slots</h3>
                 </div>
                 {selectedDate && (
-                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1">
+                  <Badge variant="outline" className="bg-primary text-white border-primary/20 px-3 py-1 text-lg font-semibold">
                     {formatDateForDisplay(selectedDate)}
                   </Badge>
                 )}
