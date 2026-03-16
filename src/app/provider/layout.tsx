@@ -3,7 +3,7 @@
 "use client";
 
 import type { PropsWithChildren } from 'react';
-import React, { Suspense, useEffect, useState, useRef } from 'react'; // Added useRef
+import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react'; // Added useRef, useCallback
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -33,13 +33,14 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useLoading } from '@/contexts/LoadingContext';
 import ThemeToggle from '@/components/shared/ThemeToggle';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit, Timestamp, updateDoc } from 'firebase/firestore';
 import type { ProviderApplication, FirestoreNotification } from '@/types/firestore';
-import { useUnreadNotificationsCount } from '@/hooks/useUnreadNotificationsCount'; // Added
-import { useGlobalSettings } from '@/hooks/useGlobalSettings'; // Added for sound URL
-import ProviderBottomNavigationBar from '@/components/provider/ProviderBottomNavigationBar'; // Import new component
-import { useIsMobile } from '@/hooks/use-mobile'; // Import mobile hook
+import { useUnreadNotificationsCount } from '@/hooks/useUnreadNotificationsCount'; 
+import { useGlobalSettings } from '@/hooks/useGlobalSettings'; 
+import ProviderBottomNavigationBar from '@/components/provider/ProviderBottomNavigationBar'; 
+import { useIsMobile } from '@/hooks/use-mobile'; 
 import { cn } from '@/lib/utils';
+import NewJobProviderPopup from '@/components/provider/NewJobProviderPopup'; // Added
 
 const ProviderPageLoader = () => (
   <div className="flex justify-center items-center min-h-[calc(100vh-120px)]">
@@ -49,6 +50,7 @@ const ProviderPageLoader = () => (
 );
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
+const PROCESSED_JOB_NOTIFICATIONS_KEY = 'fixbro_processedJobNotifications';
 
 export default function ProviderLayout({ children }: PropsWithChildren) {
   const { user: providerUser, isLoading: authIsLoading, logOut: handleLogoutAuth } = useAuth();
@@ -59,11 +61,16 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
   const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(null);
   const [isCheckingApproval, setIsCheckingApproval] = useState(false); 
 
-  const { count: unreadProviderNotificationsCount, isLoading: isLoadingProviderNotifications } = useUnreadNotificationsCount(providerUser?.uid); // For Provider
+  const { count: unreadProviderNotificationsCount, isLoading: isLoadingProviderNotifications } = useUnreadNotificationsCount(providerUser?.uid); 
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const providerNotificationAudioRef = useRef<HTMLAudioElement | null>(null);
   const previousProviderUnreadCountRef = useRef<number>(0);
-  const isMobile = useIsMobile(); // Check for mobile view
+  const isMobile = useIsMobile(); 
+
+  const [showNewJobPopup, setShowNewJobPopup] = useState(false);
+  const [newJobPopupDetails, setNewJobPopupDetails] = useState<{ bookingDocId: string; bookingHumanId: string; notificationId: string; } | null>(null);
+  // Use a ref for tracking processed/dismissed IDs within the current instance to avoid effect re-runs
+  const processedJobNotificationIdsRef = useRef<string[]>([]);
 
   useEffect(() => {
     // Dynamically update manifest
@@ -77,6 +84,87 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
       document.head.appendChild(newManifestLink);
     }
   }, []);
+
+  useEffect(() => {
+    if (!providerUser?.uid || authIsLoading || !isProviderApproved) return;
+
+    const notificationsRef = collection(db, "userNotifications");
+    const q = query(
+      notificationsRef,
+      where("userId", "==", providerUser.uid),
+      where("type", "==", "booking_update"), 
+      where("read", "==", false), 
+      orderBy("createdAt", "desc"),
+      limit(5) 
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setShowNewJobPopup(false);
+        setNewJobPopupDetails(null);
+        return;
+      }
+      
+      // Look for the most recent unread "new job" notification not dismissed in this session
+      const relevantDoc = snapshot.docs.find(docSnap => {
+        const data = docSnap.data();
+        const title = (data.title || "").toLowerCase();
+        return title.includes("new job") && !processedJobNotificationIdsRef.current.includes(docSnap.id);
+      });
+
+      if (relevantDoc) {
+        const notification = { id: relevantDoc.id, ...relevantDoc.data() } as FirestoreNotification;
+        const href = notification.href;
+        let bookingDocId = "";
+        if (href && href.startsWith('/provider/booking/')) {
+          const parts = href.split('/');
+          bookingDocId = parts[parts.length - 1];
+        }
+        let bookingHumanId = "N/A";
+        const messageMatch = notification.message?.match(/ID: (\S+)/);
+        if (messageMatch && messageMatch[1]) {
+          bookingHumanId = messageMatch[1];
+        } else {
+          const titleMatch = notification.title?.match(/ID: (\S+)/); 
+           if (titleMatch && titleMatch[1]) bookingHumanId = titleMatch[1];
+        }
+
+        if (bookingDocId && bookingHumanId !== "N/A") {
+          setNewJobPopupDetails({ bookingDocId, bookingHumanId, notificationId: notification.id! });
+          setShowNewJobPopup(true);
+        }
+      } else {
+        // Hide if the relevant notification is no longer present or was read elsewhere
+        setShowNewJobPopup(false);
+        setNewJobPopupDetails(null);
+      }
+    }, (error) => {
+      console.error("ProviderLayout: Error in notifications listener:", error);
+    });
+    return () => unsubscribe();
+  }, [providerUser, authIsLoading, isProviderApproved]);
+
+  const handleCloseNewJobPopup = useCallback(async (markNotificationAsRead?: boolean, notificationIdToMark?: string) => {
+    setShowNewJobPopup(false);
+
+    if (notificationIdToMark) {
+        // Track as dismissed in this instance so it doesn't pop up again until refresh
+        processedJobNotificationIdsRef.current.push(notificationIdToMark);
+    }
+
+    if (markNotificationAsRead && notificationIdToMark && providerUser?.uid) {
+      try {
+        await updateDoc(doc(db, "userNotifications", notificationIdToMark), { read: true });
+        setNewJobPopupDetails(null);
+      } catch (error) {
+        console.error("ProviderLayout: Failed to mark notification as read:", error);
+      }
+    } else {
+        setNewJobPopupDetails(null);
+    }
+  }, [providerUser?.uid]);
+
+  const hasPlayedInitialSoundRef = useRef(false);
 
   useEffect(() => {
     const checkProviderStatus = async () => {
@@ -144,8 +232,15 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
       providerNotificationAudioRef.current &&
       providerUser
     ) {
+      // Play sound on initial load if there are unread notifications
+      if (!hasPlayedInitialSoundRef.current && unreadProviderNotificationsCount > 0) {
+        providerNotificationAudioRef.current.play().catch(e => console.warn("ProviderLayout: Initial audio play failed:", e));
+        hasPlayedInitialSoundRef.current = true;
+      }
+
+      // Play sound when count increases (new notification)
       if (unreadProviderNotificationsCount > previousProviderUnreadCountRef.current) {
-        providerNotificationAudioRef.current.play().catch(e => console.warn("ProviderLayout: Notification sound play failed:", e));
+        providerNotificationAudioRef.current.play().catch(e => console.warn("ProviderLayout: New notification audio play failed:", e));
       }
     }
     // Update the ref *after* the check, regardless of whether the sound played or not,
@@ -296,6 +391,14 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
             <Suspense fallback={<ProviderPageLoader />}>
               {children}
             </Suspense>
+            {newJobPopupDetails && (
+              <NewJobProviderPopup
+                isOpen={showNewJobPopup}
+                bookingDocId={newJobPopupDetails.bookingDocId}
+                bookingHumanId={newJobPopupDetails.bookingHumanId}
+                onClose={(markAsRead) => handleCloseNewJobPopup(markAsRead, newJobPopupDetails.notificationId)}
+              />
+            )}
           </main>
            {isMobile && isProviderApproved && <ProviderBottomNavigationBar />}
         </SidebarInset>
