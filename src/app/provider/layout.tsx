@@ -64,11 +64,13 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
   const { count: unreadProviderNotificationsCount, isLoading: isLoadingProviderNotifications } = useUnreadNotificationsCount(providerUser?.uid); 
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const providerNotificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const providerOrderAudioRef = useRef<HTMLAudioElement | null>(null); // Added for order sound
   const previousProviderUnreadCountRef = useRef<number>(0);
   const isMobile = useIsMobile(); 
 
   const [showNewJobPopup, setShowNewJobPopup] = useState(false);
   const [newJobPopupDetails, setNewJobPopupDetails] = useState<{ bookingDocId: string; bookingHumanId: string; notificationId: string; } | null>(null);
+  const [hasNewJobInUnread, setHasNewJobInUnread] = useState(false); // Track if any unread is a new job
   // Use a ref for tracking processed/dismissed IDs within the current instance to avoid effect re-runs
   const processedJobNotificationIdsRef = useRef<string[]>([]);
 
@@ -102,9 +104,14 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
       if (snapshot.empty) {
         setShowNewJobPopup(false);
         setNewJobPopupDetails(null);
+        setHasNewJobInUnread(false);
         return;
       }
       
+      // Check if ANY of the top unread notifications is a new job assignment
+      const anyNewJob = snapshot.docs.some(docSnap => (docSnap.data().title || "").toLowerCase().includes("new job"));
+      setHasNewJobInUnread(anyNewJob);
+
       // Look for the most recent unread "new job" notification not dismissed in this session
       const relevantDoc = snapshot.docs.find(docSnap => {
         const data = docSnap.data();
@@ -211,7 +218,8 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
 
   // Notification sound effect for provider
   useEffect(() => {
-    if (globalSettings?.chatNotificationSoundUrl) { // Re-use chat sound for now
+    // 1. Setup normal notification/chat sound
+    if (globalSettings?.chatNotificationSoundUrl) {
       if (!providerNotificationAudioRef.current) {
         providerNotificationAudioRef.current = new Audio(globalSettings.chatNotificationSoundUrl);
         providerNotificationAudioRef.current.load();
@@ -222,25 +230,40 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     } else {
       providerNotificationAudioRef.current = null;
     }
+
+    // 2. Setup order specific sound
+    if (!providerOrderAudioRef.current) {
+      providerOrderAudioRef.current = new Audio('/sounds/order_sound.wav');
+      providerOrderAudioRef.current.load();
+    }
   }, [globalSettings?.chatNotificationSoundUrl]);
 
   useEffect(() => {
     if (
       !isLoadingProviderNotifications &&
       !isLoadingGlobalSettings &&
-      globalSettings?.chatNotificationSoundUrl &&
-      providerNotificationAudioRef.current &&
       providerUser
     ) {
+      const normalAudio = providerNotificationAudioRef.current;
+      const orderAudio = providerOrderAudioRef.current;
+
       // Play sound on initial load if there are unread notifications
       if (!hasPlayedInitialSoundRef.current && unreadProviderNotificationsCount > 0) {
-        providerNotificationAudioRef.current.play().catch(e => console.warn("ProviderLayout: Initial audio play failed:", e));
+        if (hasNewJobInUnread && orderAudio) {
+          orderAudio.play().catch(e => console.warn("ProviderLayout: Initial order audio play failed:", e));
+        } else if (normalAudio) {
+          normalAudio.play().catch(e => console.warn("ProviderLayout: Initial normal audio play failed:", e));
+        }
         hasPlayedInitialSoundRef.current = true;
       }
 
       // Play sound when count increases (new notification)
       if (unreadProviderNotificationsCount > previousProviderUnreadCountRef.current) {
-        providerNotificationAudioRef.current.play().catch(e => console.warn("ProviderLayout: New notification audio play failed:", e));
+        if (hasNewJobInUnread && orderAudio) {
+          orderAudio.play().catch(e => console.warn("ProviderLayout: New order notification audio play failed:", e));
+        } else if (normalAudio) {
+          normalAudio.play().catch(e => console.warn("ProviderLayout: New normal notification audio play failed:", e));
+        }
       }
     }
     // Update the ref *after* the check, regardless of whether the sound played or not,
@@ -248,7 +271,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     if (!isLoadingProviderNotifications) {
         previousProviderUnreadCountRef.current = unreadProviderNotificationsCount;
     }
-  }, [unreadProviderNotificationsCount, isLoadingProviderNotifications, globalSettings, isLoadingGlobalSettings, providerUser]);
+  }, [unreadProviderNotificationsCount, isLoadingProviderNotifications, globalSettings, isLoadingGlobalSettings, providerUser, hasNewJobInUnread]);
 
 
   const handleChangePassword = async () => {
