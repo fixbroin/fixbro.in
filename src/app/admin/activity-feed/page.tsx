@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
@@ -33,6 +33,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface GroupedUserActivity extends UserActivity {
+  _isGrouped?: boolean;
+  _totalQuantity?: number;
+  _groupCount?: number;
+}
 
 const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => {
   const configs: Record<string, { icon: any, color: string, bg: string, label: string }> = {
@@ -95,6 +101,35 @@ export default function AdminActivityFeedPage() {
     return 5;
   });
 
+  const displayActivities = useMemo(() => {
+    const result: GroupedUserActivity[] = [];
+    activities.forEach((activity) => {
+      const prev = result[result.length - 1];
+      const isSameUser = prev && (
+        (activity.userId && activity.userId === prev.userId) || 
+        (activity.guestId && activity.guestId === prev.guestId)
+      );
+      
+      const isGroupableType = activity.eventType === 'addToCart' || activity.eventType === 'removeFromCart';
+      
+      if (isSameUser && prev.eventType === activity.eventType && isGroupableType && prev.eventData.serviceId === activity.eventData.serviceId) {
+        prev._isGrouped = true;
+        prev._groupCount = (prev._groupCount || 1) + 1;
+        if (activity.eventData.quantity) {
+          prev._totalQuantity = (prev._totalQuantity || prev.eventData.quantity || 0) + activity.eventData.quantity;
+        }
+      } else {
+        const newActivity = { ...activity } as GroupedUserActivity;
+        if (isGroupableType) {
+          newActivity._totalQuantity = activity.eventData.quantity;
+          newActivity._groupCount = 1;
+        }
+        result.push(newActivity);
+      }
+    });
+    return result;
+  }, [activities]);
+
   const handleAutoRefreshToggle = (checked: boolean) => {
     setIsAutoRefreshEnabled(checked);
     if (typeof window !== 'undefined') {
@@ -125,6 +160,8 @@ export default function AdminActivityFeedPage() {
       } as UserActivity));
 
       setActivities(fetchedActivities);
+      
+      // Update pagination markers. For auto-refresh, the last doc fetched is still the point for 'Load More'
       setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
       setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
     } catch (error) {
@@ -266,8 +303,11 @@ export default function AdminActivityFeedPage() {
     }
   };
 
-  const renderEventData = (activity: UserActivity) => {
+  const renderEventData = (activity: GroupedUserActivity) => {
     const data = activity.eventData;
+    const isGrouped = activity._isGrouped;
+    const totalQty = activity._totalQuantity;
+
     switch (activity.eventType) {
       case 'pageView':
         return (
@@ -281,9 +321,29 @@ export default function AdminActivityFeedPage() {
       case 'timeOnPage':
         return <span className="text-xs font-medium">Spent <span className="text-primary">{data.durationSeconds}s</span> on {data.pageUrl || 'a page'}</span>;
       case 'addToCart':
-        return <span className="text-xs font-medium">Added <span className="text-orange-600">{data.serviceName}</span> (Qty: {data.quantity})</span>;
+        return (
+          <span className="text-xs font-medium">
+            Added <span className="text-orange-600">{data.serviceName}</span> 
+            {isGrouped ? (
+              <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                Total: {totalQty}
+              </span>
+            ) : (
+              ` (Qty: ${data.quantity})`
+            )}
+          </span>
+        );
       case 'removeFromCart':
-        return <span className="text-xs font-medium text-pink-600">Removed {data.serviceName}</span>;
+        return (
+          <span className="text-xs font-medium text-pink-600">
+            Removed {data.serviceName}
+            {isGrouped && (
+              <span className="ml-2 px-2 py-0.5 bg-pink-100 text-pink-700 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                Total: {totalQty}
+              </span>
+            )}
+          </span>
+        );
       case 'newBooking':
         return (
           <div className="flex items-center gap-2">
@@ -294,9 +354,16 @@ export default function AdminActivityFeedPage() {
           </div>
         );
       case 'newUser':
-        return <span className="text-xs font-bold text-green-600">{data.email}</span>;
+        return <span className="text-xs font-bold text-green-600">{data.email || data.mobileNumber}</span>;
       case 'userLogin':
-        return <span className="text-xs font-medium">via {data.email}</span>;
+        return (
+          <span className="text-xs font-medium">
+            via {data.email || data.mobileNumber || data.loginMethod || 'Auth'}
+            {data.loginMethod && (data.email || data.mobileNumber) && (
+              <span className="ml-1 text-[10px] text-muted-foreground uppercase opacity-70">({data.loginMethod})</span>
+            )}
+          </span>
+        );
       case 'userLogout':
         return <span className="text-xs text-muted-foreground italic">Logout ({data.logoutMethod})</span>;
       case 'checkoutStep':
@@ -306,7 +373,7 @@ export default function AdminActivityFeedPage() {
     }
   };
 
-  const renderUserCell = (activity: UserActivity) => {
+  const renderUserCell = (activity: GroupedUserActivity) => {
     const isGuest = !activity.userId;
     const name = activity.userId ? (usersData[activity.userId]?.fullName || 'Loading...') : 'Guest User';
     
@@ -330,7 +397,7 @@ export default function AdminActivityFeedPage() {
     );
   };
 
-  const renderMobileCard = (activity: UserActivity, idx: number) => (
+  const renderMobileCard = (activity: GroupedUserActivity, idx: number) => (
     <motion.div
       key={activity.id}
       initial={{ opacity: 0, y: 20 }}
@@ -469,7 +536,7 @@ export default function AdminActivityFeedPage() {
                   </TableHeader>
                   <TableBody>
                     <AnimatePresence initial={false}>
-                      {activities.map((activity, idx) => (
+                      {displayActivities.map((activity, idx) => (
                         <motion.tr
                           key={activity.id}
                           initial={{ opacity: 0, y: -10 }}
@@ -510,7 +577,7 @@ export default function AdminActivityFeedPage() {
               {/* Mobile View: Cards */}
               <div className="md:hidden">
                 <AnimatePresence initial={false}>
-                  {activities.map((activity, idx) => renderMobileCard(activity, idx))}
+                  {displayActivities.map((activity, idx) => renderMobileCard(activity, idx))}
                 </AnimatePresence>
               </div>
             </>
