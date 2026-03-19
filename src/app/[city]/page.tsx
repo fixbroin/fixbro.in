@@ -114,9 +114,13 @@ export default async function CityHomePage({ params }: CityPageProps) {
   const appBaseUrl = getBaseUrl();
   const citySchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "Product",
     "name": `Home Services in ${cityData.name}`,
     "description": cityData.metaDescription || `Professional home services in ${cityData.name}.`,
+    "brand": {
+      "@type": "Brand",
+      "name": "FixBro"
+    },
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro"

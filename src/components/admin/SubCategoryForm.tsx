@@ -18,11 +18,7 @@ import { storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch"; // Import Switch
-
-const generateSlug = (name: string) => {
-  if (!name) return "";
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-};
+import { generateSlug, generateUniqueSlug } from "@/lib/slugUtils";
 
 const subCategoryFormSchema = z.object({
   name: z.string().min(2, { message: "Sub-category name must be at least 2 characters." }),
@@ -78,6 +74,7 @@ export default function SubCategoryForm({ onSubmit: onSubmitProp, initialData, o
   const [originalImageUrlFromInitialData, setOriginalImageUrlFromInitialData] = useState<string | null>(null);
   
   const [isFormBusyForImage, setIsFormBusyForImage] = useState(false);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
   const form = useForm<SubCategoryFormData>({
@@ -126,9 +123,22 @@ export default function SubCategoryForm({ onSubmit: onSubmitProp, initialData, o
   }, [initialData, form]);
 
   useEffect(() => {
-    if (watchedName && !initialData && !form.getFieldState('slug').isDirty) {
-      form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
-    }
+    const handler = setTimeout(async () => {
+      if (watchedName && !form.getFieldState('slug').isDirty) {
+        setIsCheckingSlug(true);
+        try {
+          const uniqueSlug = await generateUniqueSlug(watchedName, "adminSubCategories", initialData?.id);
+          form.setValue('slug', uniqueSlug, { shouldValidate: true });
+        } catch (error) {
+          console.error("Error generating unique slug:", error);
+          form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
+        } finally {
+          setIsCheckingSlug(false);
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
   }, [watchedName, initialData, form]);
 
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -272,17 +282,20 @@ await onSubmitProp({
           name="slug"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Slug {initialData ? "(Non-editable)" : "(Auto-generated or custom)"}</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                Slug (Auto-generated or custom)
+                {isCheckingSlug && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="e.g., plumbing-services"
                   {...field}
                   onChange={(e) => field.onChange(generateSlug(e.target.value))}
-                  disabled={effectiveIsSubmitting || !!initialData}
+                  disabled={effectiveIsSubmitting}
                 />
               </FormControl>
               <FormDescription>
-                 {initialData ? "Slug cannot be changed for existing sub-categories." : "Lowercase, dash-separated. Auto-generated from name if left blank."}
+                 Lowercase, dash-separated. Auto-generated from name if left blank or unchanged.
               </FormDescription>
               <FormMessage />
             </FormItem>

@@ -7,30 +7,11 @@ import type { Metadata } from 'next';
 import { getBaseUrl } from '@/lib/config';
 import Link from 'next/link';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import JsonLdScript from '@/components/shared/JsonLdScript';
 
 import type { BreadcrumbItem } from '@/types/ui';
 
 export const dynamic = 'force-dynamic';
-
-export async function generateMetadata(): Promise<Metadata> {
-  const appBaseUrl = getBaseUrl();
-  const canonicalUrl = `${appBaseUrl}/blog`;
-
-  return {
-    title: "Blog",
-    description: "Tips, guides, and updates from the FixBro team to help you with your home needs.",
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    openGraph: {
-      title: "Blog | FixBro",
-      description: "Tips, guides, and updates from the FixBro team to help you with your home needs.",
-      url: canonicalUrl,
-      type: 'website',
-    },
-  };
-}
-
 
 async function getPublishedPosts(): Promise<ClientBlogPost[]> {
   try {
@@ -44,13 +25,13 @@ async function getPublishedPosts(): Promise<ClientBlogPost[]> {
           ...data,
           id: doc.id,
           // Serialize Timestamps to ISO strings
-          createdAt: data.createdAt && typeof data.createdAt.toDate === 'function' 
-            ? data.createdAt.toDate().toISOString() 
+          createdAt: data.createdAt && typeof (data.createdAt as any).toDate === 'function' 
+            ? (data.createdAt as any).toDate().toISOString() 
             : new Date().toISOString(),
-          updatedAt: data.updatedAt && typeof data.updatedAt.toDate === 'function' 
-            ? data.updatedAt.toDate().toISOString() 
+          updatedAt: data.updatedAt && typeof (data.updatedAt as any).toDate === 'function' 
+            ? (data.updatedAt as any).toDate().toISOString() 
             : undefined,
-        };
+        } as ClientBlogPost;
       })
       .filter(post => post.isPublished === true)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -60,6 +41,26 @@ async function getPublishedPosts(): Promise<ClientBlogPost[]> {
     console.error("Error fetching blog posts:", error);
     return [];
   }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const appBaseUrl = getBaseUrl();
+  const canonicalUrl = `${appBaseUrl}/blog`;
+
+  return {
+    title: "#1 Home Service Blog in Bangalore | Maintenance Tips & Guides | FixBro",
+    description: "Expert home maintenance tips, repair guides, and the latest updates from FixBro. Learn how to keep your Bangalore home in top shape with our professional advice.",
+    keywords: ["home service blog", "maintenance tips Bangalore", "repair guides", "FixBro blog"],
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: "FixBro Blog: Expert Home Service Tips & Guides in Bangalore",
+      description: "Stay updated with expert tips and guides for your home maintenance needs in Bangalore.",
+      url: canonicalUrl,
+      type: 'website',
+    },
+  };
 }
 
 export default async function BlogListPage() {
@@ -72,18 +73,30 @@ export default async function BlogListPage() {
   const featuredPost = posts[0];
   const otherPosts = posts.slice(1);
 
+  const blogIndexSchema = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    "name": "FixBro Home Service Blog",
+    "description": "Expert home maintenance tips and guides for Bangalore homeowners.",
+    "publisher": {
+      "@type": "Organization",
+      "name": "FixBro"
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
+      <JsonLdScript data={blogIndexSchema} idSuffix="blog-index" />
       {/* Header Section */}
       <div className="bg-primary/5 py-16 md:py-24">
         <div className="container mx-auto px-4">
           <Breadcrumbs items={breadcrumbItems} />
           <div className="mt-8 text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-6xl font-headline font-bold text-foreground mb-6">
-              Our <span className="text-primary">Blog</span>
+              Expert <span className="text-primary">Home Service Tips</span> for Bangalore
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-              Expert tips, home maintenance guides, and the latest updates from the FixBro team.
+              Your go-to guide for home maintenance, repair hacks, and professional service updates in Bangalore.
             </p>
           </div>
         </div>
@@ -149,7 +162,7 @@ export default async function BlogListPage() {
               <div className="space-y-10">
                 <h3 className="text-3xl font-headline font-bold">Recent Articles</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-                  {otherPosts.map((post, index) => (
+                  {otherPosts.map((post: ClientBlogPost) => (
                     <BlogPostCard key={post.id} post={post} />
                   ))}
                 </div>

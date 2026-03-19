@@ -215,6 +215,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   return (
     <div 
       onClick={handleNavigation}
+      title={`View details for ${service.name}`}
       className="relative block p-3 my-2 gap-3 bg-card border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full cursor-pointer group"
     >
         {/* Mobile-only Layout Container */}

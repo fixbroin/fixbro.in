@@ -113,10 +113,14 @@ export default async function CityCategoryPage({ params }: PageProps) {
 
   const categoryCitySchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "Product",
     "name": `${categoryData.name} in ${cityData.name}`,
     "description": categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}.`,
     "image": categoryData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "brand": {
+      "@type": "Brand",
+      "name": "FixBro"
+    },
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro"

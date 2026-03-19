@@ -437,7 +437,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const citySnap = await getDocs(cityQuery);
             if (!citySnap.empty) {
                 fetchedCityData = {id: citySnap.docs[0].id, ...(citySnap.docs[0].data() as Omit<FirestoreCity, 'id'>)} as FirestoreCity;
-                currentH1 = fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("Fixbro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
+                currentH1 = fetchedCityData.h1_title || replacePlaceholders(fetchedSeoSettings.cityPageH1Pattern, { cityName: fetchedCityData.name }) || `Professional Home Services in ${fetchedCityData.name}`;
                 currentCityNameForLd = fetchedCityData.name;
             }
         } catch (e) { console.error("Error fetching city data for H1/LD:", e); }
@@ -449,7 +449,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const areaSnap = await getDocs(areaQuery);
             if (!areaSnap.empty) {
                 fetchedAreaData = {id: areaSnap.docs[0].id, ...(areaSnap.docs[0].data() as Omit<FirestoreArea, 'id'>)} as FirestoreArea;
-                currentH1 = fetchedAreaData.h1_title || `Services in ${fetchedAreaData.name}, ${fetchedCityData.name}`;
+                currentH1 = fetchedAreaData.h1_title || replacePlaceholders(fetchedSeoSettings.areaPageH1Pattern, { areaName: fetchedAreaData.name, cityName: fetchedCityData.name }) || `Best Home Services in ${fetchedAreaData.name}, ${fetchedCityData.name}`;
             }
         } catch (e) { console.error("Error fetching area data for H1/LD:", e); }
       }
@@ -474,18 +474,29 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       if (citySlug && areaSlug) specificPageUrl = `${pageUrl}/${citySlug}/${areaSlug}`;
       else if (citySlug) specificPageUrl = `${pageUrl}/${citySlug}`;
 
+      // Map Service to Product for review snippet support, and Organization to LocalBusiness
+      let ldType = fetchedSeoSettings.structuredDataType || 'LocalBusiness';
+      if (ldType === 'Service') ldType = 'Product';
+      if (ldType === 'Organization') ldType = 'LocalBusiness';
+
       const ldData: Record<string, any> = {
         '@context': 'https://schema.org',
-        '@type': fetchedSeoSettings.structuredDataType || 'LocalBusiness',
+        '@type': ldType,
         name: fetchedAreaData?.name ? `${siteName} - ${fetchedAreaData.name}, ${fetchedCityData?.name}` : (fetchedCityData?.name ? `${siteName} - ${fetchedCityData.name}` : (fetchedSeoSettings.structuredDataName || siteName)),
         image: ogImage,
         url: specificPageUrl,
+        brand: {
+          "@type": "Brand",
+          "name": siteName
+        },
         telephone: webSettingsData?.contactMobile || fetchedSeoSettings.structuredDataTelephone,
         // Brand-level rating for the homepage
         aggregateRating: {
           "@type": "AggregateRating",
           "ratingValue": "4.8",
-          "reviewCount": "1250"
+          "reviewCount": "1250",
+          "bestRating": "5",
+          "worstRating": "1"
         }
       };
       if (webSettingsData?.contactEmail) ldData.email = webSettingsData.contactEmail;
@@ -818,6 +829,42 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         
         {/* New "Explore by Location" Section */}
         <LazySection>
+            {/* SEO CONTENT SECTION FOR BANGALORE RANKING */}
+            <section className="py-12 md:py-16 bg-background">
+              <div className="container mx-auto px-4">
+                <div className="max-w-4xl mx-auto prose prose-blue lg:prose-lg prose-headings:font-headline prose-headings:font-bold">
+                  <h2 className="text-3xl md:text-4xl text-foreground mb-6">
+                    Professional Home Services in Bangalore – Trusted & Reliable
+                  </h2>
+                  <p className="text-muted-foreground leading-relaxed mb-6">
+                    Are you looking for the <strong>best home services in Bangalore</strong>? FixBro is your one-stop destination for all home maintenance and repair needs. Whether you need a skilled <strong>carpenter in Bangalore</strong>, a professional plumber, or expert AC repair, we connect you with background-verified and experienced professionals.
+                  </p>
+                  <h3 className="text-2xl text-foreground mb-4">Why Choose FixBro for Services in Bangalore?</h3>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 list-none p-0">
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
+                      <span><strong>Verified Experts:</strong> All our service providers in Bangalore undergo rigorous background checks.</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
+                      <span><strong>Transparent Pricing:</strong> No hidden costs. Get upfront quotes for all your home repair needs.</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
+                      <span><strong>On-Time Service:</strong> We value your time. Our experts arrive promptly at your doorstep in Bangalore.</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-muted-foreground">
+                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
+                      <span><strong>100% Satisfaction:</strong> Your happiness is our priority. We ensure top-quality service for every job.</span>
+                    </li>
+                  </ul>
+                  <p className="text-muted-foreground leading-relaxed mt-6">
+                    From Electronic City to Whitefield, and Indiranagar to Jayanagar, FixBro covers every corner of Bangalore. Book your service today and experience the convenience of professional home maintenance at your fingertips.
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <ExploreByLocation 
                 initialData={initialData?.citiesWithAreas} 
                 categories={initialData?.allCategories}

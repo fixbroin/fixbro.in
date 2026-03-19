@@ -18,11 +18,7 @@ import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject }
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { generateCategorySeo } from '@/ai/flows/generateCategorySeoFlow';
-
-const generateSlug = (name: string) => {
-  if (!name) return "";
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-};
+import { generateSlug, generateUniqueSlug } from '@/lib/slugUtils';
 
 const generateRandomHexString = (length: number) => {
   return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -79,6 +75,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
   const [originalImageUrlFromInitialData, setOriginalImageUrlFromInitialData] = useState<string | null>(null);
   const [isFormBusyForImage, setIsFormBusyForImage] = useState(false);
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
   const form = useForm<CategoryFormData>({
@@ -126,9 +123,24 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
   }, [initialData, form]);
 
   useEffect(() => {
-    if (watchedName && !initialData && !form.getFieldState('slug').isDirty) {
-      form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
-    }
+    const handler = setTimeout(async () => {
+      // Auto-generate if field is clean (not manually touched)
+      if (watchedName && !form.getFieldState('slug').isDirty) {
+        setIsCheckingSlug(true);
+        try {
+          // Pass the current ID to exclude it from the "duplicate" check when editing
+          const uniqueSlug = await generateUniqueSlug(watchedName, "adminCategories", initialData?.id);
+          form.setValue('slug', uniqueSlug, { shouldValidate: true });
+        } catch (error) {
+          console.error("Error generating unique slug:", error);
+          form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
+        } finally {
+          setIsCheckingSlug(false);
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
   }, [watchedName, initialData, form]);
 
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,17 +304,22 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
           name="slug"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Slug {initialData ? "(Non-editable)" : "(Auto-generated or custom)"}</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                Slug (Auto-generated or custom)
+                {isCheckingSlug && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="e.g., home-repairs"
                   {...field}
-                  onChange={(e) => field.onChange(generateSlug(e.target.value))}
-                  disabled={effectiveIsSubmitting || !!initialData}
+                  onChange={(e) => {
+                    field.onChange(generateSlug(e.target.value));
+                  }}
+                  disabled={effectiveIsSubmitting}
                 />
               </FormControl>
               <FormDescription>
-                {initialData ? "Slug cannot be changed for existing categories." : "Lowercase, dash-separated. Auto-generated from name if left blank."}
+                Lowercase, dash-separated. Auto-generated from name if left blank or unchanged.
               </FormDescription>
               <FormMessage />
             </FormItem>

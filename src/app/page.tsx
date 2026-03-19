@@ -79,7 +79,30 @@ export default async function Page() {
     "name": siteName,
     "url": appBaseUrl,
     "logo": `${appBaseUrl}/android-chrome-512x512.png`,
+    "sameAs": [
+      "https://www.facebook.com/fixbro.in",
+      "https://x.com/fixbro_in",
+      "https://www.instagram.com/fixbro.in/",
+      "https://www.linkedin.com/company/fixbro-in",
+      "https://www.youtube.com/@fixbro-in"
+    ]
+  };
+
+  const localBusinessSchema = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": siteName,
+    "url": appBaseUrl,
+    "image": `${appBaseUrl}/android-chrome-512x512.png`,
+    "logo": `${appBaseUrl}/android-chrome-512x512.png`,
     "description": homepageData.seoSettings.homepageMetaDescription,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": homepageData.seoSettings.structuredDataStreetAddress || "#44, G S Palya Road, Electronic City Phase 2",
+      "addressLocality": homepageData.seoSettings.structuredDataLocality || "Bangalore",
+      "postalCode": homepageData.seoSettings.structuredDataPostalCode || "560100",
+      "addressCountry": "IN"
+    },
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": homepageData.seoSettings.structuredDataTelephone,
@@ -88,7 +111,7 @@ export default async function Page() {
   };
 
   if (aggregateRating) {
-    (organizationSchema as any).aggregateRating = {
+    (localBusinessSchema as any).aggregateRating = {
       "@type": "AggregateRating",
       "ratingValue": aggregateRating.ratingValue,
       "reviewCount": aggregateRating.reviewCount,
@@ -100,6 +123,7 @@ export default async function Page() {
   return (
     <>
       <JsonLdScript data={organizationSchema} idSuffix="homepage-org" />
+      <JsonLdScript data={localBusinessSchema} idSuffix="homepage-local" />
       <HomePageClient initialData={homepageData} />
     </>
   );

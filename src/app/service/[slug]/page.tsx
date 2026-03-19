@@ -105,7 +105,7 @@ export async function generateMetadata(
 
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const placeholderData = { serviceName: serviceData.name, categoryName: serviceData.parentCategoryName };
+  const placeholderData = { serviceName: serviceData.name, categoryName: serviceData.parentCategoryName, cityName: "Bangalore" };
 
   const title = replacePlaceholders(serviceData.metaTitle || seoSettings.servicePageTitlePattern, placeholderData) || `${serviceData.name} | FixBro`;
   const description = replacePlaceholders(serviceData.metaDescription || seoSettings.servicePageDescriptionPattern, placeholderData) || `Book ${serviceData.name} with FixBro. Trusted professionals and reliable service.`;
@@ -162,10 +162,25 @@ export default async function ServicePage({ params }: ServicePageProps) {
   
   const serviceSchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "Product",
     "name": serviceData.name,
     "description": serviceData.description,
     "image": serviceData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "brand": {
+      "@type": "Brand",
+      "name": "FixBro"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `${appBaseUrl}/service/${slug}`,
+      "priceCurrency": "INR",
+      "price": serviceData.discountedPrice || serviceData.price,
+      "availability": "https://schema.org/InStock",
+      "seller": {
+        "@type": "LocalBusiness",
+        "name": "FixBro"
+      }
+    },
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro",

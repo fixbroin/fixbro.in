@@ -509,7 +509,7 @@ export default function ServiceDetailPageClient({
           <div className="flex flex-col bg-card">
             <CardHeader className="p-3 sm:p-4">
               <div className="flex items-start justify-between">
-                <h1 className="text-2xl sm:text-3xl font-headline font-bold text-foreground leading-tight">{h1Title}</h1>
+                <h1 className="text-2xl sm:text-3xl font-headline font-bold text-foreground leading-tight">{h1Title} in Bangalore</h1>
                 {(!service.imageUrl || service.imageUrl.trim() === '') && <IconComponent className="h-10 w-10 sm:h-12 sm:w-12 text-primary ml-4 shrink-0" />}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm sm:text-base mt-2">
@@ -628,9 +628,8 @@ export default function ServiceDetailPageClient({
               {service.includedItems && service.includedItems.length > 0 && (
                 <div className="p-4 sm:p-6 rounded-xl bg-primary/10 border border-primary/20">
                   <h4 className="text-lg sm:text-xl font-headline font-bold text-primary mb-3 flex items-center">
-                    <PlusCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Included:
-                  </h4>
-                  <ul className="grid grid-cols-1 gap-2">
+                   <PlusCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Included in {service.name}:
+                  </h4>                  <ul className="grid grid-cols-1 gap-2">
                     {service.includedItems.map((item, index) => (
                       <li key={`inc-${index}`} className="flex items-start text-sm sm:text-base text-foreground/80 font-medium">
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-3 text-primary flex-shrink-0 mt-0.5"/>{item}
@@ -642,9 +641,9 @@ export default function ServiceDetailPageClient({
 
               {/* WHAT'S NOT INCLUDED - COLOR CODED (RED/DESTRUCTIVE) */}
               {service.excludedItems && service.excludedItems.length > 0 && (
-                <div className="p-4 sm:p-6 rounded-xl bg-destructive/5 border border-destructive/15">
+                <div className="p-4 sm:p-6 rounded-xl bg-destructive/5 border border-destructive/20">
                   <h4 className="text-lg sm:text-xl font-headline font-bold text-destructive mb-3 flex items-center">
-                    <Ban className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Not Included:
+                    <Ban className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Not Included in {service.name}:
                   </h4>
                   <ul className="grid grid-cols-1 gap-2">
                     {service.excludedItems.map((item, index) => (
@@ -669,9 +668,8 @@ export default function ServiceDetailPageClient({
             <Card className="shadow-lg border-none bg-card mt-8 sm:mt-12 overflow-hidden">
             <CardHeader className="p-4 sm:p-6 bg-primary/5">
                 <CardTitle className="text-2xl sm:text-3xl font-headline font-bold flex items-center">
-                <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions
-                </CardTitle>
-            </CardHeader>
+                <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions about {service.name} in Bangalore
+                </CardTitle>            </CardHeader>
             <CardContent className="p-4 sm:p-6">
                 <Accordion type="single" collapsible className="w-full">
                 {service.serviceFaqs.map((faq, index) => (

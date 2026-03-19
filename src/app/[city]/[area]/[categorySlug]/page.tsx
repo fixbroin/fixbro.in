@@ -127,10 +127,14 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
   const appBaseUrl = getBaseUrl();
   const areaCategorySchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "Product",
     "name": `${categoryData.name} in ${areaData.name}, ${cityData.name}`,
     "description": categoryData.metaDescription || `Professional ${categoryData.name} services in ${areaData.name}, ${cityData.name}.`,
     "image": categoryData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "brand": {
+      "@type": "Brand",
+      "name": "FixBro"
+    },
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro"

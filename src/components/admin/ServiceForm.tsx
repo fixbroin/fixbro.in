@@ -22,11 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { nanoid } from 'nanoid';
 import { generateServiceDetails } from '@/ai/flows/generateServiceDetailsFlow';
-
-const generateSlug = (name: string) => {
-  if (!name) return "";
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-};
+import { generateSlug, generateUniqueSlug } from "@/lib/slugUtils";
 
 const serviceFaqItemSchema = z.object({
   id: z.string().optional(),
@@ -133,6 +129,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
 
   const [isFormBusyForImage, setIsFormBusyForImage] = useState(false);
   const [isGeneratingAiContent, setIsGeneratingAiContent] = useState(false);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [filteredSubCategories, setFilteredSubCategories] = useState<FirestoreSubCategory[]>([]);
 
@@ -245,9 +242,22 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
   };
 
   useEffect(() => {
-    if (watchedName && !initialData && !form.getFieldState('slug').isDirty) {
-      form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
-    }
+    const handler = setTimeout(async () => {
+      if (watchedName && !form.getFieldState('slug').isDirty) {
+        setIsCheckingSlug(true);
+        try {
+          const uniqueSlug = await generateUniqueSlug(watchedName, "adminServices", initialData?.id);
+          form.setValue('slug', uniqueSlug, { shouldValidate: true });
+        } catch (error) {
+          console.error("Error generating unique slug:", error);
+          form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
+        } finally {
+          setIsCheckingSlug(false);
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
   }, [watchedName, initialData, form]);
 
   useEffect(() => {
@@ -470,7 +480,19 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
               Generate AI Content
             </Button>
         </div>
-        <FormField control={form.control} name="slug" render={({ field }) => (<FormItem><FormLabel>Service Slug {initialData ? "(Non-editable)" : "(Optional - auto-generated if blank)"}</FormLabel><FormControl><Input placeholder="e.g., premium-ac-servicing" {...field} onChange={(e) => field.onChange(generateSlug(e.target.value))} disabled={effectiveIsSubmitting || !!initialData}/></FormControl><FormDescription>{initialData ? "Slug cannot be changed for existing services." : "Lowercase, dash-separated. Auto-generated from name if left blank."}</FormDescription><FormMessage /></FormItem>)}/>
+        <FormField control={form.control} name="slug" render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              Service Slug (Auto-generated or custom)
+              {isCheckingSlug && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            </FormLabel>
+            <FormControl>
+              <Input placeholder="e.g., premium-ac-servicing" {...field} onChange={(e) => field.onChange(generateSlug(e.target.value))} disabled={effectiveIsSubmitting}/>
+            </FormControl>
+            <FormDescription>Lowercase, dash-separated. Auto-generated from name if left blank or unchanged.</FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}/>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField control={form.control} name="parentCategoryId" render={({ field }) => ( <FormItem> <FormLabel>Parent Category</FormLabel> <Select key={`parent-cat-select-${initialData?.id || 'new-service'}-${parentCategories.length}-${field.value}`} onValueChange={(value) => { field.onChange(value); }} value={field.value} disabled={effectiveIsSubmitting || parentCategories.length === 0}> <FormControl><SelectTrigger><SelectValue placeholder={parentCategories.length > 0 ? "Select a parent category" : "No parent categories"} /></SelectTrigger></FormControl> <SelectContent>{parentCategories.map(cat => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}</SelectContent> </Select><FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="subCategoryId" render={({ field }) => ( <FormItem> <FormLabel>Sub-Category</FormLabel> <Select key={`subcat-select-${initialData?.id || 'new-service'}-${watchedParentCategoryId}-${filteredSubCategories.length}-${field.value}`} onValueChange={field.onChange} value={field.value} disabled={effectiveIsSubmitting || !watchedParentCategoryId || filteredSubCategories.length === 0}> <FormControl><SelectTrigger><SelectValue placeholder={!watchedParentCategoryId ? "Select parent category first" : (filteredSubCategories.length > 0 ? "Select a sub-category" : "No sub-categories for selected parent")} /></SelectTrigger></FormControl> <SelectContent>{filteredSubCategories.map(subCat => (<SelectItem key={subCat.id} value={subCat.id}>{subCat.name}</SelectItem>))}</SelectContent> </Select><FormMessage /> </FormItem> )}/>

@@ -449,6 +449,7 @@ export default function CategoryPageClient({
           {featuresConfig.showCustomServiceButton && (
             <div
               onClick={(e) => handleAuthRequiredNav(e as React.MouseEvent<HTMLDivElement>, '/custom-service')}
+              title="Request a custom service if you can't find what you need"
               className="relative block p-3 my-2 gap-3 bg-card border rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 w-full cursor-pointer group"
             >
               {/* MOBILE VIEW */}

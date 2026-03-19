@@ -86,7 +86,7 @@ export async function generateMetadata(
 
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const placeholderData = { categoryName: data.category.name };
+  const placeholderData = { categoryName: data.category.name, cityName: "Bangalore" };
 
   const title = replacePlaceholders(data.category.metaTitle || seoSettings.categoryPageTitlePattern, placeholderData) || `${data.category.name} Services | FixBro`;
   const description = replacePlaceholders(data.category.metaDescription || seoSettings.categoryPageDescriptionPattern, placeholderData) || `Professional ${data.category.name} services near you.`;
@@ -143,10 +143,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     
     const categorySchema = {
       "@context": "https://schema.org",
-      "@type": "Service",
+      "@type": "Product",
       "name": `${data.category.name} Services`,
       "description": data.category.seo_description || `Professional ${data.category.name} services near you.`,
       "image": data.category.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+      "brand": {
+        "@type": "Brand",
+        "name": "FixBro"
+      },
       "provider": {
         "@type": "LocalBusiness",
         "name": "FixBro"
