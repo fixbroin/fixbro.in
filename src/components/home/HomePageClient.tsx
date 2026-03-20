@@ -855,7 +855,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                     </li>
                     <li className="flex items-start gap-2 text-muted-foreground">
                       <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
-                      <span><strong>100% Satisfaction:</strong> Your happiness is our priority. We ensure top-quality service for every job.</span>
+                      <span><strong>Satisfaction:</strong> Your happiness is our priority. We ensure top-quality service for every job.</span>
                     </li>
                   </ul>
                   <p className="text-muted-foreground leading-relaxed mt-6">
