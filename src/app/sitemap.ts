@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { adminDb } from '@/lib/firebaseAdmin'; 
 import { Timestamp } from 'firebase-admin/firestore'; 
-import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost } from '@/types/firestore';
+import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config'; 
 
 export const dynamic = 'force-static'; 
@@ -34,7 +34,7 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   const staticPages = [
     '', '/about-us', '/contact-us', '/careers', '/terms-and-conditions',
     '/privacy-policy', '/faq', '/service-disclaimer', '/cancellation-policy', '/damage-and-claims-policy', '/categories', 
-    '/blog',
+    '/blog', '/sitemap',
   ];
 
   staticPages.forEach(page => {
@@ -45,6 +45,23 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
       priority: page === '' ? 1.0 : 0.8,
     });
   });
+
+  try {
+    const contentPagesSnapshot = await adminDb.collection('contentPages').get();
+    contentPagesSnapshot.forEach(docSnap => {
+      const pageData = docSnap.data() as ContentPage;
+      if (pageData.slug && !staticPages.includes(`/${pageData.slug}`)) {
+        entries.push({
+          url: `${appBaseUrl}/${pageData.slug}`,
+          lastModified: safeToISOString(pageData.updatedAt || pageData.createdAt, currentDate),
+          changeFrequency: 'monthly',
+          priority: 0.6,
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Sitemap: Error fetching content pages:", e);
+  }
 
   try {
     const blogSnapshot = await adminDb

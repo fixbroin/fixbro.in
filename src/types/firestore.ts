@@ -382,6 +382,7 @@ export interface ContentPage {
   imageUrl?: string; // Banner Image
   imageHint?: string; // AI search hint
   updatedAt: Timestamp;
+  createdAt?: Timestamp;
 }
 
 export interface FirestoreFAQ {
