@@ -262,11 +262,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         <div className="max-w-4xl mx-auto">
           {/* Main Content Card */}
           <div className="bg-card rounded-3xl shadow-2xl border border-border/50 overflow-hidden mb-16">
-            <div className="relative aspect-[21/9] w-full">
+            <div className="relative aspect-square md:aspect-[21/9] w-full">
               <AppImage
                 src={post.coverImageUrl}
                 alt={post.title}
                 fill
+                objectPosition="top"
                 className="object-cover object-top"
                 priority
               />
