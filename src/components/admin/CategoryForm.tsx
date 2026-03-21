@@ -9,16 +9,21 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { FirestoreCategory } from '@/types/firestore';
-import { useEffect, useState, useRef } from "react";
-import { Loader2, Image as ImageIcon, Trash2, Wand2 } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import NextImage from 'next/image';
-import { storage } from '@/lib/firebase';
+import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { generateCategorySeo } from '@/ai/flows/generateCategorySeoFlow';
-import { generateSlug, generateUniqueSlug } from '@/lib/slugUtils';
+
+const generateSlug = (name: string) => {
+  if (!name) return "";
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+};
 
 const generateRandomHexString = (length: number) => {
   return Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -75,8 +80,8 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
   const [originalImageUrlFromInitialData, setOriginalImageUrlFromInitialData] = useState<string | null>(null);
   const [isFormBusyForImage, setIsFormBusyForImage] = useState(false);
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [isSlugEditable, setIsSlugEditable] = useState(false);
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categoryFormSchema),
@@ -88,6 +93,35 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
 
   const watchedName = form.watch("name");
   const watchedImageHint = form.watch("imageHint");
+  const watchedSlug = form.watch("slug");
+
+  const checkSlugUniqueness = useCallback(async (baseSlug: string, currentId?: string) => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collection(db, "adminCategories"),
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const doc = querySnapshot.docs[0];
+        if (currentId && doc.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -117,31 +151,39 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
     setUploadProgress(null);
     setIsFormBusyForImage(false);
     setStatusMessage("");
+    setIsSlugEditable(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }, [initialData, form]);
 
   useEffect(() => {
-    const handler = setTimeout(async () => {
-      // Auto-generate if field is clean (not manually touched)
-      if (watchedName && !form.getFieldState('slug').isDirty) {
-        setIsCheckingSlug(true);
-        try {
-          // Pass the current ID to exclude it from the "duplicate" check when editing
-          const uniqueSlug = await generateUniqueSlug(watchedName, "adminCategories", initialData?.id);
-          form.setValue('slug', uniqueSlug, { shouldValidate: true });
-        } catch (error) {
-          console.error("Error generating unique slug:", error);
-          form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
-        } finally {
-          setIsCheckingSlug(false);
-        }
-      }
-    }, 500);
+    if (watchedName && !isSlugEditable) {
+      const delayDebounceFn = setTimeout(async () => {
+        const baseSlug = generateSlug(watchedName);
+        const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+        form.setValue('slug', uniqueSlug, { shouldValidate: true });
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedName, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
-    return () => clearTimeout(handler);
-  }, [watchedName, initialData, form]);
+  // Handle manual slug changes to ensure uniqueness if needed
+  useEffect(() => {
+    if (isSlugEditable && watchedSlug && form.getFieldState('slug').isDirty) {
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSlug(watchedSlug);
+            if (baseSlug !== watchedSlug) {
+                form.setValue('slug', baseSlug, { shouldValidate: true });
+            }
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            if (uniqueSlug !== baseSlug) {
+                form.setValue('slug', uniqueSlug, { shouldValidate: true });
+            }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -304,22 +346,36 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
           name="slug"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                Slug (Auto-generated or custom)
-                {isCheckingSlug && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-              </FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel>Slug {initialData ? "(Editing might affect SEO)" : "(Auto-generated or custom)"}</FormLabel>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSlugEditable(!isSlugEditable)}
+                  className="h-8 px-2 text-xs"
+                  disabled={effectiveIsSubmitting}
+                >
+                  {isSlugEditable ? (
+                    <><Lock className="mr-1 h-3 w-3" /> Lock</>
+                  ) : (
+                    <><Edit2 className="mr-1 h-3 w-3" /> Edit Manually</>
+                  )}
+                </Button>
+              </div>
               <FormControl>
                 <Input
                   placeholder="e.g., home-repairs"
                   {...field}
-                  onChange={(e) => {
-                    field.onChange(generateSlug(e.target.value));
-                  }}
-                  disabled={effectiveIsSubmitting}
+                  onChange={(e) => field.onChange(generateSlug(e.target.value))}
+                  disabled={effectiveIsSubmitting || !isSlugEditable}
+                  className={!isSlugEditable ? "bg-muted/50 font-mono text-xs" : "font-mono text-xs"}
                 />
               </FormControl>
               <FormDescription>
-                Lowercase, dash-separated. Auto-generated from name if left blank or unchanged.
+                {isSlugEditable 
+                  ? "Lowercase, dash-separated. Uniqueness is automatically checked." 
+                  : "Automatically generated and unique. Click 'Edit Manually' to customize."}
               </FormDescription>
               <FormMessage />
             </FormItem>

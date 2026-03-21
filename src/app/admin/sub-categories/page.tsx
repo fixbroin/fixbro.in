@@ -17,8 +17,8 @@ import { ref as storageRef, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton
-import { Switch } from '@/components/ui/switch'; // Import Switch
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 
 const generateSlug = (name: string) => {
   if (!name) return "";
@@ -106,6 +106,22 @@ export default function AdminSubCategoriesPage() {
     setIsFormOpen(true);
   };
 
+  const handleToggleActive = async (subCategory: FirestoreSubCategory) => {
+    setIsSubmitting(true);
+    try {
+        await updateDoc(doc(db, "adminSubCategories", subCategory.id), { 
+          isActive: !subCategory.isActive, 
+          updatedAt: Timestamp.now() 
+        });
+        setSubCategories(prev => prev.map(s => s.id === subCategory.id ? { ...s, isActive: !s.isActive } : s));
+        toast({ title: "Status Updated", description: `Sub-category "${subCategory.name}" ${!subCategory.isActive ? "enabled" : "disabled"}.` });
+    } catch (error) {
+        toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteSubCategory = async (subCategoryId: string) => {
     setIsSubmitting(true);
     try {
@@ -129,19 +145,6 @@ export default function AdminSubCategoriesPage() {
       toast({ title: "Error", description: "Could not delete sub-category.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleToggleActive = async (subCategory: FirestoreSubCategory) => {
-    setIsSubmitting(true);
-    try {
-        await updateDoc(doc(db, "adminSubCategories", subCategory.id), { isActive: !subCategory.isActive, updatedAt: Timestamp.now() });
-        setSubCategories(prev => prev.map(s => s.id === subCategory.id ? { ...s, isActive: !s.isActive } : s));
-        toast({ title: "Status Updated", description: `Sub-category "${subCategory.name}" ${!subCategory.isActive ? "enabled" : "disabled"}.` });
-    } catch (error) {
-        toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
-    } finally {
-        setIsSubmitting(false);
     }
   };
 
@@ -261,7 +264,6 @@ export default function AdminSubCategoriesPage() {
                                 checked={subCategory.isActive === undefined ? true : subCategory.isActive}
                                 onCheckedChange={() => handleToggleActive(subCategory)}
                                 disabled={isSubmitting}
-                                aria-label={`Toggle status for ${subCategory.name}`}
                             />
                           </TableCell>
                           <TableCell>

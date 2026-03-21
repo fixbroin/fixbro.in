@@ -8,11 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BellRing, BellOff, ArrowLeft, CheckCircle2, Info, AlertTriangle, Tag, Loader2, Trash2 as TrashIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch, Timestamp, getDocs } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch, Timestamp, getDocs, limit } from "firebase/firestore";
 import type { FirestoreNotification } from "@/types/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
 import { useLoading } from "@/contexts/LoadingContext";
+import { getTimestampMillis } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,7 +59,8 @@ export default function ProviderNotificationsPage() {
     const q = query(
       notificationsCollectionRef,
       where("userId", "==", providerUser.uid),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -263,7 +265,10 @@ export default function ProviderNotificationsPage() {
                       )}
                       <p className="text-xs text-muted-foreground mt-0.5">{notification.message}</p>
                       <p className="text-[10px] text-muted-foreground mt-1.5">
-                        {notification.createdAt ? formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true }) : 'just now'}
+                        {(() => {
+                            const millis = getTimestampMillis(notification.createdAt);
+                            return millis ? formatDistanceToNow(new Date(millis), { addSuffix: true }) : 'just now';
+                        })()}
                       </p>
                     </div>
                     {!notification.read && (

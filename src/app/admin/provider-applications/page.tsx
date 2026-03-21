@@ -23,13 +23,15 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { sendProviderApplicationStatusEmail } from '@/ai/flows/sendProviderApplicationStatusUpdateFlow'; 
 import { getBaseUrl } from '@/lib/config'; 
 import { Separator } from "@/components/ui/separator";
+import { getTimestampMillis } from '@/lib/utils';
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
 const applicationStatusOptions: ProviderApplicationStatus[] = ['pending_review', 'pending_step_1', 'pending_step_2', 'pending_step_3', 'pending_step_4', 'approved', 'rejected', 'needs_update'];
 
-const formatApplicationTimestamp = (timestamp?: Timestamp): string => {
-  if (!timestamp) return 'N/A';
-  return timestamp.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+const formatApplicationTimestamp = (timestamp?: any): string => {
+  const millis = getTimestampMillis(timestamp);
+  if (!millis) return 'N/A';
+  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 export default function AdminProviderApplicationsPage() {
@@ -48,26 +50,29 @@ export default function AdminProviderApplicationsPage() {
 
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
 
-  useEffect(() => {
+  const fetchApplications = async () => {
     setIsLoading(true);
-    const applicationsCollectionRef = collection(db, PROVIDER_APPLICATION_COLLECTION);
-    const q = query(applicationsCollectionRef, orderBy("createdAt", "desc"));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const applicationsCollectionRef = collection(db, PROVIDER_APPLICATION_COLLECTION);
+      const q = query(applicationsCollectionRef, orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
       const fetchedApplications = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
       } as ProviderApplication));
       setApplications(fetchedApplications);
-      setIsLoading(false);
-    }, (error) => {
+    } catch (error) {
       console.error("Error fetching provider applications: ", error);
       toast({ title: "Error", description: "Could not fetch provider applications.", variant: "destructive" });
+    } finally {
       setIsLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchApplications();
   }, [toast]);
+
 
   const filteredApplications = useMemo(() => {
     if (filterStatus === "all") {
@@ -101,6 +106,8 @@ export default function AdminProviderApplicationsPage() {
       setShowNotesInputFor(null); 
       setAdminReviewNotes("");
       setPendingStatusForNotes(null);
+      await fetchApplications(); // Refresh list
+
 
       // Send email to provider
       if (appConfig.smtpHost && appConfig.senderEmail && appToUpdate.email && appToUpdate.userId) {

@@ -12,17 +12,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import type { FirestoreService, FirestoreSubCategory, FirestoreTax, FirestoreCategory, ServiceFaqItem, PriceVariant } from '@/types/firestore';
-import { useEffect, useState, useRef } from "react";
-import { Loader2, Image as ImageIcon, Trash2, PlusCircle, Percent, Clock, HelpCircle, Sparkles, Wand2, Users, ShoppingBag, ListOrdered } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Loader2, Image as ImageIcon, Trash2, PlusCircle, Percent, Clock, HelpCircle, Sparkles, Wand2, Users, ShoppingBag, ListOrdered, Edit2, Lock } from "lucide-react";
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
-import { storage } from '@/lib/firebase';
+import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { nanoid } from 'nanoid';
 import { generateServiceDetails } from '@/ai/flows/generateServiceDetailsFlow';
-import { generateSlug, generateUniqueSlug } from "@/lib/slugUtils";
+
+const generateSlug = (name: string) => {
+  if (!name) return "";
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+};
 
 const serviceFaqItemSchema = z.object({
   id: z.string().optional(),
@@ -57,6 +62,8 @@ const serviceFormSchema = z.object({
   imageHint: z.string().max(50, { message: "Image hint should be max 50 characters."}).optional().or(z.literal('')),
   rating: z.coerce.number().min(0).max(5).default(0),
   reviewCount: z.coerce.number().min(0).default(0),
+  hasMinQuantity: z.boolean().default(false),
+  minQuantity: z.coerce.number().min(1, "Min quantity must be at least 1.").optional().nullable(),
   maxQuantity: z.coerce.number().min(0, "Max quantity must be non-negative.").optional().nullable(),
   isActive: z.boolean().default(true),
   taxId: z.string().nullable().optional(),
@@ -129,9 +136,9 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
 
   const [isFormBusyForImage, setIsFormBusyForImage] = useState(false);
   const [isGeneratingAiContent, setIsGeneratingAiContent] = useState(false);
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [filteredSubCategories, setFilteredSubCategories] = useState<FirestoreSubCategory[]>([]);
+  const [isSlugEditable, setIsSlugEditable] = useState(false);
 
   const form = useForm<ServiceFormDataInternal>({
     resolver: zodResolver(serviceFormSchema),
@@ -139,7 +146,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
       name: "", slug: "", parentCategoryId: undefined, subCategoryId: undefined, price: 0, discountedPrice: undefined,
       hasPriceVariants: false, priceVariants: [],
       description: "", shortDescription: "", fullDescription: "", serviceHighlights: [],
-      imageUrl: "", imageHint: "", rating: 0, reviewCount: 0, maxQuantity: null, isActive: true,
+      imageUrl: "", imageHint: "", rating: 0, reviewCount: 0, 
+      hasMinQuantity: false, minQuantity: 2, maxQuantity: null, isActive: true,
       taxId: null, isTaxInclusive: "false",
       h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
       taskTimeValue: null, taskTimeUnit: null, includedItems: [], excludedItems: [], allowPayLater: true, serviceFaqs: [],
@@ -158,7 +166,36 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
   const watchedParentCategoryId = form.watch("parentCategoryId");
   const watchedTaxId = form.watch("taxId");
   const watchedHasPriceVariants = form.watch("hasPriceVariants");
+  const watchedSlug = form.watch("slug");
   const taxSelected = watchedTaxId !== null && watchedTaxId !== NO_TAX_VALUE;
+
+  const checkSlugUniqueness = useCallback(async (baseSlug: string, currentId?: string) => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collection(db, "adminServices"),
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const doc = querySnapshot.docs[0];
+        if (currentId && doc.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -185,6 +222,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         imageHint: initialData.imageHint || "",
         rating: initialData.rating || 0,
         reviewCount: initialData.reviewCount || 0,
+        hasMinQuantity: initialData.hasMinQuantity || false,
+        minQuantity: initialData.minQuantity === undefined ? 2 : initialData.minQuantity,
         maxQuantity: initialData.maxQuantity === undefined ? null : initialData.maxQuantity,
         isActive: initialData.isActive === undefined ? true : initialData.isActive,
         taxId: initialData.taxId || null,
@@ -209,7 +248,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         name: "", slug: "", parentCategoryId: undefined, subCategoryId: undefined, price: 0, discountedPrice: null,
         hasPriceVariants: false, priceVariants: [],
         description: "", shortDescription: "", fullDescription: "", serviceHighlights: [],
-        imageUrl: "", imageHint: "", rating: 0, reviewCount: 0, maxQuantity: null, isActive: true,
+        imageUrl: "", imageHint: "", rating: 0, reviewCount: 0, 
+        hasMinQuantity: false, minQuantity: 2, maxQuantity: null, isActive: true,
         taxId: null, isTaxInclusive: "false",
         h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
         taskTimeValue: null, taskTimeUnit: null, includedItems: [], excludedItems: [], allowPayLater: true, serviceFaqs: [],
@@ -223,42 +263,39 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
     setUploadProgress(null);
     setIsFormBusyForImage(false);
     setStatusMessage("");
+    setIsSlugEditable(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   }, [initialData, form, subCategories]);
 
-  const onSubmit = async (data: ServiceFormDataInternal) => {
-    const { serviceHighlights, includedItems, excludedItems, isTaxInclusive, discountedPrice, ...rest } = data;
-    const formattedData = {
-      ...rest,
-      isTaxInclusive: isTaxInclusive === "true",
-      serviceHighlights: serviceHighlights?.map(h => h.value).filter(v => v.trim() !== "") || [],
-      includedItems: includedItems?.map(i => i.value).filter(v => v.trim() !== "") || [],
-      excludedItems: excludedItems?.map(e => e.value).filter(v => v.trim() !== "") || [],
-      discountedPrice: discountedPrice === null ? undefined : discountedPrice,
-    };
-    await onSubmitProp(formattedData as any);
-  };
-
   useEffect(() => {
-    const handler = setTimeout(async () => {
-      if (watchedName && !form.getFieldState('slug').isDirty) {
-        setIsCheckingSlug(true);
-        try {
-          const uniqueSlug = await generateUniqueSlug(watchedName, "adminServices", initialData?.id);
-          form.setValue('slug', uniqueSlug, { shouldValidate: true });
-        } catch (error) {
-          console.error("Error generating unique slug:", error);
-          form.setValue('slug', generateSlug(watchedName), { shouldValidate: true });
-        } finally {
-          setIsCheckingSlug(false);
-        }
-      }
-    }, 500);
+    if (watchedName && !isSlugEditable) {
+      const delayDebounceFn = setTimeout(async () => {
+        const baseSlug = generateSlug(watchedName);
+        const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+        form.setValue('slug', uniqueSlug, { shouldValidate: true });
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedName, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
-    return () => clearTimeout(handler);
-  }, [watchedName, initialData, form]);
+  // Handle manual slug changes to ensure uniqueness if needed
+  useEffect(() => {
+    if (isSlugEditable && watchedSlug && form.getFieldState('slug').isDirty) {
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSlug(watchedSlug);
+            if (baseSlug !== watchedSlug) {
+                form.setValue('slug', baseSlug, { shouldValidate: true });
+            }
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            if (uniqueSlug !== baseSlug) {
+                form.setValue('slug', uniqueSlug, { shouldValidate: true });
+            }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
   useEffect(() => {
     const currentParentId = form.getValues('parentCategoryId');
@@ -440,6 +477,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         imageHint: formData.imageHint,
         rating: formData.rating,
         reviewCount: formData.reviewCount,
+        hasMinQuantity: formData.hasMinQuantity,
+        minQuantity: (formData.hasMinQuantity && formData.minQuantity !== null) ? formData.minQuantity : undefined,
         maxQuantity: formData.maxQuantity === null ? undefined : formData.maxQuantity,
         isActive: formData.isActive,
         taxId: finalTaxIdValue,
@@ -480,19 +519,46 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
               Generate AI Content
             </Button>
         </div>
-        <FormField control={form.control} name="slug" render={({ field }) => (
-          <FormItem>
-            <FormLabel className="flex items-center gap-2">
-              Service Slug (Auto-generated or custom)
-              {isCheckingSlug && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-            </FormLabel>
-            <FormControl>
-              <Input placeholder="e.g., premium-ac-servicing" {...field} onChange={(e) => field.onChange(generateSlug(e.target.value))} disabled={effectiveIsSubmitting}/>
-            </FormControl>
-            <FormDescription>Lowercase, dash-separated. Auto-generated from name if left blank or unchanged.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}/>
+        <FormField
+          control={form.control}
+          name="slug"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between">
+                <FormLabel>Service Slug {initialData ? "(Editing might affect SEO)" : "(Auto-generated or custom)"}</FormLabel>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSlugEditable(!isSlugEditable)}
+                  className="h-8 px-2 text-xs"
+                  disabled={effectiveIsSubmitting}
+                >
+                  {isSlugEditable ? (
+                    <><Lock className="mr-1 h-3 w-3" /> Lock</>
+                  ) : (
+                    <><Edit2 className="mr-1 h-3 w-3" /> Edit Manually</>
+                  )}
+                </Button>
+              </div>
+              <FormControl>
+                <Input
+                  placeholder="e.g., premium-ac-servicing"
+                  {...field}
+                  onChange={(e) => field.onChange(generateSlug(e.target.value))}
+                  disabled={effectiveIsSubmitting || !isSlugEditable}
+                  className={!isSlugEditable ? "bg-muted/50 font-mono text-xs" : "font-mono text-xs"}
+                />
+              </FormControl>
+              <FormDescription>
+                {isSlugEditable 
+                  ? "Lowercase, dash-separated. Uniqueness is automatically checked." 
+                  : "Automatically generated and unique. Click 'Edit Manually' to customize."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField control={form.control} name="parentCategoryId" render={({ field }) => ( <FormItem> <FormLabel>Parent Category</FormLabel> <Select key={`parent-cat-select-${initialData?.id || 'new-service'}-${parentCategories.length}-${field.value}`} onValueChange={(value) => { field.onChange(value); }} value={field.value} disabled={effectiveIsSubmitting || parentCategories.length === 0}> <FormControl><SelectTrigger><SelectValue placeholder={parentCategories.length > 0 ? "Select a parent category" : "No parent categories"} /></SelectTrigger></FormControl> <SelectContent>{parentCategories.map(cat => (<SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>))}</SelectContent> </Select><FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="subCategoryId" render={({ field }) => ( <FormItem> <FormLabel>Sub-Category</FormLabel> <Select key={`subcat-select-${initialData?.id || 'new-service'}-${watchedParentCategoryId}-${filteredSubCategories.length}-${field.value}`} onValueChange={field.onChange} value={field.value} disabled={effectiveIsSubmitting || !watchedParentCategoryId || filteredSubCategories.length === 0}> <FormControl><SelectTrigger><SelectValue placeholder={!watchedParentCategoryId ? "Select parent category first" : (filteredSubCategories.length > 0 ? "Select a sub-category" : "No sub-categories for selected parent")} /></SelectTrigger></FormControl> <SelectContent>{filteredSubCategories.map(subCat => (<SelectItem key={subCat.id} value={subCat.id}>{subCat.name}</SelectItem>))}</SelectContent> </Select><FormMessage /> </FormItem> )}/>
@@ -539,6 +605,38 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField control={form.control} name="taxId" render={({ field }) => ( <FormItem><FormLabel className="flex items-center"><Percent className="mr-2 h-4 w-4 text-muted-foreground" />Applicable Tax (Optional)</FormLabel> <Select key={`tax-id-select-${initialData?.id || 'new-service'}-${taxes.length}-${field.value}`} onValueChange={(value) => { const newTaxId = value === NO_TAX_VALUE ? null : value; field.onChange(newTaxId); if (newTaxId === null) { form.setValue('isTaxInclusive', "false", { shouldValidate: true });}}} value={field.value ?? NO_TAX_VALUE} disabled={effectiveIsSubmitting || taxes.length === 0}> <FormControl><SelectTrigger><SelectValue placeholder={taxes.length > 0 ? "Select a tax configuration" : "No active taxes"} /></SelectTrigger></FormControl> <SelectContent><SelectItem value={NO_TAX_VALUE}>No Tax</SelectItem>{taxes.map(tax => (<SelectItem key={tax.id} value={tax.id}>{tax.taxName} ({tax.taxPercent}%)</SelectItem>))}</SelectContent> </Select><FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="isTaxInclusive" render={({ field }) => { return ( <FormItem><FormLabel className={!taxSelected ? "text-muted-foreground" : ""}>Price Tax Type</FormLabel> <Select key={`is-tax-inclusive-select-${initialData?.id || 'new-service'}-${taxes.length}-${String(field.value)}`} onValueChange={field.onChange} value={field.value} disabled={!taxSelected || effectiveIsSubmitting}> <FormControl><SelectTrigger><SelectValue placeholder="Select tax type" /></SelectTrigger></FormControl> <SelectContent><SelectItem value={"false"}>Tax Exclusive (Price + Tax)</SelectItem><SelectItem value={"true"}>Tax Inclusive (Price includes Tax)</SelectItem></SelectContent> </Select>{!taxSelected && <FormDescription className="text-xs">Select a tax first to enable this option.</FormDescription>}<FormMessage /> </FormItem> ); }}/>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="hasMinQuantity"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-background/50">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base flex items-center">
+                    <ListOrdered className="mr-2 h-4 w-4 text-muted-foreground"/>
+                    Enforce Min Quantity
+                  </FormLabel>
+                  <FormDescription>Set a minimum number of units for booking.</FormDescription>
+                </div>
+                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={effectiveIsSubmitting} /></FormControl>
+              </FormItem>
+            )}
+          />
+          {form.watch("hasMinQuantity") && (
+            <FormField
+              control={form.control}
+              name="minQuantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">Min Quantity Value</FormLabel>
+                  <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ""} disabled={effectiveIsSubmitting} /></FormControl>
+                  <FormDescription className="text-xs">Automatically added to cart.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="membersRequired" render={({ field }) => (<FormItem><FormLabel className="flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground"/>Members Required</FormLabel><FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ""} disabled={effectiveIsSubmitting} /></FormControl><FormDescription className="text-xs">Technicians for this task.</FormDescription><FormMessage /></FormItem>)}/>

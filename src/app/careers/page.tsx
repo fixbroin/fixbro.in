@@ -10,25 +10,49 @@ import { getBaseUrl } from '@/lib/config';
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { Timestamp } from 'firebase-admin/firestore';
+import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 
-export const dynamic = 'force-dynamic'; 
+function getTimestampMillis(ts: any): number {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === 'function') return ts.toMillis();
+  if (typeof ts === 'object') {
+    if (ts.seconds !== undefined) return ts.seconds * 1000 + (ts.nanoseconds || 0) / 1000000;
+    if (ts._seconds !== undefined) return ts._seconds * 1000 + (ts._nanoseconds || 0) / 1000000;
+    if (ts instanceof Date) return ts.getTime();
+  }
+  if (typeof ts === 'string') {
+    const date = new Date(ts);
+    return isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+  return typeof ts === 'number' ? ts : 0;
+}
+
+export const revalidate = 3600; // Revalidate every hour
 
 const PAGE_SLUG = "careers";
 
-async function getPageData(slug: string): Promise<ContentPage | null> {
-  try {
-    const pageDocRef = adminDb.collection("contentPages").doc(slug);
-    const docSnap = await pageDocRef.get();
-    if (docSnap.exists) {
-      const data = docSnap.data();
-      return { id: docSnap.id, ...data } as ContentPage;
-    }
-    return null;
-  } catch (error) {
-    console.error(`Error fetching content page for slug "${slug}":`, error);
-    return null;
-  }
-}
+const getPageData = cache(async (slug: string): Promise<ContentPage | null> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const pageDocRef = adminDb.collection("contentPages").doc(slug);
+        const docSnap = await pageDocRef.get();
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          return { id: docSnap.id, ...data } as ContentPage;
+        }
+        return null;
+      } catch (error) {
+        console.error(`Error fetching content page for slug "${slug}":`, error);
+        return null;
+      }
+    },
+    [`content-page-${slug}`],
+    { revalidate: 3600, tags: ['content'] }
+  )();
+});
+
 
 export async function generateMetadata(
   props: {},
@@ -153,7 +177,10 @@ export default async function CareersPage() {
                 {pageData.updatedAt && (
                     <div className="mt-12 pt-6 border-t border-border/50 text-right">
                         <p className="text-xs text-muted-foreground">
-                            Last updated: {pageData.updatedAt instanceof Timestamp ? pageData.updatedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date(pageData.updatedAt as any).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            Last updated: {(() => {
+                                const millis = getTimestampMillis(pageData.updatedAt);
+                                return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A';
+                            })()}
                         </p>
                     </div>
                 )}

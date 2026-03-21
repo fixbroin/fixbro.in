@@ -28,7 +28,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { getCache, setCache } from '@/lib/client-cache';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from '@/lib/utils';
+import { cn, getTimestampMillis } from '@/lib/utils';
 import { LazySection } from '@/components/shared/LazySection';
 
 interface ServiceDetailPageClientProps {
@@ -215,8 +215,14 @@ export default function ServiceDetailPageClient({
         parentCategoryName,
         parentCategorySlug,
         parentCategoryId,
-        createdAt: firestoreServiceData.createdAt && firestoreServiceData.createdAt instanceof Timestamp ? firestoreServiceData.createdAt.toDate().toISOString() : String(firestoreServiceData.createdAt || ''),
-        updatedAt: firestoreServiceData.updatedAt && firestoreServiceData.updatedAt instanceof Timestamp ? firestoreServiceData.updatedAt.toDate().toISOString() : String(firestoreServiceData.updatedAt || ''),
+        createdAt: (() => {
+            const millis = getTimestampMillis(firestoreServiceData.createdAt);
+            return millis ? new Date(millis).toISOString() : String(firestoreServiceData.createdAt || '');
+        })(),
+        updatedAt: (() => {
+            const millis = getTimestampMillis(firestoreServiceData.updatedAt);
+            return millis ? new Date(millis).toISOString() : String(firestoreServiceData.updatedAt || '');
+        })(),
         taskTimeValue: firestoreServiceData.taskTimeValue,
         taskTimeUnit: firestoreServiceData.taskTimeUnit,
         includedItems: firestoreServiceData.includedItems,
@@ -407,7 +413,7 @@ export default function ServiceDetailPageClient({
       triggerAuthRedirect(currentPathname);
       return;
     }
-    const newQuantity = 1;
+    const newQuantity = service.hasMinQuantity && service.minQuantity ? service.minQuantity : 1;
     setQuantity(newQuantity);
     updateCartAndShowToast(newQuantity, 'added');
   };
@@ -509,7 +515,7 @@ export default function ServiceDetailPageClient({
           <div className="flex flex-col bg-card">
             <CardHeader className="p-3 sm:p-4">
               <div className="flex items-start justify-between">
-                <h1 className="text-2xl sm:text-3xl font-headline font-bold text-foreground leading-tight">{h1Title} in Bangalore</h1>
+                <h1 className="text-2xl sm:text-3xl font-headline font-bold text-foreground leading-tight">{h1Title}</h1>
                 {(!service.imageUrl || service.imageUrl.trim() === '') && <IconComponent className="h-10 w-10 sm:h-12 sm:w-12 text-primary ml-4 shrink-0" />}
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm sm:text-base mt-2">
@@ -550,6 +556,13 @@ export default function ServiceDetailPageClient({
                     )}
                 </div>
 
+                {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
+                    <div className="flex items-center gap-2 text-sm sm:text-base text-amber-700 font-bold bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                        <span>This service requires a minimum of {service.minQuantity} units per booking.</span>
+                    </div>
+                )}
+
                 <div className="w-full">
                   {!isAvailable ? (
                     <Button size="lg" className="w-full text-sm sm:text-base" disabled>
@@ -562,7 +575,7 @@ export default function ServiceDetailPageClient({
                   ) : (
                     <div className="w-full flex items-center justify-between bg-muted/50 p-2 rounded-xl border border-border/50">
                       <span className="text-xs sm:text-sm font-bold text-foreground ml-2">Quantity:</span>
-                      <QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} maxQuantity={service.maxQuantity}/>
+                      <QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0} maxQuantity={service.maxQuantity}/>
                     </div>
                   )}
                 </div>
@@ -628,8 +641,9 @@ export default function ServiceDetailPageClient({
               {service.includedItems && service.includedItems.length > 0 && (
                 <div className="p-4 sm:p-6 rounded-xl bg-primary/10 border border-primary/20">
                   <h4 className="text-lg sm:text-xl font-headline font-bold text-primary mb-3 flex items-center">
-                   <PlusCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Included in {service.name}:
-                  </h4>                  <ul className="grid grid-cols-1 gap-2">
+                    <PlusCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Included:
+                  </h4>
+                  <ul className="grid grid-cols-1 gap-2">
                     {service.includedItems.map((item, index) => (
                       <li key={`inc-${index}`} className="flex items-start text-sm sm:text-base text-foreground/80 font-medium">
                         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-3 text-primary flex-shrink-0 mt-0.5"/>{item}
@@ -641,9 +655,9 @@ export default function ServiceDetailPageClient({
 
               {/* WHAT'S NOT INCLUDED - COLOR CODED (RED/DESTRUCTIVE) */}
               {service.excludedItems && service.excludedItems.length > 0 && (
-                <div className="p-4 sm:p-6 rounded-xl bg-destructive/5 border border-destructive/20">
+                <div className="p-4 sm:p-6 rounded-xl bg-destructive/5 border border-destructive/15">
                   <h4 className="text-lg sm:text-xl font-headline font-bold text-destructive mb-3 flex items-center">
-                    <Ban className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Not Included in {service.name}:
+                    <Ban className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> What's Not Included:
                   </h4>
                   <ul className="grid grid-cols-1 gap-2">
                     {service.excludedItems.map((item, index) => (
@@ -668,8 +682,9 @@ export default function ServiceDetailPageClient({
             <Card className="shadow-lg border-none bg-card mt-8 sm:mt-12 overflow-hidden">
             <CardHeader className="p-4 sm:p-6 bg-primary/5">
                 <CardTitle className="text-2xl sm:text-3xl font-headline font-bold flex items-center">
-                <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions about {service.name} in Bangalore
-                </CardTitle>            </CardHeader>
+                <HelpCircle className="mr-3 h-6 w-6 sm:h-8 sm:w-8 text-primary"/>Frequently Asked Questions
+                </CardTitle>
+            </CardHeader>
             <CardContent className="p-4 sm:p-6">
                 <Accordion type="single" collapsible className="w-full">
                 {service.serviceFaqs.map((faq, index) => (

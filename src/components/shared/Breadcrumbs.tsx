@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import type { BreadcrumbItem } from '@/types/ui';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/config';
+import { useEffect, useState } from 'react';
 
 interface BreadcrumbsProps {
   items: BreadcrumbItem[];
@@ -13,28 +13,36 @@ interface BreadcrumbsProps {
 }
 
 const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className }) => {
+  const [baseUrl, setBaseUrl] = useState('');
+
+  useEffect(() => {
+    setBaseUrl(window.location.origin);
+  }, []);
+
   if (!items || items.length === 0) {
     return null;
   }
 
-  const appBaseUrl = getBaseUrl();
-  const breadcrumbListSchema = {
+  // Generate BreadcrumbList JSON-LD Schema
+  const schemaData = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     "itemListElement": items.map((item, index) => ({
       "@type": "ListItem",
       "position": index + 1,
       "name": item.label,
-      "item": item.href ? (item.href.startsWith('http') ? item.href : `${appBaseUrl}${item.href}`) : undefined
+      "item": item.href ? `${baseUrl}${item.href}` : undefined
     }))
   };
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbListSchema) }}
-      />
+      {baseUrl && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaData) }}
+        />
+      )}
       <nav aria-label="Breadcrumb" className={cn("mb-4 sm:mb-6", className)}>
         <ol className="flex items-center space-x-1.5 text-xs sm:text-sm text-muted-foreground">
           {items.map((item, index) => (
@@ -63,5 +71,4 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className }) => {
 };
 
 export default Breadcrumbs;
-
 

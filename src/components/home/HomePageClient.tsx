@@ -19,7 +19,7 @@ import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Star, Clock, ListChecks, Loader2, FileText, ShoppingCart, Users, Ban, Percent } from 'lucide-react';
+import { Star, Clock, ListChecks, Loader2, FileText, ShoppingCart, Users, Ban, Percent, Info } from 'lucide-react';
 import AdBannerCard from '@/components/shared/AdBannerCard';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import { getCache, setCache } from '@/lib/client-cache';
@@ -118,6 +118,7 @@ interface HomePageClientProps {
   areaSlug?: string;
   breadcrumbItems?: BreadcrumbItem[];
   initialData?: HomepageData;
+  initialH1Title?: string;
 }
 
 const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service }) => {
@@ -206,7 +207,8 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
         toast({ title: "Unavailable", description: `This service is currently not available.`});
         return;
     }
-    handleQuantityChange(1);
+    const newQuantity = service.hasMinQuantity && service.minQuantity ? service.minQuantity : 1;
+    handleQuantityChange(newQuantity);
   };
 
   const formatTaskTime = (value?: number, unit?: 'hours' | 'minutes'): string | null => {
@@ -309,6 +311,11 @@ const isAvailable = service.maxQuantity === undefined || service.maxQuantity > 0
                     </p>
                    )}
                 </div>
+                {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
+                  <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-1 py-0.5 rounded border border-amber-100 w-fit">
+                    Min. {service.minQuantity} units
+                  </div>
+                )}
               </div>
 
                 {!isAvailable ? (
@@ -323,6 +330,7 @@ const isAvailable = service.maxQuantity === undefined || service.maxQuantity > 0
                         initialQuantity={quantity} 
                         onQuantityChange={handleQuantityChange}
                         minQuantity={0}
+                        enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0}
                         maxQuantity={service.maxQuantity}
                     /> 
                   </div>
@@ -365,13 +373,13 @@ const HomepageServiceCarousel: React.FC<{ services: FirestoreService[] }> = ({ s
   );
 };
 
-export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, initialData }: HomePageClientProps) {
+export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, initialData, initialH1Title }: HomePageClientProps) {
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const [structuredData, setStructuredData] = useState<Record<string, any> | null>(() => getCache<Record<string, any>>('structuredData', true) || null);
   const [seoSettings, setSeoSettings] = useState<FirestoreSEOSettings | null>(() => initialData?.seoSettings || getCache<FirestoreSEOSettings>('seoSettings', true) || null);
-  const [pageH1, setPageH1] = useState<string | undefined>(() => initialData?.seoSettings.homepageH1 || getCache<string>('pageH1', true) || undefined);
+  const [pageH1, setPageH1] = useState<string | undefined>(() => initialH1Title || initialData?.seoSettings.homepageH1 || getCache<string>('pageH1', true) || undefined);
   const { showLoading } = useLoading();
 
   const [featuresConfig, setFeaturesConfig] = useState<FeaturesConfiguration>(() => initialData?.featuresConfig || getCache<FeaturesConfiguration>('featuresConfig', true) || defaultFeaturesConfig);
@@ -393,7 +401,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     const cachedStructuredData = getCache<Record<string, any>>('structuredData');
     
     if (initialData && !citySlug && !areaSlug) {
-        setPageH1(initialData.seoSettings.homepageH1);
+        setPageH1(initialH1Title || initialData.seoSettings.homepageH1);
         setIsLoadingPageData(false);
         return;
     }
@@ -410,10 +418,6 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     try {
       let currentSeoSettings = seoSettings;
       if (!currentSeoSettings) {
-          // If we don't have it in state (not from initialData or cache), we need a fallback.
-          // Since getGlobalSEOSettings is server-only, we must fetch from Firestore directly here if needed,
-          // OR assume it's always provided by server.
-          // For resilience, let's fetch directly from client db if missing.
           const settingsDocRef = doc(db, 'seoSettings', 'global');
           const docSnap = await getDoc(settingsDocRef);
           if (docSnap.exists()) {
@@ -426,7 +430,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       if (!currentSeoSettings) return;
 
       const fetchedSeoSettings = currentSeoSettings;
-      let currentH1 = fetchedSeoSettings.homepageH1;
+      let currentH1 = initialH1Title || fetchedSeoSettings.homepageH1;
       let fetchedCityData: FirestoreCity | null = null;
       let fetchedAreaData: FirestoreArea | null = null;
       let currentCityNameForLd = fetchedSeoSettings.structuredDataLocality;
@@ -437,7 +441,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const citySnap = await getDocs(cityQuery);
             if (!citySnap.empty) {
                 fetchedCityData = {id: citySnap.docs[0].id, ...(citySnap.docs[0].data() as Omit<FirestoreCity, 'id'>)} as FirestoreCity;
-                currentH1 = fetchedCityData.h1_title || replacePlaceholders(fetchedSeoSettings.cityPageH1Pattern, { cityName: fetchedCityData.name }) || `Professional Home Services in ${fetchedCityData.name}`;
+                currentH1 = initialH1Title || fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("Fixbro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
                 currentCityNameForLd = fetchedCityData.name;
             }
         } catch (e) { console.error("Error fetching city data for H1/LD:", e); }
@@ -449,7 +453,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const areaSnap = await getDocs(areaQuery);
             if (!areaSnap.empty) {
                 fetchedAreaData = {id: areaSnap.docs[0].id, ...(areaSnap.docs[0].data() as Omit<FirestoreArea, 'id'>)} as FirestoreArea;
-                currentH1 = fetchedAreaData.h1_title || replacePlaceholders(fetchedSeoSettings.areaPageH1Pattern, { areaName: fetchedAreaData.name, cityName: fetchedCityData.name }) || `Best Home Services in ${fetchedAreaData.name}, ${fetchedCityData.name}`;
+                currentH1 = initialH1Title || fetchedAreaData.h1_title || `Services in ${fetchedAreaData.name}, ${fetchedCityData.name}`;
             }
         } catch (e) { console.error("Error fetching area data for H1/LD:", e); }
       }
@@ -474,29 +478,18 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       if (citySlug && areaSlug) specificPageUrl = `${pageUrl}/${citySlug}/${areaSlug}`;
       else if (citySlug) specificPageUrl = `${pageUrl}/${citySlug}`;
 
-      // Map Service to Product for review snippet support, and Organization to LocalBusiness
-      let ldType = fetchedSeoSettings.structuredDataType || 'LocalBusiness';
-      if (ldType === 'Service') ldType = 'Product';
-      if (ldType === 'Organization') ldType = 'LocalBusiness';
-
       const ldData: Record<string, any> = {
         '@context': 'https://schema.org',
-        '@type': ldType,
+        '@type': fetchedSeoSettings.structuredDataType || 'LocalBusiness',
         name: fetchedAreaData?.name ? `${siteName} - ${fetchedAreaData.name}, ${fetchedCityData?.name}` : (fetchedCityData?.name ? `${siteName} - ${fetchedCityData.name}` : (fetchedSeoSettings.structuredDataName || siteName)),
         image: ogImage,
         url: specificPageUrl,
-        brand: {
-          "@type": "Brand",
-          "name": siteName
-        },
         telephone: webSettingsData?.contactMobile || fetchedSeoSettings.structuredDataTelephone,
         // Brand-level rating for the homepage
         aggregateRating: {
           "@type": "AggregateRating",
           "ratingValue": "4.8",
-          "reviewCount": "1250",
-          "bestRating": "5",
-          "worstRating": "1"
+          "reviewCount": "1250"
         }
       };
       if (webSettingsData?.contactEmail) ldData.email = webSettingsData.contactEmail;
@@ -530,14 +523,9 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       console.error("Error in fetchPageSpecificData:", error);
       setIsLoadingPageData(false);
     }
-  }, [citySlug, areaSlug, initialData, seoSettings]);
+  }, [citySlug, areaSlug, initialData, seoSettings, initialH1Title]);
 
   const setupRealtimeListeners = useCallback(() => {
-    if (initialData && isMounted) {
-        // Even if we have initialData, we might want to start listeners after first render
-        // but let's keep initialData logic simple for now and only start listeners if not already active
-    }
-
     // 1. Features Config Listener
     const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
     const unsubscribeConfig = onSnapshot(configDocRef, (docSnap) => {
@@ -573,7 +561,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       unsubscribePopular();
       unsubscribeRecent();
     };
-  }, [isMounted]);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -829,42 +817,6 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         
         {/* New "Explore by Location" Section */}
         <LazySection>
-            {/* SEO CONTENT SECTION FOR BANGALORE RANKING */}
-            <section className="py-12 md:py-16 bg-background">
-              <div className="container mx-auto px-4">
-                <div className="max-w-4xl mx-auto prose prose-blue lg:prose-lg prose-headings:font-headline prose-headings:font-bold">
-                  <h2 className="text-3xl md:text-4xl text-foreground mb-6">
-                    Professional Home Services in Bangalore – Trusted & Reliable
-                  </h2>
-                  <p className="text-muted-foreground leading-relaxed mb-6">
-                    Are you looking for the <strong>best home services in Bangalore</strong>? FixBro is your one-stop destination for all home maintenance and repair needs. Whether you need a skilled <strong>carpenter in Bangalore</strong>, a professional plumber, or expert AC repair, we connect you with background-verified and experienced professionals.
-                  </p>
-                  <h3 className="text-2xl text-foreground mb-4">Why Choose FixBro for Services in Bangalore?</h3>
-                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 list-none p-0">
-                    <li className="flex items-start gap-2 text-muted-foreground">
-                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
-                      <span><strong>Verified Experts:</strong> All our service providers in Bangalore undergo rigorous background checks.</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-muted-foreground">
-                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
-                      <span><strong>Transparent Pricing:</strong> No hidden costs. Get upfront quotes for all your home repair needs.</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-muted-foreground">
-                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
-                      <span><strong>On-Time Service:</strong> We value your time. Our experts arrive promptly at your doorstep in Bangalore.</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-muted-foreground">
-                      <div className="p-1 bg-primary/10 rounded-full mt-1"><ListChecks className="w-4 h-4 text-primary" /></div>
-                      <span><strong>Satisfaction:</strong> Your happiness is our priority. We ensure top-quality service for every job.</span>
-                    </li>
-                  </ul>
-                  <p className="text-muted-foreground leading-relaxed mt-6">
-                    From Electronic City to Whitefield, and Indiranagar to Jayanagar, FixBro covers every corner of Bangalore. Book your service today and experience the convenience of professional home maintenance at your fingertips.
-                  </p>
-                </div>
-              </div>
-            </section>
-
             <ExploreByLocation 
                 initialData={initialData?.citiesWithAreas} 
                 categories={initialData?.allCategories}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
 import { Eye, Check, Trash2, Loader2, PackageSearch, Construction, Phone, CheckCircle2, MoreHorizontal } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc, limit } from 'firebase/firestore';
 import type { CustomServiceRequest, CustomRequestStatus, FirestoreNotification } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -16,10 +16,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from "@/components/ui/separator";
+import { getTimestampMillis } from '@/lib/utils';
 
-const formatDate = (timestamp?: Timestamp): string => {
-  if (!timestamp) return 'N/A';
-  return timestamp.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const formatDate = (timestamp?: any): string => {
+  const millis = getTimestampMillis(timestamp);
+  if (!millis) return 'N/A';
+  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const getStatusBadgeVariant = (status: CustomRequestStatus) => {
@@ -109,7 +111,7 @@ export default function CustomServiceAdminPage() {
   useEffect(() => {
     setIsLoading(true);
     const requestsRef = collection(db, "customServiceRequests");
-    const q = query(requestsRef, orderBy("submittedAt", "desc"));
+    const q = query(requestsRef, orderBy("submittedAt", "desc"), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomServiceRequest)));
       setIsLoading(false);

@@ -7,58 +7,65 @@ import type { Metadata } from 'next';
 import { getBaseUrl } from '@/lib/config';
 import Link from 'next/link';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
+import { unstable_cache } from 'next/cache';
+import { serializeFirestoreData } from '@/lib/serializeUtils';
+import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
 import type { BreadcrumbItem } from '@/types/ui';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600; // Revalidate every hour
 
-async function getPublishedPosts(): Promise<ClientBlogPost[]> {
-  try {
-    const postsRef = adminDb.collection('blogPosts');
-    const snapshot = await postsRef.get();
-    
-    const posts: ClientBlogPost[] = snapshot.docs
-      .map(doc => {
-        const data = doc.data() as FirestoreBlogPost;
-        return {
-          ...data,
-          id: doc.id,
-          // Serialize Timestamps to ISO strings
-          createdAt: data.createdAt && typeof (data.createdAt as any).toDate === 'function' 
-            ? (data.createdAt as any).toDate().toISOString() 
-            : new Date().toISOString(),
-          updatedAt: data.updatedAt && typeof (data.updatedAt as any).toDate === 'function' 
-            ? (data.updatedAt as any).toDate().toISOString() 
-            : undefined,
-        } as ClientBlogPost;
-      })
-      .filter(post => post.isPublished === true)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    return posts;
-  } catch (error) {
-    console.error("Error fetching blog posts:", error);
-    return [];
-  }
-}
+const getPublishedPosts = unstable_cache(
+  async (): Promise<ClientBlogPost[]> => {
+    try {
+      const postsRef = adminDb.collection('blogPosts');
+      const snapshot = await postsRef.get();
+      
+      const posts: ClientBlogPost[] = snapshot.docs
+        .map(doc => {
+          const data = serializeFirestoreData(doc.data()) as FirestoreBlogPost;
+          return {
+            ...data,
+            id: doc.id,
+            // Ensure createdAt and updatedAt are ISO strings for the client
+            createdAt: data.createdAt ? (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString()) : new Date().toISOString(),
+            updatedAt: data.updatedAt ? (typeof data.updatedAt === 'string' ? data.updatedAt : undefined) : undefined,
+          };
+        })
+        .filter(post => post.isPublished === true)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      return posts;
+    } catch (error) {
+      console.error("Error fetching blog posts:", error);
+      return [];
+    }
+  },
+  ['published-blog-posts'],
+  { revalidate: 3600, tags: ['blog'] }
+);
 
 export async function generateMetadata(): Promise<Metadata> {
+  const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const canonicalUrl = `${appBaseUrl}/blog`;
+  
+  const title = `Expert Home Maintenance Tips & Guides | Blog${seoSettings.defaultMetaTitleSuffix || ' | FixBro'}`;
+  const description = "Discover professional tips, DIY guides, and home maintenance advice from FixBro experts. Learn how to keep your home in top shape.";
 
   return {
-    title: "#1 Home Service Blog in Bangalore | Maintenance Tips & Guides | FixBro",
-    description: "Expert home maintenance tips, repair guides, and the latest updates from FixBro. Learn how to keep your Bangalore home in top shape with our professional advice.",
-    keywords: ["home service blog", "maintenance tips Bangalore", "repair guides", "FixBro blog"],
+    title,
+    description,
     alternates: {
-      canonical: canonicalUrl,
+      canonical: `${appBaseUrl}/blog`,
     },
     openGraph: {
-      title: "FixBro Blog: Expert Home Service Tips & Guides in Bangalore",
-      description: "Stay updated with expert tips and guides for your home maintenance needs in Bangalore.",
-      url: canonicalUrl,
+      title,
+      description,
+      url: `${appBaseUrl}/blog`,
+      siteName: seoSettings.siteName || 'FixBro',
       type: 'website',
+      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png` }],
     },
   };
 }
@@ -73,30 +80,47 @@ export default async function BlogListPage() {
   const featuredPost = posts[0];
   const otherPosts = posts.slice(1);
 
-  const blogIndexSchema = {
+  const appBaseUrl = getBaseUrl();
+  const blogListingSchema = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    "name": "FixBro Home Service Blog",
-    "description": "Expert home maintenance tips and guides for Bangalore homeowners.",
+    "name": "FixBro Blog",
+    "description": "Expert home maintenance tips, guides, and updates from FixBro.",
+    "url": `${appBaseUrl}/blog`,
     "publisher": {
       "@type": "Organization",
-      "name": "FixBro"
-    }
+      "name": "FixBro",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${appBaseUrl}/android-chrome-512x512.png`
+      }
+    },
+    "blogPost": posts.slice(0, 10).map(post => ({
+      "@type": "BlogPosting",
+      "headline": post.title,
+      "url": `${appBaseUrl}/blog/${post.slug}`,
+      "datePublished": post.createdAt,
+      "image": post.coverImageUrl || `${appBaseUrl}/default-image.png`,
+      "author": {
+        "@type": "Person",
+        "name": post.authorName || "FixBro Expert"
+      }
+    }))
   };
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <JsonLdScript data={blogIndexSchema} idSuffix="blog-index" />
+      <JsonLdScript data={blogListingSchema} idSuffix="blog-list" />
       {/* Header Section */}
       <div className="bg-primary/5 py-16 md:py-24">
         <div className="container mx-auto px-4">
           <Breadcrumbs items={breadcrumbItems} />
           <div className="mt-8 text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-6xl font-headline font-bold text-foreground mb-6">
-              Expert <span className="text-primary">Home Service Tips</span> for Bangalore
+              Our <span className="text-primary">Blog</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-              Your go-to guide for home maintenance, repair hacks, and professional service updates in Bangalore.
+              Expert tips, home maintenance guides, and the latest updates from the FixBro team.
             </p>
           </div>
         </div>
@@ -162,7 +186,7 @@ export default async function BlogListPage() {
               <div className="space-y-10">
                 <h3 className="text-3xl font-headline font-bold">Recent Articles</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-                  {otherPosts.map((post: ClientBlogPost) => (
+                  {otherPosts.map((post, index) => (
                     <BlogPostCard key={post.id} post={post} />
                   ))}
                 </div>
@@ -175,7 +199,7 @@ export default async function BlogListPage() {
               <Calendar className="h-10 w-10 text-primary opacity-50" />
             </div>
             <h2 className="text-2xl font-headline font-bold mb-2">No posts found</h2>
-            <p className="text-muted-foreground">We're working on some great content for you. Check back soon!</p>
+            <p className="text-muted-foreground">We&apos;re working on some great content for you. Check back soon!</p>
           </div>
         )}
       </div>

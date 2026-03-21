@@ -1,97 +1,95 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Tag, Eye, Loader2, PackageSearch, XIcon, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XIcon, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { 
   collection, 
- query, orderBy, onSnapshot, doc, updateDoc, Timestamp, deleteDoc, where, getDocs, deleteField, addDoc, getDoc, runTransaction, limit } from "firebase/firestore";
+ query, orderBy, onSnapshot, doc, updateDoc, Timestamp, deleteDoc, where, getDocs, deleteField, addDoc, getDoc, runTransaction, limit, startAfter, type QueryDocumentSnapshot } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import BookingDetailsModalContent from '@/components/admin/BookingDetailsModalContent';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateInvoicePdf as generateInvoicePdfForDownload } from '@/lib/invoiceGenerator'; 
-import { sendBookingConfirmationEmail, type BookingConfirmationEmailInput } from '@/ai/flows/sendBookingEmailFlow';
-import { sendProviderBookingAssignmentEmail, type ProviderBookingAssignmentEmailInput } from '@/ai/flows/sendProviderBookingAssignmentFlow';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from "@/hooks/useGlobalSettings";
-import { Calendar } from '@/components/ui/calendar';
-import { defaultAppSettings } from '@/config/appDefaults';
 import AssignProviderModal from '@/components/admin/AssignProviderModal'; 
 import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { Search, MapPin, Phone, Mail, IndianRupee, History } from "lucide-react";
+import { cn } from '@/lib/utils';
 import AppImage from '@/components/ui/AppImage';
+import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
+import { triggerRefresh } from '@/lib/revalidateUtils';
+import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 
 const statusOptions: BookingStatus[] = [
   "Pending Payment", "Confirmed", "AssignedToProvider", "ProviderAccepted", 
   "ProviderRejected", "InProgressByProvider", "Processing", "Completed", "Cancelled", "Rescheduled"
 ];
-const receivedPaymentMethods = ["Cash", "UPI", "Bank Transfer", "Card (POS)"];
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/')); 
         return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch (e) {
-        return dateString;
-    }
+    } catch (e) { return dateString; }
 };
 
 const getStatusBadgeVariant = (status: BookingStatus) => {
     switch (status) {
       case 'Completed': return 'default';
-      case 'Confirmed':
-      case 'ProviderAccepted':
-      case 'AssignedToProvider':
-      case 'InProgressByProvider':
-        return 'default'; 
-      case 'Pending Payment':
-      case 'Rescheduled':
-      case 'Processing':
-        return 'secondary';
-      case 'Cancelled':
-      case 'ProviderRejected':
-        return 'destructive';
+      case 'Confirmed': case 'ProviderAccepted': case 'AssignedToProvider': case 'InProgressByProvider': return 'default'; 
+      case 'Pending Payment': case 'Rescheduled': case 'Processing': return 'secondary';
+      case 'Cancelled': case 'ProviderRejected': return 'destructive';
       default: return 'outline';
     }
-  };
+};
 
 const getStatusBadgeClass = (status: BookingStatus) => {
     switch (status) {
-        case 'Completed': return 'bg-green-500 hover:bg-green-600';
-        case 'Confirmed':
-        case 'ProviderAccepted':
-        case 'AssignedToProvider':
-        case 'InProgressByProvider':
-            return 'bg-blue-500 hover:bg-blue-600';
-        case 'Pending Payment':
-        case 'Rescheduled':
-            return 'bg-orange-500 hover:bg-orange-600';
-        case 'Processing':
-            return 'bg-purple-500 hover:bg-purple-600';
-        case 'Cancelled':
-        case 'ProviderRejected':
-            return 'bg-red-600 hover:bg-red-700';
+        case 'Completed': return 'bg-green-500 text-white hover:bg-green-600';
+        case 'Confirmed': case 'ProviderAccepted': case 'AssignedToProvider': case 'InProgressByProvider': return 'bg-blue-500 text-white hover:bg-blue-600';
+        case 'Pending Payment': case 'Rescheduled': return 'bg-orange-500 text-white hover:bg-orange-600';
+        case 'Processing': return 'bg-purple-500 text-white hover:bg-purple-600';
+        case 'Cancelled': case 'ProviderRejected': return 'bg-red-500 text-white hover:bg-red-600';
         default: return '';
     }
 };
 
+const getPaymentBadgeClass = (method: string | undefined, status: string) => {
+    if (status === 'Completed') return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
+    const m = (method || 'Cash').toLowerCase();
+    const isPayAfter = m.includes('after') || m.includes('cash');
+    if (isPayAfter) return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50';
+    return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
+};
+
+const getPaymentLabel = (method: string | undefined, status: string) => {
+    const label = method || "Cash";
+    if (status !== 'Completed') return label;
+    if (label.toLowerCase().includes('after') || label.toLowerCase().includes('cash')) return "Pay After Paid";
+    return `Paid (${label})`;
+};
+
+const PAGE_SIZE = 10;
+
 export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -102,24 +100,12 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<FirestoreBooking | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
-  const [marketingConfig, setMarketingConfig] = useState<MarketingAutomationSettings | null>(null);
-
-
-  const [isPaymentMethodDialogOpen, setIsPaymentMethodDialogOpen] = useState(false);
-  const [selectedBookingForPaymentUpdate, setSelectedBookingForPaymentUpdate] = useState<FirestoreBooking | null>(null);
-  const [paymentReceivedMethodForDialog, setPaymentReceivedMethodForDialog] = useState<string>("");
-
-  const { settings: globalCompanySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
-
-  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
-  const [selectedBookingForReschedule, setSelectedBookingForReschedule] = useState<FirestoreBooking | null>(null);
-  const [rescheduleDate, setRescheduleDate] = useState<Date | undefined>(undefined);
-  const [rescheduleSelectedTimeSlot, setRescheduleSelectedTimeSlot] = useState<string | undefined>();
-  const [rescheduleAvailableTimeSlots, setRescheduleAvailableTimeSlots] = useState<string[]>([]);
-  const [isLoadingRescheduleSlots, setIsLoadingRescheduleSlots] = useState(false);
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [bookingToAssign, setBookingToAssign] = useState<FirestoreBooking | null>(null);
+
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
 
   const handleWhatsAppClick = (booking: FirestoreBooking) => {
     if (booking.customerPhone) {
@@ -130,1018 +116,189 @@ export default function AdminBookingsPage() {
     }
   };
 
-
   useEffect(() => {
-    setIsLoading(true);
-    const bookingsCollectionRef = collection(db, "bookings");
-    const q = query(bookingsCollectionRef, orderBy("createdAt", "desc"));
+    if (searchTerm.trim().length > 0) {
+      const delayDebounceFn = setTimeout(async () => {
+        setIsLoading(true);
+        try {
+          const bookingsRef = collection(db, "bookings");
+          const term = searchTerm.trim();
+          const lowerTerm = term.toLowerCase();
+          
+          const queries = [
+            query(bookingsRef, where("bookingId", ">=", term), where("bookingId", "<=", term + '\uf8ff')),
+            query(bookingsRef, where("customerPhone", ">=", term), where("customerPhone", "<=", term + '\uf8ff')),
+            query(bookingsRef, where("customerName", ">=", term), where("customerName", "<=", term + '\uf8ff')),
+          ];
+          const snapShots = await Promise.all(queries.map(q => getDocs(q)));
+          let results: FirestoreBooking[] = [];
+          snapShots.forEach(snap => snap.docs.forEach(docSnap => results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
+          const uniqueResults = Array.from(new Map(results.map(b => [b.id, b])).values());
+          setBookings(uniqueResults);
+          setHasMore(false);
+        } catch (error) { console.error("Search error:", error); } finally { setIsLoading(false); }
+      }, 400);
+      return () => clearTimeout(delayDebounceFn);
+    } else {
+      setIsLoading(true);
+      const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setBookings(snapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+        setHasMore(snapshot.docs.length === PAGE_SIZE);
+        setIsLoading(false);
+      }, (err) => { console.error("Error fetching bookings:", err); setIsLoading(false); });
+      return () => unsubscribe();
+    }
+  }, [searchTerm, toast]);
 
-    const marketingConfigRef = doc(db, "webSettings", "marketingAutomation");
-    const unsubMarketing = onSnapshot(marketingConfigRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setMarketingConfig(docSnap.data() as MarketingAutomationSettings);
-        }
-    });
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedBookings = querySnapshot.docs.map(docSnap => ({
-        ...docSnap.data(),
-        id: docSnap.id,
-      } as FirestoreBooking));
-      setBookings(fetchedBookings);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching bookings: ", error);
-      toast({ title: "Error", description: "Could not fetch bookings.", variant: "destructive" });
-      setIsLoading(false);
-    });
-
-    return () => {
-        unsubscribe();
-        unsubMarketing();
-    };
-  }, [toast]);
+  const loadMoreBookings = async () => {
+    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0) return;
+    setIsLoadingMore(true);
+    try {
+      const moreBookings = await getArchivedBookings();
+      const existingIds = new Set(bookings.map(b => b.id));
+      setBookings(prev => [...prev, ...moreBookings.filter(b => !existingIds.has(b.id))]);
+      setHasMore(false);
+    } catch (error) { console.error("Error load more:", error); } finally { setIsLoadingMore(false); }
+  };
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter(booking => {
-      const matchesStatus = filterStatus === "All" || booking.status === filterStatus;
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
-        booking.bookingId.toLowerCase().includes(searchLower) || 
-        booking.customerName.toLowerCase().includes(searchLower) ||
-        booking.customerPhone.includes(searchTerm) ||
-        booking.customerEmail.toLowerCase().includes(searchLower);
-      
-      return matchesStatus && matchesSearch;
-    });
-  }, [bookings, filterStatus, searchTerm]);
-  
-  const handleReferralBonusOnCompletion = async (booking: FirestoreBooking) => {
-    if (!booking.userId) return;
-    console.log(`Referral check for booking ${booking.bookingId}, user ${booking.userId}`);
-  
+    return bookings.filter(b => (filterStatus === "All" || b.status === filterStatus));
+  }, [bookings, filterStatus]);
+
+  const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
+    if (!booking.id) return;
+
+    if (newStatus === 'Completed' && !finalizedPaymentMethod) {
+        setBookingToComplete(booking);
+        setIsCompleteDialogOpen(true);
+        return;
+    }
+
+    setIsUpdatingStatus(booking.id);
     try {
-      const userDocRef = doc(db, "users", booking.userId);
-      const userSnap = await getDoc(userDocRef);
-      if (!userSnap.exists() || !userSnap.data()?.referredBy) {
-        console.log(`User ${booking.userId} was not referred.`);
-        return;
-      }
-      const firestoreUser = { id: userSnap.id, ...userSnap.data() } as FirestoreUser;
-  
-      const userBookingsQuery = query(
-        collection(db, "bookings"),
-        where("userId", "==", firestoreUser.id),
-        where("status", "==", "Completed")
-      );
-      const userBookingsSnap = await getDocs(userBookingsQuery);
-      if (userBookingsSnap.size > 1) {
-        console.log(`User ${firestoreUser.id} already has completed bookings.`);
-        return;
-      }
-  
-      const referralsRef = collection(db, "referrals");
-      const referralQuery = query(
-        referralsRef,
-        where("referredUserId", "==", firestoreUser.id),
-        where("status", "==", "pending"),
-        limit(1)
-      );
-      const referralSnap = await getDocs(referralQuery);
-      if (referralSnap.empty) {
-        console.log(`No pending referral record for user ${firestoreUser.id}.`);
-        return;
-      }
-      const referralDoc = referralSnap.docs[0];
-      const referralData = referralDoc.data() as Referral;
-  
-      const referralSettingsRef = doc(db, "appConfiguration", "referral");
-      const referralSettingsSnap = await getDoc(referralSettingsRef);
-      const referralSettings = referralSettingsSnap.exists() ? referralSettingsSnap.data() as ReferralSettings : null;
-  
-      if (!referralSettings?.isReferralSystemEnabled) {
-        console.log("Referral system disabled.");
-        return;
-      }
-      if (booking.totalAmount < (referralSettings.minBookingValueForBonus || 0)) {
-        console.log(`Booking amount ${booking.totalAmount} is less than minimum ${referralSettings.minBookingValueForBonus}.`);
-        await updateDoc(referralDoc.ref, { status: 'failed', failureReason: 'min_booking_not_met' });
-        return;
-      }
-  
-      await runTransaction(db, async (transaction) => {
-        const referrerDocRef = doc(db, "users", referralData.referrerId);
-        const referrerDoc = await transaction.get(referrerDocRef);
-        if (!referrerDoc.exists()) throw new Error(`Referrer user ${referralData.referrerId} not found.`);
-  
-        const newWalletBalance = (referrerDoc.data().walletBalance || 0) + referralData.referrerBonus;
-        transaction.update(referrerDocRef, { walletBalance: newWalletBalance });
-        transaction.update(referralDoc.ref, { status: 'completed', bookingId: booking.bookingId });
-        
-        const notification: Omit<FirestoreNotification, 'id'> = {
-          userId: referralData.referrerId,
-          title: "Referral Bonus Credited!",
-          message: `Your referral bonus of ₹${referralData.referrerBonus} has been credited for ${firestoreUser.displayName}'s first booking.`,
-          type: "success",
-          href: "/referral",
-          read: false,
-          createdAt: Timestamp.now(),
-        };
-        transaction.set(doc(collection(db, "userNotifications")), notification);
-
-        // We can't easily call async triggerPushNotification inside runTransaction, 
-        // so we'll handle it after the transaction succeeds.
-      });
-  
-      // Trigger actual Push Notification after transaction
-      triggerPushNotification({
-        userId: referralData.referrerId,
-        title: "Referral Bonus Credited!",
-        body: `Your referral bonus of ₹${referralData.referrerBonus} has been credited for ${firestoreUser.displayName}'s first booking.`,
-        href: "/referral"
-      });
-
-      toast({ title: "Referral Bonus Awarded!", description: `₹${referralData.referrerBonus} credited to the referrer's wallet.` });
-      console.log(`Bonus of ${referralData.referrerBonus} awarded to ${referralData.referrerId}.`);
-  
-    } catch (error) {
-      console.error("Error processing referral bonus:", error);
-      toast({ title: "Referral Bonus Error", description: (error as Error).message, variant: "destructive" });
-    }
-  };
-
-
-  const prepareAndSendEmail = async (
-    booking: FirestoreBooking,
-    emailType: 'booking_confirmation' | 'booking_completion' | 'booking_rescheduled' | 'booking_cancelled_by_admin' | 'booking_cancelled_by_user',
-    updatedPaymentMethod?: string,
-    originalScheduledDateForEmail?: string,
-    originalScheduledTimeSlotForEmail?: string,
-    cancellationReason?: string
-  ) => {
-    if (isLoadingAppSettings) {
-      toast({ title: "Processing", description: "App settings still loading, please wait.", variant: "default" });
-      return false;
-    }
-    toast({ title: "Processing Email", description: `Preparing ${emailType.replace(/_/g, ' ')} email...`, variant: "default" });
-    const companyDetailsForInvoice = {
-      name: globalCompanySettings?.websiteName || "FixBro.in",
-      address: globalCompanySettings?.address || "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",
-      contactEmail: globalCompanySettings?.contactEmail || "support@fixbro.in",
-      contactMobile: globalCompanySettings?.contactMobile || "+91-7353113455",
-      logoUrl: globalCompanySettings?.logoUrl || undefined,
-    };
-    let invoicePdfBase64 = "";
-    if (emailType === 'booking_completion') { try { const dataUri = await generateInvoicePdfForDownload(booking, companyDetailsForInvoice); if (typeof dataUri === 'string' && dataUri.includes(',')) { invoicePdfBase64 = dataUri.split(',')[1]; } else { console.warn("generateInvoicePdf did not return a valid data URI string for completion email."); } } catch (invoiceError) { console.error("Error generating invoice for completion email:", invoiceError); } }
-    const emailInput: BookingConfirmationEmailInput = {
-      emailType: emailType, bookingId: booking.bookingId, customerName: booking.customerName, customerEmail: booking.customerEmail, customerPhone: booking.customerPhone, addressLine1: booking.addressLine1, addressLine2: booking.addressLine2, city: booking.city, state: booking.state, pincode: booking.pincode, scheduledDate: formatDateForDisplay(booking.scheduledDate), scheduledTimeSlot: booking.scheduledTimeSlot, services: booking.services.map((s: BookingServiceItem) => ({ serviceId: s.serviceId, name: s.name, quantity: s.quantity, pricePerUnit: s.pricePerUnit, discountedPricePerUnit: s.discountedPricePerUnit, })), subTotal: booking.subTotal, visitingCharge: booking.visitingCharge, discountAmount: booking.discountAmount, discountCode: booking.discountCode, appliedPlatformFees: booking.appliedPlatformFees?.map(fee => ({ name: fee.name, amount: fee.calculatedFeeAmount + fee.taxAmountOnFee, })), taxAmount: booking.taxAmount, totalAmount: booking.totalAmount, paymentMethod: updatedPaymentMethod || booking.paymentMethod, status: booking.status, invoicePdfBase64: invoicePdfBase64 || undefined, smtpHost: appConfig.smtpHost, smtpPort: appConfig.smtpPort, smtpUser: appConfig.smtpUser, smtpPass: appConfig.smtpPass, senderEmail: appConfig.senderEmail, previousScheduledDate: originalScheduledDateForEmail ? formatDateForDisplay(originalScheduledDateForEmail) : undefined, previousScheduledTimeSlot: originalScheduledTimeSlotForEmail,
-      cancellationReason,
-      siteName: globalCompanySettings?.websiteName,
-    };
-    try { const emailResult = await sendBookingConfirmationEmail(emailInput); if (emailResult.success) { toast({ title: "Email Sent", description: `${emailType.replace(/_/g, ' ')} email sent to customer.` }); } else { toast({ title: "Email Failed", description: emailResult.message || `Could not send ${emailType.replace(/_/g, ' ')} email.`, variant: "destructive", duration: 7000 }); } return emailResult.success;
-    } catch (emailFlowError) { console.error(`Error calling sendBookingConfirmationEmail flow for ${emailType}:`, emailFlowError); toast({ title: "Email System Error", description: "Failed to trigger email sending process.", variant: "destructive", duration: 7000 }); return false; }
-  };
-
-  const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus) => {
-    const bookingId = booking.id;
-    if (!bookingId) { toast({ title: "Error", description: "Booking ID is missing.", variant: "destructive" }); return; }
-    if (newStatus === "Rescheduled" && booking.status !== "Rescheduled") {
-      setSelectedBookingForReschedule(booking); const currentScheduledDate = new Date(booking.scheduledDate.replace(/-/g, '/')); setRescheduleDate(isNaN(currentScheduledDate.getTime()) ? new Date() : currentScheduledDate); setRescheduleSelectedTimeSlot(booking.scheduledTimeSlot); setIsRescheduleDialogOpen(true); fetchRescheduleSlots(isNaN(currentScheduledDate.getTime()) ? new Date() : currentScheduledDate); return;
-    }
-    const requiresPaymentMethodConfirmation = newStatus === "Completed" && (booking.paymentMethod === "Pay After Service" || booking.paymentMethod === "Cash on Delivery" || booking.status === "Pending Payment");
-    if (requiresPaymentMethodConfirmation && newStatus === "Completed") { setSelectedBookingForPaymentUpdate(booking); setIsPaymentMethodDialogOpen(true);
-    } else {
-      setIsUpdatingStatus(bookingId); const bookingDocRef = doc(db, "bookings", bookingId);
-      try { const updatePayload: Record<string, any> = { status: newStatus, updatedAt: Timestamp.now() }; if (newStatus === "Completed" && booking.isReviewedByCustomer === undefined) { updatePayload.isReviewedByCustomer = false; } await updateDoc(bookingDocRef, updatePayload); toast({ title: "Success", description: `Booking status updated to ${newStatus}.` });
-        const updatedBookingForNotifications = { ...booking, status: newStatus };
-
-        // --- USER NOTIFICATION FOR STATUS CHANGE ---
-        if (booking.userId && newStatus !== "Cancelled") { // Cancelled is already handled below
-           const userNotification: Omit<FirestoreNotification, 'id'> = {
-              userId: booking.userId,
-              title: `Booking Status: ${newStatus}`,
-              message: `Your booking ${booking.bookingId} status has been updated to ${newStatus}.`,
-              type: 'info',
-              href: '/my-bookings',
-              read: false,
-              createdAt: Timestamp.now(),
-           };
-           await addDoc(collection(db, "userNotifications"), userNotification);
-           triggerPushNotification({
-             userId: booking.userId,
-             title: userNotification.title,
-             body: userNotification.message,
-             href: userNotification.href
-           }).catch(err => console.error("Error sending user status push:", err));
+      const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
+      if (newStatus === "Completed") {
+        if (additionalCharges && additionalCharges.length > 0) {
+            updateData.additionalCharges = additionalCharges;
+            const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
+            updateData.totalAmount = (booking.totalAmount || 0) + extraTotal;
         }
-        // --- END USER NOTIFICATION ---
-
-        if (newStatus === "Completed") {
-            await prepareAndSendEmail(updatedBookingForNotifications, 'booking_completion');
-            await handleReferralBonusOnCompletion(updatedBookingForNotifications); // Handle Referral
-            if (marketingConfig?.isWhatsAppEnabled && marketingConfig.whatsAppOnBookingCompleted?.enabled && marketingConfig.whatsAppOnBookingCompleted.templateName) {
-                try {
-                    await fetch('/api/whatsapp/send', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: booking.customerPhone,
-                            templateName: marketingConfig.whatsAppOnBookingCompleted.templateName,
-                            parameters: [booking.bookingId],
-                        }),
-                    });
-                } catch (waError) {
-                    console.error("Failed to trigger WhatsApp message for booking completed:", waError);
-                }
-            }
-        }
-        if (newStatus === "Cancelled") {
-            await prepareAndSendEmail(updatedBookingForNotifications, 'booking_cancelled_by_admin', undefined, undefined, "Cancelled due to operational reasons.");
-            
-            // Trigger Push Notification for user
-            if (booking.userId) {
-                triggerPushNotification({
-                  userId: booking.userId,
-                  title: "Booking Cancelled",
-                  body: `Your booking ${booking.bookingId} has been cancelled by an administrator.`,
-                  href: '/my-bookings'
-                });
-            }
-
-            if (marketingConfig?.isWhatsAppEnabled && marketingConfig.whatsAppOnBookingCancelled?.enabled && marketingConfig.whatsAppOnBookingCancelled.templateName) {
-                 try {
-                    await fetch('/api/whatsapp/send', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            to: booking.customerPhone,
-                            templateName: marketingConfig.whatsAppOnBookingCancelled.templateName,
-                            parameters: [booking.bookingId],
-                        }),
-                    });
-                } catch (waError) {
-                    console.error("Failed to trigger WhatsApp message for booking cancelled:", waError);
-                }
-            }
-        }
-      } catch (error) { console.error("Error updating booking status: ", error); toast({ title: "Error", description: "Could not update booking status.", variant: "destructive" });
-      } finally { setIsUpdatingStatus(null); }
-    }
-  };
-
-  const handleConfirmPaymentAndUpdateStatus = async () => {
-    if (!selectedBookingForPaymentUpdate || !selectedBookingForPaymentUpdate.id || !paymentReceivedMethodForDialog) { toast({ title: "Error", description: "Booking or payment method missing for confirmation.", variant: "destructive" }); return; }
-    const bookingToUpdate = selectedBookingForPaymentUpdate; const bookingIdToUpdate = bookingToUpdate.id;
-    if (!bookingIdToUpdate) { toast({ title: "Error", description: "Booking ID is missing.", variant: "destructive" }); return; }
-    
-    setIsUpdatingStatus(bookingIdToUpdate); setIsPaymentMethodDialogOpen(false);
-    const updatedBookingForEmail: FirestoreBooking = { ...bookingToUpdate, paymentMethod: paymentReceivedMethodForDialog, status: "Completed" };
-    const updatePayload: Record<string, any> = { status: "Completed" as BookingStatus, paymentMethod: paymentReceivedMethodForDialog, updatedAt: Timestamp.now(), };
-    if (bookingToUpdate.isReviewedByCustomer === undefined) { updatePayload.isReviewedByCustomer = false; }
-    
-    // Referral Bonus on Completion
-    await handleReferralBonusOnCompletion(updatedBookingForEmail);
-
-    if (marketingConfig?.isWhatsAppEnabled && marketingConfig.whatsAppOnBookingCompleted?.enabled && marketingConfig.whatsAppOnBookingCompleted.templateName) {
-        try {
-            await fetch('/api/whatsapp/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    to: bookingToUpdate.customerPhone,
-                    templateName: marketingConfig.whatsAppOnBookingCompleted.templateName,
-                    parameters: [bookingToUpdate.bookingId],
-                }),
-            });
-        } catch (waError) {
-            console.error("Failed to trigger WhatsApp message for payment confirmation:", waError);
-        }
-    }
-    const bookingDocRef = doc(db, "bookings", bookingIdToUpdate);
-    try { 
-        await updateDoc(bookingDocRef, updatePayload); 
-        toast({ title: "Success", description: `Booking marked as Completed. Payment via ${paymentReceivedMethodForDialog}.` });
-        
-        // --- USER NOTIFICATION FOR COMPLETION ---
-        if (bookingToUpdate.userId) {
-            const userNotification: Omit<FirestoreNotification, 'id'> = {
-                userId: bookingToUpdate.userId,
-                title: "Service Completed!",
-                message: `Your booking ${bookingToUpdate.bookingId} has been marked as completed. Thank you for choosing FixBro!`,
-                type: 'success',
-                href: '/my-bookings',
-                read: false,
-                createdAt: Timestamp.now(),
-            };
-            await addDoc(collection(db, "userNotifications"), userNotification);
-            triggerPushNotification({
-                userId: bookingToUpdate.userId,
-                title: userNotification.title,
-                body: userNotification.message,
-                href: userNotification.href
-            }).catch(err => console.error("Error sending user completion push:", err));
-        }
-        // --- END USER NOTIFICATION ---
-
-        // Send email *after* successful database update
-        await prepareAndSendEmail(updatedBookingForEmail, 'booking_completion', paymentReceivedMethodForDialog);
-    } catch (error) { console.error("Error updating booking status and payment method: ", error); toast({ title: "Error", description: "Could not update booking.", variant: "destructive" });
-    } finally { setIsUpdatingStatus(null); setSelectedBookingForPaymentUpdate(null); setPaymentReceivedMethodForDialog(""); }
-  };
-
-  const handleViewDetails = (booking: FirestoreBooking) => { setSelectedBooking(booking); setIsDetailsModalOpen(true); };
-  const handleEditBooking = (bookingId: string) => { if (bookingId) { router.push(`/admin/bookings/edit/${bookingId}`); } else { toast({ title: "Error", description: "Booking ID is missing.", variant: "destructive" }); } };
-  const handleDeleteBooking = async (bookingId: string) => {
-    if (!bookingId) { toast({ title: "Error", description: "Booking ID is missing for delete.", variant: "destructive" }); return; }
-    setIsDeleting(bookingId); 
-    const bookingDocRef = doc(db, "bookings", bookingId);
-    try { 
-        await deleteDoc(bookingDocRef); 
-        toast({ title: "Success", description: `Booking deleted.` });
-    } catch (error) { 
-        console.error("Error deleting booking: ", error); 
-        toast({ title: "Error", description: "Could not delete booking.", variant: "destructive" });
-    } finally { 
-        setIsDeleting(null); 
-    }
-  };
-  
-  const parseTimeToMinutes = (timeStr: string): number => { if (!timeStr || !timeStr.includes(':')) return 0; const [hours, minutes] = timeStr.split(':').map(Number); return hours * 60 + minutes; };
-  const formatTimeFromMinutes = (totalMinutes: number): string => { const hours = Math.floor(totalMinutes / 60); const minutes = totalMinutes % 60; const period = hours >= 12 && hours < 24 ? 'PM' : 'AM'; let displayHours = hours % 12; if (displayHours === 0) 12; return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`; };
-  const generateAdminRawTimeSlots = (referenceDate: Date, config: AppSettings): string[] => {
-    const slots: string[] = []; const now = new Date(); let effectiveDelayHours = 0;
-    if (config.enableLimitLateBookings && typeof config.limitLateBookingHours === 'number' && config.limitLateBookingHours > 0) { effectiveDelayHours = config.limitLateBookingHours; }
-    const earliestBookableAbsoluteTime = new Date(now.getTime() + (effectiveDelayHours * 60 * 60 * 1000) + (1 * 60 * 1000));
-    const slotInterval = config.timeSlotSettings?.slotIntervalMinutes || defaultAppSettings.timeSlotSettings.slotIntervalMinutes;
-    const servicePeriodsToUse = Object.values(config.timeSlotSettings.weeklyAvailability || {});
-
-    servicePeriodsToUse.forEach(periodConfig => {
-      if (!periodConfig.startTime || !periodConfig.endTime) return; 
-      let currentSlotTimeMinutes = parseTimeToMinutes(periodConfig.startTime); 
-      const periodEndTimeMinutes = parseTimeToMinutes(periodConfig.endTime);
-      while (currentSlotTimeMinutes < periodEndTimeMinutes) { 
-        const currentSlotDateTime = new Date(referenceDate); 
-        currentSlotDateTime.setHours(Math.floor(currentSlotTimeMinutes / 60), currentSlotTimeMinutes % 60, 0, 0); 
-        if (currentSlotDateTime >= earliestBookableAbsoluteTime) { slots.push(formatTimeFromMinutes(currentSlotTimeMinutes)); } currentSlotTimeMinutes += slotInterval; 
+        if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
-    }); 
-    
-    // Remove duplicates and sort
-    return Array.from(new Set(slots)).sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
+
+      await updateDoc(doc(db, "bookings", booking.id), updateData);
+      await triggerRefresh('bookings');
+      fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: booking.id }), }).catch(err => console.error(err));
+      toast({ title: "Success", description: `Booking is now ${newStatus}.` });
+      setIsCompleteDialogOpen(false);
+      setBookingToComplete(null);
+    } catch (error) { console.error(error); toast({ title: "Update Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
   };
 
-  useEffect(() => { if (isRescheduleDialogOpen && rescheduleDate && selectedBookingForReschedule) { fetchRescheduleSlots(rescheduleDate); } }, [rescheduleDate, isRescheduleDialogOpen, selectedBookingForReschedule, appConfig]); // eslint-disable-line react-hooks/exhaustive-deps
-  const handleRescheduleDateSelect = (date: Date | undefined) => { if (date) { setRescheduleDate(date); setRescheduleSelectedTimeSlot(undefined); } };
-  const handleConfirmReschedule = async () => {
-    if (!selectedBookingForReschedule || !selectedBookingForReschedule.id || !rescheduleDate || !rescheduleSelectedTimeSlot) { toast({ title: "Missing Information", description: "Please select a new date and time slot.", variant: "destructive" }); return; }
-    setIsUpdatingStatus(selectedBookingForReschedule.id); const bookingDocRef = doc(db, "bookings", selectedBookingForReschedule.id); const originalScheduledDate = selectedBookingForReschedule.scheduledDate; const originalScheduledTimeSlot = selectedBookingForReschedule.scheduledTimeSlot;
-    try { const newScheduledDate = rescheduleDate.toLocaleDateString('en-CA'); await updateDoc(bookingDocRef, { scheduledDate: newScheduledDate, scheduledTimeSlot: rescheduleSelectedTimeSlot, status: "Rescheduled" as BookingStatus, updatedAt: Timestamp.now(), });
-      const updatedBookingForEmail = { ...selectedBookingForReschedule, scheduledDate: newScheduledDate, scheduledTimeSlot: rescheduleSelectedTimeSlot, status: "Rescheduled" as BookingStatus };
-      await prepareAndSendEmail(updatedBookingForEmail, 'booking_rescheduled', undefined, originalScheduledDate, originalScheduledTimeSlot);
-      toast({ title: "Booking Rescheduled", description: `Booking ${selectedBookingForReschedule.bookingId} has been rescheduled.` }); setIsRescheduleDialogOpen(false); setSelectedBookingForReschedule(null);
-    } catch (error) { console.error("Error rescheduling booking:", error); toast({ title: "Error", description: "Could not reschedule booking.", variant: "destructive" });
-    } finally { setIsUpdatingStatus(null); }
-  };
-
-  const openAssignModal = (booking: FirestoreBooking) => {
-    if (!booking.id) { toast({title: "Error", description: "Booking data missing for assignment.", variant: "destructive"}); return;}
-    setBookingToAssign(booking);
-    setIsAssignModalOpen(true);
+  const handleDeleteBooking = async (id: string) => {
+    setIsDeleting(id);
+    try {
+      await deleteDoc(doc(db, "bookings", id));
+      await triggerRefresh('bookings');
+      toast({ title: "Deleted", description: "Record removed." });
+    } catch (err) { toast({ title: "Error", variant: "destructive" }); } finally { setIsDeleting(null); }
   };
 
   const handleConfirmAssignment = async (bookingId: string, providerId: string, providerName: string) => {
     setIsUpdatingStatus(bookingId);
-    const bookingDocRef = doc(db, "bookings", bookingId);
     try {
-        await updateDoc(bookingDocRef, {
-            providerId: providerId,
-            status: "AssignedToProvider" as BookingStatus,
-            updatedAt: Timestamp.now(),
-        });
-        toast({ title: "Booking Assigned", description: `Booking assigned to ${providerName}.` });
-
-        // Fetch Provider Email
-        const providerAppDocRef = doc(db, "providerApplications", providerId);
-        const providerDocSnap = await getDoc(providerAppDocRef);
-        if (!providerDocSnap.exists()) {
-            throw new Error(`Provider application for ID ${providerId} not found.`);
-        }
-        const providerData = providerDocSnap.data() as ProviderApplication;
-        const providerEmail = providerData.email;
-
-        if (!providerEmail) {
-            throw new Error(`Email not found for provider ${providerName} (ID: ${providerId}).`);
-        }
-
-        // Fetch Booking Details for Email
-        const currentBookingSnap = await getDoc(bookingDocRef);
-        if (!currentBookingSnap.exists()) {
-            throw new Error(`Booking ${bookingId} not found for notification.`);
-        }
-        const currentBookingData = currentBookingSnap.data() as FirestoreBooking;
-
-        const emailInput: ProviderBookingAssignmentEmailInput = {
-            providerName: providerName,
-            providerEmail: providerEmail,
-            bookingId: currentBookingData.bookingId,
-            bookingDocId: bookingId,
-            serviceName: currentBookingData.services.map(s => s.name).join(', ') || "Multiple Services",
-            scheduledDate: formatDateForDisplay(currentBookingData.scheduledDate),
-            scheduledTimeSlot: currentBookingData.scheduledTimeSlot,
-            customerName: currentBookingData.customerName,
-            customerAddress: `${currentBookingData.addressLine1}${currentBookingData.addressLine2 ? ', ' + currentBookingData.addressLine2 : ''}, ${currentBookingData.city}`,
-            smtpHost: appConfig.smtpHost,
-            smtpPort: appConfig.smtpPort,
-            smtpUser: appConfig.smtpUser,
-            smtpPass: appConfig.smtpPass,
-            senderEmail: appConfig.senderEmail,
-        };
-
-        const emailResult = await sendProviderBookingAssignmentEmail(emailInput);
-        if (emailResult.success) {
-            toast({ title: "Notification Sent", description: `Assignment email sent to ${providerName}.` });
-        } else {
-            toast({ title: "Email Error", description: emailResult.message || `Could not send assignment email to ${providerName}.`, variant: "destructive", duration: 7000 });
-        }
-        
-        // Create Firestore Notification for Provider
-        const providerNotification: FirestoreNotification = {
-          userId: providerId,
-          title: "New Job Assignment!",
-          message: `You've been assigned Booking ID: ${currentBookingData.bookingId} for ${currentBookingData.services.map(s=>s.name).join(', ')} on ${formatDateForDisplay(currentBookingData.scheduledDate)}.`,
-          type: 'booking_update',
-          href: `/provider/booking/${bookingId}`,
-          read: false,
-          createdAt: Timestamp.now(),
-        };
-        await addDoc(collection(db, "userNotifications"), providerNotification);
-
-        // Trigger Push Notification for provider
-        triggerPushNotification({
-          userId: providerId,
-          title: providerNotification.title,
-          body: providerNotification.message,
-          href: providerNotification.href,
-          sound: 'order' // Play specific order sound for assignments
-        });
-
-        // --- USER NOTIFICATION FOR PROVIDER ASSIGNMENT ---
-        if (currentBookingData.userId) {
-            const userNotification: Omit<FirestoreNotification, 'id'> = {
-                userId: currentBookingData.userId,
-                title: "Provider Assigned!",
-                message: `${providerName} has been assigned to your booking ${currentBookingData.bookingId}.`,
-                type: 'info',
-                href: '/my-bookings',
-                read: false,
-                createdAt: Timestamp.now(),
-            };
-            await addDoc(collection(db, "userNotifications"), userNotification);
-            triggerPushNotification({
-                userId: currentBookingData.userId,
-                title: userNotification.title,
-                body: userNotification.message,
-                href: userNotification.href
-            }).catch(err => console.error("Error sending user assignment push:", err));
-        }
-        // --- END USER NOTIFICATION ---
-
-        setIsAssignModalOpen(false);
-        setBookingToAssign(null);
-    } catch (error) {
-        console.error("Error assigning provider or sending notification:", error);
-        toast({ title: "Error", description: (error as Error).message || "Could not assign provider or send notification.", variant: "destructive" });
-    } finally {
-        setIsUpdatingStatus(null);
-    }
-  };
-
-  const handleUnassignProvider = async (bookingId: string) => {
-    if (!bookingId) {
-      toast({ title: "Error", description: "Booking ID is missing for unassignment.", variant: "destructive" });
-      return;
-    }
-    setIsUpdatingStatus(bookingId);
-    const bookingDocRef = doc(db, "bookings", bookingId);
-    try {
-      await updateDoc(bookingDocRef, {
-        providerId: deleteField(), 
-        status: "Confirmed" as BookingStatus, 
-        updatedAt: Timestamp.now(),
-      });
-      toast({ title: "Provider Unassigned", description: "Provider has been unassigned from the booking." });
-    } catch (error) {
-      console.error("Error unassigning provider:", error);
-      toast({ title: "Error", description: "Could not unassign provider.", variant: "destructive" });
-    } finally {
-      setIsUpdatingStatus(null);
-    }
-  };
-  
-  const fetchRescheduleSlots = async (date: Date) => {
-    if (!appConfig || isLoadingAppSettings) { toast({ title: "Config Loading", description: "Application settings are still loading. Please wait.", variant: "default" }); return; }
-    setIsLoadingRescheduleSlots(true); const today = new Date(); today.setHours(0, 0, 0, 0); const selectedDay = new Date(date); selectedDay.setHours(0, 0, 0, 0);
-    if (selectedDay < today) { setRescheduleAvailableTimeSlots([]); setIsLoadingRescheduleSlots(false); toast({ title: "Invalid Date", description: "Cannot reschedule to a past date.", variant: "destructive" }); return; }
-    const rawSlots = generateAdminRawTimeSlots(date, appConfig); setRescheduleAvailableTimeSlots(rawSlots); setIsLoadingRescheduleSlots(false);
+      await updateDoc(doc(db, "bookings", bookingId), { providerId, status: "AssignedToProvider", updatedAt: Timestamp.now() });
+      await triggerRefresh('bookings');
+      fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: bookingId }) });
+      toast({ title: "Assigned", description: `Assigned to ${providerName}.` });
+      setIsAssignModalOpen(false);
+    } catch (err) { toast({ title: "Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
   };
 
   const renderBookingCard = (booking: FirestoreBooking) => (
-    <Card key={booking.id} className="mb-4 shadow-md border-l-4 overflow-hidden hover:shadow-lg transition-shadow duration-300" style={{ borderLeftColor: getStatusBadgeClass(booking.status).split(' ')[0].replace('bg-', 'var(--') }}>
-      <CardHeader className="p-4 pb-2 bg-muted/30">
+    <Card key={booking.id} className="mb-4 border-l-4 shadow-md overflow-hidden" style={{ borderLeftColor: getStatusBadgeClass(booking.status).split(' ')[0].replace('bg-', 'var(--') }}>
+      <CardHeader className="p-4 bg-muted/20 pb-3">
         <div className="flex justify-between items-start">
             <div className="space-y-1">
-                <CardTitle className="text-base font-mono font-bold text-primary tracking-tight">{booking.bookingId}</CardTitle>
-                <div className="flex items-center text-sm font-bold text-foreground">
-                  <UserCheck2 className="h-4 w-4 mr-1.5 text-primary" />
-                  {booking.customerName}
-                </div>
+                <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
+                <div className="text-sm font-bold">{booking.customerName}</div>
             </div>
-            <Badge variant={getStatusBadgeVariant(booking.status)} className={`capitalize text-[11px] px-2.5 py-1 font-bold shadow-sm ${getStatusBadgeClass(booking.status)}`}>
-                {isUpdatingStatus === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : booking.status}
-            </Badge>
+            <Badge className={cn("capitalize px-3 py-0.5 font-bold shadow-sm", getStatusBadgeClass(booking.status))}>{booking.status}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-4 text-sm space-y-4">
-        {/* Contact Info - Darker & Larger */}
-        <div className="grid grid-cols-1 gap-2 bg-muted/20 p-3 rounded-lg border border-muted/50 shadow-inner">
-           <div className="flex items-center justify-between text-foreground font-semibold text-sm">
-             <div className="flex items-center">
-               <Phone className="h-4 w-4 mr-2.5 text-primary" />
-               {booking.customerPhone}
-             </div>
-             {booking.customerPhone && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 hover:bg-primary/10 transition-colors" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
-                  <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={20} height={20} />
-                  <span className="sr-only">Chat on WhatsApp</span>
-                </Button>
-              )}
-           </div>
-           <div className="flex items-center text-foreground font-semibold text-sm break-all">
-             <Mail className="h-4 w-4 mr-2.5 text-primary" />
-             {booking.customerEmail}
-           </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-foreground font-extrabold flex items-center">
-              <CalendarDays className="h-3.5 w-3.5 mr-1 text-primary" /> Date
-            </span>
-            <div className="text-sm font-bold text-foreground pl-1">
-              {formatDateForDisplay(booking.scheduledDate)}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-foreground font-extrabold flex items-center">
-              <Clock className="h-3.5 w-3.5 mr-1 text-primary" /> Slot
-            </span>
-            <div className="text-sm font-bold text-foreground pl-1">
-              {booking.scheduledTimeSlot}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-foreground font-extrabold flex items-center">
-              <IndianRupee className="h-3.5 w-3.5 mr-1 text-primary" /> Amount
-            </span>
-            <div className="text-base font-black text-foreground pl-1">
-              ₹{booking.totalAmount.toLocaleString()}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <span className="text-[11px] uppercase tracking-wider text-foreground font-extrabold flex items-center">
-              <Tag className="h-3.5 w-3.5 mr-1 text-primary" /> Method
-            </span>
-            <div className="text-sm font-bold text-foreground pl-1 break-words">
-              {booking.paymentMethod}
-            </div>
-          </div>
-        </div>
-
-        <Separator className="bg-muted" />
-
-        <div className="space-y-2">
-           <span className="text-[11px] uppercase tracking-wider text-foreground font-extrabold flex items-center">
-             <ListOrdered className="h-4 w-4 mr-1.5 text-primary" /> Services
-           </span>
-           <div className="text-sm font-medium text-foreground bg-background p-3 rounded-lg border border-muted shadow-sm">
-             {booking.services.map(s => `${s.name} (x${s.quantity})`).join(', ')}
-           </div>
-        </div>
-
-        {booking.estimatedEndTime && (
-          <div className="flex items-center text-xs bg-green-50 text-green-800 p-2.5 rounded-lg border border-green-200 font-bold shadow-sm">
-            <History className="h-4 w-4 mr-2 text-green-600" />
-            <span>Ends: {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-          </div>
-        )}
-
-        <div className="pt-2">
-          <Select value={booking.status} onValueChange={(newStatus) => handleStatusChange(booking, newStatus as BookingStatus)} disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}>
-              <SelectTrigger className="h-10 text-sm font-bold bg-background shadow-md border-muted px-3">
-                <div className="flex-1 flex justify-center">
-                  <Badge variant={getStatusBadgeVariant(booking.status)} className={`capitalize px-4 py-1 font-bold shadow-md ${getStatusBadgeClass(booking.status)}`}>
-                    {isUpdatingStatus === booking.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : booking.status}
-                  </Badge>
+      <CardContent className="p-4 space-y-3 text-sm">
+        <div className="space-y-2 bg-muted/10 p-2 rounded-lg border border-muted/50">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-medium">
+                    <Phone className="h-4 w-4 text-primary" /> {booking.customerPhone}
+                    {booking.customerPhone && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
+                            <AppImage src="/whatsapp.png" alt="WhatsApp" width={18} height={18} />
+                        </Button>
+                    )}
                 </div>
-              </SelectTrigger>
-              <SelectContent className="max-h-[350px]">
-                {statusOptions.map(status => (<SelectItem key={status} value={status} className="text-sm font-medium">{status}</SelectItem>))}
-              </SelectContent>
+                <div className="font-black text-base text-primary"><IndianRupee className="h-3.5 w-3.5" />{booking.totalAmount.toLocaleString()}</div>
+            </div>
+            <div className="flex justify-between items-center text-xs py-1 border-t border-muted/30 mt-1 pt-1">
+                <span className="text-muted-foreground">Payment:</span>
+                <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter", getPaymentBadgeClass(booking.paymentMethod, booking.status))}>{getPaymentLabel(booking.paymentMethod, booking.status)}</Badge>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground break-all mt-1">
+                <Mail className="h-3.5 w-3.5 text-primary" /> {booking.customerEmail}
+            </div>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 py-1 border-y border-muted/50">
+            <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> {formatDateForDisplay(booking.scheduledDate)}</div>
+            <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> {booking.scheduledTimeSlot}</div>
+        </div>
+        {booking.estimatedEndTime && (
+          <div className="text-[10px] font-black flex items-center text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md w-fit"><History className="h-3 w-3 mr-1.5" />Ends: {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
+        )}
+        <div className="pt-1">
+          <Select value={booking.status} onValueChange={(s) => handleStatusChange(booking, s as BookingStatus)} disabled={isUpdatingStatus === booking.id}>
+              <SelectTrigger className="w-full h-10 font-bold shadow-sm bg-background border-muted"><div className="flex-1 flex justify-center"><Badge className={cn("capitalize px-4 py-0.5 font-bold", getStatusBadgeClass(booking.status))}>{isUpdatingStatus === booking.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" /> : booking.status}</Badge></div></SelectTrigger>
+              <SelectContent>{statusOptions.map(opt => <SelectItem key={opt} value={opt} className="font-medium">{opt}</SelectItem>)}</SelectContent>
           </Select>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0 flex flex-col gap-3 bg-muted/5">
-        {/* Row 1: Assign/Reassign and Unassign */}
-        <div className="flex gap-2.5 w-full">
-          {booking.providerId ? (
-            <>
-              <Button 
-                variant="default" 
-                size="sm" 
-                className="flex-1 text-xs h-10 px-1 font-bold bg-muted/30 text-foreground border border-border/40 shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl" 
-                onClick={() => openAssignModal(booking)} 
-                disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}
-              >
-                <Users className="mr-1.5 h-4 w-4 shrink-0" /> Reassign
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="flex-1 text-xs h-10 px-1 font-bold bg-red-50 text-red-600 border border-red-100 shadow-sm hover:bg-red-600 hover:text-white transition-all duration-300 rounded-xl" 
-                    disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}
-                  >
-                    <XIcon className="mr-1.5 h-4 w-4 shrink-0" /> Unassign
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader><AlertDialogTitle>Confirm Unassign</AlertDialogTitle><AlertDialogDescription>Are you sure you want to unassign the provider from booking {booking.bookingId}?</AlertDialogDescription></AlertDialogHeader>
-                  <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignProvider(booking.id!)} className="bg-destructive hover:bg-destructive/90">Yes, Unassign</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          ) : (booking.status === "Confirmed" || booking.status === "Pending Payment" || booking.status === "Rescheduled") ? (
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="w-full text-sm h-11 font-bold bg-muted/30 text-foreground border border-border/40 shadow-md hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl" 
-              onClick={() => openAssignModal(booking)} 
-              disabled={isUpdatingStatus === booking.id || isLoadingAppSettings || isAssignModalOpen}
-            >
-              <UserCheck2 className="mr-2 h-4 w-4" /> Assign Provider
-            </Button>
-          ) : null}
-        </div>
-
-        {/* Row 2: Utility Actions */}
-        <div className="flex items-center gap-2.5 w-full">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 text-sm h-10 bg-muted/30 text-foreground border border-border/40 font-bold shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl" 
-            onClick={() => handleViewDetails(booking)}
-          >
-            <Eye className="h-4 w-4 mr-1.5"/> Details
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 text-sm h-10 bg-muted/30 text-foreground border border-border/40 font-bold shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl" 
-            onClick={() => handleEditBooking(booking.id!)}
-          >
-            <Edit className="h-4 w-4 mr-1.5"/> Edit
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="destructive" 
-                size="icon" 
-                className="h-10 w-10 shrink-0 bg-red-50 text-red-600 border border-red-100 shadow-sm hover:bg-red-600 hover:text-white transition-all duration-300 rounded-xl" 
-                title="Delete Booking" 
-                disabled={isDeleting === booking.id || !booking.id}
-              >
-                {isDeleting === booking.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Confirm Deletion</AlertDialogTitle><AlertDialogDescription>This will permanently delete the booking <span className="font-bold text-foreground">{booking.bookingId}</span>.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleDeleteBooking(booking.id!)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </CardFooter>
+      <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap"><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => router.push(`/admin/bookings/edit/${booking.id}`)}>Edit</Button><Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>Assign</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent className="w-[90vw] rounded-2xl"><AlertDialogHeader><AlertDialogTitle className="font-bold">Delete Booking?</AlertDialogTitle><AlertDialogDescription>Remove #{booking.bookingId} from system?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(booking.id!)} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></CardFooter>
     </Card>
-  );
-
-  const BookingSkeleton = () => (
-    <div className="space-y-4">
-      {[1, 2, 3].map((i) => (
-        <Card key={i} className="w-full overflow-hidden">
-          <div className="p-4 bg-muted/30 flex justify-between">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-5 w-20" />
-          </div>
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-4 w-24" /></div>
-              <div className="space-y-2"><Skeleton className="h-3 w-16" /><Skeleton className="h-4 w-24" /></div>
-            </div>
-            <Skeleton className="h-10 w-full" />
-            <div className="flex gap-2"><Skeleton className="h-9 flex-1" /><Skeleton className="h-9 flex-1" /></div>
-          </div>
-        </Card>
-      ))}
-    </div>
   );
 
   return (
     <div className="space-y-6">
-      <Card className="border-none shadow-md overflow-hidden">
-        <CardHeader className="bg-primary/5 pb-8 sm:flex-row sm:items-center sm:justify-between border-b">
-          <div className="space-y-1">
-            <CardTitle className="text-2xl flex items-center font-bold">
-              <Tag className="mr-2 h-6 w-6 text-primary" /> Manage Bookings
-            </CardTitle>
-            <CardDescription className="text-muted-foreground/80">
-              Real-time dashboard for customer service requests and provider assignments.
-            </CardDescription>
-          </div>
-          <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="ID, Name, Phone..."
-                className="pl-9 h-10 bg-background"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as BookingStatus | "All")}>
-              <SelectTrigger className="h-10 sm:w-[180px] bg-background"><SelectValue placeholder="All Statuses" /></SelectTrigger>
-              <SelectContent><SelectItem value="All">All Statuses</SelectItem>{statusOptions.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading || isLoadingAppSettings || isLoadingCompanySettings ? (
-            <div className="p-6">
-               <div className="hidden md:block space-y-4">
-                 <Skeleton className="h-10 w-full" />
-                 {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-16 w-full" />)}
-               </div>
-               <div className="md:hidden">
-                 <BookingSkeleton />
-               </div>
-            </div>
-          ) : filteredBookings.length === 0 ? (
-            <div className="text-center py-20 bg-muted/10">
-              <div className="bg-background inline-flex p-4 rounded-full shadow-sm mb-4">
-                <PackageSearch className="h-10 w-10 text-muted-foreground/60" />
-              </div>
-              <h3 className="text-lg font-semibold">No bookings found</h3>
-              <p className="text-muted-foreground max-w-xs mx-auto text-sm mt-1">
-                {searchTerm ? `No results for "${searchTerm}"` : "Try adjusting your filters or search term."}
-              </p>
-              { (searchTerm || filterStatus !== "All") && (
-                <Button variant="link" onClick={() => { setSearchTerm(""); setFilterStatus("All"); }} className="mt-2 text-primary">
-                  Clear all filters
-                </Button>
-              )}
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div><h1 className="text-3xl font-bold flex items-center"><ListOrdered className="mr-2 h-8 w-8 text-primary" /> Manage Bookings</h1><p className="text-muted-foreground">Real-time service management dashboard.</p></div>
+        <div className="flex flex-col sm:flex-row gap-2"><Button onClick={() => router.push('/admin/bookings/create')} className="bg-primary h-10 font-bold"><PlusCircle className="mr-2 h-4 w-4" /> Create Booking</Button><div className="relative w-full sm:w-64"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="ID, Name, Phone..." className="pl-9 h-10 w-full bg-background" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div><Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as BookingStatus | "All")}><SelectTrigger className="h-10 sm:w-44 bg-background font-bold"><SelectValue placeholder="All Statuses" /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem>{statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+      </div>
+
+      <Card><CardContent className="p-0">
+          {isLoading ? ( <div className="py-20 text-center"><Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" /><p className="text-sm text-muted-foreground">Syncing Database...</p></div>
+          ) : filteredBookings.length === 0 ? ( <div className="text-center py-20"><PackageSearch className="h-10 w-10 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-semibold">No bookings found</h3></div>
           ) : (
-            <>
-              {/* Desktop View */}
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
-                <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10 shadow-sm">
-                  <TableRow>
-                    <TableHead className="w-[120px] font-bold text-foreground">Booking ID</TableHead>
-                    <TableHead className="font-bold text-foreground">Customer</TableHead>
-                    <TableHead className="font-bold text-foreground">Date & Time</TableHead>
-                    <TableHead className="font-bold text-foreground">Services</TableHead>
-                    <TableHead className="text-right font-bold text-foreground pr-6">Amount (₹)</TableHead>
-                  </TableRow>
-                </TableHeader>
+            <><div className="hidden md:block">
+                <Table><TableHeader><TableRow><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {filteredBookings.map((booking) => (
-                    <React.Fragment key={booking.id}>
-                      {/* Info Row */}
-                      <TableRow className="group hover:bg-primary/[0.03] transition-all duration-200 border-b-0 relative overflow-hidden">
-                        <TableCell className="font-mono text-xs font-bold text-primary bg-primary/[0.02] group-hover:bg-primary/[0.05] transition-colors">{booking.bookingId}</TableCell>
-                        <TableCell>
-                          <div className="font-extrabold text-sm flex items-center group-hover:text-primary transition-colors mb-1">
-                            {booking.customerName}
-                          </div>
-                          <div className="flex flex-col space-y-1">
-                             <span className="flex items-center justify-between text-xs font-bold text-foreground">
-                               <div className="flex items-center">
-                                 <Phone className="h-3 w-3 mr-2 text-primary shadow-sm" />
-                                 {booking.customerPhone}
-                               </div>
-                               {booking.customerPhone && (
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 ml-2 hover:bg-primary/10 transition-colors" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
-                                    <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={16} height={16} />
-                                    <span className="sr-only">Chat on WhatsApp</span>
-                                  </Button>
-                                )}
-                             </span>
-                             <span className="flex items-center text-xs font-bold text-foreground break-all">
-                               <Mail className="h-3 w-3 mr-2 text-primary shadow-sm" />
-                               {booking.customerEmail}
-                             </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-extrabold flex items-center text-foreground">
-                            <CalendarDays className="h-3.5 w-3.5 mr-2 text-primary" />
-                            {formatDateForDisplay(booking.scheduledDate)}
-                          </div>
-                          <div className="text-sm font-bold text-foreground flex items-center mt-1">
-                            <Clock className="h-3.5 w-3.5 mr-2 text-primary" />
-                            {booking.scheduledTimeSlot}
-                          </div>
-                          {booking.estimatedEndTime && (
-                            <div className="text-[10px] text-green-700 font-black flex items-center mt-2 bg-green-100/50 px-2 py-1 rounded border border-green-200 w-fit shadow-sm">
-                              <History className="h-3 w-3 mr-1.5 text-green-600" />
-                              Ends: {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="max-w-[220px]">
-                           <div className="text-xs font-bold text-foreground bg-muted/40 group-hover:bg-muted/60 px-3 py-2 rounded-lg border border-muted transition-colors leading-relaxed">
-                             {booking.services.map(s => s.name).join(', ')}
-                           </div>
-                        </TableCell>
-                        <TableCell className="text-right pr-6">
-                          <div className="font-black text-lg text-foreground flex items-center justify-end tracking-tight">
-                             <IndianRupee className="h-4 w-4 mr-0.5 text-green-600" />
-                             {booking.totalAmount.toLocaleString()}
-                          </div>
-                          <div className="text-xs font-extrabold text-foreground mt-1 flex items-center justify-end">
-                             <Tag className="h-3 w-3 mr-1.5 text-primary" />
-                             {booking.paymentMethod}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {/* Actions Row */}
-                      <TableRow className="bg-muted/5 group-hover:bg-primary/[0.01] border-b-2 transition-colors">
-                        <TableCell colSpan={6} className="py-4 px-4">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              {booking.providerId ? (
-                                <>
-                                  <Button 
-                                    variant="default" 
-                                    size="sm" 
-                                    className="h-10 text-xs font-bold bg-muted/30 text-foreground border border-border/40 shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl px-4"
-                                    onClick={() => openAssignModal(booking)}
-                                    disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}
-                                  >
-                                    <Users className="mr-1.5 h-4 w-4" /> Reassign
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button 
-                                        variant="destructive" 
-                                        size="sm" 
-                                        className="h-10 text-xs font-bold bg-red-50 text-red-600 border border-red-100 shadow-sm hover:bg-red-600 hover:text-white transition-all duration-300 rounded-xl px-4"
-                                        disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}
-                                      >
-                                        <XIcon className="mr-1.5 h-4 w-4" /> Unassign
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader><AlertDialogTitle>Confirm Unassign</AlertDialogTitle><AlertDialogDescription>Are you sure you want to unassign the provider from booking {booking.bookingId}?</AlertDialogDescription></AlertDialogHeader>
-                                      <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignProvider(booking.id!)} className="bg-destructive hover:bg-destructive/90">Yes, Unassign</AlertDialogAction></AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </>
-                              ) : (booking.status === "Confirmed" || booking.status === "Pending Payment" || booking.status === "Rescheduled") ? (
-                                <Button 
-                                  variant="default" 
-                                  size="sm" 
-                                  className="h-10 text-xs font-bold bg-muted/30 text-foreground border border-border/40 shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl px-4"
-                                  onClick={() => openAssignModal(booking)}
-                                  disabled={isUpdatingStatus === booking.id || isLoadingAppSettings || isAssignModalOpen}
-                                >
-                                  <UserCheck2 className="mr-1.5 h-4 w-4" /> Assign Provider
-                                </Button>
-                              ) : <span className="text-[10px] px-3 text-muted-foreground italic py-1">No Provider Actions</span>}
-                            </div>
-
-                            <Separator orientation="vertical" className="h-6 mx-1 hidden lg:block" />
-
-                            {/* Status Group */}
-                            <div className="w-[180px]">
-                              <Select 
-                                value={booking.status} 
-                                onValueChange={(newStatus) => handleStatusChange(booking, newStatus as BookingStatus)} 
-                                disabled={isUpdatingStatus === booking.id || isLoadingAppSettings}
-                              >
-                                <SelectTrigger className="h-10 text-xs bg-background shadow-md border-muted px-2 rounded-xl">
-                                  <div className="flex-1 flex justify-center">
-                                    <Badge variant={getStatusBadgeVariant(booking.status)} className={`capitalize px-3 py-0.5 font-bold shadow-sm ${getStatusBadgeClass(booking.status)}`}>
-                                      {isUpdatingStatus === booking.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : booking.status}
-                                    </Badge>
-                                  </div>
-                                </SelectTrigger>
-                                <SelectContent className="max-h-[300px]">
-                                  {statusOptions.map(status => (<SelectItem key={status} value={status} className="text-xs">{status}</SelectItem>))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="flex-grow" />
-
-                            {/* Utility Icons */}
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-10 px-4 text-xs bg-muted/30 text-foreground border border-border/40 font-bold shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl"
-                                onClick={() => handleViewDetails(booking)} 
-                              >
-                                <Eye className="h-4 w-4 mr-2" /> Details
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-10 px-4 text-xs bg-muted/30 text-foreground border border-border/40 font-bold shadow-sm hover:bg-primary hover:text-primary-foreground transition-all duration-300 rounded-xl"
-                                onClick={() => handleEditBooking(booking.id!)} 
-                                disabled={isDeleting === booking.id || !booking.id}
-                              >
-                                <Edit className="h-4 w-4 mr-2" /> Edit
-                              </Button>
-
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button 
-                                    variant="destructive" 
-                                    size="icon" 
-                                    className="h-10 w-10 bg-red-50 text-red-600 border border-red-100 shadow-sm hover:bg-red-600 hover:text-white transition-all duration-300 rounded-xl"
-                                    disabled={isDeleting === booking.id || !booking.id}
-                                  >
-                                    {isDeleting === booking.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will permanently delete <span className="font-bold text-foreground">{booking.bookingId}</span>. This action is irreversible.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      onClick={() => handleDeleteBooking(booking.id!)} 
-                                      className="bg-destructive hover:bg-destructive/90"
-                                    >
-                                      Yes, delete booking
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                  {filteredBookings.map((b) => (
+                    <React.Fragment key={b.id}>
+                      <TableRow className="hover:bg-transparent border-b-0"><TableCell className="font-mono text-xs font-bold text-primary">{b.bookingId}</TableCell><TableCell><div className="font-bold">{b.customerName}</div><div className="flex items-center gap-1.5 mt-0.5"><span className="text-xs text-muted-foreground">{b.customerPhone}</span>{b.customerPhone && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-primary/10" onClick={() => handleWhatsAppClick(b)} title="WhatsApp"><AppImage src="/whatsapp.png" alt="WA" width={14} height={14} /></Button>)}</div></TableCell><TableCell><div className="text-sm font-bold">{formatDateForDisplay(b.scheduledDate)}</div><div className="text-xs">{b.scheduledTimeSlot}</div>{b.estimatedEndTime && (<div className="text-[10px] font-black flex items-center mt-1 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit"><History className="h-3 w-3 mr-1" />Ends: {new Date(b.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(b.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>)}</TableCell>
+                      <TableCell><Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter shadow-sm", getPaymentBadgeClass(b.paymentMethod, b.status))}>{getPaymentLabel(b.paymentMethod, b.status)}</Badge></TableCell>
+                      <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
+<TableCell className="text-right pr-6 font-black text-lg">{b.totalAmount.toLocaleString()}</TableCell></TableRow>
+                      <TableRow className="bg-muted/5 border-b-2"><TableCell colSpan={5} className="py-3 px-4"><div className="flex flex-wrap items-center gap-3"><Select value={b.status} onValueChange={(s) => handleStatusChange(b, s as BookingStatus)} disabled={isUpdatingStatus === b.id}><SelectTrigger className="h-9 w-44 bg-background font-bold text-xs shadow-sm"><Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge></SelectTrigger><SelectContent>{statusOptions.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent></Select><Button variant="default" size="sm" className="h-9 px-4 font-bold shadow-sm" onClick={() => { setBookingToAssign(b); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(b.status)}><Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}</Button><Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button><Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => router.push(`/admin/bookings/edit/${b.id}`)}>Edit</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === b.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete?</AlertDialogTitle><AlertDialogDescription>Remove #{b.bookingId}?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(b.id!)} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></TableCell></TableRow>
                     </React.Fragment>
                   ))}
-                </TableBody>
-                </Table>
-              </div>
-              
-              {/* Mobile View */}
-              <div className="md:hidden p-4 space-y-4 bg-muted/5">
-                {filteredBookings.map(renderBookingCard)}
-              </div>
+                </TableBody></Table>
+              </div><div className="md:hidden p-4 space-y-4">{filteredBookings.map(renderBookingCard)}</div>
+              {hasMore && !searchTerm && (<div className="p-6 text-center border-t"><Button variant="outline" onClick={loadMoreBookings} disabled={isLoadingMore}>Load More</Button></div>)}
             </>
-          )}
-        </CardContent>
-      </Card>
+          )}</CardContent></Card>
 
-      {selectedBooking && (<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}><DialogContent className="max-w-3xl w-[90vw] max-h-[90vh] flex flex-col p-0"><DialogHeader className="p-6 pb-4 border-b"><DialogTitle className="text-xl">Booking Details: {selectedBooking.bookingId}</DialogTitle><DialogDescription>Review complete information for this booking.</DialogDescription></DialogHeader><div className="overflow-y-auto flex-grow p-6"><BookingDetailsModalContent booking={selectedBooking} /></div><div className="p-6 border-t flex justify-end"><DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose></div></DialogContent></Dialog>)}
-      <Dialog open={isPaymentMethodDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setSelectedBookingForPaymentUpdate(null); setPaymentReceivedMethodForDialog(""); } setIsPaymentMethodDialogOpen(isOpen); }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirm Payment for Booking</DialogTitle><DialogDescription>Booking ID: <span className="font-semibold">{selectedBookingForPaymentUpdate?.bookingId}</span><br />Select the method used to receive payment. This will mark the booking as "Completed".</DialogDescription></DialogHeader><div className="py-4 space-y-3"><Label>Payment Received Via:</Label><RadioGroup value={paymentReceivedMethodForDialog} onValueChange={setPaymentReceivedMethodForDialog}>{receivedPaymentMethods.map(method => (<div key={method} className="flex items-center space-x-2"><RadioGroupItem value={method} id={`payment-method-${method.toLowerCase().replace(/\s+/g, '-')}`} /><Label htmlFor={`payment-method-${method.toLowerCase().replace(/\s+/g, '-')}`}>{method}</Label></div>))}</RadioGroup></div><DialogFooter className="mt-2"><Button variant="outline" onClick={() => { setIsPaymentMethodDialogOpen(false); setSelectedBookingForPaymentUpdate(null); setPaymentReceivedMethodForDialog(""); }}>Cancel</Button><Button onClick={handleConfirmPaymentAndUpdateStatus} disabled={!paymentReceivedMethodForDialog || isUpdatingStatus === selectedBookingForPaymentUpdate?.id || isLoadingAppSettings}>{(isUpdatingStatus === selectedBookingForPaymentUpdate?.id || isLoadingAppSettings) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm & Complete Booking</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={isRescheduleDialogOpen} onOpenChange={(open) => { if (!open) { setSelectedBookingForReschedule(null); setRescheduleDate(undefined); setRescheduleSelectedTimeSlot(undefined); setRescheduleAvailableTimeSlots([]); } setIsRescheduleDialogOpen(open); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Reschedule Booking: {selectedBookingForReschedule?.bookingId}</DialogTitle><DialogDescription>Select a new date and time for this booking. Current: {selectedBookingForReschedule ? formatDateForDisplay(selectedBookingForReschedule.scheduledDate) : ''} at {selectedBookingForReschedule?.scheduledTimeSlot}.</DialogDescription></DialogHeader><div className="py-4 space-y-4"><div><Label htmlFor="reschedule-calendar" className="block mb-2 font-medium">New Date</Label><Calendar mode="single" selected={rescheduleDate} onSelect={handleRescheduleDateSelect} className="rounded-md border mx-auto" disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} id="reschedule-calendar"/></div>{rescheduleDate && (<div><Label className="block mb-2 font-medium">Available Time Slots for {rescheduleDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</Label>{isLoadingRescheduleSlots ? (<div className="flex items-center justify-center py-2"><Loader2 className="h-5 w-5 animate-spin mr-2"/> Fetching slots...</div>) : rescheduleAvailableTimeSlots.length > 0 ? (<RadioGroup value={rescheduleSelectedTimeSlot} onValueChange={setRescheduleSelectedTimeSlot} className="grid grid-cols-2 sm:grid-cols-3 gap-2">{rescheduleAvailableTimeSlots.map(slot => (<Label key={slot} htmlFor={`slot-${slot}`} className={`flex items-center justify-center space-x-2 border rounded-md p-2 hover:bg-accent/50 cursor-pointer ${rescheduleSelectedTimeSlot === slot ? 'bg-primary text-primary-foreground border-primary ring-1 ring-primary' : 'border-input bg-background'}`}><RadioGroupItem value={slot} id={`slot-${slot}`} className="border-muted-foreground data-[state=checked]:border-primary-foreground" /><span className="text-xs">{slot}</span></Label>))}</RadioGroup>) : (<p className="text-sm text-muted-foreground text-center py-2">No slots available for this date.</p>)}</div>)}</div><DialogFooter><Button variant="outline" onClick={() => setIsRescheduleDialogOpen(false)}>Cancel</Button><Button onClick={handleConfirmReschedule} disabled={!rescheduleDate || !rescheduleSelectedTimeSlot || isLoadingRescheduleSlots || isUpdatingStatus === selectedBookingForReschedule?.id}>{(isUpdatingStatus === selectedBookingForReschedule?.id || isLoadingRescheduleSlots) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm Reschedule</Button></DialogFooter></DialogContent></Dialog>
-      
-      {bookingToAssign && (
-        <AssignProviderModal
-            isOpen={isAssignModalOpen}
-            onClose={() => { setIsAssignModalOpen(false); setBookingToAssign(null); }}
-            booking={bookingToAssign}
-            onAssignConfirm={handleConfirmAssignment}
-        />
-      )}
+      {selectedBooking && (<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}><DialogContent className="max-w-3xl w-[90vw] max-h-[90vh] flex flex-col p-0"><DialogHeader className="p-6 pb-4 border-b"><DialogTitle>Details: {selectedBooking.bookingId}</DialogTitle></DialogHeader><div className="overflow-y-auto flex-grow p-6"><BookingDetailsModalContent booking={selectedBooking} /></div><div className="p-6 border-t flex justify-end"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></div></DialogContent></Dialog>)}
+      {bookingToAssign && (<AssignProviderModal isOpen={isAssignModalOpen} onClose={() => { setIsAssignModalOpen(false); setBookingToAssign(null); }} booking={bookingToAssign} onAssignConfirm={handleConfirmAssignment} />)}
+      {bookingToComplete && (<CompleteBookingDialog isOpen={isCompleteDialogOpen} onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }} onConfirm={(charges, pMethod) => handleStatusChange(bookingToComplete, 'Completed', charges, pMethod)} originalAmount={bookingToComplete.totalAmount} currentPaymentMethod={bookingToComplete.paymentMethod || "Cash"} isProcessing={isUpdatingStatus === bookingToComplete.id} />)}
     </div>
   );
 }

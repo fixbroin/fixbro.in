@@ -1,6 +1,4 @@
 
-"use client";
-
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
 import type { UserOptions, CellWidthType } from 'jspdf-autotable';
@@ -125,6 +123,21 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
     });
   }
 
+  if (booking.additionalCharges && booking.additionalCharges.length > 0) {
+    const feeStartIdx = booking.services.length + (booking.appliedPlatformFees?.length || 0);
+    booking.additionalCharges.forEach((charge, index) => {
+      body.push([
+        feeStartIdx + index + 1,
+        charge.name + " (Extra Service/Part)",
+        1,
+        charge.amount.toFixed(2),
+        "0.0%",
+        "0.00",
+        charge.amount.toFixed(2),
+      ]);
+    });
+  }
+
   doc.autoTable({
     head: head, body: body, startY: startYCustomer + 10, theme: 'striped',
     headStyles: { fillColor: [70, 160, 162] }, columnStyles: tableColumnStyles,
@@ -155,6 +168,15 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
   if (totalBasePlatformFees > 0) {
     finalY += 6;
     drawRightAlignedText("Platform Fees (Base):", `+ Rs. ${totalBasePlatformFees.toFixed(2)}`, finalY);
+  }
+
+  // ✅ Additional Charges (On-Site) summary support
+  if (booking.additionalCharges && booking.additionalCharges.length > 0) {
+    const extraTotal = booking.additionalCharges.reduce((sum, c) => sum + c.amount, 0);
+    if (extraTotal > 0) {
+      finalY += 6;
+      drawRightAlignedText("Additional Charges:", `+ Rs. ${extraTotal.toFixed(2)}`, finalY);
+    }
   }
 
   finalY += 6;

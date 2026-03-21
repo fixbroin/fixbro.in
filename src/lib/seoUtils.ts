@@ -4,36 +4,36 @@ import type { FirestoreSEOSettings } from '@/types/firestore';
 // Define default SEO values
 export const defaultSeoValues: FirestoreSEOSettings = {
   siteName: 'FixBro – Trusted Home Services',
-  defaultMetaTitleSuffix: ' - FixBro',
-  defaultMetaDescription: 'Book trusted home services near you with FixBro. Hire professional carpenters, electricians, plumbers, painters, and handyman experts.',
+  defaultMetaTitleSuffix: ' | FixBro',
+  defaultMetaDescription: 'FixBro provides top-rated home services including carpentry, electrical, plumbing, painting, and more. Book professional experts near you.',
   defaultMetaKeywords: 'fixbro, home services near me, handyman services, carpenter near me, electrician near me',
-  homepageMetaTitle: 'FixBro – Trusted Home Services Near You',
-  homepageMetaDescription: 'FixBro helps you book trusted home services including carpentry, electrical, plumbing, painting, and installations.',
-  homepageMetaKeywords: 'fixbro, home services, handyman near me',
-  homepageH1: 'Trusted Home Services Near You',
-  categoryPageTitlePattern: '#1 {{categoryName}} Services | Professional & Trusted | FixBro',
-  categoryPageDescriptionPattern: 'Book top-rated {{categoryName}} services. Professional, reliable, and background-verified experts at your doorstep. Get a free quote today!',
-  categoryPageKeywordsPattern: '{{categoryName}}, {{categoryName}} services, home {{categoryName}}',
-  categoryPageH1Pattern: 'Best {{categoryName}} Services',
-  cityCategoryPageTitlePattern: '#1 {{categoryName}} Services in {{cityName}} | Top-Rated Experts | FixBro',
-  cityCategoryPageDescriptionPattern: 'Searching for the best {{categoryName}} services in {{cityName}}? FixBro provides professional and affordable {{categoryName}} experts. Book now for a hassle-free experience!',
-  cityCategoryPageKeywordsPattern: '{{categoryName}} {{cityName}}, {{categoryName}} services in {{cityName}}, best {{categoryName}} {{cityName}}',
-  cityCategoryPageH1Pattern: 'Top-Rated {{categoryName}} Services in {{cityName}}',
-  areaCategoryPageTitlePattern: '#1 {{categoryName}} Services in {{areaName}}, {{cityName}} | Professional Experts | FixBro',
-  areaCategoryPageDescriptionPattern: 'Looking for {{categoryName}} in {{areaName}}, {{cityName}}? Get professional and reliable {{categoryName}} services from FixBro. Trusted by thousands. Book your service today!',
-  areaCategoryPageKeywordsPattern: '{{categoryName}} {{areaName}}, {{categoryName}} {{areaName}} {{cityName}}, best {{categoryName}} in {{areaName}}',
-  areaCategoryPageH1Pattern: 'Professional {{categoryName}} Services in {{areaName}}, {{cityName}}',
-  servicePageTitlePattern: '{{serviceName}} in {{cityName}} | Professional & Guaranteed | FixBro',
-  servicePageDescriptionPattern: 'Get professional {{serviceName}} from FixBro. Background-verified experts, transparent pricing, and 100% satisfaction guaranteed. Book your service in {{cityName}} now!',
-  servicePageKeywordsPattern: '{{serviceName}}, {{categoryName}}, {{serviceName}} service',
-  servicePageH1Pattern: '{{serviceName}}',
-  areaPageTitlePattern: 'Best Home Services in {{areaName}}, {{cityName}} | #1 Trusted Experts | FixBro',
-  areaPageDescriptionPattern: 'Top-rated home services in {{areaName}}, {{cityName}}. From plumbing to carpentry, get background-verified experts at FixBro. Quality guaranteed. Book now!',
-  areaPageKeywordsPattern: '{{areaName}} home services, services in {{areaName}} {{cityName}}',
+  homepageMetaTitle: 'FixBro – Best Professional Home Services Near You',
+  homepageMetaDescription: 'FixBro helps you book the best trusted home services including carpentry, electrical, plumbing, painting, and installations. Professional experts near you.',
+  homepageMetaKeywords: 'fixbro, home services, handyman near me, best professional home services',
+  homepageH1: 'Best Professional Home Services Near You',
+  categoryPageTitlePattern: 'Best {{categoryName}} Services Near Me | Professional {{categoryName}} | FixBro',
+  categoryPageDescriptionPattern: 'Looking for the best {{categoryName}} services? Book professional {{categoryName}} experts near you for high-quality home maintenance and repairs.',
+  categoryPageKeywordsPattern: 'best {{categoryName}} near me, professional {{categoryName}} services, {{categoryName}} experts, home {{categoryName}}',
+  categoryPageH1Pattern: 'Professional {{categoryName}} Services',
+  cityCategoryPageTitlePattern: 'Best {{categoryName}} Services in {{cityName}} | Professional {{categoryName}} Near Me',
+  cityCategoryPageDescriptionPattern: 'Hire the best {{categoryName}} services in {{cityName}}. Our professional {{categoryName}} experts provide reliable and affordable home solutions in {{cityName}}.',
+  cityCategoryPageKeywordsPattern: '{{categoryName}} in {{cityName}}, {{categoryName}} services {{cityName}}, best {{categoryName}} near me, professional {{categoryName}} {{cityName}}',
+  cityCategoryPageH1Pattern: 'Best {{categoryName}} Services in {{cityName}}',
+  areaCategoryPageTitlePattern: 'Top-Rated {{categoryName}} in {{areaName}}, {{cityName}} | Expert {{categoryName}} Near Me',
+  areaCategoryPageDescriptionPattern: 'Need a professional {{categoryName}} in {{areaName}}, {{cityName}}? Book top-rated experts for all your {{categoryName}} needs near you.',
+  areaCategoryPageKeywordsPattern: '{{categoryName}} {{areaName}}, {{categoryName}} in {{areaName}} {{cityName}}, best {{categoryName}} {{areaName}}',
+  areaCategoryPageH1Pattern: 'Expert {{categoryName}} Services in {{areaName}}, {{cityName}}',
+  servicePageTitlePattern: '{{serviceName}} | Best Professional {{categoryName}} in {{cityName}}',
+  servicePageDescriptionPattern: 'Book professional {{serviceName}} in {{cityName}}. Expert {{categoryName}} solutions with trusted professionals and transparent pricing.',
+  servicePageKeywordsPattern: '{{serviceName}}, {{categoryName}} {{cityName}}, book {{serviceName}} online',
+  servicePageH1Pattern: 'Professional {{serviceName}}',
+  areaPageTitlePattern: 'Best Home Services in {{areaName}}, {{cityName}} | Trusted Professionals Near Me',
+  areaPageDescriptionPattern: 'Looking for reliable home services in {{areaName}}, {{cityName}}? FixBro provides top-rated professionals for all your home repair and maintenance needs.',
+  areaPageKeywordsPattern: 'home services in {{areaName}}, handyman {{areaName}} {{cityName}}, home repair {{areaName}}',
   areaPageH1Pattern: 'Trusted Home Services in {{areaName}}, {{cityName}}',
-  cityPageTitlePattern: '#1 Home Services in {{cityName}} | Professional & Reliable | FixBro',
-  cityPageDescriptionPattern: 'Book professional home services in {{cityName}}. FixBro offers trusted experts for all your home maintenance needs. Affordable prices, verified pros. Book today!',
-  cityPageKeywordsPattern: 'home services {{cityName}}, best services in {{cityName}}, FixBro {{cityName}}',
+  cityPageTitlePattern: 'Best Professional Home Services in {{cityName}} | Top-Rated Handyman Near Me',
+  cityPageDescriptionPattern: 'FixBro provides the best professional home services in {{cityName}}. Book top-rated experts for carpentry, electrical, plumbing, and more in {{cityName}}.',
+  cityPageKeywordsPattern: 'home services {{cityName}}, best handyman {{cityName}}, professional home repair {{cityName}}',
   cityPageH1Pattern: 'Professional Home Services in {{cityName}}',
   structuredDataType: 'LocalBusiness',
   structuredDataName: 'FixBro',
@@ -53,16 +53,25 @@ export const defaultSeoValues: FirestoreSEOSettings = {
   },
 };
 
-export function replacePlaceholders(template?: string, data?: Record<string, string | undefined>): string {
+/**
+ * Utility to replace placeholders in a string.
+ * @param template The string with placeholders like {{name}}
+ * @param data An object containing values for the placeholders
+ * @returns The string with placeholders replaced
+ */
+export function replacePlaceholders(
+  template: string | undefined | null,
+  data: Record<string, string | number | undefined | null>
+): string {
   if (!template) return '';
-  if (!data) return template;
+  
   let result = template;
   try {
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         const placeholderValue = data[key];
         if (placeholderValue !== undefined && placeholderValue !== null) {
-          result = result.replace(new RegExp(`{{${key}}}`, 'g'), String(placeholderValue));
+           result = result.replace(new RegExp(`{{${key}}}`, 'g'), String(placeholderValue));
         } else {
            result = result.replace(new RegExp(`{{${key}}}`, 'g'), '');
         }
