@@ -20,7 +20,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 const reviewStatusOptions: ReviewStatus[] = ["Pending", "Approved", "Rejected", "Flagged"];
 
-const formatReviewTimestamp = (timestamp?: any): string => {
+const formatReviewTimestamp = (timestamp?: unknown): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
   return formatDistanceToNow(new Date(millis), { addSuffix: true });
@@ -135,10 +135,14 @@ export default function AdminReviewsPage() {
   };
 
   const filteredReviews = useMemo(() => {
-    if (filterStatus === "All") {
-      return reviews;
-    }
-    return reviews.filter(review => review.status === filterStatus);
+    const base = filterStatus === "All" ? reviews : reviews.filter(review => review.status === filterStatus);
+    
+    // Explicitly sort by createdAt descending to ensure most recent is always first
+    return [...base].sort((a, b) => {
+      const aTime = getTimestampMillis(a.createdAt);
+      const bTime = getTimestampMillis(b.createdAt);
+      return bTime - aTime;
+    });
   }, [reviews, filterStatus]);
 
   const handleDeleteReview = async (reviewId: string) => {
@@ -294,7 +298,7 @@ export default function AdminReviewsPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will permanently delete the review by "{review.userName}" for "{review.serviceName}".
+                                  This will permanently delete the review by &quot;{review.userName}&quot; for &quot;{review.serviceName}&quot;.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
