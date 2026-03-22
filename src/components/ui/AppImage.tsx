@@ -18,7 +18,7 @@ interface AppImageProps {
   aiHint?: string
   fallbackSrc?: string
   loading?: "eager" | "lazy"
-  onError?: (event: any) => void
+  onError?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void
   unoptimized?: boolean
 }
 
@@ -46,7 +46,7 @@ export default function AppImage({
   const isDefaultImage = !src || error
   const imageSrc = isDefaultImage ? (fallbackSrc || "/default-image.png") : src
 
-  const handleOnError = (e: any) => {
+  const handleOnError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setError(true);
     if (onError) onError(e);
   };

@@ -73,7 +73,7 @@ export default function AdminReportsPage() {
       }
 
       let newTotalRevenue = 0;
-      let newTotalBookings = fetchedBookings.length;
+      const newTotalBookings = fetchedBookings.length;
       let newCompletedBookings = 0;
       let newActiveBookings = 0;
       const monthlyBookingsData: { [key: string]: { monthYear: string; bookings: number } } = {};

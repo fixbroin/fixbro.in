@@ -22,7 +22,7 @@ const DynamicManifest = () => {
     }
 
     // Find the existing manifest link
-    let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+    const manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
 
     if (manifestLink) {
       // If the path is already correct, do nothing

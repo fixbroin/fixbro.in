@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
       form.reset(); 
     } catch (error: any) {
       console.error("Forgot password error:", error);
-      let errorMessage = "Could not send password reset email. Please try again.";
+      const errorMessage = "Could not send password reset email. Please try again.";
       if (error.code === 'auth/user-not-found') {
         console.warn("Attempt to reset password for non-existent user:", data.email);
         toast({

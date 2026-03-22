@@ -152,7 +152,7 @@ export default function SchedulePage() {
                 });
 
                 setIsSearchingForNextDay(true);
-                let nextDay = new Date(selectedDate);
+                const nextDay = new Date(selectedDate);
                 let found = false;
 
                 // Small delay before searching and showing next toast to let user process the first one

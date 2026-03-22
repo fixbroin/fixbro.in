@@ -182,7 +182,7 @@ export const getDashboardData = unstable_cache(
 export const getArchivedBookings = unstable_cache(
   async (): Promise<FirestoreBooking[]> => {
     try {
-      let q = adminDb.collection('bookings').orderBy('createdAt', 'desc');
+      const q = adminDb.collection('bookings').orderBy('createdAt', 'desc');
       
       const offset = 10;
       const snapshot = await q.offset(offset).limit(50).get();
@@ -203,7 +203,7 @@ export const getArchivedBookings = unstable_cache(
 export const getArchivedUsers = unstable_cache(
   async (): Promise<FirestoreUser[]> => {
     try {
-      let q = adminDb.collection('users').orderBy('createdAt', 'desc');
+      const q = adminDb.collection('users').orderBy('createdAt', 'desc');
       
       const offset = 20;
       const snapshot = await q.offset(offset).limit(50).get();

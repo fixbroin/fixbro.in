@@ -142,7 +142,7 @@ export default function MyBookingsPage() {
 
       // Enrich bookings with provider details AND service images if missing
       const enrichedPromises = fetchedBookings.map(async (booking): Promise<EnrichedBooking> => {
-        let enrichedBooking: EnrichedBooking = { ...booking };
+        const enrichedBooking: EnrichedBooking = { ...booking };
 
         // 1. Fetch Provider Details
         if (booking.providerId) {

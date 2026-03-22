@@ -16,7 +16,6 @@ const InjectRawHtml: React.FC<InjectRawHtmlProps> = ({ htmlContent }) => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // This component should only render on the client side to interact with the DOM.
     setIsClient(true);
   }, []);
 

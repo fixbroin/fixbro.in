@@ -48,7 +48,7 @@ const getPriceForNthUnit = (service: CartItem, n: number): number => {
 
   const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
 
-  let applicableTier = sortedVariants.find(tier => {
+  const applicableTier = sortedVariants.find(tier => {
     const start = tier.fromQuantity;
     const end = tier.toQuantity ?? Infinity;
     return n >= start && n <= end;

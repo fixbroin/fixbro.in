@@ -19,7 +19,7 @@ const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
       return service.discountedPrice ?? service.price;
     }
     const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
-    let applicableTier = sortedVariants.find(tier => {
+    const applicableTier = sortedVariants.find(tier => {
       const start = tier.fromQuantity;
       const end = tier.toQuantity ?? Infinity;
       return n >= start && n <= end;

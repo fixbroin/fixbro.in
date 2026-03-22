@@ -51,7 +51,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   }, [service.id]);
 
   const updateCartAndShowToast = (newQuantity: number, action: 'added' | 'updated' | 'removed') => {
-    let cartEntries = getCartEntries();
+    const cartEntries = getCartEntries();
     const existingEntryIndex = cartEntries.findIndex(entry => entry.serviceId === service.id);
 
     if (newQuantity > 0) {

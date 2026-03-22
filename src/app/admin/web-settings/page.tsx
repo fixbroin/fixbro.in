@@ -347,7 +347,7 @@ export default function WebSettingsPage() {
     const originalDbUrl = originalGlobalSettings[currentDbUrlKey] as string | undefined;
     const currentManualUrl = globalSettings[currentDbUrlKey] as string | undefined;
     let finalImageUrl = currentManualUrl || "";
-    let finalImageHint = hintKey ? (generalInfoForm.getValues(hintKey) || "") : undefined;
+    const finalImageHint = hintKey ? (generalInfoForm.getValues(hintKey) || "") : undefined;
 
 
     try {
@@ -408,8 +408,8 @@ export default function WebSettingsPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, assetType: 'logo' | 'favicon' | 'websiteIcon') => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      let maxSizeMB = assetType === 'logo' ? 2 : (assetType === 'favicon' ? 0.5 : 1);
-      let expectedTypes = assetType === 'favicon' ? ["image/x-icon", "image/png", "image/svg+xml"] : ["image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"];
+      const maxSizeMB = assetType === 'logo' ? 2 : (assetType === 'favicon' ? 0.5 : 1);
+      const expectedTypes = assetType === 'favicon' ? ["image/x-icon", "image/png", "image/svg+xml"] : ["image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"];
       
       if (!expectedTypes.includes(file.type)) {
         toast({ title: "Invalid File Type", description: `Please select a valid image type (${expectedTypes.join(', ')}).`, variant: "destructive"});

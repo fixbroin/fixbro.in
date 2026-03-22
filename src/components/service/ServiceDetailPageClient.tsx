@@ -62,7 +62,7 @@ const getPriceForNthUnit = (service: FirestoreService | ClientServiceData, n: nu
 
   const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
 
-  let applicableTier = sortedVariants.find(tier => {
+  const applicableTier = sortedVariants.find(tier => {
     const start = tier.fromQuantity;
     const end = tier.toQuantity ?? Infinity;
     return n >= start && n <= end;
@@ -360,7 +360,7 @@ export default function ServiceDetailPageClient({
 
   const updateCartAndShowToast = (newQuantity: number, action: 'added' | 'updated' | 'removed') => {
     if (!service) return;
-    let cartEntries = getCartEntries();
+    const cartEntries = getCartEntries();
     const existingEntryIndex = cartEntries.findIndex(entry => entry.serviceId === service.id);
     const oldQuantity = existingEntryIndex > -1 ? cartEntries[existingEntryIndex].quantity : 0;
     

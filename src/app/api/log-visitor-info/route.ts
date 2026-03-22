@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const headersList = await headers();
     const forwardedFor = headersList.get('x-forwarded-for');
     const realIp = headersList.get('x-real-ip');
-    let userIp = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || 'unknown');
+    const userIp = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || 'unknown');
 
     // 2. Fetch Geo-data from Server side (More reliable)
     let geoData = {

@@ -10,9 +10,9 @@ const THEME_STORAGE_KEY = 'fixbro-theme';
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null); // Start with null to indicate loading
 
-  // Effect to set initial theme from localStorage
+  // Effect to set initial theme from localStorage and apply it
   useEffect(() => {
-    let initialTheme: 'light' | 'dark' = 'light'; // Fallback default
+    let initialTheme: 'light' | 'dark' = 'light';
     try {
       const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as 'light' | 'dark' | null;
       if (storedTheme === 'light' || storedTheme === 'dark') {
@@ -21,27 +21,29 @@ export default function ThemeToggle() {
     } catch (e) {
       console.warn('ThemeToggle: Error accessing localStorage for initial theme.', e);
     }
-    setTheme(initialTheme);
-  }, []);
-
-  // Effect to apply theme changes to DOM and localStorage
-  useEffect(() => {
-    if (!theme || typeof window === 'undefined') return; // Don't run until initialTheme is loaded
-
-    if (theme === 'dark') {
+    
+    // Apply initial theme to DOM immediately
+    if (initialTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    
+    setTheme(initialTheme);
+  }, []);
+
+  // Effect to apply theme changes to DOM and localStorage after user interaction
+  useEffect(() => {
+    if (!theme || typeof window === 'undefined') return;
+
+    const isDarkMode = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    
     try {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch (e) {
-      console.warn('ThemeToggle: Error writing theme to localStorage.', e);
-    }
-    try {
       window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
     } catch (e) {
-      console.warn('ThemeToggle: Error dispatching themeChanged event.', e);
+      console.warn('ThemeToggle: Error syncing theme change.', e);
     }
   }, [theme]);
 

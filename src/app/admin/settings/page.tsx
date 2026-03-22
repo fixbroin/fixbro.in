@@ -153,7 +153,7 @@ export default function AdminSettingsPage() {
   const handleSaveSettings = async (sectionName: string) => {
     setIsSaving(true);
     
-    let settingsToSave: AppSettings = {
+    const settingsToSave: AppSettings = {
       ...defaultAppSettings, 
       ...settings, 
       timeSlotSettings: { 

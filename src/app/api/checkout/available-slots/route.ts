@@ -68,7 +68,7 @@ function calculateEndDateTime(
 ): string {
     let remainingMinutes = workDuration + bufferDuration;
     let currentMinutes = startMinutes;
-    let currentDate = new Date(startDateISO);
+    const currentDate = new Date(startDateISO);
     
     while (remainingMinutes > 0) {
         let dayName = getDayName(currentDate);
@@ -126,7 +126,7 @@ function* simulateProgression(
 ) {
     let remainingMinutesToBlock = workDuration + bufferDuration;
     let currentMinutes = startMinutes;
-    let currentDate = new Date(startDateISO);
+    const currentDate = new Date(startDateISO);
     
     const slotInterval = appConfig.timeSlotSettings?.slotIntervalMinutes || DEFAULT_SLOT_INTERVAL_MINUTES;
 

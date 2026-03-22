@@ -18,7 +18,8 @@ const WhatsAppInputSchema = z.object({
 export type WhatsAppInput = z.infer<typeof WhatsAppInputSchema>;
 
 export async function sendWhatsAppFlow(input: WhatsAppInput): Promise<{ success: boolean; message: string }> {
-    let { to, templateName, parameters } = input;
+    const { templateName, parameters } = input;
+    let { to } = input;
     
     const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
     const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;

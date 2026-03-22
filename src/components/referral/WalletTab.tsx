@@ -69,7 +69,7 @@ export default function WalletTab() {
         
         // This part runs every time either query returns new data
         Promise.all([Promise.all(earnedPromises), getDocs(welcomeBonusQuery)]).then(([earnedBonuses, welcomeSnapshot]) => {
-             let combinedHistory: WalletHistoryItem[] = [...earnedBonuses];
+             const combinedHistory: WalletHistoryItem[] = [...earnedBonuses];
              
              if (!welcomeSnapshot.empty) {
                 const welcomeData = welcomeSnapshot.docs[0].data() as Referral;

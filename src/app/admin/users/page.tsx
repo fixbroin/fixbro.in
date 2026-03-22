@@ -112,7 +112,7 @@ export default function AdminUsersPage() {
           }
           
           const snapShots = await Promise.all(queries.map(q => getDocs(q)));
-          let results: FirestoreUser[] = [];
+          const results: FirestoreUser[] = [];
           snapShots.forEach(snap => {
             snap.docs.forEach(docSnap => {
               results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreUser);

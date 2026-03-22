@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Share, PlusSquare, Smartphone, Monitor, Info } from 'lucide-react';
+import { Download, X, Share, PlusSquare, Smartphone } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import AppImage from '@/components/ui/AppImage';
 import {
@@ -12,7 +12,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 
 // Extend Event type to include PWA-specific properties
@@ -36,8 +35,13 @@ const PwaInstallButton = () => {
   const isMobile = useIsMobile();
   const DISMISS_KEY = 'pwa_install_prompt_dismissed_v2';
 
+  // Handle mounting separately to avoid cascading re-renders during hydration
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
     
     // Check if dismissed before
     if (localStorage.getItem(DISMISS_KEY) === 'true') {
@@ -45,7 +49,10 @@ const PwaInstallButton = () => {
     }
     
     // Check if the app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    
+    if (isStandalone) {
       setIsAppInstalled(true);
     }
 
@@ -53,11 +60,6 @@ const PwaInstallButton = () => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIos(isIosDevice);
-
-  }, []);
-
-  useEffect(() => {
-    if (!isMounted) return;
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();

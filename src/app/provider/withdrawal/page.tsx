@@ -234,7 +234,7 @@ function WithdrawalPageContent() {
                 // Update monthly stats withdrawals
                 const now = new Date();
                 const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                let stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+                const stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
                 if (stats.monthKey === monthKey) {
                     stats.withdrawals = (stats.withdrawals || 0) - editingRequest.amount + data.amount!;
                 }
@@ -272,7 +272,7 @@ function WithdrawalPageContent() {
                 // Update monthly stats withdrawals
                 const now = new Date();
                 const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                let stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+                const stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
                 if (stats.monthKey === monthKey) {
                     stats.withdrawals = (stats.withdrawals || 0) + data.amount!;
                 }

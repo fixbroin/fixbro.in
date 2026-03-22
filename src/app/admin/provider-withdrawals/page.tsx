@@ -217,7 +217,7 @@ export default function ProviderWithdrawalsPage() {
             // Update monthly stats withdrawals
             const now = new Date();
             const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            let stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+            const stats = userDoc.data().monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
             
             // Note: Withdrawals are already added to stats when REQUESTED by provider.
             // If we are completing an OLD request from a previous month, 

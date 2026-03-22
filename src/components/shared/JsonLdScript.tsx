@@ -2,20 +2,22 @@
 "use client";
 
 import Script from 'next/script';
+import { useId } from 'react';
 
 interface JsonLdScriptProps {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   idSuffix?: string; // To make ID more unique if multiple on page
 }
 
 const JsonLdScript: React.FC<JsonLdScriptProps> = ({ data, idSuffix }) => {
+  const reactId = useId();
   if (!data || Object.keys(data).length === 0) {
     return null;
   }
 
   // Generate a base ID, make it more unique if suffix is provided
-  const baseId = `json-ld-${data['@type']?.toLowerCase().replace(/[^a-z0-9]/gi, '') || 'data'}`;
-  const scriptId = idSuffix ? `${baseId}-${idSuffix}` : `${baseId}-${Math.random().toString(36).substring(2, 7)}`;
+  const baseId = `json-ld-${(data['@type'] as string)?.toLowerCase().replace(/[^a-z0-9]/gi, '') || 'data'}`;
+  const scriptId = idSuffix ? `${baseId}-${idSuffix}` : `${baseId}-${reactId.replace(/:/g, '')}`;
 
 
   return (
@@ -23,7 +25,6 @@ const JsonLdScript: React.FC<JsonLdScriptProps> = ({ data, idSuffix }) => {
       id={scriptId}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
-      strategy="beforeInteractive" 
     />
   );
 };

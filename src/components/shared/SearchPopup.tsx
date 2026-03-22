@@ -161,7 +161,7 @@ export default function SearchPopup({ isOpen, onClose }: SearchPopupProps) {
               ) : searchTerm && filteredServices.length === 0 ? (
                 <div className="text-center py-10">
                   <XCircle className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground">No results found for "{searchTerm}".</p>
+                  <p className="text-muted-foreground">No results found for &quot;{searchTerm}&quot;.</p>
                 </div>
               ) : !searchTerm ? (
                  <div className="text-center py-10">

@@ -58,7 +58,7 @@ const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
       return service.discountedPrice ?? service.price;
     }
     const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
-    let applicableTier = sortedVariants.find(tier => {
+    const applicableTier = sortedVariants.find(tier => {
       const start = tier.fromQuantity;
       const end = tier.toQuantity ?? Infinity;
       return n >= start && n <= end;
@@ -295,7 +295,7 @@ export default function PaymentPage() {
     }
     setCalculatedPlatformFees(newCalculatedPlatformFees); setTotalPlatformFeeBaseAmount(totalPlatformFeeBaseAmount); setTotalTaxOnPlatformFees(totalTaxOnPlatformFees);
 
-    let totalItemTaxAmount = newBreakdownItems.reduce((sum, item) => sum + item.taxAmount, 0);
+    const totalItemTaxAmount = newBreakdownItems.reduce((sum, item) => sum + item.taxAmount, 0);
     let visitingChargeTaxAmount = 0; let visitingChargeTaxPercentForBreakdown = 0;
     if (appConfig.enableTaxOnVisitingCharge && calculatedBaseVisitingCharge > 0 && (appConfig.visitingChargeTaxPercent || 0) > 0) {
       visitingChargeTaxAmount = calculatedBaseVisitingCharge * ((appConfig.visitingChargeTaxPercent || 0) / 100);

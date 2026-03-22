@@ -179,7 +179,7 @@ export default function ProviderApplicationDetailsModal({
     
     try {
       const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, application.id);
-      let updatePayload: any = { updatedAt: Timestamp.now() };
+      const updatePayload: any = { updatedAt: Timestamp.now() };
 
       if (docType === 'aadhaar') {
         updatePayload['aadhaar.verified'] = true;

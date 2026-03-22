@@ -131,7 +131,7 @@ export default function AdminBookingsPage() {
             query(bookingsRef, where("customerName", ">=", term), where("customerName", "<=", term + '\uf8ff')),
           ];
           const snapShots = await Promise.all(queries.map(q => getDocs(q)));
-          let results: FirestoreBooking[] = [];
+          const results: FirestoreBooking[] = [];
           snapShots.forEach(snap => snap.docs.forEach(docSnap => results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
           const uniqueResults = Array.from(new Map(results.map(b => [b.id, b])).values());
           setBookings(uniqueResults);

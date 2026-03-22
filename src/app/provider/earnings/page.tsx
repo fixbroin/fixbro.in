@@ -81,10 +81,10 @@ export default function ProviderEarningsPage() {
         
         let totalNetEarnings = 0;
         let totalCashCollected = 0;
-        let totalLifetimePaidOut = 0;
+        const totalLifetimePaidOut = 0;
 
         // Stats for THIS month specifically
-        let mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+        const mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
         
         bookingsSnap.docs.forEach(d => {
             const b = d.data() as FirestoreBooking;

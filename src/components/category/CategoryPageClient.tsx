@@ -274,7 +274,7 @@ export default function CategoryPageClient({
         }
 
         const dynamicBreadcrumbs = initialBreadcrumbItems || (() => {
-            let crumbs: BreadcrumbItem[] = [{ label: "Home", href: "/" }];
+            const crumbs: BreadcrumbItem[] = [{ label: "Home", href: "/" }];
             if (fetchedCityData) crumbs.push({ label: fetchedCityData.name, href: `/${citySlug}` });
             if (fetchedAreaData) crumbs.push({ label: fetchedAreaData.name, href: `/${citySlug}/${areaSlug}`});
             crumbs.push({ label: getOverriddenCategoryName(foundCategory.id, foundCategory.name) });

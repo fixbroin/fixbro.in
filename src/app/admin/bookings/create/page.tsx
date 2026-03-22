@@ -109,7 +109,7 @@ export default function AdminCreateBookingPage() {
           queries.push(query(usersRef, where("mobileNumber", ">=", `+91${term}`), where("mobileNumber", "<=", `+91${term}` + '\uf8ff'), limit(5)));
         }
         const snapShots = await Promise.all(queries.map(q => getDocs(q)));
-        let results: FirestoreUser[] = [];
+        const results: FirestoreUser[] = [];
         snapShots.forEach(snap => snap.docs.forEach(docSnap => results.push({ ...docSnap.data(), uid: docSnap.id } as FirestoreUser)));
         const uniqueResults = Array.from(new Map(results.map(u => [u.uid, u])).values());
         setSearchResults(uniqueResults);
