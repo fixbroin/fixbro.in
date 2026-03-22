@@ -210,7 +210,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   
   const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity);
   
-  const isAvailable = service.maxQuantity === undefined || service.maxQuantity > 0;
+  const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
 
   return (
     <div 

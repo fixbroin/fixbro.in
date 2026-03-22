@@ -96,6 +96,8 @@ const getServiceData = cache(async (slug: string): Promise<ClientServiceData | n
           excludedItems: restOfServiceData.excludedItems,
           allowPayLater: restOfServiceData.allowPayLater,
           serviceFaqs: restOfServiceData.serviceFaqs,
+          hasMinQuantity: restOfServiceData.hasMinQuantity,
+          minQuantity: restOfServiceData.minQuantity,
           metaTitle: restOfServiceData.seo_title, // Map seo_title to metaTitle for ClientServiceData
           metaDescription: restOfServiceData.seo_description,
           metaKeywords: restOfServiceData.seo_keywords,

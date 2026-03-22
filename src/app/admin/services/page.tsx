@@ -219,7 +219,10 @@ export default function AdminServicesPage() {
         await addDoc(servicesCollectionRef, newServicePayload as FirestoreService); // Cast to ensure type compatibility for addDoc
         toast({ title: "Success", description: "Service added successfully." });
       }
-      await triggerRefresh('services'); // SmartSync: Invalidate cache
+      await triggerRefresh('services'); // SmartSync: Invalidate main services cache
+      if (data.slug) {
+        await triggerRefresh(`service-${data.slug}`); // Invalidate specific service page cache
+      }
       setIsFormOpen(false); setEditingService(null); await fetchData();
     } catch (error) {
       console.error("Error saving service: ", error);

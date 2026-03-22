@@ -203,7 +203,7 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
 
   const handleInitialAdd = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    if (service.maxQuantity !== undefined && 1 > service.maxQuantity) {
+    if (service.maxQuantity !== undefined && service.maxQuantity !== null && 1 > service.maxQuantity) {
         toast({ title: "Unavailable", description: `This service is currently not available.`});
         return;
     }
@@ -211,7 +211,7 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
     handleQuantityChange(newQuantity);
   };
 
-  const formatTaskTime = (value?: number, unit?: 'hours' | 'minutes'): string | null => {
+  const formatTaskTime = (value?: number | null, unit?: 'hours' | 'minutes' | null): string | null => {
     if (value === undefined || value === null || !unit) return null;
     if (value <= 0) return null;
     return `${value} ${unit}`;
@@ -284,7 +284,7 @@ const getPriceDisplayInfo = (service: FirestoreService, quantity: number) => {
 
  const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity);
 
-const isAvailable = service.maxQuantity === undefined || service.maxQuantity > 0;
+const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
   
   return (
     <Card onClick={handleClick} className="cursor-pointer h-full flex flex-col hover:shadow-lg transition-shadow ">

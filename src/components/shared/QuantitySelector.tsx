@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast'; // Import useToast
 interface QuantitySelectorProps {
   initialQuantity?: number;
   minQuantity?: number;
-  enforcedMinQuantity?: number; // New prop
-  maxQuantity?: number;
+  enforcedMinQuantity?: number | null; // New prop
+  maxQuantity?: number | null;
   onQuantityChange: (quantity: number) => void;
   className?: string;
 }
@@ -32,10 +32,11 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
   }, [initialQuantity]);
 
   const handleIncrement = () => {
-    if (quantity >= maxQuantity) {
+    const effectiveMax = maxQuantity ?? 99;
+    if (quantity >= effectiveMax) {
       toast({
         title: "Maximum Quantity Reached",
-        description: `You can only add up to ${maxQuantity} units for this service.`,
+        description: `You can only add up to ${effectiveMax} units for this service.`,
         variant: "default",
       });
       return;
@@ -43,8 +44,9 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
     
     // If current is 0 and there's an enforced min, jump to it
     let newQuantity = quantity + 1;
-    if (quantity === 0 && enforcedMinQuantity > 0) {
-      newQuantity = enforcedMinQuantity;
+    const effectiveEnforcedMin = enforcedMinQuantity ?? 0;
+    if (quantity === 0 && effectiveEnforcedMin > 0) {
+      newQuantity = effectiveEnforcedMin;
     }
     
     setQuantity(newQuantity);
@@ -55,7 +57,8 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
     let newQuantity = quantity - 1;
     
     // Logic: If current quantity is equal to enforcedMinQuantity, next step is 0
-    if (enforcedMinQuantity > 0 && quantity <= enforcedMinQuantity) {
+    const effectiveEnforcedMin = enforcedMinQuantity ?? 0;
+    if (effectiveEnforcedMin > 0 && quantity <= effectiveEnforcedMin) {
       newQuantity = 0;
     }
     
@@ -70,17 +73,19 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
       value = minQuantity;
     }
     
-    if (value > maxQuantity) {
-      value = maxQuantity;
+    const effectiveMax = maxQuantity ?? 99;
+    if (value > effectiveMax) {
+      value = effectiveMax;
       toast({
         title: "Maximum Quantity Exceeded",
-        description: `You can only add up to ${maxQuantity} units.`,
+        description: `You can only add up to ${effectiveMax} units.`,
         variant: "default",
       });
     }
 
-    if (value > 0 && enforcedMinQuantity > 0 && value < enforcedMinQuantity) {
-        value = enforcedMinQuantity;
+    const effectiveEnforcedMin = enforcedMinQuantity ?? 0;
+    if (value > 0 && effectiveEnforcedMin > 0 && value < effectiveEnforcedMin) {
+        value = effectiveEnforcedMin;
     }
 
     value = Math.max(minQuantity, value);
@@ -113,7 +118,7 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
             }
         }}
         min={minQuantity}
-        max={maxQuantity}
+        max={maxQuantity ?? undefined}
         aria-label="Quantity"
       />
       <Button
@@ -121,7 +126,7 @@ const QuantitySelector: React.FC<QuantitySelectorProps> = ({
         size="icon"
         className="h-8 w-8"
         onClick={handleIncrement}
-        disabled={quantity >= maxQuantity}
+        disabled={quantity >= (maxQuantity ?? 99)}
         aria-label="Increase quantity"
       >
         <Plus className="h-4 w-4" />

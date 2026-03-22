@@ -229,13 +229,13 @@ export default function AdminCreateBookingPage() {
             name: selectedService.name, 
             quantity: selectedQuantity, 
             pricePerUnit: summary.itemTotal / selectedQuantity, 
-            discountedPricePerUnit: selectedService.discountedPrice, 
+            discountedPricePerUnit: selectedService.discountedPrice ?? undefined, 
             isTaxInclusive: !!selectedService.isTaxInclusive, 
             taxPercentApplied: rate, 
             taxAmountForItem: summary.itemTotal - base,
-            taskTimeValue: selectedService.taskTimeValue,
-            taskTimeUnit: selectedService.taskTimeUnit,
-            shortDescription: selectedService.shortDescription,
+            taskTimeValue: selectedService.taskTimeValue ?? undefined,
+            taskTimeUnit: selectedService.taskTimeUnit ?? undefined,
+            shortDescription: selectedService.shortDescription ?? undefined,
             imageUrl: selectedService.imageUrl
         });
       }

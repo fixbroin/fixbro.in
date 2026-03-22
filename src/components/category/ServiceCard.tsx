@@ -160,7 +160,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                 <AppImage src={displayImageUrl} alt={service.name} fill sizes="112px" className="object-cover rounded-lg" data-ai-hint={aiHintValue} priority={priority} />
             </Link>
             <div className="w-full mt-2">
-                {quantity === 0 ? (<Button size="sm" className="h-9 rounded-md px-4 w-full" onClick={handleInitialAddToCart}><ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add</Button>) : (<QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0}/>)}
+                {quantity === 0 ? (<Button size="sm" className="h-9 rounded-md px-4 w-full" onClick={handleInitialAddToCart}><ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add</Button>) : (<QuantitySelector initialQuantity={quantity} onQuantityChange={handleQuantityChange} minQuantity={0} enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0} maxQuantity={service.maxQuantity}/>)}
             </div>
           </div>
         </div>
@@ -220,6 +220,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                       onQuantityChange={handleQuantityChange}
                       minQuantity={0}
                       enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0}
+                      maxQuantity={service.maxQuantity}
                     />
                   )}
             </div>

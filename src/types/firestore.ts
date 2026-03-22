@@ -65,42 +65,42 @@ export interface FirestoreService {
   description: string; // Short description for cards
   price: number; // This is the DISPLAYED price (can be inclusive or exclusive of tax)
   isTaxInclusive?: boolean; // True if the 'price' field already includes tax
-  discountedPrice?: number; // This is also DISPLAYED price
+  discountedPrice?: number | null; // This is also DISPLAYED price
   
   hasPriceVariants?: boolean; // New: Toggle for tiered pricing
   priceVariants?: PriceVariant[]; // New: Array for pricing tiers
 
   rating: number; // Default rating, can be an aggregate
   reviewCount?: number;
-  minQuantity?: number; // New field for minimum booking quantity
+  minQuantity?: number | null; // New field for minimum booking quantity
   hasMinQuantity?: boolean; // New field to enable/disable min quantity
-  maxQuantity?: number; // Maximum quantity a user can book
+  maxQuantity?: number | null; // Maximum quantity a user can book
   imageUrl?: string; // Main image for the service detail page
   imageHint?: string; // AI hint for the main image
   isActive: boolean;
-  shortDescription?: string; // Could be same as description or a slightly longer version
-  fullDescription?: string; // Detailed description for service page
+  shortDescription?: string | null; // Could be same as description or a slightly longer version
+  fullDescription?: string | null; // Detailed description for service page
   serviceHighlights?: string[];
   taxId?: string | null; // Allow null for "No Tax"
   taxName?: string; // Denormalized tax name
   taxPercent?: number; // Denormalized tax percentage
-  h1_title?: string; // SEO: H1 title for the service page
-  seo_title?: string; // SEO: Meta title for the service page
-  seo_description?: string; // SEO: Meta description
-  seo_keywords?: string; // SEO: Meta keywords (comma-separated)
+  h1_title?: string | null; // SEO: H1 title for the service page
+  seo_title?: string | null; // SEO: Meta title for the service page
+  seo_description?: string | null; // SEO: Meta description
+  seo_keywords?: string | null; // SEO: Meta keywords (comma-separated)
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 
   // New fields for task duration
-  taskTimeValue?: number;
-  taskTimeUnit?: 'hours' | 'minutes';
+  taskTimeValue?: number | null;
+  taskTimeUnit?: 'hours' | 'minutes' | null;
   includedItems?: string[];
   excludedItems?: string[];
   allowPayLater?: boolean;
   serviceFaqs?: ServiceFaqItem[];
 
   // Fields from new request
-  membersRequired?: number;
+  membersRequired?: number | null;
   bookedCount?: number; // Added bookedCount
 }
 
@@ -111,9 +111,9 @@ export interface ClientServiceData extends Omit<FirestoreService, 'createdAt' | 
   parentCategoryName?: string; // Added for breadcrumbs
   parentCategorySlug?: string; // Added for breadcrumbs
   parentCategoryId?: string; // Added for fetching related services
-  metaTitle?: string;
-  metaDescription?: string;
-  metaKeywords?: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  metaKeywords?: string | null;
 }
 
 export interface CartEntry {
@@ -144,12 +144,12 @@ export interface BookingServiceItem {
   serviceId: string;
   name: string;
   imageUrl?: string; // Added imageUrl property
-  shortDescription?: string; // Added shortDescription
-  taskTimeValue?: number; // Added taskTimeValue
-  taskTimeUnit?: 'hours' | 'minutes'; // Added taskTimeUnit
+  shortDescription?: string | null; // Added shortDescription
+  taskTimeValue?: number | null; // Added taskTimeValue
+  taskTimeUnit?: 'hours' | 'minutes' | null; // Added taskTimeUnit
   quantity: number;
   pricePerUnit: number; // DISPLAYED pricePerUnit at the time of booking
-  discountedPricePerUnit?: number; // DISPLAYED discountedPricePerUnit
+  discountedPricePerUnit?: number | null; // DISPLAYED discountedPricePerUnit
   isTaxInclusive?: boolean; // Was the pricePerUnit tax inclusive at booking?
   taxPercentApplied?: number; // Tax percent applied to this item's base price
   taxAmountForItem?: number; // Calculated tax amount for this item (based on its base price)
