@@ -97,7 +97,7 @@ export default function ReferralInfoTab({ settings }: ReferralInfoTabProps) {
     ? `${settings.referredUserBonus}%` 
     : `₹${settings.referredUserBonus || 0}`;
 
-  const shareMessage = `Hey! I've been using FixBro for my home services and they are excellent. You should try them too! Sign up using my link via Google or Mobile and you'll get a ${referredBonusDisplay} welcome reward in your wallet immediately! 🏠🛠️\n\nJoin here: ${referralLink}`;
+  const shareMessage = `Hey! I've been using FixBro for my home services and they are excellent. You should try them too! Sign up using my link you'll get a ${referredBonusDisplay} welcome reward in your wallet immediately! 🏠🛠️\n\nJoin here: ${referralLink}`;
   const codeShareMessage = `Hey! Use my referral code: ${firestoreUser?.referralCode} on FixBro to get a ${referredBonusDisplay} welcome bonus in your wallet! 🏠🛠️\n\nJoin here: ${referralLink}`;
 
   const shareOnWhatsApp = () => {
