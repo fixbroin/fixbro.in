@@ -425,8 +425,8 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
               )}
             </main>
           </SidebarInset>
+          {isMobile && isProviderApproved && <ProviderBottomNavigationBar />}
         </SidebarProvider>
-        {isMobile && isProviderApproved && <ProviderBottomNavigationBar />}
       </div>
     </ProtectedRoute>
   );
