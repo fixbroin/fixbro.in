@@ -61,7 +61,12 @@ export default function AppImage({
           fill={fill}
           width={!fill ? width : undefined}
           height={!fill ? height : undefined}
-          sizes={sizes || (fill ? "100vw" : undefined)}
+          sizes={
+  sizes ||
+  (fill
+    ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+    : undefined)
+}
           className="object-contain animate-pulse bg-muted"
         />
       )}
@@ -72,7 +77,12 @@ export default function AppImage({
         fill={fill}
         width={!fill ? width : undefined}
         height={!fill ? height : undefined}
-        sizes={sizes || (fill ? "100vw" : undefined)}
+        sizes={
+  sizes ||
+  (fill
+    ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+    : undefined)
+}
         priority={priority}
         loading={loading}
         onLoad={() => setLoaded(true)}

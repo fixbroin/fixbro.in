@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
 import type { ElementType } from 'react';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 interface NavItem {
   href: string;
@@ -24,6 +25,9 @@ const ProviderBottomNavigationBar = () => {
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const { setOpenMobile } = useSidebar(); // Get the function to open the mobile sidebar
+  const isKeyboardVisible = useKeyboardVisible();
+
+  if (isKeyboardVisible) return null;
 
   const navItems: NavItem[] = [
     { href: '/provider', label: 'Dashboard', icon: LayoutDashboard, isProtected: true },

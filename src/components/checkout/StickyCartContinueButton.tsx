@@ -9,6 +9,7 @@ import { getCartEntries, type CartEntry } from '@/lib/cartManager';
 import { usePathname, useRouter } from 'next/navigation'; 
 import { useAuth } from '@/hooks/useAuth'; 
 import { useLoading } from '@/contexts/LoadingContext'; 
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 const StickyCartContinueButton = () => {
   const [cartItemCount, setCartItemCount] = useState(0);
@@ -17,6 +18,7 @@ const StickyCartContinueButton = () => {
   const router = useRouter(); 
   const { user, triggerAuthRedirect } = useAuth(); 
   const { showLoading, isLoading } = useLoading(); 
+  const isKeyboardVisible = useKeyboardVisible();
 
   const updateCartCount = () => {
     const entries = getCartEntries();
@@ -58,7 +60,7 @@ const StickyCartContinueButton = () => {
   };
 
 
-  if (!isMounted || cartItemCount === 0) {
+  if (!isMounted || cartItemCount === 0 || isKeyboardVisible) {
     return null;
   }
 

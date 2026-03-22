@@ -10,6 +10,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useLoading } from '@/contexts/LoadingContext'; 
 import { db } from '@/lib/firebase';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { doc, getDoc } from "firebase/firestore";
 import type { FirestoreService } from '@/types/firestore';
 
@@ -52,6 +53,7 @@ const StickyCartContinueButton = () => {
   const router = useRouter(); 
   const { user, triggerAuthRedirect } = useAuth(); 
   const { showLoading, isLoading } = useLoading(); 
+  const isKeyboardVisible = useKeyboardVisible();
   
   const updateCartState = async () => {
     setIsLoadingPrice(true);
@@ -118,7 +120,7 @@ const StickyCartContinueButton = () => {
   };
 
 
-  if (!isMounted || cartItemCount === 0) {
+  if (!isMounted || cartItemCount === 0 || isKeyboardVisible) {
     return null;
   }
 
