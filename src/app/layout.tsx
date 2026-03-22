@@ -85,6 +85,11 @@ export async function generateViewport(): Promise<Viewport> {
 
   return {
     themeColor: themeColorValue,
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+    interactiveWidget: 'resizes-content',
   };
 }
 

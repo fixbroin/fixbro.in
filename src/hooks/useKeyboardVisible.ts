@@ -2,34 +2,38 @@ import { useState, useEffect } from 'react';
 
 /**
  * Hook that returns true if the on-screen keyboard is likely visible.
- * Works by monitoring the Visual Viewport API which changes when the keyboard appears on most mobile browsers.
+ * Works by monitoring the Visual Viewport API and comparing it against the initial height.
  */
 export function useKeyboardVisible() {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    // Only run on client-side and if Visual Viewport API is supported
     if (typeof window === 'undefined' || !window.visualViewport) {
       return;
     }
 
     const visualViewport = window.visualViewport;
+    // Capture the initial height when the hook mounts
+    // We use a reasonably large value as the "unobscured" height
+    const initialHeight = window.innerHeight;
     
     const handleResize = () => {
-      // If the visual viewport height is significantly smaller than the window height,
-      // the keyboard is likely visible.
-      // Using 85% as a threshold to avoid false positives from browser chrome.
-      const isVisible = visualViewport.height < window.innerHeight * 0.85;
+      // If the current visual viewport height is significantly smaller than 
+      // the initial innerHeight, the keyboard is likely visible.
+      // We use a 150px threshold which is safer than a percentage for various screen sizes.
+      const isVisible = visualViewport.height < initialHeight - 150;
       setKeyboardVisible(isVisible);
     };
 
     visualViewport.addEventListener('resize', handleResize);
+    // Also listen to window resize as a fallback
+    window.addEventListener('resize', handleResize);
     
-    // Initial check
     handleResize();
 
     return () => {
       visualViewport.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
