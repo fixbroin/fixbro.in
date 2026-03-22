@@ -340,7 +340,7 @@ export async function POST(req: NextRequest) {
 
             if (isPathClear) {
                 // FIXED: Include breakTimeMinutes in endDateTime for UI transparency
-                const endDateTime = calculateEndDateTime(dateISO, potentialStart, totalCartDuration, breakTimeMinutes, appConfig);
+                const endDateTime = calculateEndDateTime(dateISO, potentialStart, totalCartDuration, 0, appConfig);
                 availableSlots.push({ 
                     slot: formatTimeFromMinutes(potentialStart), 
                     remainingCapacity: minRemainingCapacity,
