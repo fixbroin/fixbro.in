@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
-import React, { useState, useEffect } from 'react';
 import type { ElementType } from 'react';
 
 interface NavItem {
@@ -25,34 +24,6 @@ const ProviderBottomNavigationBar = () => {
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const { setOpenMobile } = useSidebar(); // Get the function to open the mobile sidebar
-
-  const [bottomOffset, setBottomOffset] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-
-    const handleResize = () => {
-      const vw = window.visualViewport;
-      if (!vw) return;
-      
-      // Calculate how much the visual viewport has shrunk/moved
-      // window.innerHeight is the layout viewport height (doesn't change with keyboard)
-      // vw.height is the visible height (shrinks with keyboard)
-      // vw.offsetTop is the scroll position within the layout viewport
-      const offset = window.innerHeight - (vw.height + vw.offsetTop);
-      setBottomOffset(offset > 0 ? offset : 0);
-    };
-
-    window.visualViewport.addEventListener('resize', handleResize);
-    window.visualViewport.addEventListener('scroll', handleResize);
-    // Run once to initialize
-    handleResize();
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize);
-      window.visualViewport?.removeEventListener('scroll', handleResize);
-    };
-  }, []);
 
   const navItems: NavItem[] = [
     { href: '/provider', label: 'Dashboard', icon: LayoutDashboard, isProtected: true },
@@ -81,11 +52,8 @@ const ProviderBottomNavigationBar = () => {
   };
 
   return (
-    <nav 
-      className="fixed bottom-0 left-0 right-0 md:hidden bg-background border-t border-border shadow-t-lg z-40"
-      style={{ transform: `translateY(${bottomOffset}px)` }}
-    >
-      <div className="container mx-auto flex justify-around items-center h-16 px-1">
+    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-lg border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40 pb-safe">
+      <div className="container mx-auto flex justify-around items-center h-16 px-2">
         {navItems.map((item) => {
           const isActive = !item.isButton && pathname === item.href;
           const IconComponent = item.icon;
