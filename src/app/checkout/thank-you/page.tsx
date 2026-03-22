@@ -9,7 +9,7 @@ import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, Timestamp, doc, getDoc, runTransaction, query, where, getDocs, limit, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import type { FirestoreBooking, BookingServiceItem, FirestoreService, FirestorePromoCode, AppSettings, AppliedPlatformFeeItem, FirestoreNotification, BookingStatus, MarketingAutomationSettings, MarketingSettings } from '@/types/firestore';
-import { getCartEntries, saveCartEntries, syncCartToFirestore } from '@/lib/cartManager';
+import { getActiveCheckoutEntries, removeCheckedOutItemsFromCart } from '@/lib/cartManager';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { sendBookingConfirmationEmail, type BookingConfirmationEmailInput } from '@/ai/flows/sendBookingEmailFlow';
@@ -51,17 +51,13 @@ const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive: boolean,
     return (displayedPrice * 100) / (100 + taxPercent);
 };
 
-const clearLocalStorageItems = (uid?: string) => {
-    if (uid) {
-        try {
-            saveCartEntries([]);
-            syncCartToFirestore(uid, []).catch(err => console.error("Error syncing empty cart after booking:", err));
-        } catch (e) {
-            console.error("Error clearing cart after booking:", e);
-        }
+const clearLocalStorageItems = async (uid?: string) => {
+    try {
+        await removeCheckedOutItemsFromCart(uid);
+    } catch (e) {
+        console.error("Error clearing cart after booking:", e);
     }
     if (typeof window !== 'undefined') {
-        window.dispatchEvent(new StorageEvent('storage', { key: 'fixbroUserCart' }));
         localStorage.removeItem('fixbroScheduledDate');
         localStorage.removeItem('fixbroScheduledTimeSlot');
         localStorage.removeItem('fixbroEstimatedEndTime');
@@ -200,13 +196,13 @@ export default function ThankYouPage() {
             console.error("Error during cancellation payment verification/update:", error);
             toast({ title: "Payment Error", description: (error as Error).message || "Failed to verify payment. Please contact support.", variant: "destructive" });
         } finally {
-            clearLocalStorageItems(currentUser?.uid);
+            await clearLocalStorageItems(currentUser?.uid);
             setIsLoadingPage(false);
         }
         return;
       }
       
-      const cartEntriesFromStorage = getCartEntries();
+      const cartEntriesFromStorage = getActiveCheckoutEntries();
       if (cartEntriesFromStorage.length === 0) {
         toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
         router.push('/my-bookings');
@@ -407,7 +403,7 @@ export default function ThankYouPage() {
             body: JSON.stringify({ bookingDocId: docRef.id }),
         }).catch(err => console.error("Error triggering server post-process:", err));
 
-        clearLocalStorageItems(currentUser?.uid);
+        await clearLocalStorageItems(currentUser?.uid);
 
       } catch (error) {
         console.error("Error creating booking:", error);

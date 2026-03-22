@@ -59,6 +59,7 @@ export interface PriceVariant {
 export interface FirestoreService {
   id: string; // Firestore document ID
   subCategoryId: string; // ID of the parent FirestoreSubCategory
+  parentCategoryId?: string; // Optional denormalized parent category ID
   name: string;
   slug: string;
   order?: number; // New field for service ordering

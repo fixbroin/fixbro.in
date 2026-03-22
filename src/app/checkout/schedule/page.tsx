@@ -20,7 +20,7 @@ import type {
   AppSettings,
   DayAvailability
 } from '@/types/firestore';
-import { getCartEntries, type CartEntry } from '@/lib/cartManager';
+import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/contexts/LoadingContext'; 
 import { useRouter, usePathname } from 'next/navigation';
@@ -75,7 +75,7 @@ export default function SchedulePage() {
 
   const fetchAvailableSlots = useCallback(async (date: Date) => {
     try {
-        const cartEntries = getCartEntries();
+        const cartEntries = getActiveCheckoutEntries();
         const response = await fetch('/api/checkout/available-slots', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

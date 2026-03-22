@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowRight, ArrowLeft, CreditCard, Landmark, IndianRupee, Wallet, Info, Clock, Loader2, Tag, CheckCircle, XCircle, ListFilter, HandCoins, Ban } from 'lucide-react';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getCartEntries, type CartEntry } from '@/lib/cartManager';
+import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { FirestoreService, FirestoreUser, FirestorePromoCode, AppSettings, PlatformFeeSetting, AppliedPlatformFeeItem, PriceVariant } from '@/types/firestore';
@@ -143,7 +143,7 @@ export default function PaymentPage() {
   const loadInitialData = useCallback(async () => {
     setIsLoadingCartDetails(true);
     setIsLoadingPromos(true);
-    const currentCartEntries = getCartEntries();
+    const currentCartEntries = getActiveCheckoutEntries();
     setCartEntries(currentCartEntries);
 
     logUserActivity('checkoutStep', { checkoutStepName: 'payment', pageUrl: pathname, cartItemCount: currentCartEntries.length }, currentUser?.uid, !currentUser ? getGuestId() : null);

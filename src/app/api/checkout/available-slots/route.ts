@@ -136,7 +136,9 @@ function* simulateProgression(
     bufferDuration: number,
     appConfig: AppSettings
 ) {
-    let remainingMinutesToBlock = workDuration + bufferDuration;
+    let remainingMinutesToBlock = workDuration;
+    let bufferRemaining = bufferDuration;
+    let isWorkCompleted = false;
     let currentMinutes = startMinutes;
     const currentDate = new Date(startDateISO);
     
@@ -173,12 +175,57 @@ function* simulateProgression(
             continue;
         }
 
-        yield { dateISO, minutes: currentMinutes };
+        const minutesAvailableToday = dayEnd - currentMinutes;
+        const minutesToConsumeToday = Math.min(minutesAvailableToday, remainingMinutesToBlock);
+        
+        const segmentStart = currentMinutes;
+        const segmentEnd = currentMinutes + minutesToConsumeToday;
 
-        remainingMinutesToBlock -= slotInterval;
-        currentMinutes += slotInterval;
+        // 🔥 Yield ALL standard slot boundaries that overlap with this work segment
+        // A standard slot is: dayStart, dayStart + slotInterval, etc.
+        // It overlaps if: slotStart < segmentEnd AND slotStart + slotInterval > segmentStart
+        let slotStart = dayStart;
+        while (slotStart < segmentEnd) {
+            if (slotStart + slotInterval > segmentStart) {
+                yield { dateISO, minutes: slotStart };
+            }
+            slotStart += slotInterval;
+        }
+
+        // Move time forward
+        remainingMinutesToBlock -= minutesToConsumeToday;
+        currentMinutes += minutesToConsumeToday;
+
+        // ✅ When work finishes, start buffer ONLY if there is time left TODAY
+        if (!isWorkCompleted && remainingMinutesToBlock <= 0) {
+            isWorkCompleted = true;
+
+            const minutesLeftToday = dayEnd - currentMinutes;
+            if (minutesLeftToday > 0) {
+                // Only take as much buffer as fits in the current day
+                remainingMinutesToBlock = Math.min(bufferRemaining, minutesLeftToday);
+            } else {
+                // Work ended exactly at or after dayEnd, no buffer needed for next day
+                remainingMinutesToBlock = 0;
+            }
+        }
 
         if (currentMinutes >= dayEnd) {
+            // If we just finished work and were about to start buffer, 
+            // but we hit the end of the day, we stop here.
+            if (isWorkCompleted) {
+                remainingMinutesToBlock = 0; 
+                break;
+            }
+
+            // Move to next day
+            currentDate.setDate(currentDate.getDate() + 1);
+            
+            // 🔥 CRITICAL FIX: Reset currentMinutes to the START of the next day
+            const nextDayName = getDayName(currentDate);
+            const nextDayAvail = appConfig.timeSlotSettings?.weeklyAvailability[nextDayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[nextDayName];
+            currentMinutes = parseTimeToMinutes(nextDayAvail.startTime);
+            
             daysSearched++;
         }
     }
@@ -270,7 +317,13 @@ export async function POST(req: NextRequest) {
                 });
 
                 const startMin = parseTimeToMinutes(booking.scheduledTimeSlot);
-                const progression = simulateProgression(booking.scheduledDate, startMin, bookingWorkDuration, breakTimeMinutes, appConfig);
+                const progression = simulateProgression(
+                    booking.scheduledDate,
+                    startMin,
+                    bookingWorkDuration,
+                    breakTimeMinutes, // ✅ Restore buffer blocking for existing bookings
+                    appConfig
+                );
 
                 for (const step of progression) {
                     const key = getSlotKey(step.dateISO, step.minutes);
@@ -286,7 +339,10 @@ export async function POST(req: NextRequest) {
 
             // Store in cache
             if (BUSY_MAP_CACHE.size >= MAX_CACHE_SIZE) {
-                BUSY_MAP_CACHE.clear(); // Simple eviction: clear all if too big
+                const firstKey = BUSY_MAP_CACHE.keys().next().value; // Simple eviction: clear all if too big 
+                if (firstKey !== undefined) {
+                    BUSY_MAP_CACHE.delete(firstKey);
+                }
             }
             BUSY_MAP_CACHE.set(cacheKey, globalBusyMap);
         }
@@ -315,6 +371,34 @@ export async function POST(req: NextRequest) {
                 continue;
             }
 
+            // 🚨 MULTI-DAY SERVICE RESTRICTION
+
+const totalWorkingMinutesInDay = dayEndMinutes - dayStartMinutes;
+
+if (totalCartDuration > totalWorkingMinutesInDay) {
+    // Only allow starting at beginning of day
+    if (potentialStart !== dayStartMinutes) {
+        potentialStart += slotInterval;
+        continue;
+    }
+}
+// 🚨 LONG SERVICE RESTRICTION (FULL-DAY FIX)
+
+const FULL_DAY_THRESHOLD = 6 * 60; // 6 hours (adjust if needed)
+
+const remainingMinutesToday = dayEndMinutes - potentialStart;
+
+// If long service and not enough time today → skip this slot
+
+
+if (
+    totalCartDuration >= FULL_DAY_THRESHOLD &&
+    totalCartDuration <= totalWorkingMinutesInDay && // ✅ IMPORTANT
+    remainingMinutesToday < totalCartDuration
+) {
+    potentialStart += slotInterval;
+    continue;
+}
             let isPathClear = true;
             let minRemainingCapacity = Infinity;
 

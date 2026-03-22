@@ -112,3 +112,51 @@ export const syncCartToFirestore = async (userId: string, cartEntries: CartEntry
     }
   }
 };
+
+/**
+ * Saves the active checkout items to localStorage when proceeding from the cart.
+ */
+export const saveActiveCheckoutEntries = (entries: CartEntry[]): void => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.setItem('fixbroActiveCheckoutItems', JSON.stringify(entries));
+  }
+};
+
+/**
+ * Gets the active checkout cart entries. If none are explicitly set (e.g. older flow), it falls back to the full cart.
+ */
+export const getActiveCheckoutEntries = (): CartEntry[] => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return [];
+  }
+  const storedActive = window.localStorage.getItem('fixbroActiveCheckoutItems');
+  if (storedActive) {
+    try {
+      const parsed = JSON.parse(storedActive);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : getCartEntries();
+    } catch (e) {
+      return getCartEntries();
+    }
+  }
+  return getCartEntries();
+};
+
+/**
+ * Removes checked out items from the main cart after a successful booking.
+ */
+export const removeCheckedOutItemsFromCart = async (userId: string | undefined): Promise<void> => {
+  const allCart = getCartEntries();
+  const checkedOut = getActiveCheckoutEntries();
+  const remaining = allCart.filter(item => !checkedOut.some(c => c.serviceId === item.serviceId));
+  
+  saveCartEntries(remaining);
+  if (userId) {
+    await syncCartToFirestore(userId, remaining);
+  }
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem('fixbroActiveCheckoutItems');
+    window.localStorage.removeItem('fixbroActiveCheckoutCategory');
+    window.localStorage.removeItem('fixbroActiveCheckoutCategoryName');
+    window.dispatchEvent(new StorageEvent('storage', { key: CART_STORAGE_KEY }));
+  }
+};
