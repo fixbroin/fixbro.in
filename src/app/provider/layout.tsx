@@ -58,7 +58,13 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const router = useRouter();
   const { showLoading, hideLoading } = useLoading();
-  const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(null);
+  const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem(`provider_approved_${providerUser?.uid}`);
+      return cached === 'true' ? true : cached === 'false' ? false : null;
+    }
+    return null;
+  });
   const [isCheckingApproval, setIsCheckingApproval] = useState(false); 
 
   const { count: unreadProviderNotificationsCount, isLoading: isLoadingProviderNotifications } = useUnreadNotificationsCount(providerUser?.uid); 
@@ -86,6 +92,17 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
       document.head.appendChild(newManifestLink);
     }
   }, []);
+
+  // Update cached value when providerUser changes
+  useEffect(() => {
+    if (providerUser?.uid) {
+      const cached = sessionStorage.getItem(`provider_approved_${providerUser.uid}`);
+      if (cached === 'true') setIsProviderApproved(true);
+      else if (cached === 'false') setIsProviderApproved(false);
+    } else {
+      setIsProviderApproved(null);
+    }
+  }, [providerUser?.uid]);
 
   useEffect(() => {
     if (!providerUser?.uid || authIsLoading || !isProviderApproved) return;
@@ -175,46 +192,55 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const checkProviderStatus = async () => {
-      if (providerUser && !authIsLoading) { 
-        setIsCheckingApproval(true); 
-        try {
-          const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid);
-          const docSnap = await getDoc(appDocRef);
-          if (docSnap.exists()) {
-            const appData = docSnap.data() as ProviderApplication;
-            if (appData.status === 'approved') {
-              setIsProviderApproved(true);
-            } else {
-              setIsProviderApproved(false);
-              if (pathname !== '/provider-registration') { 
-                toast({ title: "Access Denied", description: "Your provider application is not yet approved or has been rejected.", variant: "destructive" });
-                router.push('/');
-              }
-            }
+      if (!providerUser || authIsLoading) return;
+
+      // If we already know the status, don't show loading or fetch again
+      if (isProviderApproved !== null) {
+        // Immediate redirection if not approved and on a protected page
+        if (isProviderApproved === false && pathname !== '/provider-registration') {
+            router.push('/');
+        }
+        return;
+      }
+
+      setIsCheckingApproval(true); 
+      try {
+        const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid);
+        const docSnap = await getDoc(appDocRef);
+        if (docSnap.exists()) {
+          const appData = docSnap.data() as ProviderApplication;
+          if (appData.status === 'approved') {
+            setIsProviderApproved(true);
+            sessionStorage.setItem(`provider_approved_${providerUser.uid}`, 'true');
           } else {
             setIsProviderApproved(false);
-             if (pathname !== '/provider-registration') {
-                toast({ title: "Application Not Found", description: "Provider application not found. Please complete registration.", variant: "destructive" });
-                router.push('/provider-registration');
-             }
-          }
-        } catch (error) {
-          console.error("Error checking provider status:", error);
-          setIsProviderApproved(false);
-           if (pathname !== '/provider-registration') {
-              toast({ title: "Error", description: "Could not verify provider status.", variant: "destructive" });
+            sessionStorage.setItem(`provider_approved_${providerUser.uid}`, 'false');
+            if (pathname !== '/provider-registration') { 
+              toast({ title: "Access Denied", description: "Your provider application is not yet approved or has been rejected.", variant: "destructive" });
               router.push('/');
+            }
+          }
+        } else {
+          setIsProviderApproved(false);
+          sessionStorage.setItem(`provider_approved_${providerUser.uid}`, 'false');
+           if (pathname !== '/provider-registration') {
+              toast({ title: "Application Not Found", description: "Provider application not found. Please complete registration.", variant: "destructive" });
+              router.push('/provider-registration');
            }
-        } finally {
-          setIsCheckingApproval(false); 
         }
-      } else if (!authIsLoading && !providerUser) {
-        setIsProviderApproved(false); 
+      } catch (error) {
+        console.error("Error checking provider status:", error);
+        // On error, don't cache as false, just allow one retry if they navigate again
+         if (pathname !== '/provider-registration') {
+            toast({ title: "Error", description: "Could not verify provider status.", variant: "destructive" });
+            router.push('/');
+         }
+      } finally {
         setIsCheckingApproval(false); 
       }
     };
     checkProviderStatus();
-  }, [providerUser, authIsLoading, router, toast, pathname]);
+  }, [providerUser, authIsLoading, router, toast, pathname, isProviderApproved]);
 
   // Notification sound effect for provider
   useEffect(() => {
