@@ -324,7 +324,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r bg-card text-card-foreground">
           <ProviderSidebarContent />
         </Sidebar>
-        <SidebarInset className="bg-muted/30 overflow-x-hidden relative min-h-screen flex flex-col">
+        <SidebarInset className="bg-muted/30 overflow-x-hidden">
           <header className="bg-background/95 backdrop-blur-xl sticky top-0 z-40 border-b border-border/40 transition-all duration-300 h-16 flex items-center justify-between px-4 sm:px-6">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="hidden md:inline-flex text-muted-foreground hover:text-primary transition-colors" />
@@ -410,7 +410,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
               )}
             </div>
           </header>
-          <main className={cn("p-2 sm:p-4 md:p-6 relative flex-grow", { "pb-20": isMobile })}>
+          <main className={cn("p-2 sm:p-4 md:p-6 relative", { "pb-20": isMobile })}>
             <Suspense fallback={<ProviderPageLoader />}>
               {children}
             </Suspense>
