@@ -445,13 +445,15 @@ function CartPageContent() {
                return (
                 <Card key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center p-3 sm:p-4 shadow-sm">
                   {item.imageUrl && (
-                    <div className="relative w-full sm:w-20 md:w-24 h-32 sm:h-20 md:h-24 rounded-md overflow-hidden mb-3 sm:mb-0 sm:mr-4 flex-shrink-0">
+                    <Link href={`/service/${item.slug}`} className="relative w-full sm:w-20 md:w-24 h-32 sm:h-20 md:h-24 rounded-md overflow-hidden mb-3 sm:mb-0 sm:mr-4 flex-shrink-0 hover:opacity-90 transition-opacity">
                       <AppImage src={item.imageUrl} alt={item.name} fill sizes="(max-width: 640px) 100vw, 96px" className="object-cover" data-ai-hint={item.imageHint || "service item"} />
-                    </div>
+                    </Link>
                   )}
                   <div className="flex-grow">
-                    <h3 className="text-md sm:text-lg font-semibold">{item.name}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                    <Link href={`/service/${item.slug}`} className="hover:text-primary transition-colors">
+                      <h3 className="text-md sm:text-lg font-semibold">{item.name}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                    </Link>
                     <div className="flex items-baseline gap-2 mt-1">
                       <p className="text-sm sm:text-md font-medium text-foreground">Total: ₹{totalPriceForItem.toFixed(2)}</p>
                        {item.quantity > 1 && <p className="text-xs text-muted-foreground">(Avg. ₹{(totalPriceForItem / item.quantity).toFixed(2)} each)</p>}

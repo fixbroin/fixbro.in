@@ -496,10 +496,12 @@ function CartPageContent() {
   <div className="flex flex-row w-full gap-3">
     {/* LEFT TEXT */}
     <div className="flex-1 flex flex-col">
-      <h3 className="font-bold text-base leading-tight">{item.name}</h3>
-      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-        {item.description}
-      </p>
+      <Link href={`/service/${item.slug}`} className="hover:text-primary transition-colors">
+        <h3 className="font-bold text-base leading-tight">{item.name}</h3>
+        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+          {item.description}
+        </p>
+      </Link>
 
       <div className="flex items-baseline gap-2 mt-2">
         <p className="text-lg font-bold">{mainPrice}</p>
@@ -530,14 +532,14 @@ function CartPageContent() {
     </div>
 
     {/* RIGHT IMAGE */}
-    <div className="flex-shrink-0 w-24 h-24 relative">
+    <Link href={`/service/${item.slug}`} className="flex-shrink-0 w-24 h-24 relative">
       <AppImage
         src={item.imageUrl || "/default-image.png"}
         alt={item.name}
         fill
         className="rounded-lg object-cover"
       />
-    </div>
+    </Link>
   </div>
 
   {/* QUANTITY + REMOVE BUTTON ROW */}
@@ -566,24 +568,26 @@ function CartPageContent() {
   {/* DESKTOP LAYOUT */}
   <div className="hidden md:flex flex-row items-center w-full gap-1">
     {/* LEFT IMAGE */}
-    <div className="relative w-32 h-32 flex-shrink-0">
+    <Link href={`/service/${item.slug}`} className="relative w-32 h-32 flex-shrink-0">
       <AppImage
-  src={item.imageUrl || "/default-image.png"}
-  alt={item.name}
-  fill
-  className="object-cover rounded-lg"
-/>
-    </div>
+        src={item.imageUrl || "/default-image.png"}
+        alt={item.name}
+        fill
+        className="object-cover rounded-lg"
+      />
+    </Link>
 
     {/* CENTER TEXT */}
-    <div className="flex-1 flex flex-col">
-      <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-2">
-        {item.name}
-      </h3>
+    <div className="flex-1 flex flex-col px-4">
+      <Link href={`/service/${item.slug}`} className="hover:text-primary transition-colors">
+        <h3 className="font-bold text-lg leading-tight text-foreground line-clamp-2">
+          {item.name}
+        </h3>
 
-      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-        {item.description}
-      </p>
+        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+          {item.description}
+        </p>
+      </Link>
 
       {/* PRICE & PROMO */}
       <div className="mt-auto">
