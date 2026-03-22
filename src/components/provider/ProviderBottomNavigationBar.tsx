@@ -9,8 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
 import type { ElementType } from 'react';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
-import { useState, useEffect } from 'react';
 
 interface NavItem {
   href: string;
@@ -26,31 +24,6 @@ const ProviderBottomNavigationBar = () => {
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const { setOpenMobile } = useSidebar(); // Get the function to open the mobile sidebar
-  const isKeyboardVisible = useKeyboardVisible();
-  const [isInputFocused, setIsInputFocused] = useState(false);
-
-  useEffect(() => {
-    const handleFocus = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        setIsInputFocused(true);
-      }
-    };
-
-    const handleBlur = () => {
-      setIsInputFocused(false);
-    };
-
-    document.addEventListener('focusin', handleFocus);
-    document.addEventListener('focusout', handleBlur);
-
-    return () => {
-      document.removeEventListener('focusin', handleFocus);
-      document.removeEventListener('focusout', handleBlur);
-    };
-  }, []);
-
-  if (isKeyboardVisible || isInputFocused) return null;
 
   const navItems: NavItem[] = [
     { href: '/provider', label: 'Dashboard', icon: LayoutDashboard, isProtected: true },

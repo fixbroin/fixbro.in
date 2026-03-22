@@ -16,7 +16,6 @@ import type { FirestoreCategory, CustomServiceRequest } from '@/types/firestore'
 import { useToast } from "@/hooks/use-toast";
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { getTimestampMillis } from '@/lib/utils';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 const formatDate = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -37,7 +36,6 @@ const getStatusBadgeVariant = (status: CustomServiceRequest['status']) => {
 export default function CustomServicePage() {
   const { user, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
-  const isKeyboardVisible = useKeyboardVisible();
 
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
   const [requests, setRequests] = useState<CustomServiceRequest[]>([]);
@@ -142,14 +140,12 @@ export default function CustomServicePage() {
         )}
 
         {/* Floating Action Button for Mobile */}
-        {!isKeyboardVisible && (
-          <div className="sm:hidden fixed bottom-16 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t z-40">
-            <Button onClick={() => setIsFormOpen(true)} className="w-full h-12 text-lg shadow-lg">
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Create New Request
-            </Button>
-          </div>
-        )}
+        <div className="sm:hidden fixed bottom-16 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t z-40">
+           <Button onClick={() => setIsFormOpen(true)} className="w-full h-12 text-lg shadow-lg">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Create New Request
+           </Button>
+        </div>
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

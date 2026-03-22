@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Download, X, Share, PlusSquare, Smartphone, Monitor, Info } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import AppImage from '@/components/ui/AppImage';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +34,6 @@ const PwaInstallButton = () => {
   const [isIos, setIsIos] = useState(false);
   
   const isMobile = useIsMobile();
-  const isKeyboardVisible = useKeyboardVisible();
   const DISMISS_KEY = 'pwa_install_prompt_dismissed_v2';
 
   useEffect(() => {
@@ -97,7 +95,7 @@ const PwaInstallButton = () => {
     localStorage.setItem(DISMISS_KEY, 'true');
   };
 
-  if (!isMounted || isAppInstalled || isDismissed || (isMobile && isKeyboardVisible)) {
+  if (!isMounted || isAppInstalled || isDismissed) {
     return null;
   }
 

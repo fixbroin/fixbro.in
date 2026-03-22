@@ -13,7 +13,6 @@ import { doc, onSnapshot } from 'firebase/firestore'; // Added onSnapshot
 import { db } from '@/lib/firebase'; // Added db
 import type { ReferralSettings } from '@/types/firestore'; // Added ReferralSettings
 import type { ElementType } from 'react';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 interface NavItem {
   href: string;
@@ -29,7 +28,6 @@ const BottomNavigationBar = () => {
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
   const { featuresConfig, isLoading: isLoadingFeatures } = useFeaturesConfig();
-  const isKeyboardVisible = useKeyboardVisible();
   
   // New state for referral settings
   const [referralSettings, setReferralSettings] = useState<ReferralSettings | null>(null);
@@ -51,8 +49,6 @@ const BottomNavigationBar = () => {
       });
       return () => unsubscribe();
   }, []);
-
-  if (isKeyboardVisible) return null;
 
   const navItems: NavItem[] = [
     { href: '/', label: 'Home', icon: Home, isProtected: false },

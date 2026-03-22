@@ -8,7 +8,6 @@ import SubCategoryCard from './SubCategoryCard';
 import { Menu, X } from 'lucide-react';
 import type { FirestoreSubCategory } from '@/types/firestore';
 import { cn } from '@/lib/utils';
-import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 
 interface SubCategoryFloatingButtonProps {
   subCategories: FirestoreSubCategory[];
@@ -23,7 +22,6 @@ export default function SubCategoryFloatingButton({
 }: SubCategoryFloatingButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const isKeyboardVisible = useKeyboardVisible();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -51,30 +49,28 @@ export default function SubCategoryFloatingButton({
     <>
       
     {/* Floating Action Button */}
-    {!isKeyboardVisible && (
-      <div
-        className={cn(
-          "fixed bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out",
-          isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
-        )}
+    <div
+      className={cn(
+        "fixed bottom-20 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out",
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
+      )}
+    >
+      <Button
+        variant="default"
+        size="lg"
+        className="rounded-full shadow-xl flex items-center justify-center gap-2 
+                   h-10 px-2 sm:h-12 sm:px-4 transition-all duration-300"
+        aria-label="View Sub-categories"
+        onClick={() => setIsModalOpen(true)}
       >
-        <Button
-          variant="default"
-          size="lg"
-          className="rounded-full shadow-xl flex items-center justify-center gap-2 
-                     h-10 px-2 sm:h-12 sm:px-4 transition-all duration-300"
-          aria-label="View Sub-categories"
-          onClick={() => setIsModalOpen(true)}
-        >
-          {/* Icon size changes with screen */}
-          <Menu className="h-5 w-5 sm:h-7 sm:w-7" />
-          {/* Text visible only on desktop */}
-          <span className="hidden sm:inline">Jump to Sub-Category</span>
-          {/* Short text visible only on mobile */}
-          <span className="inline sm:hidden">Menu</span>
-        </Button>
-      </div>
-    )}
+        {/* Icon size changes with screen */}
+        <Menu className="h-5 w-5 sm:h-7 sm:w-7" />
+        {/* Text visible only on desktop */}
+        <span className="hidden sm:inline">Jump to Sub-Category</span>
+        {/* Short text visible only on mobile */}
+        <span className="inline sm:hidden">Menu</span>
+      </Button>
+    </div>
   
 
 
