@@ -673,14 +673,36 @@ export default function WebSettingsPage() {
       </Card>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 mb-6">
-          <TabsTrigger value="general"><Building className="mr-2 h-4 w-4" />General Info</TabsTrigger>
-          <TabsTrigger value="branding"><ImageIcon className="mr-2 h-4 w-4" />Branding</TabsTrigger>
-          <TabsTrigger value="social_media"><ExternalLink className="mr-2 h-4 w-4" />Social Media</TabsTrigger>
-          <TabsTrigger value="content"><FileText className="mr-2 h-4 w-4" />Content Pages</TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="general"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Building className="mr-2 h-4 w-4" />General Info
+            </TabsTrigger>
+            <TabsTrigger 
+              value="branding"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ImageIcon className="mr-2 h-4 w-4" />Branding
+            </TabsTrigger>
+            <TabsTrigger 
+              value="social_media"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />Social Media
+            </TabsTrigger>
+            <TabsTrigger 
+              value="content"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <FileText className="mr-2 h-4 w-4" />Content Pages
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="general">
+        <TabsContent value="general" className="mt-0 focus-visible:outline-none">
           <Card>
             <CardHeader><CardTitle>General Information</CardTitle></CardHeader>
             <Form {...generalInfoForm}>

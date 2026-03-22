@@ -24,12 +24,24 @@ export default function WhatsAppSettingsPage() {
       </Card>
 
       <Tabs defaultValue="templates" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="templates"><FileText className="mr-2 h-4 w-4"/>Manage Templates</TabsTrigger>
-          <TabsTrigger value="test_sender"><Beaker className="mr-2 h-4 w-4"/>Test Sender</TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="templates"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <FileText className="mr-2 h-4 w-4"/>Manage Templates
+            </TabsTrigger>
+            <TabsTrigger 
+              value="test_sender"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Beaker className="mr-2 h-4 w-4"/>Test Sender
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="templates">
+        <TabsContent value="templates" className="mt-0 focus-visible:outline-none">
             <WhatsAppTemplateManagementTab />
         </TabsContent>
         <TabsContent value="test_sender">

@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, PackageSearch, Briefcase } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { FirestoreBooking, BookingStatus, FirestoreNotification } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collectionGroup, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getDoc, getDocs, limit, addDoc, collection } from "firebase/firestore";
@@ -116,14 +117,36 @@ export default function ProviderMyJobsPage() {
       </Card>
       
       <Tabs defaultValue="new" className="w-full">
-        <TabsList className="h-auto flex-wrap justify-start">
-          <TabsTrigger value="new">New Requests ({newJobRequests.length})</TabsTrigger>
-          <TabsTrigger value="ongoing">Ongoing ({ongoingJobs.length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({completedJobs.length})</TabsTrigger>
-          <TabsTrigger value="other">Other Statuses ({otherJobs.length})</TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="new" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              New Requests <Badge className="ml-2 bg-primary/10 text-primary border-none hover:bg-primary/10">{newJobRequests.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="ongoing" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              Ongoing <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none hover:bg-blue-500/10">{ongoingJobs.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="completed" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              Completed <Badge className="ml-2 bg-green-500/10 text-green-500 border-none hover:bg-green-500/10">{completedJobs.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="other" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              Other Statuses <Badge className="ml-2 bg-muted text-muted-foreground border-none hover:bg-muted">{otherJobs.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </div>
         
-        <TabsContent value="new">
+        <TabsContent value="new" className="mt-0 focus-visible:outline-none">
           {newJobRequests.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
               {newJobRequests.map(job => (

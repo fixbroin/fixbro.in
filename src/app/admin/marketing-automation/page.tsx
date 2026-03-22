@@ -263,10 +263,25 @@ export default function MarketingAutomationPage() {
       </Card>
       
       <Tabs defaultValue="email_automations" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6"><TabsTrigger value="email_automations"><Mail className="mr-2 h-4 w-4" />Email Automations</TabsTrigger><TabsTrigger value="send_email"><Send className="mr-2 h-4 w-4" />Send Manual Email</TabsTrigger></TabsList>
-        <TabsContent value="send_email"><SendManualEmailForm /></TabsContent>
-        <TabsContent value="email_automations">
-          <Form {...form}>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="email_automations"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Mail className="mr-2 h-4 w-4" />Email Automations
+            </TabsTrigger>
+            <TabsTrigger 
+              value="send_email"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Send className="mr-2 h-4 w-4" />Send Manual Email
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="send_email" className="mt-0 focus-visible:outline-none"><SendManualEmailForm /></TabsContent>
+        <TabsContent value="email_automations" className="mt-0 focus-visible:outline-none">          <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               {renderAutomationCard('noBookingReminder', 'No Booking Reminder', "Follow-up with users who sign up but don't book a service.", <Users className="mr-2 h-5 w-5 text-primary"/>, "A friendly reminder from " + (globalSettings.websiteName || "FixBro"), "noBookingReminderCategoryId")}
               {renderAutomationCard('abandonedCart', 'Abandoned Cart Reminder', "Remind users who add items to cart but don't check out.", <ShoppingCart className="mr-2 h-5 w-5 text-primary"/>, "You left something in your cart!", "abandonedCartCategoryId")}

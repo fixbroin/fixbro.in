@@ -55,19 +55,30 @@ export default function FeaturesPage() {
       </Card>
 
       <Tabs defaultValue="sections_control" className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-6">
-          <TabsTrigger value="sections_control">
-            <LayoutGrid className="mr-2 h-4 w-4"/>Sections Control
-          </TabsTrigger>
-          <TabsTrigger value="category_display">
-            <ListChecks className="mr-2 h-4 w-4"/>Homepage Categories
-          </TabsTrigger>
-          <TabsTrigger value="ads_management">
-            <ImageIconLucide className="mr-2 h-4 w-4"/>Ad Banners
-          </TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="sections_control"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <LayoutGrid className="mr-2 h-4 w-4"/>Sections Control
+            </TabsTrigger>
+            <TabsTrigger 
+              value="category_display"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ListChecks className="mr-2 h-4 w-4"/>Homepage Categories
+            </TabsTrigger>
+            <TabsTrigger 
+              value="ads_management"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ImageIconLucide className="mr-2 h-4 w-4"/>Ad Banners
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="sections_control">
+        <TabsContent value="sections_control" className="mt-0 focus-visible:outline-none">
           <SectionsControlTab />
         </TabsContent>
 

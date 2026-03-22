@@ -63,22 +63,36 @@ export default function QuotationInvoicePage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
-          <TabsTrigger value="create_quotation">
-            <FileText className="mr-2 h-4 w-4" /> {editingQuotation ? "Edit Quotation" : "Create Quotation"}
-          </TabsTrigger>
-          <TabsTrigger value="manage_quotations">
-            <ListChecks className="mr-2 h-4 w-4" /> Manage Quotations
-          </TabsTrigger>
-          <TabsTrigger value="create_invoice">
-            <ReceiptText className="mr-2 h-4 w-4" /> {editingInvoice ? "Edit Invoice" : "Create Invoice"}
-          </TabsTrigger>
-          <TabsTrigger value="manage_invoices">
-            <ListChecks className="mr-2 h-4 w-4" /> Manage Invoices
-          </TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="create_quotation"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <FileText className="mr-2 h-4 w-4" /> {editingQuotation ? "Edit Quotation" : "Create Quotation"}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="manage_quotations"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ListChecks className="mr-2 h-4 w-4" /> Manage Quotations
+            </TabsTrigger>
+            <TabsTrigger 
+              value="create_invoice"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ReceiptText className="mr-2 h-4 w-4" /> {editingInvoice ? "Edit Invoice" : "Create Invoice"}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="manage_invoices"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ListChecks className="mr-2 h-4 w-4" /> Manage Invoices
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="create_quotation">
+        <TabsContent value="create_quotation" className="mt-0 focus-visible:outline-none">
           <CreateQuotationForm
             key={editingQuotation ? `edit-q-${editingQuotation.id}` : 'create-q'}
             initialData={editingQuotation}

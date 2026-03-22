@@ -247,17 +247,17 @@ export default function ProviderApplicationDetailsModal({
         <div className="overflow-y-auto overflow-x-hidden flex-grow min-h-0">
             <div className="p-4 sm:p-6">
             <Tabs defaultValue="personal" className="w-full">
-                <div className="overflow-x-auto pb-2 -mx-1 scrollbar-hide">
-                    <TabsList className="flex w-max min-w-full mb-4 h-auto p-1 bg-muted">
-                        <TabsTrigger value="personal" className="flex-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"><UserCircle className="mr-1.5 h-4 w-4 shrink-0"/>Personal</TabsTrigger>
-                        <TabsTrigger value="work" className="flex-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"><Briefcase className="mr-1.5 h-4 w-4 shrink-0"/>Work Info</TabsTrigger>
-                        <TabsTrigger value="kyc" className="flex-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"><FileText className="mr-1.5 h-4 w-4 shrink-0"/>KYC Docs</TabsTrigger>
-                        <TabsTrigger value="bank" className="flex-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"><Banknote className="mr-1.5 h-4 w-4 shrink-0"/>Bank & Area</TabsTrigger>
-                        <TabsTrigger value="confirmation" className="flex-1 px-3 py-2 text-xs sm:text-sm whitespace-nowrap"><EditIcon className="mr-1.5 h-4 w-4 shrink-0"/>Status</TabsTrigger>
+                <div className="relative mb-6">
+                    <TabsList className="h-11 w-full justify-start gap-1 bg-muted p-1 overflow-x-auto no-scrollbar flex-nowrap rounded-lg">
+                        <TabsTrigger value="personal" className="px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"><UserCircle className="mr-1.5 h-4 w-4 shrink-0"/>Personal</TabsTrigger>
+                        <TabsTrigger value="work" className="px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"><Briefcase className="mr-1.5 h-4 w-4 shrink-0"/>Work Info</TabsTrigger>
+                        <TabsTrigger value="kyc" className="px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"><FileText className="mr-1.5 h-4 w-4 shrink-0"/>KYC Docs</TabsTrigger>
+                        <TabsTrigger value="bank" className="px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"><Banknote className="mr-1.5 h-4 w-4 shrink-0"/>Bank & Area</TabsTrigger>
+                        <TabsTrigger value="confirmation" className="px-3 py-1.5 text-xs sm:text-sm whitespace-nowrap rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"><EditIcon className="mr-1.5 h-4 w-4 shrink-0"/>Status</TabsTrigger>
                     </TabsList>
                 </div>
 
-                <TabsContent value="personal" className="space-y-3 text-sm focus-visible:outline-none focus-visible:ring-0">
+                <TabsContent value="personal" className="space-y-3 text-sm focus-visible:outline-none focus-visible:ring-0 mt-0">
                     <p><strong>Full Name:</strong> {application.fullName || 'N/A'}</p>
                     <p><strong>Email:</strong> {application.email || 'N/A'}</p>
                     <p><strong>Mobile:</strong> {application.mobileNumber || 'N/A'}</p>

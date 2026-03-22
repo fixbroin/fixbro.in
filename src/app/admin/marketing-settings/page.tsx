@@ -132,18 +132,60 @@ export default function MarketingSettingsPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSaveSettings)}>
         <Tabs defaultValue="google" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 mb-6 h-auto flex-wrap justify-start">
-                <TabsTrigger value="google"><BarChart2 className="mr-2 h-4 w-4"/>Google</TabsTrigger>
-                <TabsTrigger value="meta"><FacebookIcon className="mr-2 h-4 w-4"/>Meta</TabsTrigger>
-                <TabsTrigger value="other"><ListChecks className="mr-2 h-4 w-4"/>Other Platforms</TabsTrigger>
-                <TabsTrigger value="feeds"><HelpCircle className="mr-2 h-4 w-4"/>Feeds</TabsTrigger>
-                <TabsTrigger value="ads_txt"><FileText className="mr-2 h-4 w-4"/>ads.txt</TabsTrigger>
-                <TabsTrigger value="custom_scripts"><Code className="mr-2 h-4 w-4"/>Custom Scripts</TabsTrigger>
-                <TabsTrigger value="firebase"><Smartphone className="mr-2 h-4 w-4"/>Firebase</TabsTrigger>
-                <TabsTrigger value="whatsapp"><MessageSquare className="mr-2 h-4 w-4"/>WhatsApp</TabsTrigger>
-            </TabsList>
+            <div className="relative mb-6">
+              <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+                <TabsTrigger 
+                  value="google"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <BarChart2 className="mr-2 h-4 w-4"/>Google
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="meta"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <FacebookIcon className="mr-2 h-4 w-4"/>Meta
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="other"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <ListChecks className="mr-2 h-4 w-4"/>Other Platforms
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="feeds"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <HelpCircle className="mr-2 h-4 w-4"/>Feeds
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ads_txt"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <FileText className="mr-2 h-4 w-4"/>ads.txt
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="custom_scripts"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <Code className="mr-2 h-4 w-4"/>Custom Scripts
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="firebase"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <Smartphone className="mr-2 h-4 w-4"/>Firebase
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="whatsapp"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <MessageSquare className="mr-2 h-4 w-4"/>WhatsApp
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="google">
+            <TabsContent value="google" className="mt-0 focus-visible:outline-none">
                 <Card>
                     <CardHeader><CardTitle>Google Integrations</CardTitle></CardHeader>
                     <CardContent className="space-y-4">

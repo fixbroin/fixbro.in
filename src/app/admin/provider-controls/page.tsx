@@ -28,19 +28,66 @@ export default function ProviderControlsPage() {
       </Card>
 
       <Tabs defaultValue="experience_levels" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-1 mb-6 h-auto flex-wrap justify-start">
-          <TabsTrigger value="experience_levels"><UserCheck className="mr-2 h-4 w-4"/>Experience</TabsTrigger>
-          <TabsTrigger value="skill_levels"><ListChecks className="mr-2 h-4 w-4"/>Skills</TabsTrigger>
-          <TabsTrigger value="qualifications"><ListChecks className="mr-2 h-4 w-4"/>Qualifications</TabsTrigger>
-          <TabsTrigger value="languages"><Languages className="mr-2 h-4 w-4"/>Languages</TabsTrigger>
-          <TabsTrigger value="additional_docs"><Paperclip className="mr-2 h-4 w-4"/>Additional Docs</TabsTrigger>
-          <TabsTrigger value="provider_fees"><HandCoins className="mr-2 h-4 w-4"/>Provider Fees</TabsTrigger>
-          <TabsTrigger value="withdrawal_settings"><Banknote className="mr-2 h-4 w-4"/>Withdrawals</TabsTrigger>
-          <TabsTrigger value="registration_access"><Power className="mr-2 h-4 w-4"/>Registration</TabsTrigger>
-          <TabsTrigger value="terms_management"><FileText className="mr-2 h-4 w-4"/>Terms</TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="experience_levels"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <UserCheck className="mr-2 h-4 w-4"/>Experience
+            </TabsTrigger>
+            <TabsTrigger 
+              value="skill_levels"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ListChecks className="mr-2 h-4 w-4"/>Skills
+            </TabsTrigger>
+            <TabsTrigger 
+              value="qualifications"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <ListChecks className="mr-2 h-4 w-4"/>Qualifications
+            </TabsTrigger>
+            <TabsTrigger 
+              value="languages"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Languages className="mr-2 h-4 w-4"/>Languages
+            </TabsTrigger>
+            <TabsTrigger 
+              value="additional_docs"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Paperclip className="mr-2 h-4 w-4"/>Additional Docs
+            </TabsTrigger>
+            <TabsTrigger 
+              value="provider_fees"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <HandCoins className="mr-2 h-4 w-4"/>Provider Fees
+            </TabsTrigger>
+            <TabsTrigger 
+              value="withdrawal_settings"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Banknote className="mr-2 h-4 w-4"/>Withdrawals
+            </TabsTrigger>
+            <TabsTrigger 
+              value="registration_access"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Power className="mr-2 h-4 w-4"/>Registration
+            </TabsTrigger>
+            <TabsTrigger 
+              value="terms_management"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <FileText className="mr-2 h-4 w-4"/>Terms
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="experience_levels">
+        <TabsContent value="experience_levels" className="mt-0 focus-visible:outline-none">
           <ExperienceLevelManager />
         </TabsContent>
         <TabsContent value="skill_levels">

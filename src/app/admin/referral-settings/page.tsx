@@ -25,14 +25,36 @@ export default function ReferralSettingsPage() {
       </Card>
 
       <Tabs defaultValue="referral_settings" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
-          <TabsTrigger value="referral_settings"><Handshake className="mr-2 h-4 w-4"/>Referral Settings</TabsTrigger>
-          <TabsTrigger value="withdrawal_settings"><Banknote className="mr-2 h-4 w-4"/>Withdrawal Settings</TabsTrigger>
-          <TabsTrigger value="referral_signups"><UserPlus className="mr-2 h-4 w-4"/>Referral Signups</TabsTrigger>
-          <TabsTrigger value="withdrawal_requests"><SendToBack className="mr-2 h-4 w-4"/>Withdrawal Requests</TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="referral_settings"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Handshake className="mr-2 h-4 w-4"/>Referral Settings
+            </TabsTrigger>
+            <TabsTrigger 
+              value="withdrawal_settings"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Banknote className="mr-2 h-4 w-4"/>Withdrawal Settings
+            </TabsTrigger>
+            <TabsTrigger 
+              value="referral_signups"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <UserPlus className="mr-2 h-4 w-4"/>Referral Signups
+            </TabsTrigger>
+            <TabsTrigger 
+              value="withdrawal_requests"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <SendToBack className="mr-2 h-4 w-4"/>Withdrawal Requests
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="referral_settings">
+        <TabsContent value="referral_settings" className="mt-0 focus-visible:outline-none">
           <ReferralSettingsTab />
         </TabsContent>
         <TabsContent value="withdrawal_settings">

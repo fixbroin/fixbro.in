@@ -212,13 +212,30 @@ export default function SEOSettingsPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSaveSettings)}>
           <Tabs defaultValue="global" className="w-full">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
-              <TabsTrigger value="global"><Globe className="mr-2 h-4 w-4"/>Global & Homepage</TabsTrigger>
-              <TabsTrigger value="patterns"><FileText className="mr-2 h-4 w-4"/>Page Content Patterns</TabsTrigger>
-              <TabsTrigger value="structured_data"><BarChart className="mr-2 h-4 w-4"/>Structured Data</TabsTrigger>
-            </TabsList>
+            <div className="relative mb-6">
+              <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+                <TabsTrigger 
+                  value="global"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <Globe className="mr-2 h-4 w-4"/>Global & Homepage
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="patterns"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <FileText className="mr-2 h-4 w-4"/>Page Content Patterns
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="structured_data"
+                  className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+                >
+                  <BarChart className="mr-2 h-4 w-4"/>Structured Data
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="global">
+            <TabsContent value="global" className="mt-0 focus-visible:outline-none">
               <Card>
                 <CardHeader><CardTitle>Global Defaults & Homepage SEO</CardTitle></CardHeader>
                 <CardContent className="space-y-6">
