@@ -91,14 +91,27 @@ const ExploreByLocation = dynamic(() => import('@/components/shared/ExploreByLoc
     loading: () => <Skeleton className="h-64 w-full rounded-xl" />
 });
 
-const SectionHeader: React.FC<{ title: string; icon?: React.ReactNode; subtitle?: string; centered?: boolean }> = ({ title, icon, subtitle, centered = true }) => (
+const SectionHeader: React.FC<{ 
+  title: string; 
+  icon?: React.ReactNode; 
+  subtitle?: string; 
+  centered?: boolean;
+  isH1?: boolean;
+}> = ({ title, icon, subtitle, centered = true, isH1 = false }) => {
+  const TitleTag = isH1 ? 'h1' : 'h2';
+  return (
     <div className={cn("mb-8 md:mb-12", centered ? "text-center" : "text-left")}>
-        <h2 className={cn("text-2xl md:text-3xl font-headline font-semibold text-foreground flex items-center gap-2", centered ? "justify-center" : "justify-start")}>
+        <TitleTag className={cn(
+          "font-headline font-semibold text-foreground flex items-center gap-2", 
+          isH1 ? "text-2xl md:text-4xl" : "text-xl md:text-3xl",
+          centered ? "justify-center" : "justify-start"
+        )}>
             {icon} {title}
-        </h2>
+        </TitleTag>
         {subtitle && <p className="text-muted-foreground mt-2 text-sm md:text-base max-w-2xl mx-auto">{subtitle}</p>}
     </div>
-);
+  );
+};
 
 const FEATURES_CONFIG_COLLECTION = "webSettings";
 const FEATURES_CONFIG_DOC_ID = "featuresConfiguration";
@@ -643,7 +656,9 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   }, [handleSimpleNavigation]);
 
   const displayHeroCarousel = !isLoadingAppSettings && (appConfig.enableHeroCarousel ?? true);
-  const finalH1 = pageH1 || seoSettings?.homepageH1 || 'Choose Your Service';
+  const finalH1 = pageH1 || initialH1Title || (citySlug || areaSlug 
+    ? `Professional Home Services in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+    : "Discover Our Services");
   
   const renderAdsByPlacement = (placement: AdPlacement) => {
     const adsForPlacement = activeAds.filter(ad => ad.placement === placement);
@@ -740,6 +755,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
           <div className="container mx-auto px-4">
             <SectionHeader 
                 title={finalH1} 
+                isH1={true}
                 subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
             />
             <HomeCategoriesSection />

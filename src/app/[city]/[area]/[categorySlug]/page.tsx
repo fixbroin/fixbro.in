@@ -73,7 +73,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(categoryData.metaDescription || seoSettings.areaCategoryPageDescriptionPattern, placeholderData) || `Hire top-rated ${categoryData.name} experts in ${areaData.name}, ${cityData.name}. Trusted professionals, transparent pricing, and quality home services near you.`;
   const keywords = (replacePlaceholders(categoryData.metaKeywords || seoSettings.areaCategoryPageKeywordsPattern, placeholderData) || `${categoryData.name} in ${areaData.name}, best ${categoryData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = categoryData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = categoryData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -90,7 +91,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/${citySlug}/${areaSlug}/${categorySlug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'website',
     },
   };
@@ -124,12 +125,15 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
   breadcrumbItems.push({ label: categoryData.name });
 
   const appBaseUrl = getBaseUrl();
+  const rawSchemaImage = categoryData.imageUrl || `/android-chrome-512x512.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const areaCategorySchema = {
     "@context": "https://schema.org",
     "@type": "Service",
     "name": `${categoryData.name} in ${areaData.name}, ${cityData.name}`,
     "description": categoryData.metaDescription || `Professional ${categoryData.name} services in ${areaData.name}, ${cityData.name}. Trusted experts by FixBro.`,
-    "image": categoryData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro",

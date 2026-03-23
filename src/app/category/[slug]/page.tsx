@@ -100,7 +100,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(data.category.metaDescription || seoSettings.categoryPageDescriptionPattern, placeholderData) || `Professional ${data.category.name} services near you.`;
   const keywords = replacePlaceholders(data.category.metaKeywords || seoSettings.categoryPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = data.category.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = data.category.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -117,7 +118,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/category/${slug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'website',
     },
   };
@@ -149,12 +150,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (data) {
     breadcrumbItems.push({ label: data.category.name });
     
+    const rawSchemaImage = data.category.imageUrl || `/android-chrome-512x512.png`;
+    const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+    
     const categorySchema = {
       "@context": "https://schema.org",
       "@type": "Service",
       "name": `${data.category.name} Services`,
       "description": data.category.seo_description || `Professional ${data.category.name} services near you.`,
-      "image": data.category.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+      "image": schemaImage,
       "provider": {
         "@type": "LocalBusiness",
         "name": "FixBro"

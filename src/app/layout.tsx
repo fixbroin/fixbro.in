@@ -12,6 +12,7 @@ import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getBaseUrl } from '@/lib/config';
 import MarketingScriptsInjector from '@/components/layout/MarketingScriptsInjector';
+import Script from 'next/script';
 import { Roboto } from 'next/font/google';
 import PageViewTracker from '@/components/layout/PageViewTracker';
 import ThemeInjector from '@/components/layout/ThemeInjector';
@@ -35,8 +36,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const defaultDescription = seoSettings.defaultMetaDescription || 'Book home services easily with FixBro.';
   const defaultKeywords = (seoSettings.defaultMetaKeywords || '').split(',').map(k => k.trim()).filter(k => k);
-  const defaultOgImage = `/android-chrome-512x512.png`;
+  const defaultOgImage = `/default-image.png`;
   const ogImage = seoSettings.structuredDataImage || defaultOgImage;
+  const absoluteOgImage = ogImage.startsWith('http') ? ogImage : `${appBaseUrl}${ogImage.startsWith('/') ? '' : '/'}${ogImage}`;
 
   return {
     metadataBase: new URL(appBaseUrl),
@@ -65,8 +67,11 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     openGraph: {
       siteName: siteName,
+      title: siteName,
+      description: defaultDescription,
+      url: '/',
+      images: [{ url: absoluteOgImage, width: 1200, height: 630, alt: siteName }],
       type: 'website',
-      images: ogImage ? [{ url: ogImage.startsWith('http') ? ogImage : `${appBaseUrl}${ogImage.startsWith('/') ? '' : '/'}${ogImage}` }] : [],
     },
     icons: {
       icon: [
@@ -120,17 +125,23 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${roboto.variable}`} suppressHydrationWarning>
-      <head>
-        <style id="fixbro-dynamic-theme-styles" dangerouslySetInnerHTML={{ __html: serverThemeStyles }} />
-        <script
+      <body className="font-body antialiased no-select">
+        <style 
+          id="fixbro-dynamic-theme-styles" 
+          precedence="high"
+          href="fixbro-dynamic-theme-styles"
+          dangerouslySetInnerHTML={{ __html: serverThemeStyles }} 
+        />
+        <Script
+          id="fixbro-initial-theme"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const theme = (function() { // IIFE for getInitialTheme
+                const theme = (function() { 
                   try {
                     const storedTheme = localStorage.getItem('fixbro-theme');
                     if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
-                    // ALWAYS default to light on first visit for brand consistency
                     return 'light';
                   } catch (e) { return 'light'; }
                 })();
@@ -139,20 +150,16 @@ export default async function RootLayout({
                 } else {
                   document.documentElement.classList.remove('dark');
                 }
-                // Persist the determined theme back to localStorage if it wasn't already there or differs
                 try {
                     if (localStorage.getItem('fixbro-theme') !== theme) {
                         localStorage.setItem('fixbro-theme', theme);
                     }
-                } catch (e) { /* LocalStorage not available or failed */ }
+                } catch (e) { }
               })();
             `,
           }}
         />
         <ThemeInjector />
-      </head>
-
-      <body className="font-body antialiased no-select">
         <Suspense fallback={<RootSuspenseLoader />}>
           <AuthProvider>
             <LoadingProvider>

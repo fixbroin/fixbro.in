@@ -30,19 +30,19 @@ const prompt = ai.definePrompt({
   name: 'generateAreaCategorySeoPrompt',
   input: { schema: GenerateAreaCategorySeoInputSchema },
   output: { schema: GenerateAreaCategorySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro".
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service category within a specific neighborhood/area of a city to rank #1 on Google.
+  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
+Your task is to generate highly aggressive, intent-driven SEO content for a specific service category within a specific neighborhood or area of Bangalore to rank #1 on Google for hyper-local searches.
 
 Area Name: {{areaName}}
 City Name: {{cityName}}
 Category Name: {{categoryName}}
 
-Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", and "Near Me".
+Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
 
-1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services in {{areaName}}, {{cityName}}".
-2.  **meta_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in {{areaName}}, {{cityName}} | Expert {{categoryName}} Near Me".
-3.  **meta_description**: A compelling meta description (under 160 chars) that includes the area, city, and category, using phrases like "trusted experts" or "affordable pricing" to drive local bookings.
-4.  **meta_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} {{areaName}}", "{{categoryName}} near me {{areaName}}", "professional {{categoryName}} in {{areaName}} {{cityName}}".
+1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services in {{areaName}}, Bangalore".
+2.  **meta_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in {{areaName}} | Top-Rated Experts in Bangalore".
+3.  **meta_description**: A compelling meta description (under 160 chars) that includes Bangalore, the area ({{areaName}}), and the category. Use hyper-local phrases like "trusted by homeowners in {{areaName}}" or "best {{categoryName}} near me in {{areaName}}".
+4.  **meta_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} {{areaName}} bangalore", "professional {{categoryName}} near me {{areaName}}", "{{areaName}} local {{categoryName}} specialists".
 
 Return the entire response as a single, valid JSON object that adheres to the defined output schema.
 `,

@@ -53,6 +53,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = `Expert Home Maintenance Tips & Guides | Blog${seoSettings.defaultMetaTitleSuffix || ' | FixBro'}`;
   const description = "Discover professional tips, DIY guides, and home maintenance advice from FixBro experts. Learn how to keep your home in top shape.";
 
+  const rawOgImage = seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
+
   return {
     title,
     description,
@@ -65,7 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: `${appBaseUrl}/blog`,
       siteName: seoSettings.siteName || 'FixBro',
       type: 'website',
-      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png` }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
     },
   };
 }
@@ -95,17 +98,21 @@ export default async function BlogListPage() {
         "url": `${appBaseUrl}/android-chrome-512x512.png`
       }
     },
-    "blogPost": posts.slice(0, 10).map(post => ({
-      "@type": "BlogPosting",
-      "headline": post.title,
-      "url": `${appBaseUrl}/blog/${post.slug}`,
-      "datePublished": post.createdAt,
-      "image": post.coverImageUrl || `${appBaseUrl}/default-image.png`,
-      "author": {
-        "@type": "Person",
-        "name": post.authorName || "FixBro Expert"
-      }
-    }))
+    "blogPost": posts.slice(0, 10).map(post => {
+      const rawImage = post.coverImageUrl || `/default-image.png`;
+      const absImage = rawImage.startsWith('http') ? rawImage : `${appBaseUrl}${rawImage.startsWith('/') ? '' : '/'}${rawImage}`;
+      return {
+        "@type": "BlogPosting",
+        "headline": post.title,
+        "url": `${appBaseUrl}/blog/${post.slug}`,
+        "datePublished": post.createdAt,
+        "image": absImage,
+        "author": {
+          "@type": "Person",
+          "name": post.authorName || "FixBro Expert"
+        }
+      };
+    })
   };
 
   return (

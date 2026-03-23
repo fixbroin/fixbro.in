@@ -28,17 +28,17 @@ const prompt = ai.definePrompt({
   name: 'generateCitySeoPrompt',
   input: { schema: GenerateCitySeoInputSchema },
   output: { schema: GenerateCitySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro".
-Your task is to generate highly aggressive, intent-driven SEO content for a city-level landing page to rank #1 on Google.
+  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
+Your task is to generate highly aggressive, intent-driven SEO content for a city-level landing page to rank #1 on Google for Bangalore-based searches.
 
 City Name: {{cityName}}
 
-Based on the city name, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", and "Near Me".
+Based on the city name, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
 
 1.  **h1_title**: An H1 title using the format: "Best Professional Home Services in {{cityName}}".
 2.  **seo_title**: A meta title (under 60 chars) with the format: "Best Home Services in {{cityName}} | Top-Rated Handyman Near Me".
-3.  **seo_description**: A meta description (under 160 chars) that is compelling and includes the city name, key services (like carpentry, plumbing), and words like "trusted professionals".
-4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best home services {{cityName}}", "professional home repair {{cityName}}", and "top handyman near me".
+3.  **seo_description**: A meta description (under 160 chars) that is compelling and includes the city name, key services (like carpentry, plumbing, electrical), and mentions top neighborhoods like "Koramangala", "HSR Layout", and "Indiranagar". Use words like "trusted professionals" to drive local bookings.
+4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best home services in {{cityName}}", "professional home repair {{cityName}}", "top handyman near me {{cityName}}", and "home maintenance services bangalore".
 
 Return the entire response as a single, valid JSON object that adheres to the defined output schema.
 `,

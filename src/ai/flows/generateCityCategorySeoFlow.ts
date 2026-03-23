@@ -29,18 +29,18 @@ const prompt = ai.definePrompt({
   name: 'generateCityCategorySeoPrompt',
   input: { schema: GenerateCityCategorySeoInputSchema },
   output: { schema: GenerateCityCategorySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro".
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service category within a city to rank #1 on Google.
+  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
+Your task is to generate highly aggressive, intent-driven SEO content for a specific service category within Bangalore to rank #1 on Google for city-wide category searches.
 
 City Name: {{cityName}}
 Category Name: {{categoryName}}
 
-Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", and "Near Me".
+Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
 
 1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services in {{cityName}}".
-2.  **meta_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in {{cityName}} | Professional {{categoryName}} Near Me".
-3.  **meta_description**: A compelling meta description (under 160 chars) that includes the city, category, and words like "trusted experts" or "affordable pricing" to drive high click-through rates.
-4.  **meta_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} {{cityName}}", "professional {{categoryName}} near me", "top-rated {{categoryName}} {{cityName}}", and specific sub-services if applicable.
+2.  **meta_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in {{cityName}} | Professional {{categoryName}} Services".
+3.  **meta_description**: A compelling meta description (under 160 chars) that includes Bangalore, the category, and mentions top neighborhoods like "Koramangala", "HSR Layout", or "Indiranagar". Use words like "trusted experts" or "affordable pricing" to drive local bookings.
+4.  **meta_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} {{cityName}}", "professional {{categoryName}} services bangalore", "top-rated {{categoryName}} bangalore", and "expert {{categoryName}} near me".
 
 Return the entire response as a single, valid JSON object that adheres to the defined output schema.
 `,

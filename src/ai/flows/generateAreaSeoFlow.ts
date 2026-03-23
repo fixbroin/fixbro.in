@@ -29,18 +29,18 @@ const prompt = ai.definePrompt({
   name: 'generateAreaSeoPrompt',
   input: { schema: GenerateAreaSeoInputSchema },
   output: { schema: GenerateAreaSeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro".
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service area within a city to rank #1 on Google.
+  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
+Your task is to generate highly aggressive, intent-driven SEO content for a specific service area or locality within Bangalore to rank #1 on Google for hyper-local searches.
 
 Area Name: {{areaName}}
 City Name: {{cityName}}
 
-Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", and "Near Me".
+Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
 
-1.  **h1_title**: An H1 title using the format: "Best Home Services in {{areaName}}, {{cityName}}".
-2.  **seo_title**: A meta title (under 60 chars) with the format: "Top Home Services in {{areaName}} | Best Handyman Near Me".
-3.  **seo_description**: A meta description (under 160 chars) that is compelling and includes the area, city, and key services, using phrases like "trusted experts".
-4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best home services {{areaName}}", "professional handyman in {{areaName}}", "home repair near me".
+1.  **h1_title**: An H1 title using the format: "Best Professional Home Services in {{areaName}}, Bangalore".
+2.  **seo_title**: A meta title (under 60 chars) with the format: "Top Home Services in {{areaName}} | Best Handyman in Bangalore".
+3.  **seo_description**: A meta description (under 160 chars) that is compelling and mentions the specific area ({{areaName}}), Bangalore, and key services. Use localized phrases like "trusted by residents in {{areaName}}" or "Bangalore's expert home repair team".
+4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best home services {{areaName}} bangalore", "professional handyman in {{areaName}}", "home repair near me {{areaName}}", and "{{areaName}} local home experts".
 
 Return the entire response as a single, valid JSON object that adheres to the defined output schema.
 `,

@@ -28,17 +28,17 @@ const prompt = ai.definePrompt({
   name: 'generateCategorySeoPrompt',
   input: { schema: GenerateCategorySeoInputSchema },
   output: { schema: GenerateCategorySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro".
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service category page to rank #1 on Google.
+  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
+Your task is to generate highly aggressive, intent-driven SEO content for a specific service category page to rank #1 on Google for Bangalore-based searches.
 
 Category Name: {{categoryName}}
 
-Based on this detail, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", and "Near Me".
+Based on this detail, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
 
-1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services Near You".
-2.  **seo_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} Near Me | Professional {{categoryName}} Services".
-3.  **seo_description**: A compelling meta description (under 160 chars) that includes the category and words like "trusted experts" or "affordable pricing" to drive local bookings.
-4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} near me", "professional {{categoryName}} services", and other related local terms.
+1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services in Bangalore".
+2.  **seo_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in Bangalore | Professional {{categoryName}} Services".
+3.  **seo_description**: A compelling meta description (under 160 chars) that includes the category and mentions "Bangalore" and top neighborhoods like "Koramangala", "HSR Layout", or "Indiranagar". Use words like "trusted experts" or "affordable pricing" to drive local bookings.
+4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} in bangalore", "professional {{categoryName}} services bangalore", and other related local terms.
 5.  **imageHint**: Provide one or two keywords for an AI image search for the category's main image. Max 50 characters.
 
 Return the entire response as a single, valid JSON object that adheres to the defined output schema.

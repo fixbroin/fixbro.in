@@ -147,7 +147,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(serviceData.seo_description || seoSettings.servicePageDescriptionPattern, placeholderData) || `Book professional ${serviceData.name} in ${cityName}. Trusted experts, transparent pricing, and quality home solutions by FixBro.`;
   const keywords = (replacePlaceholders(serviceData.seo_keywords || seoSettings.servicePageKeywordsPattern, placeholderData) || `${serviceData.name}, best ${serviceData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = serviceData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = serviceData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -164,7 +165,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/service/${slug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'article',
     },
   };
@@ -192,12 +193,15 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const h1Title = replacePlaceholders(serviceData.h1_title || seoSettings.servicePageH1Pattern, placeholderData) || `Best Professional ${serviceData.name} in ${cityName}`;
 
   const appBaseUrl = getBaseUrl();
+  const rawSchemaImage = serviceData.imageUrl || `/android-chrome-512x512.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const serviceSchema = {
     "@context": "https://schema.org",
     "@type": "Service",
     "name": serviceData.name,
     "description": serviceData.seo_description || serviceData.description,
-    "image": serviceData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro",

@@ -76,7 +76,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(categoryData.metaDescription || seoSettings.cityCategoryPageDescriptionPattern, placeholderData) || `Hire the best professional ${categoryData.name} services in ${cityData.name}. Trusted experts, transparent pricing, and high-quality home solutions near you.`;
   const keywords = (replacePlaceholders(categoryData.metaKeywords || seoSettings.cityCategoryPageKeywordsPattern, placeholderData) || `${categoryData.name} in ${cityData.name}, best ${categoryData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = categoryData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = categoryData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -93,7 +94,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/${citySlug}/category/${categorySlug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'website',
     },
   };
@@ -127,12 +128,15 @@ export default async function CityCategoryPage({ params }: PageProps) {
   breadcrumbItems.push({ label: cityData.name, href: `/${citySlugParam}` });
   breadcrumbItems.push({ label: categoryData.name });
 
+  const rawSchemaImage = categoryData.imageUrl || `/android-chrome-512x512.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const categoryCitySchema = {
     "@context": "https://schema.org",
     "@type": "Service",
     "name": `${categoryData.name} in ${cityData.name}`,
     "description": categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by FixBro.`,
-    "image": categoryData.imageUrl || `${appBaseUrl}/android-chrome-512x512.png`,
+    "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro",

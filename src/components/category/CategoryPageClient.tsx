@@ -408,7 +408,6 @@ export default function CategoryPageClient({
 
   return (
     <div className="container mx-auto px-4 py-4 pb-24">
-      {seoPageH1 && <h1 className="sr-only">{seoPageH1}</h1>}
       {breadcrumbItems.length > 0 && <Breadcrumbs items={breadcrumbItems} />}
       <nav className="mb-1 hidden md:flex items-center justify-between">
         <Button variant="outline" onClick={() => { showLoading(); router.back(); }}>
@@ -419,9 +418,9 @@ export default function CategoryPageClient({
         </Button>
       </nav>
       
-      <h2 className="text-3xl md:text-4xl font-headline font-semibold mb-2 text-foreground">
+      <h1 className="text-2xl md:text-4xl font-headline font-semibold mb-2 text-foreground">
         {displayPageH1}
-      </h2>
+      </h1>
       <p className="text-muted-foreground mb-3">Browse services under {getOverriddenCategoryName(category.id, category.name)}{areaSlug && citySlug ? ` in ${areaSlug.replace(/-/g, ' ')}, ${citySlug.replace(/-/g, ' ')}` : citySlug ? ` in ${citySlug.replace(/-/g, ' ')}` : ""}.</p>
 
       {hasAnyServices ? (

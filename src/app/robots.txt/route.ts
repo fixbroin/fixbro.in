@@ -12,9 +12,19 @@ export function GET() {
 User-agent: *
 Allow: /
 
-# Disallow admin panel for all crawlers
+# Disallow private and administrative areas
 Disallow: /admin/
 Disallow: /admin/*
+Disallow: /provider/
+Disallow: /provider/*
+Disallow: /api/
+Disallow: /api/*
+Disallow: /auth/
+Disallow: /auth/*
+
+# Disallow build files and internal next.js folders
+Disallow: /_next/
+Disallow: /_next/*
 
 Sitemap: ${baseUrl}/sitemap.xml
   `.trim();

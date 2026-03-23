@@ -82,7 +82,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(areaData.metaDescription || seoSettings.areaPageDescriptionPattern, placeholderData) || `Trusted home services in ${areaData.name}, ${areaData.parentCityData?.name}.`;
   const keywords = replacePlaceholders(areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = areaData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = areaData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -99,7 +100,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/${citySlug}/${areaSlug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'website',
     },
   };
@@ -153,11 +154,21 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
   breadcrumbItems.push({ label: areaData.parentCityData!.name, href: `/${citySlug}` });
   breadcrumbItems.push({ label: areaData.name });
 
+  const seoSettings = homepageData.seoSettings;
+  const appBaseUrl = getBaseUrl();
+  const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
+
+  const h1Title = replacePlaceholders(areaData.h1_title || seoSettings.areaPageH1Pattern, placeholderData) || `Expert Home Services in ${areaData.name}`;
+
+  const rawSchemaImage = areaData.imageUrl || seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const areaSchema = {
     "@context": "https://schema.org",
     "@type": "Service",
     "name": `Home Services in ${areaData.name}, ${areaData.parentCityData!.name}`,
     "description": areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
+    "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
       "name": "FixBro"
@@ -181,7 +192,7 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
   return (
     <>
       <JsonLdScript data={areaSchema} idSuffix={`area-${areaData.id}`} />
-      <HomePageClient citySlug={citySlug} areaSlug={areaSlug} breadcrumbItems={breadcrumbItems} initialData={homepageData} />
+      <HomePageClient citySlug={citySlug} areaSlug={areaSlug} breadcrumbItems={breadcrumbItems} initialData={homepageData} initialH1Title={h1Title} />
     </>
   );
 }

@@ -11,24 +11,17 @@ interface JsonLdScriptProps {
 
 const JsonLdScript: React.FC<JsonLdScriptProps> = ({ data, idSuffix }) => {
   const reactId = useId();
-  if (!data || Object.keys(data).length === 0) {
-    return null;
-  }
-
-  // Generate a base ID, make it more unique if suffix is provided
-  const baseId = `json-ld-${(data['@type'] as string)?.toLowerCase().replace(/[^a-z0-9]/gi, '') || 'data'}`;
-  const scriptId = idSuffix ? `${baseId}-${idSuffix}` : `${baseId}-${reactId.replace(/:/g, '')}`;
-
+  const baseId = idSuffix ? `json-ld-${idSuffix}` : 'json-ld-script';
+  const scriptId = `${baseId}-${reactId.replace(/:/g, '')}`;
 
   return (
     <Script
       id={scriptId}
       type="application/ld+json"
+      strategy="afterInteractive"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
     />
   );
 };
 
 export default JsonLdScript;
-
-    

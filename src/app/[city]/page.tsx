@@ -57,7 +57,8 @@ export async function generateMetadata(
   const description = replacePlaceholders(cityData.metaDescription || seoSettings.cityPageDescriptionPattern, placeholderData) || `Trusted home services in ${cityData.name}.`;
   const keywords = replacePlaceholders(cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
-  const ogImage = cityData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = cityData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -74,7 +75,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/${citySlug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'website',
     },
   };
@@ -118,6 +119,9 @@ export default async function CityHomePage({ params }: CityPageProps) {
   const placeholderData = { cityName: cityData.name };
   const h1Title = replacePlaceholders(cityData.h1_title || seoSettings.cityPageH1Pattern, placeholderData) || `Best Professional Home Services in ${cityData.name}`;
 
+  const rawSchemaImage = cityData.imageUrl || seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const citySchema = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
@@ -125,7 +129,7 @@ export default async function CityHomePage({ params }: CityPageProps) {
     "url": `${appBaseUrl}/${citySlug}`,
     "description": cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by FixBro.`,
     "telephone": seoSettings.structuredDataTelephone,
-    "image": cityData.imageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/android-chrome-512x512.png`,
+    "image": schemaImage,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": cityData.name,

@@ -117,7 +117,8 @@ export async function generateMetadata(
   const title = post.metaTitle || post.meta_title || `${post.title} | FixBro Blog`;
   const description = post.metaDescription || post.meta_description || post.excerpt || post.title || '';
   
-  const ogImage = post.coverImageUrl || seoSettings.structuredDataImage || `${appBaseUrl}/default-image.png`;
+  const rawOgImage = post.coverImageUrl || seoSettings.structuredDataImage || `/default-image.png`;
+  const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
   return {
     title: title,
@@ -133,7 +134,7 @@ export async function generateMetadata(
       title: title,
       description: description,
       url: `/blog/${slug}`,
-      images: [{ url: ogImage }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
       type: 'article',
       publishedTime: (() => {
         const millis = getTimestampMillis(post.createdAt);
@@ -187,12 +188,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const displayReadingTime = post.readingTime || calculateReadingTime(post.content);
 
   const appBaseUrl = getBaseUrl();
+  const rawSchemaImage = post.coverImageUrl || `/default-image.png`;
+  const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
+
   const blogSchema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     "headline": post.title,
     "description": post.excerpt || post.metaDescription,
-    "image": post.coverImageUrl || `${appBaseUrl}/default-image.png`,
+    "image": schemaImage,
     "datePublished": getIsoDate(post.createdAt),
     "dateModified": getIsoDate(post.updatedAt || post.createdAt),
     "author": {
