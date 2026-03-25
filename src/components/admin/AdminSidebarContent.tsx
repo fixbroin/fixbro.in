@@ -12,10 +12,13 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight } from 'lucide-react';
+import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight, RefreshCw } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutGrid },
@@ -75,11 +78,48 @@ export default function AdminSidebarContent() {
   const { settings: globalSettings } = useGlobalSettings();
   const { isMobile, setOpenMobile } = useSidebar();
   const { showLoading } = useLoading();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLinkClick = () => {
     showLoading();
     if (isMobile) {
       setOpenMobile(false);
+    }
+  };
+
+  const handleRefreshCache = async () => {
+    if (!user) return;
+    setIsRefreshing(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/admin/clear-cache', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ tag: 'all' }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast({
+          title: "Cache Cleared",
+          description: "Website cache has been completely refreshed.",
+        });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Could not clear cache.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -158,6 +198,21 @@ export default function AdminSidebarContent() {
           );
         })}
         </SidebarMenu>
+
+        <div className="px-4 mt-8 mb-4">
+            <div className="flex items-center gap-3 mb-4">
+                <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] whitespace-nowrap">Cache Control</span>
+                <div className="h-px w-full bg-accent/20" />
+            </div>
+            <button
+                onClick={handleRefreshCache}
+                disabled={isRefreshing}
+                className="w-full flex items-center h-11 transition-all duration-300 rounded-xl px-4 group bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-white shadow-sm disabled:opacity-50"
+            >
+                <RefreshCw className={cn("h-4 w-4 shrink-0 transition-transform duration-700", isRefreshing && "animate-spin")} />
+                <span className="ml-3 truncate font-bold text-sm">Clear System Cache</span>
+            </button>
+        </div>
       </SidebarContent>
     </>
   );

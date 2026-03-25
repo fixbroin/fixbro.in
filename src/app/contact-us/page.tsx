@@ -11,41 +11,19 @@ import ContactUsForm from "@/components/forms/ContactUsForm";
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { Card, CardContent } from "@/components/ui/card";
-import { unstable_cache } from 'next/cache';
-import { cache } from 'react';
+import { getContentPageData } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import type { BreadcrumbItem } from '@/types/ui';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 const PAGE_SLUG = "contact-us";
-
-const getPageData = cache(async (slug: string): Promise<ContentPage | null> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const pageDocRef = adminDb.collection("contentPages").doc(slug);
-        const docSnap = await pageDocRef.get();
-        if (docSnap.exists) {
-          const data = docSnap.data();
-          return { id: docSnap.id, ...data } as ContentPage;
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching content page for slug "${slug}":`, error);
-        return null;
-      }
-    },
-    [`content-page-${slug}`],
-    { revalidate: 3600, tags: ['content'] }
-  )();
-});
 
 export async function generateMetadata(
   _: {},
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageData = await getContentPageData(PAGE_SLUG);
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
@@ -68,7 +46,7 @@ export async function generateMetadata(
 }
 
 export default async function ContactUsPage() {
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageData = await getContentPageData(PAGE_SLUG);
 
   if (!pageData) {
     return (

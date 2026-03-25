@@ -5,23 +5,10 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import HomePageClient from '@/components/home/HomePageClient';
 import { getBaseUrl } from '@/lib/config';
 import { getHomepageData, getAggregateRating } from '@/lib/homepageUtils';
+import { getGlobalWebSettings } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
-export const revalidate = 3600; // Revalidate every hour
-
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-  try {
-    const settingsDocRef = adminDb.collection("webSettings").doc("global");
-    const docSnap = await settingsDocRef.get();
-    if (docSnap.exists) {
-      return docSnap.data() as GlobalWebSettings;
-    }
-    return null;
-  } catch (error) {
-    console.error("Error fetching global web settings for metadata:", error);
-    return null;
-  }
-}
+export const revalidate = false;
 
 export async function generateMetadata(
   _: {}, 
@@ -30,7 +17,7 @@ export async function generateMetadata(
   const resolvedParent = await parent;
   
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalWebsiteSettings();
+  const webSettings = await getGlobalWebSettings();
   const appBaseUrl = getBaseUrl();
 
   const title = seoSettings.homepageMetaTitle || seoSettings.siteName || 'FixBro';

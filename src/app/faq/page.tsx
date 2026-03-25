@@ -12,7 +12,7 @@ import { unstable_cache } from 'next/cache';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { serializeFirestoreData } from '@/lib/serializeUtils';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 const getFaqs = unstable_cache(
   async () => {
@@ -33,9 +33,8 @@ const getFaqs = unstable_cache(
     }
   },
   ['admin-faqs'],
-  { revalidate: 3600, tags: ['faqs'] }
+  { revalidate: false, tags: ['faqs', 'global-cache'] }
 );
-
 
 export default async function FAQPage() {
   const faqs = await getFaqs();

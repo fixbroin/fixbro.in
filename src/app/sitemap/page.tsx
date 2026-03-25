@@ -6,8 +6,10 @@ import { Metadata } from 'next';
 import { getBaseUrl } from '@/lib/config';
 import { FileText, MapPin, Layers, Briefcase, BookOpen, ChevronRight, Globe } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: 'Sitemap - FixBro Home Services',
@@ -31,86 +33,95 @@ interface SitemapData {
   blogs: FirestoreBlogPost[];
 }
 
-async function getSitemapData(): Promise<SitemapData> {
-  // Static Pages
-  const staticPages = [
-    { name: 'Home', url: '/' },
-    { name: 'About Us', url: '/about-us' },
-    { name: 'Contact Us', url: '/contact-us' },
-    { name: 'All Categories', url: '/categories' },
-    { name: 'FAQ', url: '/faq' },
-    { name: 'Blog', url: '/blog' },
-    { name: 'Login', url: '/auth/login' },
-    { name: 'Sign Up', url: '/auth/signup' },
-    { name: 'Join as a Provider', url: '/provider-registration' },
-    { name: 'Damage & Claims Policy', url: '/damage-and-claims-policy' },
-  ];
-  
-  const contentPagesSnap = await adminDb.collection('contentPages').get();
-  const dynamicContentPages = contentPagesSnap.docs.map(doc => {
-      const data = doc.data() as ContentPage;
-      return { name: data.title, url: `/${data.slug}`};
-  }).filter(page => !staticPages.some(p => p.url === page.url));
+const getSitemapData = cache(async (): Promise<SitemapData> => {
+  return unstable_cache(
+    async () => {
+      // Static Pages
+      const staticPages = [
+        { name: 'Home', url: '/' },
+        { name: 'About Us', url: '/about-us' },
+        { name: 'Contact Us', url: '/contact-us' },
+        { name: 'All Categories', url: '/categories' },
+        { name: 'FAQ', url: '/faq' },
+        { name: 'Blog', url: '/blog' },
+        { name: 'Login', url: '/auth/login' },
+        { name: 'Sign Up', url: '/auth/signup' },
+        { name: 'Join as a Provider', url: '/provider-registration' },
+        { name: 'Damage & Claims Policy', url: '/damage-and-claims-policy' },
+      ];
+      
+      const contentPagesSnap = await adminDb.collection('contentPages').get();
+      const dynamicContentPages = contentPagesSnap.docs.map(doc => {
+          const data = doc.data() as ContentPage;
+          return { name: data.title, url: `/${data.slug}`};
+      }).filter(page => !staticPages.some(p => p.url === page.url));
 
 
-  // Fetch all data in parallel
-  const [
-    citiesSnap,
-    categoriesSnap,
-    subCategoriesSnap,
-    servicesSnap,
-    blogsSnap
-  ] = await Promise.all([
-    adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
-    adminDb.collection('adminCategories').orderBy('order').get(),
-    adminDb.collection('adminSubCategories').orderBy('name').get(),
-    adminDb.collection('adminServices').where('isActive', '==', true).orderBy('name').get(),
-    adminDb.collection('blogPosts').where('isPublished', '==', true).orderBy('createdAt', 'desc').get()
-  ]);
+      // Fetch all data in parallel
+      const [
+        citiesSnap,
+        categoriesSnap,
+        subCategoriesSnap,
+        servicesSnap,
+        blogsSnap
+      ] = await Promise.all([
+        adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
+        adminDb.collection('adminCategories').orderBy('order').get(),
+        adminDb.collection('adminSubCategories').orderBy('name').get(),
+        adminDb.collection('adminServices').where('isActive', '==', true).orderBy('name').get(),
+        adminDb.collection('blogPosts').where('isPublished', '==', true).orderBy('createdAt', 'desc').get()
+      ]);
 
-  const cities = citiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCity));
-  const categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCategory));
-  const subCategories = subCategoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreSubCategory));
-  const services = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreService));
-  const blogs = blogsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreBlogPost));
-  
-  // Group City-wise Categories
-  const cityCategories = cities.map(city => ({
-    city,
-    categories,
-  }));
-  
-  // Group Area-wise Categories
-  const areaCategoriesPromises = cities.map(async (city) => {
-    const areasSnap = await adminDb.collection('areas').where('cityId', '==', city.id).where('isActive', '==', true).orderBy('name').get();
-    const areas = areasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreArea));
-    return {
-      city,
-      areas: areas.map(area => ({ area, categories })),
-    };
-  });
-  const areaCategories = await Promise.all(areaCategoriesPromises);
+      const cities = citiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCity));
+      const categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCategory));
+      const subCategories = subCategoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreSubCategory));
+      const services = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreService));
+      const blogs = blogsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreBlogPost));
+      
+      // Group City-wise Categories
+      const cityCategories = cities.map(city => ({
+        city,
+        categories,
+      }));
+      
+      // Group Area-wise Categories
+      const areaCategoriesPromises = cities.map(async (city) => {
+        const areasSnap = await adminDb.collection('areas').where('cityId', '==', city.id).where('isActive', '==', true).orderBy('name').get();
+        const areas = areasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreArea));
+        return {
+          city,
+          areas: areas.map(area => ({ area, categories })),
+        };
+      });
+      const areaCategories = await Promise.all(areaCategoriesPromises);
 
-  // Group Services by Category -> SubCategory
-  const servicesByCategory = categories.map(category => {
-    const relevantSubCats = subCategories.filter(sc => sc.parentId === category.id);
-    const subCategoriesWithServices = relevantSubCats.map(subCategory => ({
-      subCategory,
-      services: services.filter(s => s.subCategoryId === subCategory.id)
-    })).filter(sc => sc.services.length > 0);
-    return { category, subCategories: subCategoriesWithServices };
-  }).filter(cat => cat.subCategories.length > 0);
+      // Group Services by Category -> SubCategory
+      const servicesByCategory = categories.map(category => {
+        const relevantSubCats = subCategories.filter(sc => sc.parentId === category.id);
+        const subCategoriesWithServices = relevantSubCats.map(subCategory => ({
+          subCategory,
+          services: services.filter(s => s.subCategoryId === subCategory.id)
+        })).filter(sc => sc.services.length > 0);
+        return { category, subCategories: subCategoriesWithServices };
+      }).filter(cat => cat.subCategories.length > 0);
 
-  return {
-    pages: [...staticPages, ...dynamicContentPages],
-    cities,
-    cityCategories,
-    areaCategories,
-    globalCategories: categories,
-    servicesByCategory,
-    blogs,
-  };
-}
+      return {
+        pages: [...staticPages, ...dynamicContentPages],
+        cities,
+        cityCategories,
+        areaCategories,
+        globalCategories: categories,
+        servicesByCategory,
+        blogs,
+      };
+    },
+    ['visual-sitemap-data'],
+    { 
+      revalidate: false, 
+      tags: ['sitemap', 'cities', 'areas', 'categories', 'services', 'blog', 'global-cache'] 
+    }
+  )();
+});
 
 
 export default async function SitemapPage() {

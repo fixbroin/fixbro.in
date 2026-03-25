@@ -1,10 +1,9 @@
 
 // src/app/cookie-policy/page.tsx
-import { adminDb } from '@/lib/firebaseAdmin';
 import type { GlobalWebSettings, ContentPage } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, PackageSearch, Cookie } from "lucide-react";
+import { ArrowLeft, PackageSearch } from "lucide-react";
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
@@ -12,50 +11,11 @@ import { getBaseUrl } from '@/lib/config';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import type { BreadcrumbItem } from '@/types/ui';
 import AppImage from '@/components/ui/AppImage';
-import { Timestamp } from 'firebase-admin/firestore';
-import { unstable_cache } from 'next/cache';
-import { cache } from 'react';
+import { getContentPageData, getGlobalWebSettings } from '@/lib/webServerUtils';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 const PAGE_SLUG = "cookie-policy";
-
-const getPageData = cache(async (slug: string): Promise<ContentPage | null> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const pageDocRef = adminDb.collection("contentPages").doc(slug);
-        const docSnap = await pageDocRef.get();
-        if (docSnap.exists) {
-          const data = docSnap.data();
-          return { id: docSnap.id, ...data } as ContentPage;
-        }
-        // Fallback for global settings if dedicated page doesn't exist
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const settingsSnap = await settingsDocRef.get();
-        if (settingsSnap.exists) {
-            const settings = settingsSnap.data() as GlobalWebSettings;
-            if (settings.cookiePolicyContent) {
-                return {
-                    id: PAGE_SLUG,
-                    slug: PAGE_SLUG,
-                    title: "Cookie Policy",
-                    content: settings.cookiePolicyContent,
-                    updatedAt: settings.updatedAt || Timestamp.now(),
-                } as ContentPage;
-            }
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching page data for ${slug}:`, error);
-        return null;
-      }
-    },
-    [`content-page-${slug}`],
-    { revalidate: 3600, tags: ['content'] }
-  )();
-});
-
 
 export async function generateMetadata(
   props: {},
@@ -63,9 +23,15 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const resolvedParent = await parent;
 
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageDataFromDb = await getContentPageData(PAGE_SLUG);
+  const webSettings = await getGlobalWebSettings();
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalSettings();
+  
+  const pageData = pageDataFromDb || (webSettings.cookiePolicyContent ? {
+    title: "Cookie Policy",
+    content: webSettings.cookiePolicyContent,
+  } as ContentPage : null);
+
   const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || "FixBro";
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const appBaseUrl = getBaseUrl();
@@ -93,22 +59,15 @@ export async function generateMetadata(
   };
 }
 
-async function getGlobalSettings(): Promise<GlobalWebSettings | null> {
-    try {
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const docSnap = await settingsDocRef.get();
-        if (docSnap.exists) {
-            return docSnap.data() as GlobalWebSettings;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching global web settings:", error);
-        return null;
-    }
-}
-
 export default async function CookiePolicyPage() {
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageDataFromDb = await getContentPageData(PAGE_SLUG);
+  const webSettings = await getGlobalWebSettings();
+
+  const pageData = pageDataFromDb || (webSettings.cookiePolicyContent ? {
+    title: "Cookie Policy",
+    content: webSettings.cookiePolicyContent,
+  } as ContentPage : null);
+
   const pageTitleForDisplay = pageData?.title || "Cookie Policy";
 
   const breadcrumbItems: BreadcrumbItem[] = [

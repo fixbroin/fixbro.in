@@ -15,6 +15,7 @@ import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -115,6 +116,11 @@ export default function AdminSubCategoriesPage() {
         });
         setSubCategories(prev => prev.map(s => s.id === subCategory.id ? { ...s, isActive: !s.isActive } : s));
         toast({ title: "Status Updated", description: `Sub-category "${subCategory.name}" ${!subCategory.isActive ? "enabled" : "disabled"}.` });
+
+        // Refresh the cache
+        await triggerRefresh('categories');
+        await triggerRefresh('sitemap');
+        await triggerRefresh('global-cache');
     } catch (error) {
         toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
@@ -140,6 +146,11 @@ export default function AdminSubCategoriesPage() {
       await deleteDoc(subCategoryDocRef);
       setSubCategories(prev => prev.filter(sub => sub.id !== subCategoryId)); // Update local state
       toast({ title: "Success", description: "Sub-category deleted successfully." });
+
+      // Refresh the cache
+      await triggerRefresh('categories');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting sub-category: ", error);
       toast({ title: "Error", description: "Could not delete sub-category.", variant: "destructive" });
@@ -169,6 +180,12 @@ export default function AdminSubCategoriesPage() {
         await addDoc(subCategoriesCollectionRef, { ...payloadForFirestore, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "Sub-category added successfully." });
       }
+
+      // Refresh the cache
+      await triggerRefresh('categories');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
+
       setIsFormOpen(false); setEditingSubCategory(null); await fetchData();
     } catch (error) {
       console.error("Error saving sub-category: ", error);

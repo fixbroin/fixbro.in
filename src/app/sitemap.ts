@@ -3,8 +3,10 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore'; 
 import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config'; 
+import { unstable_cache } from 'next/cache';
 
 export const dynamic = 'force-static'; 
+export const revalidate = false;
 
 const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallbackDate: string): string => {
   try {
@@ -181,18 +183,27 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  try {
-    return await getSitemapEntries();
-  } catch (error) {
-    console.error("SITEMAP_GENERATION_ERROR: Failed to generate sitemap entries:", error);
-    const appBaseUrl = getBaseUrl(); 
-    return [
-      {
-        url: appBaseUrl,
-        lastModified: new Date().toISOString(),
-        changeFrequency: 'yearly',
-        priority: 0.1,
-      },
-    ];
-  }
+  return unstable_cache(
+    async () => {
+      try {
+        return await getSitemapEntries();
+      } catch (error) {
+        console.error("SITEMAP_GENERATION_ERROR: Failed to generate sitemap entries:", error);
+        const appBaseUrl = getBaseUrl(); 
+        return [
+          {
+            url: appBaseUrl,
+            lastModified: new Date().toISOString(),
+            changeFrequency: 'yearly' as const,
+            priority: 0.1,
+          },
+        ];
+      }
+    },
+    ['sitemap-data'],
+    { 
+      revalidate: false, 
+      tags: ['sitemap', 'global-cache'] 
+    }
+  )();
 }

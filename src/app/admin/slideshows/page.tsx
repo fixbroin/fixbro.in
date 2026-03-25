@@ -15,6 +15,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 
 
 
@@ -106,6 +107,9 @@ export default function AdminSlideshowsPage() {
       await deleteDoc(slideDocRef);
       setSlides(slides.filter(s => s.id !== slideId));
       toast({ title: "Success", description: "Slide deleted successfully." });
+      await triggerRefresh('slideshows');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting slide: ", error);
       toast({ title: "Error", description: "Could not delete slide.", variant: "destructive" });
@@ -140,6 +144,9 @@ export default function AdminSlideshowsPage() {
         await addDoc(slidesCollectionRef, { ...payloadForFirestore, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "Slide added successfully." });
       }
+      await triggerRefresh('slideshows');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
       setIsFormOpen(false);
       setEditingSlide(null);
       await fetchSlides(); 

@@ -1,4 +1,3 @@
-import { adminDb } from '@/lib/firebaseAdmin';
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -9,54 +8,18 @@ import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import type { BreadcrumbItem } from '@/types/ui';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
-import { unstable_cache } from 'next/cache';
-import { cache } from 'react';
+import { getContentPageData, getGlobalWebSettings } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 const PAGE_SLUG = "about-us";
-
-const getPageData = cache(async (slug: string): Promise<ContentPage | null> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const pageDocRef = adminDb.collection("contentPages").doc(slug);
-        const docSnap = await pageDocRef.get();
-        if (docSnap.exists) {
-          const data = docSnap.data();
-          return { id: docSnap.id, ...data } as ContentPage;
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching content page for slug "${slug}":`, error);
-        return null;
-      }
-    },
-    [`content-page-${slug}`],
-    { revalidate: 3600, tags: ['content'] }
-  )();
-});
-
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-    try {
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const docSnap = await settingsDocRef.get();
-        if (docSnap.exists) {
-            return docSnap.data() as GlobalWebSettings;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching global web settings for about-us metadata:", error);
-        return null;
-    }
-}
 
 export async function generateMetadata(
   props: {},
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageData = await getContentPageData(PAGE_SLUG);
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
@@ -81,7 +44,7 @@ export async function generateMetadata(
 }
 
 export default async function AboutUsPage() {
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageData = await getContentPageData(PAGE_SLUG);
 
   if (!pageData) {
     return (

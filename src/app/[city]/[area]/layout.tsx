@@ -4,8 +4,9 @@ import type { FirestoreArea, FirestoreCity, FirestoreSEOSettings, GlobalWebSetti
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
-
-export const dynamic = 'force-dynamic';
+import { getGlobalWebSettings } from '@/lib/webServerUtils';
+import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 
 interface AreaPageLayoutProps {
   params: Promise<{ city: string; area: string }>;
@@ -14,55 +15,47 @@ interface AreaPageLayoutProps {
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next'];
 
-async function getAreaData(citySlug: string, areaSlug: string): Promise<(FirestoreArea & { parentCityData?: FirestoreCity }) | null> {
-  try {
-    if (RESERVED_SLUGS.includes(citySlug) || citySlug.includes('.') || areaSlug.includes('.')) {
-      return null;
-    }
+const getAreaData = cache(async (citySlug: string, areaSlug: string): Promise<(FirestoreArea & { parentCityData?: FirestoreCity }) | null> => {
+  return unstable_cache(
+    async () => {
+      try {
+        if (RESERVED_SLUGS.includes(citySlug) || citySlug.includes('.') || areaSlug.includes('.')) {
+          return null;
+        }
 
-    const citiesRef = adminDb.collection('cities');
-    const cityQuery = citiesRef.where('slug', '==', citySlug).where('isActive', '==', true).limit(1);
-    const citySnapshot = await cityQuery.get();
+        const citiesRef = adminDb.collection('cities');
+        const cityQuery = citiesRef.where('slug', '==', citySlug).where('isActive', '==', true).limit(1);
+        const citySnapshot = await cityQuery.get();
 
-    if (citySnapshot.empty) {
-      return null;
-    }
-    const parentCityData = { id: citySnapshot.docs[0].id, ...citySnapshot.docs[0].data() } as FirestoreCity;
+        if (citySnapshot.empty) {
+          return null;
+        }
+        const parentCityData = { id: citySnapshot.docs[0].id, ...citySnapshot.docs[0].data() } as FirestoreCity;
 
-    const areasRef = adminDb.collection('areas');
-    const areaQuery = areasRef
-      .where('slug', '==', areaSlug)
-      .where('cityId', '==', parentCityData.id)
-      .where('isActive', '==', true)
-      .limit(1);
-    const areaSnapshot = await areaQuery.get();
+        const areasRef = adminDb.collection('areas');
+        const areaQuery = areasRef
+          .where('slug', '==', areaSlug)
+          .where('cityId', '==', parentCityData.id)
+          .where('isActive', '==', true)
+          .limit(1);
+        const areaSnapshot = await areaQuery.get();
 
-    if (areaSnapshot.empty) {
-      return null;
-    }
-    const doc = areaSnapshot.docs[0];
-    const areaData = { id: doc.id, ...doc.data() } as FirestoreArea;
-    return { ...areaData, parentCityData };
+        if (areaSnapshot.empty) {
+          return null;
+        }
+        const doc = areaSnapshot.docs[0];
+        const areaData = { id: doc.id, ...doc.data() } as FirestoreArea;
+        return { ...areaData, parentCityData };
 
-  } catch (error) {
-    console.error(`[AreaLayout] Error fetching area data for city "${citySlug}", area "${areaSlug}":`, error);
-    return null;
-  }
-}
-
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-  try {
-    const settingsDocRef = adminDb.collection("webSettings").doc("global");
-    const docSnap = await settingsDocRef.get();
-    if (docSnap.exists) {
-      return docSnap.data() as GlobalWebSettings;
-    }
-    return null;
-  } catch (error) {
-    console.error("[AreaLayout] Error fetching global web settings for metadata:", error);
-    return null;
-  }
-}
+      } catch (error) {
+        console.error(`[AreaLayout] Error fetching area data for city "${citySlug}", area "${areaSlug}":`, error);
+        return null;
+      }
+    },
+    [`area-layout-data-${citySlug}-${areaSlug}`],
+    { revalidate: false, tags: ['cities', 'areas', `city-${citySlug}`, `area-${areaSlug}`, 'global-cache'] }
+  )();
+});
 
 export async function generateMetadata(
   { params }: AreaPageLayoutProps,
@@ -80,7 +73,7 @@ export async function generateMetadata(
 
   const areaData = await getAreaData(citySlug, areaSlug);
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalWebsiteSettings();
+  const webSettings = await getGlobalWebSettings();
   const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || "FixBro";
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const appBaseUrl = getBaseUrl(); 

@@ -12,6 +12,7 @@ import CityForm from '@/components/admin/CityForm';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -71,6 +72,11 @@ export default function AdminCitiesPage() {
       await deleteDoc(doc(db, "cities", cityId));
       setCities(cities.filter(city => city.id !== cityId));
       toast({ title: "Success", description: "City deleted successfully." });
+      
+      // Refresh the cache
+      await triggerRefresh('cities');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting city: ", error);
       toast({ title: "Error", description: "Could not delete city. It might have areas associated with it.", variant: "destructive" });
@@ -131,6 +137,12 @@ export default function AdminCitiesPage() {
         await addDoc(citiesCollectionRef, { ...payload, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "City added successfully." });
       }
+      
+      // Refresh the cache
+      await triggerRefresh('cities');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
+
       setIsFormOpen(false);
       setEditingCity(null);
       await fetchCities(); 

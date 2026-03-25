@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 
 
 
@@ -68,6 +69,9 @@ export default function AdminFAQPage() {
       await deleteDoc(doc(db, "adminFAQs", faqId));
       setFaqs(faqs.filter(faq => faq.id !== faqId));
       toast({ title: "Success", description: "FAQ deleted successfully." });
+      await triggerRefresh('faqs');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting FAQ: ", error);
       toast({ title: "Error", description: "Could not delete FAQ.", variant: "destructive" });
@@ -95,6 +99,9 @@ export default function AdminFAQPage() {
         await addDoc(faqsCollectionRef, { ...payloadForFirestore, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "FAQ added successfully." });
       }
+      await triggerRefresh('faqs');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
       setIsFormOpen(false);
       setEditingFAQ(null);
       await fetchFAQs(); 

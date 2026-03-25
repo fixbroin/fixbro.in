@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { GlobalWebSettings, ThemeColors, ThemePalette } from '@/types/firestore';
@@ -12,7 +13,14 @@ const WEB_SETTINGS_COLLECTION = "webSettings";
 const THEME_STYLE_TAG_ID = "fixbro-dynamic-theme-styles";
 
 const ThemeInjector = () => {
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
+
   useEffect(() => {
+    // Public site: The theme is already server-injected via RootLayout's style tag.
+    // We don't need a real-time listener for every single visitor.
+    if (!isAdmin) return;
+
     const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
 
     const applyDynamicStyles = (themeColors?: ThemeColors) => {

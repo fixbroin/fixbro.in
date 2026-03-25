@@ -186,7 +186,8 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
             }
         },
         ['homepage-data'],
-        { revalidate: 86400, tags: ['global', 'cities', 'categories', 'services'] }
+        { revalidate: false,
+ tags: ['global', 'cities', 'categories', 'services', 'global-cache'] }
     )();
 });
 
@@ -255,7 +256,8 @@ export const getCategoryFullData = cache(async (categorySlug: string): Promise<F
             }
         },
         [`category-data-${categorySlug}`],
-        { revalidate: 86400, tags: ['categories', 'services', `category-${categorySlug}`] }
+        { revalidate: false,
+ tags: ['categories', 'services', `category-${categorySlug}`, 'global-cache'] }
     )();
 });
 
@@ -293,6 +295,7 @@ export const getAggregateRating = cache(async (): Promise<{ ratingValue: string,
             }
         },
         ['aggregate-rating'],
-        { revalidate: 86400, tags: ['services'] }
+        { revalidate: false,
+ tags: ['services', 'global-cache'] }
     )();
 });

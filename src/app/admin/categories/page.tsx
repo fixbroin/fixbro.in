@@ -15,6 +15,7 @@ import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, getDoc, where } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch'; // Import Switch
@@ -116,6 +117,11 @@ export default function AdminCategoriesPage() {
 
       setCategories(categories.filter(cat => cat.id !== categoryId));
       toast({ title: "Success", description: "Category deleted successfully." });
+
+      // Refresh the cache
+      await triggerRefresh('categories');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting category: ", error);
       toast({ title: "Error", description: "Could not delete category.", variant: "destructive" });
@@ -130,6 +136,11 @@ export default function AdminCategoriesPage() {
         await updateDoc(doc(db, "adminCategories", category.id), { isActive: !category.isActive, updatedAt: Timestamp.now() });
         setCategories(prev => prev.map(c => c.id === category.id ? { ...c, isActive: !c.isActive } : c));
         toast({ title: "Status Updated", description: `Category "${category.name}" ${!category.isActive ? "enabled" : "disabled"}.` });
+
+        // Refresh the cache
+        await triggerRefresh('categories');
+        await triggerRefresh('sitemap');
+        await triggerRefresh('global-cache');
     } catch (error) {
         toast({ title: "Error", description: "Could not update category status.", variant: "destructive" });
     } finally {
@@ -164,6 +175,12 @@ export default function AdminCategoriesPage() {
         setCategoryNameOverride(docRef.id, payloadForFirestore.name!);
         toast({ title: "Success", description: "Category added successfully." });
       }
+
+      // Refresh the cache
+      await triggerRefresh('categories');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
+
       setIsFormOpen(false);
       setEditingCategory(null);
       await fetchCategories();

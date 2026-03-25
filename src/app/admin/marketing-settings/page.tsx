@@ -13,6 +13,7 @@ import { Database, UploadCloud, Download, Loader2, AlertTriangle, MessageSquare,
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { revalidateTag } from 'next/cache';
 import type { MarketingSettings, FirebaseClientConfig } from '@/types/firestore';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
@@ -101,6 +102,7 @@ export default function MarketingSettingsPage() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
+      revalidateTag('marketing-settings');
       toast({ title: "Success", description: "Marketing settings saved successfully." });
     } catch (error) {
       toast({ title: "Error", description: "Could not save marketing settings.", variant: "destructive" });

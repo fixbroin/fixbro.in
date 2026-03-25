@@ -12,6 +12,7 @@ import { Settings2, Save, Loader2, AlertTriangle, Building, Image as ImageIcon, 
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { revalidateTag } from 'next/cache';
 import { ref as storageRefStandard, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import type { GlobalWebSettings, ContentPage } from '@/types/firestore';
 import NextImage from 'next/image';
@@ -263,6 +264,7 @@ export default function WebSettingsPage() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, updateData, { merge: true });
+      revalidateTag('web-settings');
       setGlobalSettings(prev => ({ ...prev, ...updateData }));
       setOriginalGlobalSettings(prev => ({...prev, ...updateData}));
       toast({ title: "Success", description: "General information saved." });
@@ -374,6 +376,7 @@ export default function WebSettingsPage() {
       }
 
       await setDoc(settingsDocRef, updateData, { merge: true });
+      revalidateTag('web-settings');
       
       setGlobalSettings(prev => ({ ...prev, ...updateData }));
       setOriginalGlobalSettings(prev => ({ ...prev, ...updateData }));
@@ -478,6 +481,7 @@ export default function WebSettingsPage() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(pageDocRef, pageData, { merge: true });
+      revalidateTag('web-settings');
       toast({ title: "Success", description: `${pageData.title} content saved.` });
       setPageImageFile(null);
     } catch (error) {
@@ -503,6 +507,7 @@ export default function WebSettingsPage() {
             updatedAt: Timestamp.now(),
         };
         await setDoc(settingsDocRef, updateData, { merge: true });
+        revalidateTag('web-settings');
         setGlobalSettings(prev => ({ ...prev, ...updateData }));
         setOriginalGlobalSettings(prev => ({...prev, ...updateData}));
         toast({ title: "Success", description: "Social media links saved." });

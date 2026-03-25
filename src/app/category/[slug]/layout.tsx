@@ -5,42 +5,34 @@ import type { FirestoreCategory, FirestoreSEOSettings, GlobalWebSettings } from 
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; // Import the helper
-
-export const dynamic = 'force-dynamic'; // Ensure metadata is fetched on each request
+import { getGlobalWebSettings } from '@/lib/webServerUtils';
+import { unstable_cache } from 'next/cache';
+import { cache } from 'react';
 
 interface CategoryPageLayoutProps {
   params: Promise<{ slug: string }>;
   children: React.ReactNode;
 }
 
-async function getCategoryData(slug: string): Promise<FirestoreCategory | null> {
-  try {
-    const catRef = adminDb.collection('adminCategories');
-    const q = catRef.where('slug', '==', slug).where('isActive', '==', true).limit(1);
-    const snapshot = await q.get();
-    if (snapshot.empty) return null;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as FirestoreCategory;
-  } catch (error) {
-    console.error('Error fetching category data for metadata:', error);
-    return null;
-  }
-}
-
-// Function to fetch global web settings (e.g., for OG image)
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-    try {
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const docSnap = await settingsDocRef.get();
-        if (docSnap.exists) {
-            return docSnap.data() as GlobalWebSettings;
-        }
+const getCategoryData = cache(async (slug: string): Promise<FirestoreCategory | null> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const catRef = adminDb.collection('adminCategories');
+        const q = catRef.where('slug', '==', slug).where('isActive', '==', true).limit(1);
+        const snapshot = await q.get();
+        if (snapshot.empty) return null;
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() } as FirestoreCategory;
+      } catch (error) {
+        console.error('Error fetching category data for metadata:', error);
         return null;
-    } catch (error) {
-        console.error("Error fetching global web settings for metadata:", error);
-        return null;
-    }
-}
+      }
+    },
+    [`category-layout-data-${slug}`],
+    { revalidate: false, tags: ['categories', `category-${slug}`, 'global-cache'] }
+  )();
+});
 
 export async function generateMetadata(
   { params }: CategoryPageLayoutProps,
@@ -51,7 +43,7 @@ export async function generateMetadata(
   const { slug } = await params;
   const categoryData = await getCategoryData(slug);
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalWebsiteSettings();
+  const webSettings = await getGlobalWebSettings();
   const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || "FixBro";
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const appBaseUrl = getBaseUrl(); // Use the helper

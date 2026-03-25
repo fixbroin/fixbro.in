@@ -8,15 +8,28 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { useAuth } from '@/hooks/useAuth';
 
+const isBot = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const botPatterns = [
+      'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
+      'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
+      'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+  ];
+  const ua = navigator.userAgent.toLowerCase();
+  return botPatterns.some(pattern => ua.includes(pattern));
+};
+
 const PageViewTracker = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isVisitorBot = isBot();
+  
   const { settings: marketingSettings, isLoading: isLoadingMarketingSettings } = useMarketingSettings();
   const { user, isLoading: isLoadingAuth } = useAuth();
-  const initialLogDoneRef = useRef(false); // To prevent duplicate logs on HMR or fast re-renders
+  const initialLogDoneRef = useRef(false);
 
   useEffect(() => {
-    if (isLoadingMarketingSettings || isLoadingAuth || initialLogDoneRef.current) {
+    if (isVisitorBot || isLoadingMarketingSettings || isLoadingAuth || initialLogDoneRef.current) {
       return;
     }
 

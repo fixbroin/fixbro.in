@@ -117,6 +117,8 @@ export default function AdminServicesPage() {
         setServices(prev => prev.map(s => s.id === service.id ? { ...s, isActive: !s.isActive } : s));
         toast({ title: "Status Updated", description: `Service "${service.name}" ${!service.isActive ? "enabled" : "disabled"}.` });
         await triggerRefresh('services');
+        await triggerRefresh('sitemap');
+        await triggerRefresh('global-cache');
     } catch (error) {
         toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
@@ -134,6 +136,8 @@ export default function AdminServicesPage() {
         setServices(prev => prev.map(s => s.id === service.id ? { ...s, allowPayLater: !service.allowPayLater } : s));
         toast({ title: "Pay Later Updated", description: `Pay later for "${service.name}" ${!service.allowPayLater ? "enabled" : "disabled"}.` });
         await triggerRefresh('services');
+        await triggerRefresh('sitemap');
+        await triggerRefresh('global-cache');
     } catch (error) {
         toast({ title: "Error", description: "Could not update pay later status.", variant: "destructive" });
     } finally {
@@ -156,6 +160,8 @@ export default function AdminServicesPage() {
       }
       await deleteDoc(serviceDocRef);
       await triggerRefresh('services'); // SmartSync: Invalidate cache
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
       setServices(prev => prev.filter(serv => serv.id !== serviceId));
       toast({ title: "Success", description: "Service deleted successfully." });
     } catch (error) {
@@ -223,6 +229,8 @@ export default function AdminServicesPage() {
       if (data.slug) {
         await triggerRefresh(`service-${data.slug}`); // Invalidate specific service page cache
       }
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
       setIsFormOpen(false); setEditingService(null); await fetchData();
     } catch (error) {
       console.error("Error saving service: ", error);

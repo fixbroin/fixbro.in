@@ -8,6 +8,7 @@ import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, Play
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { revalidateTag } from 'next/cache';
 import type { AppSettings, DayAvailability } from '@/types/firestore'; 
 import { defaultAppSettings } from '@/config/appDefaults'; 
 import PlatformSettingsForm from '@/components/admin/PlatformSettingsForm';
@@ -183,6 +184,7 @@ export default function AdminSettingsPage() {
     try {
         const settingsDocRef = doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC_ID);
         await setDoc(settingsDocRef, settingsToSave, { merge: true }); 
+        revalidateTag('app-settings');
         
         toast({
             title: "Settings Saved",

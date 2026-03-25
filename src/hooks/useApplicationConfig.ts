@@ -50,21 +50,46 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
   useEffect(() => {
     const configDocRef = doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC_ID);
 
-    const unsubscribe = onSnapshot(configDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const processed = processData(docSnap.data());
-        setConfig(processed);
-        setCache(CACHE_KEY, processed, true);
-      }
-      setIsLoading(false);
-    }, (err) => {
-      console.error("Error fetching config:", err);
-      setError("Failed to load settings.");
-      setIsLoading(false);
-    });
+    if (isAdmin) {
+      const unsubscribe = onSnapshot(configDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const processed = processData(docSnap.data());
+          setConfig(processed);
+          setCache(CACHE_KEY, processed, true);
+        }
+        setIsLoading(false);
+      }, (err) => {
+        console.error("Error fetching config:", err);
+        setError("Failed to load settings.");
+        setIsLoading(false);
+      });
 
-    return () => unsubscribe();
-  }, [processData]);
+      return () => unsubscribe();
+    } else {
+      // Public site: use one-time fetch if cache is empty or stale
+      const fetchConfig = async () => {
+        const cached = getCache<AppSettings>(CACHE_KEY, true);
+        if (cached) {
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+          const docSnap = await getDoc(configDocRef);
+          if (docSnap.exists()) {
+            const processed = processData(docSnap.data());
+            setConfig(processed);
+            setCache(CACHE_KEY, processed, true);
+          }
+        } catch (err) {
+          console.error("Error fetching config:", err);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchConfig();
+    }
+  }, [processData, isAdmin]);
 
   return { config, isLoading, error };
 }

@@ -33,8 +33,13 @@ const BottomNavigationBar = () => {
   const [referralSettings, setReferralSettings] = useState<ReferralSettings | null>(null);
   const [isLoadingReferral, setIsLoadingReferral] = useState(true);
 
-  // Fetch referral settings
+  // Fetch referral settings - Only for logged in users to save reads
   useEffect(() => {
+      if (!user) {
+          setIsLoadingReferral(false);
+          return;
+      }
+      
       const settingsDocRef = doc(db, "appConfiguration", "referral");
       const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -48,7 +53,7 @@ const BottomNavigationBar = () => {
           setIsLoadingReferral(false);
       });
       return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const navItems: NavItem[] = [
     { href: '/', label: 'Home', icon: Home, isProtected: false },

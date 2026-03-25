@@ -21,9 +21,33 @@ const removeUndefinedProps = (obj: any): any => {
 // Simple cache for logging enabled state to avoid excessive Firestore reads
 let isLoggingEnabledCache: boolean | null = null;
 let lastCacheUpdate: number = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+const isBot = (): boolean => {
+    if (typeof window === 'undefined') return true;
+    const botPatterns = [
+        'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
+        'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
+        'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+    ];
+    const ua = navigator.userAgent.toLowerCase();
+    return botPatterns.some(pattern => ua.includes(pattern));
+};
 
 const checkIsLoggingEnabled = async (): Promise<boolean> => {
+    // If it's a bot, we don't even care if logging is enabled, we skip it
+    if (isBot()) return false;
+
+    // Check session storage first for client-side persistence
+    if (typeof window !== 'undefined') {
+        try {
+            const sessionCache = sessionStorage.getItem('fb-logging-enabled');
+            if (sessionCache !== null) {
+                return sessionCache === 'true';
+            }
+        } catch (e) {}
+    }
+
     const now = Date.now();
     if (isLoggingEnabledCache !== null && (now - lastCacheUpdate < CACHE_TTL)) {
         return isLoggingEnabledCache;
@@ -32,17 +56,23 @@ const checkIsLoggingEnabled = async (): Promise<boolean> => {
     try {
         const configDocRef = doc(db, 'webSettings', 'featuresConfiguration');
         const docSnap = await getDoc(configDocRef);
+        let isEnabled = true;
         if (docSnap.exists()) {
             const data = docSnap.data() as FeaturesConfiguration;
-            isLoggingEnabledCache = data.enableUserActivityLogging !== false; // Default to true if not set
-        } else {
-            isLoggingEnabledCache = true; // Default to true if doc doesn't exist
+            isEnabled = data.enableUserActivityLogging !== false;
         }
+        
+        isLoggingEnabledCache = isEnabled;
         lastCacheUpdate = now;
-        return isLoggingEnabledCache;
+
+        if (typeof window !== 'undefined') {
+            try { sessionStorage.setItem('fb-logging-enabled', String(isEnabled)); } catch (e) {}
+        }
+
+        return isEnabled;
     } catch (error) {
         console.error("ActivityLogger: Error checking enabled state:", error);
-        return true; // Default to true on error to not miss logs unless explicitly disabled
+        return true; 
     }
 };
 

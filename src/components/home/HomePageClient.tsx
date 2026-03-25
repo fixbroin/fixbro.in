@@ -35,6 +35,17 @@ import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
 import CategoryCard from './CategoryCard';
 
+const isBot = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const botPatterns = [
+      'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
+      'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
+      'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+  ];
+  const ua = navigator.userAgent.toLowerCase();
+  return botPatterns.some(pattern => ua.includes(pattern));
+};
+
 // Lazy load components
 const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then((mod) => mod.HeroCarousel), {
   loading: () => <Skeleton className="h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px] w-full rounded-lg" />,
@@ -390,6 +401,9 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
+  const isVisitorBot = React.useRef(isBot());
   const [structuredData, setStructuredData] = useState<Record<string, any> | null>(() => getCache<Record<string, any>>('structuredData', true) || null);
   const [seoSettings, setSeoSettings] = useState<FirestoreSEOSettings | null>(() => initialData?.seoSettings || getCache<FirestoreSEOSettings>('seoSettings', true) || null);
   const [pageH1, setPageH1] = useState<string | undefined>(() => initialH1Title || initialData?.seoSettings.homepageH1 || getCache<string>('pageH1', true) || undefined);
@@ -409,6 +423,13 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const [citiesWithAreas, setCitiesWithAreas] = useState<FirestoreCity[]>(() => initialData?.citiesWithAreas || getCache<FirestoreCity[]>('citiesWithAreas', true) || []);
 
   const fetchPageSpecificData = useCallback(async () => {
+    // If it's a bot, we don't need to do extra SEO/LD+JSON fetches on client
+    // because the server already rendered the metadata and JSON-LD.
+    if (isVisitorBot.current && !isAdmin) {
+        setIsLoadingPageData(false);
+        return;
+    }
+
     const cachedH1 = getCache<string>('pageH1');
     const cachedSeoSettings = getCache<FirestoreSEOSettings>('seoSettings');
     const cachedStructuredData = getCache<Record<string, any>>('structuredData');
@@ -539,6 +560,15 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   }, [citySlug, areaSlug, initialData, seoSettings, initialH1Title]);
 
   const setupRealtimeListeners = useCallback(() => {
+    // If it's a bot or not an admin, we don't need realtime listeners.
+    // The initialData from server is enough for the first render.
+    if (isVisitorBot.current || !isAdmin) {
+        setIsLoadingFeaturesConfig(false);
+        setIsLoadingPopular(false);
+        setIsLoadingRecent(false);
+        return () => {};
+    }
+
     // 1. Features Config Listener
     const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
     const unsubscribeConfig = onSnapshot(configDocRef, (docSnap) => {
@@ -602,6 +632,12 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
   const fetchCategoryWiseData = useCallback(async (currentFeaturesConfig: FeaturesConfiguration) => {
     if (!currentFeaturesConfig.showCategoryWiseServices) return;
     
+    // If we have initialData or it's a bot, we don't need to re-fetch this on client
+    if (initialData?.categoryWiseServices || isVisitorBot.current) {
+        setIsLoadingCategoryWise(false);
+        return;
+    }
+
     try {
         const enabledCategoryIds = Object.entries(currentFeaturesConfig.homepageCategoryVisibility || {})
             .filter(([, isVisible]) => isVisible)

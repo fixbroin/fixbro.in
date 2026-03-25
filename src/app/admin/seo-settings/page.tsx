@@ -11,6 +11,7 @@ import { Target, Globe, FileText, Type, Pilcrow, BarChart, Save, Loader2, Settin
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { revalidateTag } from 'next/cache';
 import type { FirestoreSEOSettings, StructuredDataSocialProfiles } from '@/types/firestore';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
@@ -117,6 +118,7 @@ export default function SEOSettingsPage() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
+      revalidateTag('seo-settings');
       await triggerRefresh('global'); // SmartSync: Refresh all SEO metadata
       toast({ title: "Success", description: "SEO settings saved successfully." });
     } catch (error) {
@@ -136,6 +138,7 @@ export default function SEOSettingsPage() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
+      revalidateTag('seo-settings');
       await triggerRefresh('global'); // SmartSync: Refresh all SEO metadata
       form.reset(defaultSeoValues);
       toast({ title: "Reset Successful", description: "SEO settings have been restored to defaults." });

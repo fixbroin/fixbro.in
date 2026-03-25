@@ -11,8 +11,9 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 interface CityPageProps {
   params: Promise<{ city: string }>;
@@ -21,22 +22,28 @@ interface CityPageProps {
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next', 'favicon.ico'];
 
 const getCityData = cache(async (slug: string): Promise<FirestoreCity | null> => {
-  try {
-    if (slug.includes('.') || RESERVED_SLUGS.includes(slug)) {
-      return null;
-    }
-    const citiesRef = adminDb.collection('cities');
-    const q = citiesRef.where('slug', '==', slug).where('isActive', '==', true).limit(1);
-    const snapshot = await q.get();
-    if (snapshot.empty) {
+  return unstable_cache(
+    async () => {
+      try {
+        if (slug.includes('.') || RESERVED_SLUGS.includes(slug)) {
+          return null;
+        }
+        const citiesRef = adminDb.collection('cities');
+        const q = citiesRef.where('slug', '==', slug).where('isActive', '==', true).limit(1);
+        const snapshot = await q.get();
+        if (snapshot.empty) {
+            return null;
+        }
+        const doc = snapshot.docs[0];
+        return { id: doc.id, ...doc.data() } as FirestoreCity;
+      } catch (error) {
+        console.error(`[CityPage] Error fetching city data for page:`, error);
         return null;
-    }
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as FirestoreCity;
-  } catch (error) {
-    console.error(`[CityPage] Error fetching city data for page:`, error);
-    return null;
-  }
+      }
+    },
+    [`city-data-${slug}`],
+    { revalidate: false, tags: ['cities', `city-${slug}`, 'global-cache'] }
+  )();
 });
 
 

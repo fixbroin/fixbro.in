@@ -1,6 +1,5 @@
 
 // src/app/cancellation-policy/page.tsx
-import { adminDb } from '@/lib/firebaseAdmin';
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -10,8 +9,7 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
-import { unstable_cache } from 'next/cache';
-import { cache } from 'react';
+import { getContentPageData, getGlobalWebSettings } from '@/lib/webServerUtils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -28,45 +26,9 @@ function getTimestampMillis(ts: any): number {
   return typeof ts === 'number' ? ts : 0;
 }
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = false;
 
 const PAGE_SLUG = "cancellation-policy";
-
-const getPageData = cache(async (slug: string): Promise<ContentPage | null> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const pageDocRef = adminDb.collection("contentPages").doc(slug);
-        const docSnap = await pageDocRef.get();
-        if (docSnap.exists) {
-            const data = docSnap.data();
-            return { id: docSnap.id, ...data } as ContentPage;
-        }
-        return null;
-      } catch (error) {
-        console.error(`Error fetching content page for slug "${slug}":`, error);
-        return null;
-      }
-    },
-    [`content-page-${slug}`],
-    { revalidate: 3600, tags: ['content'] }
-  )();
-});
-
-
-async function getGlobalWebsiteSettings(): Promise<GlobalWebSettings | null> {
-    try {
-        const settingsDocRef = adminDb.collection("webSettings").doc("global");
-        const docSnap = await settingsDocRef.get();
-        if (docSnap.exists) {
-            return docSnap.data() as GlobalWebSettings;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching global web settings for metadata:", error);
-        return null;
-    }
-}
 
 export async function generateMetadata(
   props: {},
@@ -74,9 +36,9 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const resolvedParent = await parent;
   
-  const pageData = await getPageData(PAGE_SLUG);
+  const pageData = await getContentPageData(PAGE_SLUG);
   const seoSettings = await getGlobalSEOSettings();
-  const webSettings = await getGlobalWebsiteSettings();
+  const webSettings = await getGlobalWebSettings();
   const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || "FixBro";
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
   const appBaseUrl = getBaseUrl(); 
@@ -119,7 +81,7 @@ export async function generateMetadata(
 
 export default async function CancellationPolicyPage() {
   try {
-    const pageData = await getPageData(PAGE_SLUG);
+    const pageData = await getContentPageData(PAGE_SLUG);
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },

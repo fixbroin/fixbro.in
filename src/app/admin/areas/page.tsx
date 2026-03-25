@@ -12,6 +12,7 @@ import AreaForm from '@/components/admin/AreaForm';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy, query, Timestamp, where, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -75,6 +76,11 @@ export default function AdminAreasPage() {
       await deleteDoc(doc(db, "areas", areaId));
       setAreas(areas.filter(area => area.id !== areaId));
       toast({ title: "Success", description: "Area deleted successfully." });
+
+      // Refresh the cache
+      await triggerRefresh('areas');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
     } catch (error) {
       console.error("Error deleting area: ", error);
       toast({ title: "Error", description: "Could not delete area.", variant: "destructive" });
@@ -142,6 +148,12 @@ export default function AdminAreasPage() {
         await addDoc(areasCollectionRef, { ...payload, createdAt: Timestamp.now() });
         toast({ title: "Success", description: "Area added successfully." });
       }
+      
+      // Refresh the cache
+      await triggerRefresh('areas');
+      await triggerRefresh('sitemap');
+      await triggerRefresh('global-cache');
+
       setIsFormOpen(false);
       setEditingArea(null);
       await fetchCitiesAndAreas(); // Re-fetch to update list

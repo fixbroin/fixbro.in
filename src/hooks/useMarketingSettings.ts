@@ -10,6 +10,18 @@ import { usePathname } from 'next/navigation';
 const MARKETING_CONFIG_COLLECTION = "webSettings";
 const MARKETING_CONFIG_DOC_ID = "marketingConfiguration";
 const CACHE_KEY = "marketing-settings";
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+const isBot = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const botPatterns = [
+      'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
+      'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
+      'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+  ];
+  const ua = navigator.userAgent.toLowerCase();
+  return botPatterns.some(pattern => ua.includes(pattern));
+};
 
 const defaultFirebaseClientConfigValues: FirebaseClientConfig = {
   apiKey: "", authDomain: "", projectId: "", storageBucket: "",
@@ -55,6 +67,7 @@ export function useMarketingSettings(): UseMarketingSettingsReturn {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith('/admin');
   const hasLoadedRef = useRef(false);
+  const isVisitorBot = useRef(isBot());
 
   const processData = useCallback((firestoreData: Partial<MarketingSettings>): MarketingSettings => {
     return {
@@ -68,6 +81,12 @@ export function useMarketingSettings(): UseMarketingSettingsReturn {
   }, []);
 
   useEffect(() => {
+    // If it's a bot and we are not in admin, skip fetching to save reads
+    if (isVisitorBot.current && !isAdmin) {
+      setIsLoading(false);
+      return;
+    }
+
     const settingsDocRef = doc(db, MARKETING_CONFIG_COLLECTION, MARKETING_CONFIG_DOC_ID);
 
     if (!isAdmin && hasLoadedRef.current) return;
@@ -90,7 +109,11 @@ export function useMarketingSettings(): UseMarketingSettingsReturn {
     } else {
       const fetchMarketing = async () => {
         const cached = getCache<MarketingSettings>(CACHE_KEY, true);
-        if (cached && !isAdmin) {
+        const lastFetch = typeof window !== 'undefined' ? localStorage.getItem(`${CACHE_KEY}-last-fetch`) : null;
+        const now = Date.now();
+        
+        // Use cache if it's fresh (within TTL)
+        if (cached && !isAdmin && lastFetch && (now - parseInt(lastFetch) < CACHE_TTL)) {
             setIsLoading(false);
             return;
         }
@@ -101,6 +124,7 @@ export function useMarketingSettings(): UseMarketingSettingsReturn {
             const processed = processData(docSnap.data());
             setSettings(processed);
             setCache(CACHE_KEY, processed, true);
+            if (typeof window !== 'undefined') localStorage.setItem(`${CACHE_KEY}-last-fetch`, now.toString());
           }
         } catch (err) {
           console.error("Error fetching marketing settings:", err);

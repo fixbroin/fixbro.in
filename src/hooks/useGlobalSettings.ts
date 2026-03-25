@@ -13,7 +13,18 @@ import { getTimestampMillis } from '@/lib/utils';
 const WEB_SETTINGS_DOC_ID = "global";
 const WEB_SETTINGS_COLLECTION = "webSettings";
 const CACHE_KEY = "global-web-settings";
-const CACHE_STALE_TIME = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+const isBot = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const botPatterns = [
+      'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
+      'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
+      'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+  ];
+  const ua = navigator.userAgent.toLowerCase();
+  return botPatterns.some(pattern => ua.includes(pattern));
+};
 
 const processSettingsData = (data: Partial<GlobalWebSettings>): GlobalWebSettings => {
   const mergedLightPalette: Required<ThemePalette> = { ...DEFAULT_LIGHT_THEME_COLORS_HSL };
@@ -68,8 +79,15 @@ export function useGlobalSettings() {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith('/admin');
   const hasLoadedRef = useRef(false);
+  const isVisitorBot = useRef(isBot());
 
   useEffect(() => {
+    // If it's a bot and we are not in admin, skip fetching to save reads
+    if (isVisitorBot.current && !isAdmin) {
+      setIsLoading(false);
+      return;
+    }
+
     const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
 
     // If we have cached data and it's not admin, don't even fetch again in this session
@@ -95,7 +113,10 @@ export function useGlobalSettings() {
       // Public site and providers use one-time fetch + cache
       const fetchSettings = async () => {
         const cached = getCache<GlobalWebSettings>(CACHE_KEY, true);
-        if (cached && !isAdmin) {
+        const lastFetch = typeof window !== 'undefined' ? localStorage.getItem(`${CACHE_KEY}-last-fetch`) : null;
+        const now = Date.now();
+
+        if (cached && !isAdmin && lastFetch && (now - parseInt(lastFetch) < CACHE_TTL)) {
             setIsLoading(false);
             return;
         }
@@ -103,9 +124,10 @@ export function useGlobalSettings() {
         try {
           const docSnap = await getDoc(settingsDocRef);
           if (docSnap.exists()) {
-            const processed = processSettingsData(docSnap.data());
+            const processed = processSettingsData(docSnap.data() as Partial<GlobalWebSettings>);
             setSettings(processed);
             setCache(CACHE_KEY, processed, true);
+            if (typeof window !== 'undefined') localStorage.setItem(`${CACHE_KEY}-last-fetch`, now.toString());
           }
         } catch (err) {
           console.error("Error fetching settings:", err);
@@ -121,4 +143,3 @@ export function useGlobalSettings() {
 
   return { settings, isLoading, error };
 }
-
