@@ -36,7 +36,9 @@ export default function AdminUserListForChat({
   useEffect(() => {
     setIsLoading(true);
     const usersCollectionRef = collection(db, "users");
-    const q = query(usersCollectionRef, orderBy("createdAt", "desc"));
+    // Added limit(100) to prevent fetching ALL users at once.
+    // This significantly reduces reads while still showing recent conversations.
+    const q = query(usersCollectionRef, orderBy("createdAt", "desc"), limit(20));
 
     const unsubscribeUsers = onSnapshot(q, (querySnapshot) => {
       const fetchedUsers = querySnapshot.docs

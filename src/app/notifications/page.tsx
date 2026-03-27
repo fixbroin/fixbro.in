@@ -56,10 +56,12 @@ export default function NotificationsPage() {
 
     setIsLoadingNotifications(true);
     const notificationsCollectionRef = collection(db, "userNotifications");
+    // Added limit(50) to prevent excessive reads while still showing a good history
     const q = query(
       notificationsCollectionRef,
       where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(20)
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {

@@ -24,9 +24,14 @@ export function useTotalAdminUnreadChatCount(adminUid: string | null | undefined
 
     setIsLoading(true);
     const chatsRef = collection(db, "chats");
-    // Query for chat sessions where the admin is a participant.
-    // Firestore's array-contains can check if an element exists in an array.
-    const q = query(chatsRef, where("participants", "array-contains", adminUid));
+    // Query for chat sessions where the admin is a participant AND there are unread messages.
+    // This significantly reduces reads by only fetching active unread chats.
+    const q = query(
+      chatsRef, 
+      where("participants", "array-contains", adminUid),
+      where("adminUnreadCount", ">", 0),
+      limit(20)
+    );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       let count = 0;
