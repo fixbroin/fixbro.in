@@ -128,6 +128,7 @@ export default function ServiceDetailPageClient({
   const { toast } = useToast();
   const { user, triggerAuthRedirect } = useAuth();
   const currentPathname = usePathname();
+  const isAdmin = currentPathname?.startsWith('/admin');
   
   const cacheKey = `service-data-${serviceSlug}`;
 

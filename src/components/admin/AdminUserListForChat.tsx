@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Loader2, UserCircle, Mail, Search, Users, Circle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, where, documentId } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, where, documentId, limit } from "firebase/firestore";
 import type { FirestoreUser, ChatSession } from '@/types/firestore';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
