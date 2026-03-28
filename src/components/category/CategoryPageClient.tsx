@@ -330,9 +330,10 @@ export default function CategoryPageClient({
             loadSubCategoryServices(initialSubCats[0].id);
         }
         
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching category data:", err);
-        setError(err.message || "Failed to load category details.");
+        const errorMessage = err instanceof Error ? err.message : "Failed to load category details.";
+        setError(errorMessage);
         setIsLoading(false);
       }
     };
@@ -392,7 +393,7 @@ export default function CategoryPageClient({
     }
   }, [activeSubCategorySlug, subCategoriesWithServices, headerHeight, isHeaderVisible]);
   
-  const handleAuthRequiredNav = (e: React.MouseEvent<any>, intendedHref?: string, action?: () => void) => {
+  const handleAuthRequiredNav = (e: React.MouseEvent<HTMLElement>, intendedHref?: string, action?: () => void) => {
     e.preventDefault();
     const redirectPath = intendedHref || currentPathname;
     if (intendedHref && intendedHref !== currentPathname && !intendedHref.startsWith('#')) showLoading();
