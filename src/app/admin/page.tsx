@@ -4,19 +4,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   BarChart, DollarSign, ShoppingBag, Users, Loader2, AlertTriangle, 
-  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight, X
+  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight, Trash2
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingServiceCard';
-import { getDashboardData, type DashboardData, deleteSearchTerm } from '@/lib/adminDashboardUtils';
-import { useToast } from '@/hooks/use-toast';
+import { getDashboardData, type DashboardData, clearSearchHotspots } from '@/lib/adminDashboardUtils';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -59,25 +59,34 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingSearchTerm, setDeletingSearchTerm] = useState<string | null>(null);
   const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
 
-  const handleDeleteSearch = async (term: string) => {
-    setDeletingSearchTerm(term);
+  const handleClearSearches = async () => {
+    if (!confirm("Are you sure you want to delete all search hotspots? This cannot be undone.")) return;
+    
     try {
-      const res = await deleteSearchTerm(term);
-      if (res.success) {
-        toast({ title: "Term Deleted", description: `"${term}" has been removed from analytics.` });
-        loadData(); // Refresh dashboard
+      const result = await clearSearchHotspots();
+      if (result.success) {
+        toast({
+          title: "Searches Cleared",
+          description: "Search hotspots data has been deleted.",
+        });
+        loadData(); // Refresh the dashboard data
       } else {
-        toast({ title: "Error", description: "Could not delete term.", variant: "destructive" });
+        toast({
+          title: "Error",
+          description: result.error || "Failed to clear search hotspots.",
+          variant: "destructive",
+        });
       }
     } catch (err) {
-      console.error("Delete search error:", err);
-      toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
-    } finally {
-      setDeletingSearchTerm(null);
+      console.error("Error in handleClearSearches:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -230,16 +239,9 @@ export default function AdminDashboardPage() {
                 {recentActivities.map((activity: any) => (
                   <Link key={activity.id} href={activity.href || '#'} className="relative flex items-center group">
                     <div className="z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-card border-2 border-muted shadow-sm group-hover:border-primary/50 group-hover:scale-110 transition-all duration-300">
-                      {activity.type === 'new_booking' ? (
-                        <TagIcon className="h-4 w-4 text-primary" />
-                      ) : activity.type === 'search' ? (
-                        <Search className="h-4 w-4 text-amber-500" />
-                      ) : (
-                        <UserPlus className="h-4 w-4 text-emerald-500" />
-                      )}
+                      {activity.type === 'new_booking' ? <TagIcon className="h-4 w-4 text-primary" /> : <UserPlus className="h-4 w-4 text-emerald-500" />}
                     </div>
                     <div className="ml-6 flex-grow p-4 rounded-2xl bg-muted/30 border border-border/40 group-hover:bg-primary/[0.03] group-hover:border-primary/10 transition-all duration-300 shadow-sm">
-
                       <div className="flex justify-between items-center mb-1">
                         <p className="text-sm font-bold tracking-tight">{activity.title}</p>
                         <span className="text-[10px] font-black text-muted-foreground uppercase bg-background/80 px-2 py-0.5 rounded-full border shadow-sm">
@@ -284,9 +286,20 @@ export default function AdminDashboardPage() {
           <motion.div variants={itemVariants}>
             <Card className="border-none shadow-xl rounded-3xl bg-card">
               <CardHeader className="p-8 pb-4">
-                <CardTitle className="text-xl font-black tracking-tight flex items-center">
-                  <Search className="mr-3 h-5 w-5 text-primary"/> Search Hotspots
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl font-black tracking-tight flex items-center">
+                    <Search className="mr-3 h-5 w-5 text-primary"/> Search Hotspots
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all"
+                    onClick={handleClearSearches}
+                    title="Clear All Searches"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-8 pt-0">
                 <ScrollArea className="h-[300px]">
@@ -295,25 +308,11 @@ export default function AdminDashboardPage() {
                       <div 
                         key={s.term} 
                         className={cn(
-                          "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all cursor-default",
+                          "px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all cursor-default",
                           idx === 0 ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 hover:bg-muted"
                         )}
                       >
-                        <span className="flex-grow">{s.term}</span>
-                        <span className="opacity-50">• {s.count}</span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDeleteSearch(s.term);
-                          }}
-                          disabled={deletingSearchTerm === s.term}
-                          className={cn(
-                            "ml-1 p-0.5 rounded-full hover:bg-background/20 transition-colors",
-                            idx === 0 ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive"
-                          )}
-                        >
-                          {deletingSearchTerm === s.term ? <Loader2 className="h-2 w-2 animate-spin" /> : <X className="h-2.5 w-2.5" />}
-                        </button>
+                        {s.term} <span className="ml-1 opacity-50">• {s.count}</span>
                       </div>
                     ))}
                   </div>

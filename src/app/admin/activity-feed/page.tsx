@@ -6,11 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
   Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
-  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Search
+  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User
 } from "lucide-react";
 import type { UserActivity, FirestoreUser } from '@/types/firestore';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, Timestamp, limit, getDocs, writeBatch, where, documentId, startAfter, type DocumentSnapshot, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, orderBy, Timestamp, limit, getDocs, writeBatch, where, documentId, startAfter, type DocumentSnapshot } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
@@ -53,7 +53,6 @@ const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => 
     checkoutStep: { icon: Zap, color: 'text-purple-600', bg: 'bg-purple-500/10', label: 'Checkout' },
     adminAction: { icon: CalendarCheck2, color: 'text-slate-600', bg: 'bg-slate-500/10', label: 'Admin' },
     timeOnPage: { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/5', label: 'Time Spent' },
-    search: { icon: Search, color: 'text-amber-600', bg: 'bg-amber-500/10', label: 'Search' },
   };
 
   const config = configs[eventType] || { icon: Activity, color: 'text-gray-500', bg: 'bg-gray-500/10', label: eventType };
@@ -80,26 +79,7 @@ export default function AdminActivityFeedPage() {
   const [liveActivities, setLiveActivities] = useState<UserActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const handleDeleteActivity = async (id: string) => {
-    setDeletingId(id);
-    try {
-      await deleteDoc(doc(db, "userActivities", id));
-      
-      // Update local state
-      setLiveActivities(prev => prev.filter(a => a.id !== id));
-      setCachedActivities(prev => prev.filter(a => a.id !== id));
-      
-      toast({ title: "Activity Deleted", description: "The activity record has been removed." });
-    } catch (error) {
-      console.error("Error deleting activity:", error);
-      toast({ title: "Error", description: "Could not delete activity.", variant: "destructive" });
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   // 1. Fetch Archived History (Cheap Cache)
   const loadCachedData = useCallback(async () => {
@@ -284,12 +264,6 @@ export default function AdminActivityFeedPage() {
         return <span className="text-xs text-muted-foreground italic">Logout ({data.logoutMethod})</span>;
       case 'checkoutStep':
         return <span className="text-xs font-bold text-purple-600 uppercase tracking-tighter">{data.checkoutStepName}</span>;
-      case 'search':
-        return (
-          <span className="text-xs font-medium">
-            Searched for <span className="text-amber-600">&quot;{data.searchQuery}&quot;</span>
-          </span>
-        );
       default:
         return <code className="text-[10px] bg-muted/50 p-1 px-2 rounded font-mono text-muted-foreground break-all">{JSON.stringify(data)}</code>;
     }
@@ -329,21 +303,10 @@ export default function AdminActivityFeedPage() {
     >
       <div className="flex justify-between items-start mb-4">
         <EventBadge eventType={activity.eventType} />
-        <div className="flex items-center gap-2">
-          <div className="text-right">
-            <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
-              {formatTimestamp(activity.timestamp)}
-            </p>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-            onClick={() => handleDeleteActivity(activity.id!)}
-            disabled={deletingId === activity.id}
-          >
-            {deletingId === activity.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}
-          </Button>
+        <div className="text-right">
+          <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+            {formatTimestamp(activity.timestamp)}
+          </p>
         </div>
       </div>
 
@@ -450,8 +413,7 @@ export default function AdminActivityFeedPage() {
                       <TableHead className="w-[180px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
-                      <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Actions</TableHead>
+                      <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -474,21 +436,12 @@ export default function AdminActivityFeedPage() {
                           <TableCell>
                             {renderUserCell(activity)}
                           </TableCell>
-                          <TableCell>
-                            <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
-                                {formatTimestamp(activity.timestamp)}
-                            </span>
-                          </TableCell>
                           <TableCell className="text-right pr-8">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
-                              onClick={() => handleDeleteActivity(activity.id!)}
-                              disabled={deletingId === activity.id}
-                            >
-                              {deletingId === activity.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <TrashIcon className="h-3.5 w-3.5" />}
-                            </Button>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                                {formatTimestamp(activity.timestamp)}
+                              </span>
+                            </div>
                           </TableCell>
                         </motion.tr>
                       ))}

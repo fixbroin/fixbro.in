@@ -2,11 +2,10 @@
 'use server';
 
 import { adminDb } from './firebaseAdmin';
-import { unstable_cache } from 'next/cache';
+import { unstable_cache, revalidateTag } from 'next/cache';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { FirestoreBooking, FirestoreUser, FirestoreService, UserActivity } from '@/types/firestore';
 import { serializeFirestoreData } from './serializeUtils';
-import { triggerRefresh } from './revalidateUtils';
 
 export interface DashboardData {
   stats: {
@@ -37,9 +36,11 @@ export const getDashboardData = unstable_cache(
       let earnedCommission = systemStats?.earnedCommission || 0;
 
       // 2. Fetch other small collections/limits - OPTIMIZED: only fetch recent search activities
+      // Fix: Removed orderBy on 'count' as it was preventing results if the field was missing.
+      // Also removed orderBy on 'timestamp' to avoid requiring composite indexes for this specific view.
       const [searchActivitiesSnap, persistentSearchSnap] = await Promise.all([
-        adminDb.collection('userActivities').where('eventType', '==', 'search').orderBy('timestamp', 'desc').limit(100).get(),
-        adminDb.collection('searchAnalytics').orderBy('createdAt', 'desc').limit(100).get()
+        adminDb.collection('userActivities').where('eventType', '==', 'search').limit(100).get(),
+        adminDb.collection('searchAnalytics').limit(100).get()
       ]);
 
       // If stats don't exist yet, we do a one-time scan to initialize them
@@ -165,19 +166,8 @@ export const getDashboardData = unstable_cache(
             description: `${data.displayName || data.email}`,
             href: `/admin/users`,
           };
-        }),
-        ...searchActivitiesSnap.docs.slice(0, 5).map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            type: 'search',
-            timestamp: serializeFirestoreData<string>(data.timestamp),
-            title: 'Search Activity',
-            description: `"${data.eventData?.searchQuery}" by ${data.userDisplayName || 'Guest'}`,
-            href: `/admin/activity-feed`,
-          };
         })
-      ].sort((a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime()).slice(0, 8);
+      ].sort((a, b) => new Date(b.timestamp as string).getTime() - new Date(a.timestamp as string).getTime()).slice(0, 7);
 
       return serializeFirestoreData<DashboardData>({
         stats: {
@@ -265,48 +255,34 @@ export const getArchivedActivities = unstable_cache(
   { revalidate: 86400, tags: ['users', 'global-cache'] }
 );
 
-export const deleteSearchTerm = async (term: string): Promise<{ success: boolean }> => {
+export async function clearSearchHotspots() {
   try {
-    const lowercaseTerm = term.toLowerCase().trim();
+    const batchSize = 500;
     
     // 1. Delete from searchAnalytics
-    const analyticsSnap = await adminDb.collection('searchAnalytics')
-      .where('term', '==', lowercaseTerm)
-      .get();
-    
-    // 2. Delete from userActivities (search events)
-    // Note: This is more complex because we need to check inside eventData.searchQuery
-    const activitiesSnap = await adminDb.collection('userActivities')
-      .where('eventType', '==', 'search')
-      .get();
-    
-    const activityDocsToDelete = activitiesSnap.docs.filter(doc => 
-      doc.data().eventData?.searchQuery?.toLowerCase().trim() === lowercaseTerm
-    );
-
-    const allDocsToDelete = [
-      ...analyticsSnap.docs,
-      ...activityDocsToDelete
-    ];
-
-    if (allDocsToDelete.length === 0) return { success: true };
-
-    // Batch delete
-    const chunks = [];
-    for (let i = 0; i < allDocsToDelete.length; i += 500) {
-      chunks.push(allDocsToDelete.slice(i, i + 500));
-    }
-
-    for (const chunk of chunks) {
+    const searchAnalyticsSnap = await adminDb.collection('searchAnalytics').limit(batchSize).get();
+    if (!searchAnalyticsSnap.empty) {
       const batch = adminDb.batch();
-      chunk.forEach(doc => batch.delete(doc.ref));
+      searchAnalyticsSnap.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
     }
 
-    await triggerRefresh('global-cache');
+    // 2. Delete from userActivities where eventType is 'search'
+    const searchActivitiesSnap = await adminDb.collection('userActivities')
+      .where('eventType', '==', 'search')
+      .limit(batchSize)
+      .get();
+      
+    if (!searchActivitiesSnap.empty) {
+      const batch = adminDb.batch();
+      searchActivitiesSnap.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    revalidateTag('admin-dashboard-stats');
     return { success: true };
   } catch (error) {
-    console.error("Error deleting search term:", error);
-    return { success: false };
+    console.error("Error clearing search hotspots:", error);
+    return { success: false, error: String(error) };
   }
-};
+}
