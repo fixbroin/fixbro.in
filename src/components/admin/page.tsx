@@ -132,12 +132,37 @@ export default function AdminDashboardPage() {
         };
       });
       usersLoaded = true;
-      if (bookingsLoaded) combineAndSetActivities();
+      if (bookingsLoaded && searchLoaded) combineAndSetActivities();
     }, (err) => {
       console.error("Error fetching recent users:", err);
       setActivitiesError((prev) => prev ? `${prev} Failed to load recent users.` : "Failed to load recent users.");
       usersLoaded = true;
-      if (bookingsLoaded) combineAndSetActivities();
+      if (bookingsLoaded && searchLoaded) combineAndSetActivities();
+    });
+
+    const recentSearchQuery = query(collection(db, "userActivities"), where("eventType", "==", "search"), orderBy("timestamp", "desc"), limit(5));
+    let fetchedSearchActivities: ActivityItem[] = [];
+    let searchLoaded = false;
+
+    const unsubscribeRecentSearch = onSnapshot(recentSearchQuery, (snapshot) => {
+      fetchedSearchActivities = snapshot.docs.map(docSnap => {
+        const activity = docSnap.data() as UserActivity;
+        return {
+          id: docSnap.id,
+          type: 'new_user_signup' as any, // reuse existing type or extend
+          timestamp: activity.timestamp,
+          title: 'Search Activity',
+          description: `Searched for "${activity.eventData?.searchQuery}"`,
+          icon: <Search className="h-5 w-5 text-amber-500" />,
+          href: `/admin/activity-feed`,
+        };
+      });
+      searchLoaded = true;
+      if (bookingsLoaded && usersLoaded) combineAndSetActivities();
+    }, (err) => {
+      console.error("Error fetching recent search:", err);
+      searchLoaded = true;
+      if (bookingsLoaded && usersLoaded) combineAndSetActivities();
     });
 
     // Fetch Analytics Data (Optimized)
@@ -195,6 +220,7 @@ export default function AdminDashboardPage() {
     return () => {
       unsubscribeRecentBookings();
       unsubscribeRecentUsers();
+      unsubscribeRecentSearch();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount

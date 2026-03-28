@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   BarChart, DollarSign, ShoppingBag, Users, Loader2, AlertTriangle, 
-  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight
+  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight, X
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingServiceCard';
-import { getDashboardData, type DashboardData } from '@/lib/adminDashboardUtils';
+import { getDashboardData, type DashboardData, deleteSearchTerm } from '@/lib/adminDashboardUtils';
+import { useToast } from '@/hooks/use-toast';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -58,7 +59,27 @@ export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingSearchTerm, setDeletingSearchTerm] = useState<string | null>(null);
   const { config: appConfig } = useApplicationConfig();
+  const { toast } = useToast();
+
+  const handleDeleteSearch = async (term: string) => {
+    setDeletingSearchTerm(term);
+    try {
+      const res = await deleteSearchTerm(term);
+      if (res.success) {
+        toast({ title: "Term Deleted", description: `"${term}" has been removed from analytics.` });
+        loadData(); // Refresh dashboard
+      } else {
+        toast({ title: "Error", description: "Could not delete term.", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Delete search error:", err);
+      toast({ title: "Error", description: "An error occurred.", variant: "destructive" });
+    } finally {
+      setDeletingSearchTerm(null);
+    }
+  };
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -209,9 +230,16 @@ export default function AdminDashboardPage() {
                 {recentActivities.map((activity: any) => (
                   <Link key={activity.id} href={activity.href || '#'} className="relative flex items-center group">
                     <div className="z-10 flex h-12 w-12 items-center justify-center rounded-2xl bg-card border-2 border-muted shadow-sm group-hover:border-primary/50 group-hover:scale-110 transition-all duration-300">
-                      {activity.type === 'new_booking' ? <TagIcon className="h-4 w-4 text-primary" /> : <UserPlus className="h-4 w-4 text-emerald-500" />}
+                      {activity.type === 'new_booking' ? (
+                        <TagIcon className="h-4 w-4 text-primary" />
+                      ) : activity.type === 'search' ? (
+                        <Search className="h-4 w-4 text-amber-500" />
+                      ) : (
+                        <UserPlus className="h-4 w-4 text-emerald-500" />
+                      )}
                     </div>
                     <div className="ml-6 flex-grow p-4 rounded-2xl bg-muted/30 border border-border/40 group-hover:bg-primary/[0.03] group-hover:border-primary/10 transition-all duration-300 shadow-sm">
+
                       <div className="flex justify-between items-center mb-1">
                         <p className="text-sm font-bold tracking-tight">{activity.title}</p>
                         <span className="text-[10px] font-black text-muted-foreground uppercase bg-background/80 px-2 py-0.5 rounded-full border shadow-sm">
@@ -267,11 +295,25 @@ export default function AdminDashboardPage() {
                       <div 
                         key={s.term} 
                         className={cn(
-                          "px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all cursor-default",
+                          "flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-tight transition-all cursor-default",
                           idx === 0 ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 hover:bg-muted"
                         )}
                       >
-                        {s.term} <span className="ml-1 opacity-50">• {s.count}</span>
+                        <span className="flex-grow">{s.term}</span>
+                        <span className="opacity-50">• {s.count}</span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteSearch(s.term);
+                          }}
+                          disabled={deletingSearchTerm === s.term}
+                          className={cn(
+                            "ml-1 p-0.5 rounded-full hover:bg-background/20 transition-colors",
+                            idx === 0 ? "text-primary-foreground/70 hover:text-primary-foreground" : "text-muted-foreground hover:text-destructive"
+                          )}
+                        >
+                          {deletingSearchTerm === s.term ? <Loader2 className="h-2 w-2 animate-spin" /> : <X className="h-2.5 w-2.5" />}
+                        </button>
                       </div>
                     ))}
                   </div>
