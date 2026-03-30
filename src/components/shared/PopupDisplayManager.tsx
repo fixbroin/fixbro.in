@@ -50,20 +50,38 @@ export default function PopupDisplayManager() {
   const timerRefs = useRef<NodeJS.Timeout[]>([]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
+  if (!window.visualViewport) return;
 
-    const handleVisualViewportResize = () => {
-      if (!window.visualViewport) return;
-      // If the height is significantly smaller than the screen height, keyboard is probably open
-      const isKeyboardOpen = window.visualViewport.height < window.innerHeight * 0.85;
-      setIsInputFocused(isKeyboardOpen);
-    };
+  const handleResize = () => {
+    const viewport = window.visualViewport;
 
-    window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleVisualViewportResize);
-    };
-  }, []);
+    const isKeyboardOpen =
+      window.innerHeight - viewport.height > 150;
+
+    setIsInputFocused(isKeyboardOpen);
+  };
+
+  window.visualViewport.addEventListener('resize', handleResize);
+
+  return () => {
+    window.visualViewport?.removeEventListener('resize', handleResize);
+  };
+}, []);
+useEffect(() => {
+  const handleFocusOut = () => {
+    setTimeout(() => {
+      if (document.activeElement?.tagName !== "INPUT") {
+        setIsInputFocused(false);
+      }
+    }, 300);
+  };
+
+  document.addEventListener("focusout", handleFocusOut);
+
+  return () => {
+    document.removeEventListener("focusout", handleFocusOut);
+  };
+}, []);
 
   const validateEmail = (email: string) => {
     return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
@@ -282,6 +300,7 @@ export default function PopupDisplayManager() {
     setEmailForSubscription('');
     setNameForSubscription(''); 
     setMobileForSubscription(''); 
+    setIsInputFocused(false); // ✅ FIX
   };
 
   const handleActionClick = (targetUrl?: string | null) => {
@@ -652,8 +671,7 @@ export default function PopupDisplayManager() {
                                 placeholder="Full Name"
                                 value={nameForSubscription}
                                 onChange={(e) => setNameForSubscription(e.target.value)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
+                                
                                 required={currentPopupToDisplay.showNameInput} 
                                 className="h-10 text-base"
                                 disabled={isSubscribing}
@@ -669,8 +687,7 @@ export default function PopupDisplayManager() {
                                 placeholder="you@example.com"
                                 value={emailForSubscription}
                                 onChange={(e) => setEmailForSubscription(e.target.value)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
+                                
                                 required={currentPopupToDisplay.showEmailInput}
                                 className="h-10 text-base"
                                 disabled={isSubscribing}
@@ -690,8 +707,7 @@ export default function PopupDisplayManager() {
                                     placeholder="10-digit mobile number"
                                     value={mobileForSubscription}
                                     onChange={(e) => setMobileForSubscription(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                    onFocus={() => setIsInputFocused(true)}
-                                    onBlur={() => setIsInputFocused(false)}
+                                   
                                     required={currentPopupToDisplay.showMobileInput} 
                                     className="h-10 text-base"
                                     disabled={isSubscribing}
