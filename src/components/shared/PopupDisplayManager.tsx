@@ -506,7 +506,7 @@ export default function PopupDisplayManager() {
 
   return (
     <Dialog open={isPopupVisible} onOpenChange={(open) => { if (!open) handlePopupClose(); }}>
-      <DialogContent className="max-w-[90%] sm:max-w-md md:max-w-lg p-0 max-h-[90vh] overflow-y-auto scroll-smooth shadow-2xl rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+      <DialogContent className="max-w-[90%] sm:max-w-md md:max-w-lg p-0 overflow-hidden shadow-2xl rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
         {currentPopupToDisplay.showCloseButton !== false && (
           <DialogClose asChild>
             <Button
@@ -522,14 +522,14 @@ export default function PopupDisplayManager() {
         )}
 
         <div 
-          className="relative flex flex-col"
+          className="relative"
           onClick={currentPopupToDisplay.popupType === 'video' && currentPopupToDisplay.targetUrl ? () => handleActionClick(currentPopupToDisplay.targetUrl) : undefined}
           style={currentPopupToDisplay.popupType === 'video' && currentPopupToDisplay.targetUrl ? { cursor: 'pointer' } : {}}
         >
           {currentPopupToDisplay.imageUrl && currentPopupToDisplay.popupType !== 'video' && (
           <div className="flex items-center justify-center">
             <div 
-              className="relative flex flex-col  aspect-square w-48 md:w-64 overflow-hidden"
+              className="relative aspect-square w-48 md:w-64 overflow-hidden"
               onClick={currentPopupToDisplay.targetUrl ? () => handleActionClick(currentPopupToDisplay.targetUrl) : undefined}
               style={currentPopupToDisplay.targetUrl ? {cursor: 'pointer'} : {}}
             >
@@ -545,7 +545,7 @@ export default function PopupDisplayManager() {
           )}
           
           {currentPopupToDisplay.popupType === 'video' && currentPopupToDisplay.videoUrl && (
-            <div className="relative flex flex-col w-full aspect-video bg-black">
+            <div className="relative w-full aspect-video bg-black">
               {isDirectVideoLink ? (
                  <video
                     src={embedUrl}
