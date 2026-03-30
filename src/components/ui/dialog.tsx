@@ -40,12 +40,12 @@ const DialogContent = React.forwardRef<
 >(({ className, children, hideCloseButton, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none overflow-y-auto overflow-x-hidden">
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
           "pointer-events-auto relative grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
-          "max-h-[calc(100dvh-2rem)] overflow-y-auto",
+          "max-h-[calc(100dvh-2rem)] overflow-y-auto my-auto",
           className
         )}
         {...props}
