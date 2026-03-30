@@ -82,19 +82,11 @@
   * {
     @apply border-border;
   }
-  
-  html {
-    scroll-behavior: smooth;
-    height: -webkit-fill-available;
-  }
-
   body {
     @apply bg-background text-foreground;
     @apply antialiased;
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
   }
-
+  
   .no-select {
     -webkit-user-select: none; /* Safari */
     -ms-user-select: none; /* IE 10 and IE 11 */

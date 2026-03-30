@@ -94,7 +94,7 @@ export async function generateViewport(): Promise<Viewport> {
     initialScale: 1,
     maximumScale: 5,
     userScalable: true,
-    interactiveWidget: 'resizes-content',
+    interactiveWidget: 'overlays-content',
   };
 }
 
