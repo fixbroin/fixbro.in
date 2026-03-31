@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingServiceCard';
 import { getDashboardData, type DashboardData, clearSearchHotspots } from '@/lib/adminDashboardUtils';
+import { useAuth } from '@/hooks/useAuth';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -89,7 +90,7 @@ export default function AdminDashboardPage() {
       });
     }
   };
-
+const { user, firestoreUser } = useAuth();
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning";
@@ -152,7 +153,7 @@ export default function AdminDashboardPage() {
             <TrendingUp className="h-4 w-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Real-time Insights</span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight">{greeting}, Admin</h1>
+          <h1 className="text-4xl font-black tracking-tight">{greeting}, {firestoreUser?.displayName || user?.displayName || user?.email?.split('@')[0] || "Admin"}</h1>
           <div className="flex items-center space-x-2 text-muted-foreground text-sm font-medium">
              <Calendar className="h-4 w-4" />
              <span>{format(new Date(), 'EEEE, MMMM do yyyy')}</span>

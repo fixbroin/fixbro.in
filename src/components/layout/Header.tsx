@@ -380,27 +380,70 @@ const Header = () => {
                       <DropdownMenuSeparator className="mx-2" />
                       <div className="py-2">
                         {userSpecificNavItems.filter(item => item.condition ? item.condition() : true).map(item => (
-                          <DropdownMenuItem key={item.href} asChild className="rounded-xl px-4 py-3 cursor-pointer">
-                            <Link href={item.href} onClick={(e) => handleAuthRequiredNav(e, item.href)}>
-                              <div className="bg-primary/10 p-2 rounded-lg mr-3 text-primary">
-                                <item.icon className="h-4 w-4" />
-                              </div>
-                              <span className="font-medium">{item.label}</span>
-                            </Link>
-                          </DropdownMenuItem>
+                          <DropdownMenuItem
+  key={item.href}
+  asChild
+  className={cn(
+  "rounded-xl px-4 py-3 cursor-pointer transition-all duration-300 border mb-1 group",
+  "focus:bg-primary focus:text-white data-[highlighted]:bg-primary data-[highlighted]:text-white",
+  currentPathnameFromHook === item.href
+    ? "bg-primary text-white font-bold shadow-lg border-primary"
+    : "bg-muted/30 text-slate-700 dark:text-slate-300 border-border/40 hover:bg-primary hover:text-white hover:border-primary hover:translate-x-1"
+)}
+>
+  <Link
+    href={item.href}
+    onClick={(e) => handleAuthRequiredNav(e, item.href)}
+    className="flex items-center w-full"
+  >
+    <div
+  className={cn(
+    "p-2 rounded-lg mr-3 transition-all duration-300",
+    currentPathnameFromHook === item.href
+      ? "bg-white/20 text-white scale-110"
+      : "bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-white group-hover:scale-110"
+  )}
+>
+      <item.icon className="h-4 w-4" />
+    </div>
+
+    <span className="ml-3 truncate flex-grow">{item.label}</span>
+  </Link>
+</DropdownMenuItem>
                         ))}
                       </div>
                       {user.email === ADMIN_EMAIL && (
                         <>
                           <DropdownMenuSeparator className="mx-2" />
-                          <DropdownMenuItem asChild className="rounded-xl px-4 py-3 cursor-pointer">
-                            <Link href="/admin" onClick={(e) => handleAuthRequiredNav(e, "/admin")}>
-                              <div className="bg-amber-500/10 p-2 rounded-lg mr-3 text-amber-600">
-                                <Settings2 className="h-4 w-4" />
-                              </div>
-                              <span className="font-medium text-amber-600">Admin Control</span>
-                            </Link>
-                          </DropdownMenuItem>
+                          <DropdownMenuItem
+  asChild
+  className={cn(
+    "rounded-xl px-4 py-3 cursor-pointer transition-all duration-300 border mb-1 group",
+    "focus:bg-primary focus:text-white data-[highlighted]:bg-primary data-[highlighted]:text-white",
+    currentPathnameFromHook === "/admin"
+      ? "bg-primary text-white font-bold shadow-lg border-primary"
+      : "bg-muted/30 text-slate-700 dark:text-slate-300 border-border/40 hover:bg-primary hover:text-white hover:border-primary hover:translate-x-1"
+  )}
+>
+  <Link
+    href="/admin"
+    onClick={(e) => handleAuthRequiredNav(e, "/admin")}
+    className="flex items-center w-full"
+  >
+   <div
+  className={cn(
+    "p-2 rounded-lg mr-3 transition-all duration-300",
+    currentPathnameFromHook === "/admin"
+      ? "bg-white/20 text-white scale-110"
+      : "bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-white group-hover:scale-110"
+  )}
+>
+      <Settings2 className="h-4 w-4" />
+    </div>
+
+    <span className="ml-3 truncate flex-grow">Admin Control</span>
+  </Link>
+</DropdownMenuItem>
                         </>
                       )}
                       <DropdownMenuSeparator className="mx-2" />

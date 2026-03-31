@@ -112,7 +112,7 @@ function isCustomServiceIntent(message: string): boolean {
 
 function isLocationIntent(message: string): boolean {
     const m = normalizeText(message);
-    return /\b(city|area|location|where|place|work in|available in|operate in|dubai|sharjah|ajman|abu dhabi)\b/.test(m);
+    return /\b(city|area|location|where|available|service in|near|coverage)\b/.test(m);
 }
 
 function isHumanSupportIntent(message: string): boolean {
