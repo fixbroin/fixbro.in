@@ -25,8 +25,8 @@ const approvedTemplates = [
   { name: 'user_welcome', params: 2, button: true, header: true },
   { name: 'booking_confirmed', params: 3, button: true, header: true },
   { name: 'booking_completed', params: 1, button: true, header: true },
-  { name: 'booking_cancelled', params: 1, button: true, header: true },
-  { name: 'payment_successful', params: 1, button: true, header: true },
+  { name: 'booking_cancelled_1', params: 1, button: true, header: true },
+  { name: 'payment_successful_1', params: 1, button: true, header: true },
 ];
 
 export default function WhatsAppTestSenderForm() {
@@ -57,8 +57,8 @@ export default function WhatsAppTestSenderForm() {
           sampleParams = [{ value: 'FIXBRO-TEST-123' }, { value: 'Bed Assembly with Storage' }, { value: '25-07-2025' }];
           break;
         case 'booking_completed':
-        case 'booking_cancelled':
-        case 'payment_successful':
+        case 'booking_cancelled_1':
+        case 'payment_successful_1':
           sampleParams = [{ value: 'FIXBRO-TEST-123' }];
           break;
         default:

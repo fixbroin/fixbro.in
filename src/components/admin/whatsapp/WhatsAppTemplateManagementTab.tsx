@@ -50,8 +50,8 @@ const defaultWhatsAppSettings = {
   whatsAppOnSignup: { enabled: false, templateName: "user_welcome" },
   whatsAppOnBookingConfirmed: { enabled: false, templateName: "booking_confirmed" },
   whatsAppOnBookingCompleted: { enabled: false, templateName: "booking_completed" },
-  whatsAppOnBookingCancelled: { enabled: false, templateName: "booking_cancelled" },
-  whatsAppOnPaymentSuccess: { enabled: false, templateName: "payment_successful" },
+  whatsAppOnBookingCancelled: { enabled: false, templateName: "booking_cancelled_1" },
+  whatsAppOnPaymentSuccess: { enabled: false, templateName: "payment_successful_1" },
 };
 
 const automationEvents = [
