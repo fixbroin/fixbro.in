@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     const booking = bookingDoc.data() as any;
     const userId = booking.userId;
     const isCompleted = booking.status === 'Completed';
+    const isCancelled = booking.status === 'Cancelled';
 
     // 2. Fetch App Settings for Email/WhatsApp
     const [appConfigDoc, marketingConfigDoc, seoSettingsDoc] = await Promise.all([
@@ -272,6 +273,16 @@ export async function POST(request: Request) {
                     parameters: [booking.bookingId, servicesSummary, booking.scheduledDate],
                 }),
             }).catch(e => console.error("WhatsApp Confirmation Error:", e)));
+        } else if (isCancelled && marketingConfig.whatsAppOnBookingCancelled?.enabled) {
+            tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: booking.customerPhone,
+                    templateName: marketingConfig.whatsAppOnBookingCancelled.templateName,
+                    parameters: [booking.bookingId],
+                }),
+            }).catch(e => console.error("WhatsApp Cancellation Error:", e)));
         }
     }
 

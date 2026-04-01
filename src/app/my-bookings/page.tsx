@@ -314,6 +314,13 @@ export default function MyBookingsPage() {
 
             toast({ title: "Booking Cancelled", description: "Your booking has been successfully cancelled." });
             
+            // Trigger post-process API for WhatsApp, Stats, etc.
+            fetch('/api/bookings/post-process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingDocId: booking.id }),
+            }).catch(err => console.error("Error triggering post-process after cancellation:", err));
+
             // Send cancellation email using the NEW dedicated flow
             const emailInput: UserCancellationEmailInput = {
                 bookingId: booking.bookingId,

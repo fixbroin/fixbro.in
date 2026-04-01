@@ -20,6 +20,7 @@ const MARKETING_AUTOMATION_COLLECTION = "webSettings";
 const MARKETING_AUTOMATION_DOC_ID = "marketingAutomation";
 
 const whatsappAutomationSchema = z.object({
+  isWhatsAppEnabled: z.boolean().default(false),
   whatsAppOnSignup: z.object({
     enabled: z.boolean().default(false),
     templateName: z.string().optional(),
@@ -45,6 +46,7 @@ const whatsappAutomationSchema = z.object({
 type WhatsAppAutomationFormData = z.infer<typeof whatsappAutomationSchema>;
 
 const defaultWhatsAppSettings = {
+  isWhatsAppEnabled: false,
   whatsAppOnSignup: { enabled: false, templateName: "user_welcome_v3" },
   whatsAppOnBookingConfirmed: { enabled: false, templateName: "booking_confirmed_v1" },
   whatsAppOnBookingCompleted: { enabled: false, templateName: "booking_completed_final" },
@@ -78,6 +80,7 @@ export default function WhatsAppTemplateManagementTab() {
       if (docSnap.exists()) {
         const data = docSnap.data() as MarketingAutomationSettings;
         form.reset({
+            isWhatsAppEnabled: data.isWhatsAppEnabled ?? false,
             whatsAppOnSignup: { ...defaultWhatsAppSettings.whatsAppOnSignup, ...data.whatsAppOnSignup },
             whatsAppOnBookingConfirmed: { ...defaultWhatsAppSettings.whatsAppOnBookingConfirmed, ...data.whatsAppOnBookingConfirmed },
             whatsAppOnBookingCompleted: { ...defaultWhatsAppSettings.whatsAppOnBookingCompleted, ...data.whatsAppOnBookingCompleted },
@@ -103,6 +106,7 @@ export default function WhatsAppTemplateManagementTab() {
     try {
       const settingsDocRef = doc(db, MARKETING_AUTOMATION_COLLECTION, MARKETING_AUTOMATION_DOC_ID);
       const dataToSave: Partial<MarketingAutomationSettings> = {
+        isWhatsAppEnabled: data.isWhatsAppEnabled,
         whatsAppOnSignup: data.whatsAppOnSignup,
         whatsAppOnBookingConfirmed: data.whatsAppOnBookingConfirmed,
         whatsAppOnBookingCompleted: data.whatsAppOnBookingCompleted,
@@ -140,8 +144,35 @@ export default function WhatsAppTemplateManagementTab() {
               Enable or disable automated WhatsApp messages for key events and specify the template name to use for each.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Accordion type="multiple" className="w-full">
+          <CardContent className="space-y-6">
+            <FormField
+              control={form.control}
+              name="isWhatsAppEnabled"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-xl border-2 border-primary/20 bg-primary/5 p-4 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base font-bold flex items-center text-primary">
+                      <MessageSquare className="mr-2 h-5 w-5" />
+                      Global WhatsApp Notifications
+                    </FormLabel>
+                    <FormDescription>
+                      Master switch to enable or disable all WhatsApp outgoing notifications.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSaving}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <div className={!form.watch('isWhatsAppEnabled') ? 'opacity-50 pointer-events-none' : ''}>
+              <Accordion type="multiple" className="w-full">
               {automationEvents.map((event) => (
                 <AccordionItem value={event.id} key={event.id}>
                   <AccordionTrigger className="text-md font-medium">{event.label}</AccordionTrigger>
@@ -172,6 +203,7 @@ export default function WhatsAppTemplateManagementTab() {
                 </AccordionItem>
               ))}
             </Accordion>
+            </div>
           </CardContent>
            <CardFooter className="border-t px-6 py-4">
             <Button type="submit" disabled={isSaving}>

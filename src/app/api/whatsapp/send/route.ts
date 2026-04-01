@@ -2,6 +2,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { getBaseUrl } from '@/lib/config';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 // Handler for the POST method
 export async function POST(req: NextRequest) {
@@ -10,17 +11,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
   }
 
-  // Retrieve environment variables
-  const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-  const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-
-  if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-    console.error("WhatsApp environment variables (WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID) are not set.");
-    return NextResponse.json({ success: false, error: 'Server configuration error.' }, { status: 500 });
-  }
-
   try {
-    // Parse the request body
+    // 1. Fetch Global Master Toggle & Credentials from Firestore
+    const [marketingConfigDoc, marketingAutomationDoc] = await Promise.all([
+      adminDb.collection('webSettings').doc('marketingConfiguration').get(),
+      adminDb.collection('webSettings').doc('marketingAutomation').get()
+    ]);
+
+    const marketingConfig = marketingConfigDoc.data() || {};
+    const marketingAutomation = marketingAutomationDoc.data() || {};
+
+    // 2. Check Global Master Toggle
+    if (marketingAutomation.isWhatsAppEnabled === false) {
+      console.log("WhatsApp notifications are globally disabled.");
+      return NextResponse.json({ success: false, error: 'WhatsApp notifications are globally disabled.' }, { status: 403 });
+    }
+
+    // 3. Retrieve Credentials (Priority: DB > ENV)
+    const WHATSAPP_TOKEN = marketingConfig.whatsAppApiToken || process.env.WHATSAPP_TOKEN;
+    const WHATSAPP_PHONE_NUMBER_ID = marketingConfig.whatsAppPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+    if (!WHATSAPP_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+      console.error("WhatsApp credentials are not set in Firestore or environment variables.");
+      return NextResponse.json({ success: false, error: 'WhatsApp configuration error.' }, { status: 500 });
+    }
+
+    // 4. Parse the request body
     const body = await req.json();
     const { to, templateName, parameters = [] } = body;
 
@@ -52,10 +68,6 @@ export async function POST(req: NextRequest) {
         parameters: parameters.map((param: string) => ({ type: "text", text: param })),
       });
     }
-
-    // According to the error "Button at index 0 of type Url does not require parameters",
-    // the button component should not be sent for these templates as the URL is static.
-    // The button is part of the template itself on Meta's side.
 
     // Construct the final request payload
     const payload = {

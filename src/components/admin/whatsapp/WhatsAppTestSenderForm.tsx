@@ -109,10 +109,11 @@ export default function WhatsAppTestSenderForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <AlertTriangle className="h-4 w-4 !text-blue-600"/>
-            <AlertTitle className="text-blue-800">Prerequisites</AlertTitle>
-            <AlertDescription className="text-blue-700">
-                Make sure you have set the `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` in your `.env` file for this feature to work.
+            <AlertTriangle className="h-4 w-4 text-blue-600"/>
+            <AlertTitle className="text-blue-800 font-bold">Integration Check</AlertTitle>
+            <AlertDescription className="text-blue-700 text-xs">
+                Ensure your WhatsApp credentials (Token and Phone ID) are configured in <strong>Marketing Settings</strong> or your environment file. 
+                The <strong>Global WhatsApp Toggle</strong> must also be enabled.
             </AlertDescription>
         </Alert>
 
