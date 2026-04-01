@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { to, templateName, parameters = [] } = body;
 
+    console.log(`[WhatsApp API] Attempting to send template "${templateName}" to: ${to}`);
+
     // Validate essential parameters
     if (!to || !templateName) {
       return NextResponse.json({ success: false, error: 'Missing `to` or `templateName` in request body.' }, { status: 400 });
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
     // Construct the final request payload
     const payload = {
       messaging_product: 'whatsapp',
-      to,
+      to: to.replace(/\+/g, '').replace(/\s/g, ''), // Ensure no + or spaces
       type: 'template',
       template: {
         name: templateName,
@@ -80,6 +82,8 @@ export async function POST(req: NextRequest) {
         components: components,
       },
     };
+
+    console.log("[WhatsApp API] Payload to Meta:", JSON.stringify(payload, null, 2));
 
     // Make the API call to WhatsApp
     const result = await axios.post(
@@ -92,6 +96,8 @@ export async function POST(req: NextRequest) {
         },
       }
     );
+
+    console.log("[WhatsApp API] Success Response from Meta:", JSON.stringify(result.data, null, 2));
 
     // Return a success response
     return NextResponse.json({ success: true, result: result.data });

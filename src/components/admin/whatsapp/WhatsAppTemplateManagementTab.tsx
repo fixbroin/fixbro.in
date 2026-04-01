@@ -47,11 +47,11 @@ type WhatsAppAutomationFormData = z.infer<typeof whatsappAutomationSchema>;
 
 const defaultWhatsAppSettings = {
   isWhatsAppEnabled: false,
-  whatsAppOnSignup: { enabled: false, templateName: "user_welcome_v3" },
-  whatsAppOnBookingConfirmed: { enabled: false, templateName: "booking_confirmed_v1" },
-  whatsAppOnBookingCompleted: { enabled: false, templateName: "booking_completed_final" },
-  whatsAppOnBookingCancelled: { enabled: false, templateName: "booking_cancelled_alert" },
-  whatsAppOnPaymentSuccess: { enabled: false, templateName: "payment_successful_v2" },
+  whatsAppOnSignup: { enabled: false, templateName: "user_welcome" },
+  whatsAppOnBookingConfirmed: { enabled: false, templateName: "booking_confirmed" },
+  whatsAppOnBookingCompleted: { enabled: false, templateName: "booking_completed" },
+  whatsAppOnBookingCancelled: { enabled: false, templateName: "booking_cancelled" },
+  whatsAppOnPaymentSuccess: { enabled: false, templateName: "payment_successful" },
 };
 
 const automationEvents = [

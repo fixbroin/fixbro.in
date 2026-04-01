@@ -22,11 +22,11 @@ const testSenderFormSchema = z.object({
 type TestSenderFormData = z.infer<typeof testSenderFormSchema>;
 
 const approvedTemplates = [
-  { name: 'user_welcome_v3', params: 2, button: true, header: true },
-  { name: 'booking_confirmed_v1', params: 3, button: true, header: true },
-  { name: 'booking_completed_final', params: 1, button: true, header: true },
-  { name: 'booking_cancelled_alert', params: 1, button: true, header: true },
-  { name: 'payment_successful_v2', params: 1, button: true, header: true },
+  { name: 'user_welcome', params: 2, button: true, header: true },
+  { name: 'booking_confirmed', params: 3, button: true, header: true },
+  { name: 'booking_completed', params: 1, button: true, header: true },
+  { name: 'booking_cancelled', params: 1, button: true, header: true },
+  { name: 'payment_successful', params: 1, button: true, header: true },
 ];
 
 export default function WhatsAppTestSenderForm() {
@@ -50,15 +50,15 @@ export default function WhatsAppTestSenderForm() {
     if (template) {
       let sampleParams: {value: string}[] = [];
       switch (template.name) {
-        case 'user_welcome_v3':
+        case 'user_welcome':
           sampleParams = [{ value: 'Srikanth Achari' }, { value: 'FixBro' }];
           break;
-        case 'booking_confirmed_v1':
+        case 'booking_confirmed':
           sampleParams = [{ value: 'FIXBRO-TEST-123' }, { value: 'Bed Assembly with Storage' }, { value: '25-07-2025' }];
           break;
-        case 'booking_completed_final':
-        case 'booking_cancelled_alert':
-        case 'payment_successful_v2':
+        case 'booking_completed':
+        case 'booking_cancelled':
+        case 'payment_successful':
           sampleParams = [{ value: 'FIXBRO-TEST-123' }];
           break;
         default:
