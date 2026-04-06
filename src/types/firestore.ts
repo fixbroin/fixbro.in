@@ -363,6 +363,20 @@ export interface GlobalAdminPopup {
   sentAt?: Timestamp; // When it was last sent/activated
 }
 
+export interface WhyChooseUsItem {
+  id: string;
+  title: string;
+  description: string;
+  iconName: string;
+}
+
+export interface FooterCTA {
+  title: string;
+  subtitle?: string;
+  buttonText: string;
+  buttonLink: string;
+}
+
 // New types for Web Settings
 export interface GlobalWebSettings {
   id?: string; // Should be "global"
@@ -381,6 +395,11 @@ export interface GlobalWebSettings {
     twitter?: string;
     linkedin?: string;
     youtube?: string;
+  };
+  homepageContent?: {
+    whyChooseUs?: WhyChooseUsItem[];
+    footerCompanyBio?: string;
+    footerCTA?: FooterCTA;
   };
   themeColors?: ThemeColors;
   loaderType?: LoaderType; // Added loader type

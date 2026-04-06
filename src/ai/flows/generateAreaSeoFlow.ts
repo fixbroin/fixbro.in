@@ -6,6 +6,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { cleanSeoString, truncateSeoString } from '@/lib/seoAdvancedUtils';
 
 const GenerateAreaSeoInputSchema = z.object({
   areaName: z.string().describe("The name of the specific area or locality, e.g., 'Whitefield'."),
@@ -14,10 +15,10 @@ const GenerateAreaSeoInputSchema = z.object({
 export type GenerateAreaSeoInput = z.infer<typeof GenerateAreaSeoInputSchema>;
 
 const GenerateAreaSeoOutputSchema = z.object({
-  h1_title: z.string().describe("An H1 title optimized for the area page. Format: 'Best Home Services in {{areaName}}, {{cityName}}'"),
-  seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters. Format: 'Top Home Services in {{areaName}} | Best Handyman Near Me'"),
-  seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters. Should be a compelling summary that encourages clicks, mentioning the area, parent city, and words like 'trusted experts'."),
-  seo_keywords: z.string().describe("A comma-separated string of 10 highly relevant SEO keywords for the area. Must include variations like 'best home services {{areaName}}', 'professional handyman in {{areaName}}', 'home repair near me'."),
+  h1_title: z.string().describe("An H1 title optimized for the area page."),
+  seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
+  seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
+  seo_keywords: z.string().describe("A comma-separated string of 10 highly relevant SEO keywords for the area."),
 });
 export type GenerateAreaSeoOutput = z.infer<typeof GenerateAreaSeoOutputSchema>;
 
@@ -29,20 +30,25 @@ const prompt = ai.definePrompt({
   name: 'generateAreaSeoPrompt',
   input: { schema: GenerateAreaSeoInputSchema },
   output: { schema: GenerateAreaSeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service area or locality within Bangalore to rank #1 on Google for hyper-local searches.
+  prompt: `You are an expert Local SEO copywriter for "FixBro", the leading home services platform in Bangalore, India.
+Your task is to generate high-performance SEO content for a specific locality or neighborhood within Bangalore to rank #1 on Google for hyper-local searches.
 
 Area Name: {{areaName}}
-City Name: {{cityName}}
+City Name: {{cityName}} (usually Bangalore)
 
-Based on these details, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
+**STRATEGIC GUIDELINES:**
+1. **Hyper-Local Focus**: Emphasize {{areaName}} as the primary location. Use phrases like "Trusted by residents in {{areaName}}" or "Best professionals in {{areaName}}".
+2. **Avoid Repetition**: Do not use "Bangalore" or "{{areaName}}" more than twice in the same field. If the area is already a well-known part of Bangalore (like Whitefield), use that.
+3. **Intent Modifiers**: Use "Best", "Professional", "Verified Pros", "Same-Day".
+4. **Natural Flow**: Titles and descriptions should feel like a human wrote them, not a template.
 
-1.  **h1_title**: An H1 title using the format: "Best Professional Home Services in {{areaName}}, Bangalore".
-2.  **seo_title**: A meta title (under 60 chars) with the format: "Top Home Services in {{areaName}} | Best Handyman in Bangalore".
-3.  **seo_description**: A meta description (under 160 chars) that is compelling and mentions the specific area ({{areaName}}), Bangalore, and key services. Use localized phrases like "trusted by residents in {{areaName}}" or "Bangalore's expert home repair team".
-4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best home services {{areaName}} bangalore", "professional handyman in {{areaName}}", "home repair near me {{areaName}}", and "{{areaName}} local home experts".
+**OUTPUT FIELDS:**
+1.  **h1_title**: A localized H1. E.g., "Top-Rated Home Services & Repairs in {{areaName}}".
+2.  **seo_title**: A meta title that highlights locality and trust. E.g., "Best Handyman & Home Services in {{areaName}} | FixBro".
+3.  **seo_description**: A compelling summary mentioning {{areaName}}, the parent city, and service reliability.
+4.  **seo_keywords**: 10 hyper-local keywords.
 
-Return the entire response as a single, valid JSON object that adheres to the defined output schema.
+Return the entire response as a single, valid JSON object.
 `,
 });
 
@@ -57,6 +63,12 @@ const generateAreaSeoFlow = ai.defineFlow(
     if (!output) {
       throw new Error("AI failed to generate a valid SEO response for the area.");
     }
-    return output;
+
+    return {
+      h1_title: cleanSeoString(output.h1_title),
+      seo_title: truncateSeoString(cleanSeoString(output.seo_title), 60),
+      seo_description: truncateSeoString(cleanSeoString(output.seo_description), 160),
+      seo_keywords: output.seo_keywords,
+    };
   }
 );

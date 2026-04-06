@@ -185,7 +185,7 @@ const Footer = () => {
           <div className="lg:col-span-4 space-y-6">
             <Logo logoUrl={settings?.logoUrl} websiteName={websiteName} />
             <p className="text-muted-foreground leading-relaxed max-w-sm text-sm">
-              Your trusted partner for professional home services. We bring skilled experts directly to your doorstep, ensuring quality, reliability, and peace of mind.
+              {settings.homepageContent?.footerCompanyBio || "Your trusted partner for professional home services. We bring skilled experts directly to your doorstep, ensuring quality, reliability, and peace of mind."}
             </p>
             <div className="flex items-center gap-4">
               {socialLinks?.facebook && (

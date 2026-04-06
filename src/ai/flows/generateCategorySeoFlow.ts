@@ -5,6 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { cleanSeoString, truncateSeoString } from '@/lib/seoAdvancedUtils';
 
 const GenerateCategorySeoInputSchema = z.object({
   categoryName: z.string().describe("The name of the service category, e.g., 'Carpentry' or 'Appliance Repair'."),
@@ -12,11 +13,11 @@ const GenerateCategorySeoInputSchema = z.object({
 export type GenerateCategorySeoInput = z.infer<typeof GenerateCategorySeoInputSchema>;
 
 const GenerateCategorySeoOutputSchema = z.object({
-  h1_title: z.string().describe("An H1 title optimized for the category page. Format: 'Best Professional {{categoryName}} Services Near You'"),
-  seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters. Format: 'Best {{categoryName}} Near Me | Professional {{categoryName}} Services'"),
-  seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters. Should be a compelling summary that encourages clicks, mentioning top-rated experts and professional services."),
-  seo_keywords: z.string().describe("A comma-separated string of 10 highly relevant local SEO keywords. Must include variations like 'best {{categoryName}} near me', 'professional {{categoryName}} services', 'book {{categoryName}} online'."),
-  imageHint: z.string().describe("One or two keywords for an AI image search for the category's main image. E.g., 'carpentry tools' or 'clean appliances'. Max 50 characters."),
+  h1_title: z.string().describe("An H1 title optimized for the category page."),
+  seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
+  seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
+  seo_keywords: z.string().describe("A comma-separated string of 10 highly relevant local SEO keywords."),
+  imageHint: z.string().describe("One or two keywords for an AI image search."),
 });
 export type GenerateCategorySeoOutput = z.infer<typeof GenerateCategorySeoOutputSchema>;
 
@@ -28,20 +29,25 @@ const prompt = ai.definePrompt({
   name: 'generateCategorySeoPrompt',
   input: { schema: GenerateCategorySeoInputSchema },
   output: { schema: GenerateCategorySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India.
-Your task is to generate highly aggressive, intent-driven SEO content for a specific service category page to rank #1 on Google for Bangalore-based searches.
+  prompt: `You are an expert Local SEO copywriter for "FixBro", the leading home services platform in Bangalore, India.
+Your goal is to generate advanced, high-intent SEO content for a service category page to dominate Bangalore search results.
 
 Category Name: {{categoryName}}
 
-Based on this detail, generate the following content. Focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore".
+**STRATEGIC GUIDELINES:**
+1. **Avoid Repetition**: Do NOT repeat the category name more than twice in the title or description. If the category name is "{{categoryName}}", do not use "Professional {{categoryName}} Services" if "{{categoryName}}" already includes "Services".
+2. **Local Dominance**: Mention Bangalore naturally. Use high-intent modifiers like "Top-Rated", "Expert", "Verified", or "Same-Day".
+3. **Semantic Variety**: Use synonyms for home services like "repairs", "maintenance", "solutions", or "experts".
+4. **Formatting**: Ensure meta titles are under 60 characters and descriptions under 160.
 
-1.  **h1_title**: Create an H1 title with the format: "Best Professional {{categoryName}} Services in Bangalore".
-2.  **seo_title**: A meta title (under 60 chars) with the format: "Best {{categoryName}} in Bangalore | Professional {{categoryName}} Services".
-3.  **seo_description**: A compelling meta description (under 160 chars) that includes the category and mentions "Bangalore" and top neighborhoods like "Koramangala", "HSR Layout", or "Indiranagar". Use words like "trusted experts" or "affordable pricing" to drive local bookings.
-4.  **seo_keywords**: A comma-separated string of 10 high-intent keywords. Include "best {{categoryName}} in bangalore", "professional {{categoryName}} services bangalore", and other related local terms.
-5.  **imageHint**: Provide one or two keywords for an AI image search for the category's main image. Max 50 characters.
+**OUTPUT FIELDS:**
+1.  **h1_title**: A compelling H1. Avoid just "Best {{categoryName}}". Try "Top-Rated {{categoryName}} Experts in Bangalore" or "{{categoryName}} Services: Trusted Professionals in Bangalore".
+2.  **seo_title**: A punchy meta title. Combine the service name with a strong benefit or location.
+3.  **seo_description**: A click-worthy description mentioning Bangalore and key neighborhoods like Indiranagar, Koramangala, or Whitefield. Focus on benefits like "Verified Pros", "Upfront Pricing", or "Same-Day Service".
+4.  **seo_keywords**: 10 high-volume, localized keywords. Vary the phrasing.
+5.  **imageHint**: Keywords for finding a relevant high-quality image.
 
-Return the entire response as a single, valid JSON object that adheres to the defined output schema.
+Return the entire response as a single, valid JSON object.
 `,
 });
 
@@ -56,6 +62,14 @@ const generateCategorySeoFlow = ai.defineFlow(
     if (!output) {
       throw new Error("AI failed to generate a valid SEO response for the category.");
     }
-    return output;
+    
+    // Clean and strictly truncate
+    return {
+      h1_title: cleanSeoString(output.h1_title),
+      seo_title: truncateSeoString(cleanSeoString(output.seo_title), 60),
+      seo_description: truncateSeoString(cleanSeoString(output.seo_description), 160),
+      seo_keywords: output.seo_keywords,
+      imageHint: output.imageHint,
+    };
   }
 );

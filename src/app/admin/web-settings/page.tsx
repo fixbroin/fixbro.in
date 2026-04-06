@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea"; 
 import { Label } from "@/components/ui/label";
-import { Settings2, Save, Loader2, AlertTriangle, Building, Image as ImageIcon, FileText, ExternalLink, Trash2, Facebook, Instagram, Linkedin, Youtube, TwitterIcon, Heading1, Heading2, Bold, List, Link as LinkIcon, Type, ImagePlus, Copy, Check, Pilcrow } from "lucide-react";
+import { Settings2, Save, Loader2, AlertTriangle, Building, Image as ImageIcon, FileText, ExternalLink, Trash2, Facebook, Instagram, Linkedin, Youtube, TwitterIcon, Heading1, Heading2, Bold, List, Link as LinkIcon, Type, ImagePlus, Copy, Check, Pilcrow, LayoutDashboard, Plus, Trash } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, query, orderBy, onSnapshot } from "firebase/firestore";
@@ -65,6 +65,23 @@ const socialMediaLinksSchema = z.object({
     youtube: z.string().url("Must be a valid URL.").optional().or(z.literal('')),
 });
 type SocialMediaLinksFormData = z.infer<typeof socialMediaLinksSchema>;
+
+const homepageContentSchema = z.object({
+  whyChooseUs: z.array(z.object({
+    id: z.string(),
+    title: z.string().min(1, "Title is required"),
+    description: z.string().min(1, "Description is required"),
+    iconName: z.string().min(1, "Icon name is required"),
+  })),
+  footerCompanyBio: z.string().optional().or(z.literal('')),
+  footerCTA: z.object({
+    title: z.string().min(1, "Title is required"),
+    subtitle: z.string().optional().or(z.literal('')),
+    buttonText: z.string().min(1, "Button text is required"),
+    buttonLink: z.string().min(1, "Button link is required"),
+  }),
+});
+type HomepageContentFormData = z.infer<typeof homepageContentSchema>;
 
 
 const knownPageSlugs = ["about-us", "contact-us", "careers", "terms-and-conditions", "privacy-policy", "faq", "service-disclaimer", "cancellation-policy", "damage-and-claims-policy"];
@@ -144,6 +161,25 @@ export default function WebSettingsPage() {
     },
   });
 
+  const homepageContentForm = useForm<HomepageContentFormData>({
+    resolver: zodResolver(homepageContentSchema),
+    defaultValues: {
+      whyChooseUs: [
+        { id: '1', title: 'Trusted Professionals', iconName: 'Users', description: 'Experienced and background-verified experts.' },
+        { id: '2', title: 'Timely Service', iconName: 'ClockIcon', description: 'We value your time and ensure punctuality.' },
+        { id: '3', title: 'Verified Services', iconName: 'ShieldCheck', description: 'Quality assurance for all services provided.' },
+        { id: '4', title: 'Transparent Pricing', iconName: 'Star', description: 'No hidden costs, clear and upfront pricing.' },
+      ],
+      footerCompanyBio: "Your trusted partner for professional home services. We bring skilled experts directly to your doorstep, ensuring quality, reliability, and peace of mind.",
+      footerCTA: {
+        title: "Ready to get started?",
+        subtitle: "Book your service now and experience the best home maintenance.",
+        buttonText: "Book a Service",
+        buttonLink: "/categories",
+      }
+    }
+  });
+
   const loadGlobalSettings = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -168,6 +204,19 @@ export default function WebSettingsPage() {
             linkedin: data.socialMediaLinks?.linkedin || "",
             youtube: data.socialMediaLinks?.youtube || "",
         });
+        
+        if (data.homepageContent) {
+          homepageContentForm.reset({
+            whyChooseUs: data.homepageContent.whyChooseUs || [],
+            footerCompanyBio: data.homepageContent.footerCompanyBio || "",
+            footerCTA: data.homepageContent.footerCTA || {
+              title: "Ready to get started?",
+              subtitle: "Book your service now and experience the best home maintenance.",
+              buttonText: "Book a Service",
+              buttonLink: "/categories",
+            }
+          });
+        }
         setLogoPreview(data.logoUrl || null);
         setFaviconPreview(data.faviconUrl || null);
         setWebsiteIconPreview(data.websiteIconUrl || null);
@@ -527,6 +576,28 @@ export default function WebSettingsPage() {
     }
   };
 
+  const handleSaveHomepageContent = async (data: HomepageContentFormData) => {
+    setIsSaving(true);
+    try {
+      const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
+      const updateData: Partial<GlobalWebSettings> = {
+        homepageContent: data,
+        updatedAt: Timestamp.now(),
+      };
+      await setDoc(settingsDocRef, updateData, { merge: true });
+      await triggerRefresh('web-settings');
+      await triggerRefresh('global-cache');
+      setGlobalSettings(prev => ({ ...prev, ...updateData }));
+      setOriginalGlobalSettings(prev => ({...prev, ...updateData}));
+      toast({ title: "Success", description: "Homepage content saved." });
+    } catch (error) {
+      console.error("Error saving homepage content:", error);
+      toast({ title: "Error", description: "Could not save homepage content.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // Helper for inserting HTML tags into textarea
   const insertHtmlTag = (tag: string, endTag?: string) => {
     const textarea = textareaRef.current;
@@ -707,6 +778,12 @@ export default function WebSettingsPage() {
               <ExternalLink className="mr-2 h-4 w-4" />Social Media
             </TabsTrigger>
             <TabsTrigger 
+              value="homepage_content"
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <LayoutDashboard className="mr-2 h-4 w-4" />Homepage Content
+            </TabsTrigger>
+            <TabsTrigger 
               value="content"
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
@@ -770,6 +847,179 @@ export default function WebSettingsPage() {
                         </Button>
                     </CardFooter>
                 </form>
+            </Form>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="homepage_content">
+          <Card>
+            <CardHeader>
+              <CardTitle>Homepage & Footer Content</CardTitle>
+              <CardDescription>Manage the marketing text and CTA sections of your website.</CardDescription>
+            </CardHeader>
+            <Form {...homepageContentForm}>
+              <form onSubmit={homepageContentForm.handleSubmit(handleSaveHomepageContent)}>
+                <CardContent className="space-y-8">
+                  {/* Why Choose Us Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Why Choose Us Items</h3>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          const current = homepageContentForm.getValues('whyChooseUs');
+                          homepageContentForm.setValue('whyChooseUs', [
+                            ...current, 
+                            { id: Math.random().toString(36).substr(2, 9), title: '', description: '', iconName: 'Users' }
+                          ]);
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add Item
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {homepageContentForm.watch('whyChooseUs').map((item, index) => (
+                        <Card key={item.id} className="relative bg-muted/20">
+                          <CardContent className="pt-6 space-y-3">
+                            <div className="flex justify-between items-start gap-2">
+                              <FormField
+                                control={homepageContentForm.control}
+                                name={`whyChooseUs.${index}.title`}
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormLabel className="text-xs">Title</FormLabel>
+                                    <FormControl><Input placeholder="e.g., Trusted Experts" {...field} className="h-8 text-sm" /></FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => {
+                                  const current = homepageContentForm.getValues('whyChooseUs');
+                                  homepageContentForm.setValue('whyChooseUs', current.filter((_, i) => i !== index));
+                                }}
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <FormField
+                              control={homepageContentForm.control}
+                              name={`whyChooseUs.${index}.iconName`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Lucide Icon Name</FormLabel>
+                                  <FormControl><Input placeholder="Users, Star, ShieldCheck, etc." {...field} className="h-8 text-sm" /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={homepageContentForm.control}
+                              name={`whyChooseUs.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Description</FormLabel>
+                                  <FormControl><Textarea placeholder="Short description..." {...field} className="text-sm" rows={2} /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Footer Bio Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Footer Bio</h3>
+                    <FormField
+                      control={homepageContentForm.control}
+                      name="footerCompanyBio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Introduction (Footer Left)</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="FixBro is Bangalore's leading home services platform..." 
+                              {...field} 
+                              rows={4} 
+                            />
+                          </FormControl>
+                          <FormDescription>This text appears in the bottom left of the website footer.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* Footer CTA Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Footer CTA (Above Footer Section)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={homepageContentForm.control}
+                        name="footerCTA.title"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CTA Title</FormLabel>
+                            <FormControl><Input placeholder="Ready to get started?" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={homepageContentForm.control}
+                        name="footerCTA.subtitle"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CTA Subtitle</FormLabel>
+                            <FormControl><Input placeholder="Book your service now..." {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={homepageContentForm.control}
+                        name="footerCTA.buttonText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Text</FormLabel>
+                            <FormControl><Input placeholder="Book a Service" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={homepageContentForm.control}
+                        name="footerCTA.buttonLink"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Button Link</FormLabel>
+                            <FormControl><Input placeholder="/categories" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={isSaving} size="lg">
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Homepage Content
+                  </Button>
+                </CardFooter>
+              </form>
             </Form>
           </Card>
         </TabsContent>

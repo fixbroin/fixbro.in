@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { cleanSeoString, truncateSeoString } from '@/lib/seoAdvancedUtils';
 
 const GenerateServiceDetailsInputSchema = z.object({
   serviceName: z.string().describe("The name of the home service, e.g., 'AC Deep Cleaning' or 'Leaky Faucet Repair'."),
@@ -37,10 +38,10 @@ const GenerateServiceDetailsOutputSchema = z.object({
     })
   ).describe("An array of 3-4 frequently asked questions. These are crucial for 'People Also Ask' rich snippets on Google."),
   seo: z.object({
-    h1_title: z.string().describe("An H1 title with the exact format 'Best Professional {{serviceName}}'."),
-    seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters, with the format 'Best {{serviceName}} Near Me | Professional {{categoryName}}'."),
-    seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters. Should be a compelling summary that encourages clicks using words like 'Top-rated' and 'Affordable'."),
-    seo_keywords: z.string().describe("A comma-separated string of 10 relevant SEO keywords. Must include variations like 'best {{serviceName}} near me', 'professional {{categoryName}} services', 'book {{serviceName}} online'."),
+    h1_title: z.string().describe("An H1 title for the service page."),
+    seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
+    seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
+    seo_keywords: z.string().describe("A comma-separated string of 10 relevant SEO keywords."),
   }).describe("SEO related content for the service page."),
   rating: z.coerce.number().min(4.5).max(5).describe("A random rating between 4.5 and 5.0, with one decimal place (e.g., 4.8, 4.9) to boost click-through rates."),
   reviewCount: z.coerce.number().int().min(150).max(1500).describe("A random integer review count between 150 and 1500."),
@@ -55,57 +56,28 @@ const prompt = ai.definePrompt({
   name: 'generateServiceDetailsPrompt',
   input: { schema: GenerateServiceDetailsInputSchema },
   output: { schema: GenerateServiceDetailsOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for a home services company called "FixBro" operating specifically in Bangalore, India. Your task is to generate highly aggressive, intent-driven content and SEO metadata for a specific service to rank #1 on Google for Bangalore-based searches.
+  prompt: `You are an expert Local SEO copywriter for "FixBro", Bangalore's leading home services company.
+Your goal is to generate high-conversion content and SEO metadata for a specific service.
 
 Service Name: {{serviceName}}
 Category: {{categoryName}}
 Sub-Category: {{subCategoryName}}
 
-Please generate the content based on the service details provided. Adhere to the following structure and focus on high-intent keywords like "Best", "Professional", "Top-Rated", "Near Me", and "Bangalore". Ensure the FAQs are designed to win Google's "People Also Ask" boxes and mention Bangalore context where natural.
+**STRATEGIC SEO GUIDELINES:**
+1. **Avoid Repetitive Phrasing**: Do not use "{{serviceName}}" excessively. If the service name is "AC Repair", avoid "Professional AC Repair Services for AC Repair". Use "Expert AC Maintenance" or "Trusted Cooling Solutions".
+2. **Local Authority**: Naturally integrate "Bangalore" and neighborhoods like Indiranagar, HSR Layout, or Electronic City.
+3. **Rich Snippets**: FAQs should be phrased for voice search (e.g., "How long does AC service take in Bangalore?").
+4. **Aggressive SEO**: Use high-intent modifiers: "Best", "Top-Rated", "Verified Pros", "Upfront Pricing", "Same-Day Service".
 
-**EXAMPLE**
-For a service named "Digital or Electronic Lock Installation" in the "Carpentry" category:
+**OUTPUT INSTRUCTIONS:**
+- **shortDescription**: Concise, mentions Bangalore.
+- **fullDescription**: Marketing-heavy, highlights reliability and Bangalore coverage. Under 300 chars.
+- **serviceFaqs**: 3-4 Q&As localized for Bangalore.
+- **seo.h1_title**: Dynamic and strong. E.g., "Expert {{serviceName}} Services in Bangalore".
+- **seo.seo_title**: Catchy, under 60 chars. E.g., "{{serviceName}} in Bangalore | Best Prices & Verified Pros".
+- **seo.seo_description**: Compelling summary under 160 chars.
 
-*   **shortDescription**: "Install one digital or electronic lock on a wooden door in Bangalore."
-*   **fullDescription**: "Book skilled, professional carpenters for safe and secure digital lock installation in Bangalore. Trusted by homeowners in HSR Layout, Indiranagar, and Koramangala for quality carpentry services."
-*   **pleaseNote**: ["Lock must be provided by the customer", "Installation applicable for standard wooden doors only", "Electrical connection, configuration, or setup beyond installation not included", "Our partners do not carry a ladder; please arrange one if needed"]
-*   **imageHint**: "Digital lock installation wooden door"
-*   **serviceHighlights**: ["Safe and proper digital lock installation", "Skilled professionals handle delicate fittings", "Labour only, customer provides lock and accessories", "Available across all Bangalore neighborhoods"]
-*   **includedItems**: ["Installation of one digital or electronic lock on a wooden door", "Professional carpenter with basic tools", "Physical mounting of the lock", "Service available in all areas of Bangalore"]
-*   **excludedItems**: ["Lock supply or purchase assistance", "Installation on metal, glass, PVC, or sliding doors", "Electrical wiring or configuration of smart features"]
-*   **taskTime**: { "value": 60, "unit": "minutes" }
-*   **serviceFaqs**: [{ "question": "What does the professional digital lock installation service in Bangalore include?", "answer": "The service includes installing one digital or electronic door lock on a wooden door using customer-provided hardware by an expert carpenter across Bangalore." }, { "question": "Do you provide the digital lock?", "answer": "No, the digital or electronic lock must be provided by the customer. We offer top-rated professional installation services in Bangalore." }, { "question": "Can this be installed on any door type?", "answer": "This service is specifically for wooden or engineered wood doors. We currently do not install on metal, glass, or uPVC doors in Bangalore." }]
-*   **seo**: {
-        "h1_title": "Best Professional Digital or Electronic Lock Installation in Bangalore",
-        "seo_title": "Best Digital Lock Installation in Bangalore | Carpenter Near Me",
-        "seo_description": "Book top-rated, professional digital lock installation in Bangalore. Secure fitting on wooden doors by expert carpenters. Trusted services in Koramangala, HSR & more.",
-        "seo_keywords": "best digital lock installation in bangalore, professional electronic lock fitting bangalore, expert carpenter near me bangalore, smart lock installation services bangalore"
-    }
-*   **rating**: 4.8
-*   **reviewCount**: 452
-
-**INSTRUCTIONS**
-
-Now, using the input service details ({{serviceName}}, {{categoryName}}, {{subCategoryName}}), generate the complete JSON output following the schema. 
-
-1.  **shortDescription**: A concise, one-sentence description. Mention Bangalore if possible. Max 200 chars.
-2.  **fullDescription**: A marketing description highlighting "professional" and "top-rated" qualities in the Bangalore context. MUST BE UNDER 300 chars.
-3.  **pleaseNote**: An array of 2-4 important notes or disclaimers.
-4.  **imageHint**: One or two keywords for an AI image search. Max 50 chars.
-5.  **serviceHighlights**: An array of 2-4 short strings highlighting key benefits, including availability in Bangalore.
-6.  **includedItems**: An array of 3-5 strings listing what is included.
-7.  **excludedItems**: An array of 2-4 strings listing what is NOT included.
-8.  **taskTime**: An object with the estimated time to complete the task.
-9.  **serviceFaqs**: An array of 3-4 specific question/answer objects designed for voice search and "People Also Ask" boxes, localized for Bangalore.
-10. **seo**: An object with SEO content:
-    *   **h1_title**: Format: "Best Professional {{serviceName}} in Bangalore".
-    *   **seo_title**: Format: "Best {{serviceName}} in Bangalore | Professional {{categoryName}}" (under 60 chars).
-    *   **seo_description**: SEO meta description (under 160 chars) mentioning "Bangalore" and top neighborhoods like "Koramangala", "HSR Layout", or "Indiranagar".
-    *   **seo_keywords**: 10 comma-separated high-intent keywords including "Bangalore" variations.
-11. **rating**: A random float between 4.5 and 5.0 (one decimal place).
-12. **reviewCount**: A random integer between 150 and 1500.
-
-Return the entire response as a single, valid JSON object that adheres to the defined output schema.
+Return the entire response as a single, valid JSON object.
 `,
 });
 
@@ -120,6 +92,18 @@ const generateServiceDetailsFlow = ai.defineFlow(
     if (!output) {
       throw new Error("AI failed to generate a valid response.");
     }
-    return output;
+
+    // Clean SEO strings to ensure no redundant words
+    return {
+      ...output,
+      seo: {
+        h1_title: cleanSeoString(output.seo.h1_title),
+        seo_title: truncateSeoString(cleanSeoString(output.seo.seo_title), 60),
+        seo_description: truncateSeoString(cleanSeoString(output.seo.seo_description), 160),
+        seo_keywords: output.seo.seo_keywords,
+      },
+      shortDescription: truncateSeoString(cleanSeoString(output.shortDescription), 200),
+      fullDescription: truncateSeoString(cleanSeoString(output.fullDescription), 300),
+    };
   }
 );

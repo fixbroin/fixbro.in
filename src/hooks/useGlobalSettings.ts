@@ -65,6 +65,7 @@ const processSettingsData = (data: Partial<GlobalWebSettings>): GlobalWebSetting
       ...defaultGlobalWebSettings.socialMediaLinks,
       ...(data.socialMediaLinks || {}),
     },
+    homepageContent: data.homepageContent,
     globalAdminPopup,
   };
 };

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -399,6 +400,7 @@ const HomepageServiceCarousel: React.FC<{ services: FirestoreService[] }> = ({ s
 
 export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, initialData, initialH1Title }: HomePageClientProps) {
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const { settings } = useGlobalSettings();
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -686,8 +688,8 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       handleSimpleNavigation("/categories");
   }, [handleSimpleNavigation]);
 
-  const handleBookServiceCtaClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
+  const handleBookServiceCtaClick = useCallback((e?: React.MouseEvent<HTMLButtonElement>) => {
+      if (e) e.preventDefault();
       handleSimpleNavigation("/categories");
   }, [handleSimpleNavigation]);
 
@@ -879,18 +881,25 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <section className="py-8 md:py-10 text-center bg-primary text-primary-foreground">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-4">
-              Ready to get started?
+              {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              Book your service today and experience the Fixbro difference.
+              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
             </p>
             <Button
               size="lg"
               variant="secondary"
               className="bg-background text-primary hover:bg-background/90"
-              onClick={handleBookServiceCtaClick}
+              onClick={() => {
+                if (settings.homepageContent?.footerCTA?.buttonLink) {
+                    showLoading();
+                    router.push(settings.homepageContent.footerCTA.buttonLink);
+                } else {
+                    handleBookServiceCtaClick();
+                }
+              }}
             >
-              Book a Service
+              {settings.homepageContent?.footerCTA?.buttonText || "Book a Service"}
             </Button>
           </div>
         </section>
