@@ -72,6 +72,7 @@ type FlatService = {
   slug: string;
   url: string;
   subCategoryId?: string;
+  parentCategoryId?: string;
 };
 
 type LocationData = {
@@ -120,6 +121,11 @@ function isHumanSupportIntent(message: string): boolean {
     return /\b(human|person|agent|support|talk to someone|representative|manual|help me|frustrated|call me)\b/.test(m);
 }
 
+function isPolicyIntent(message: string): boolean {
+  const m = normalizeText(message);
+  return /\b(cancel|refund|money back|reschedule|policy|timing|fee|chargeback|return)\b/.test(m);
+}
+
 /* -------------------------
    Matching Logic
    ------------------------- */
@@ -145,16 +151,6 @@ function findBestService(userMessage: string, services: FlatService[]): FlatServ
     if (score > best.score) best = { service: s, score };
   }
   return best.score >= 45 ? best.service : null;
-}
-
-function findSubCategoryIntent(message: string, subcategories: FirestoreSubCategory[]): FirestoreSubCategory | null {
-  const m = normalizeText(message);
-  for (const sc of subcategories) {
-    const name = normalizeText(sc.name || '');
-    if (!name) continue;
-    if (m.includes(name) || name.includes(m)) return sc;
-  }
-  return null;
 }
 
 function findCategoryIntent(message: string, categories: FirestoreCategory[]): FirestoreCategory | null {
@@ -205,13 +201,22 @@ async function getFullData(): Promise<{
   const subCatsArr = subs.docs.map(d => ({ id: d.id, ...d.data() } as FirestoreSubCategory));
   const servicesArr = servs.docs.map(d => ({ id: d.id, ...d.data() } as FirestoreService));
 
-  const flatServiceList: FlatService[] = servicesArr.map((s) => ({
-    id: s.id,
-    name: s.name,
-    slug: s.slug,
-    url: `${baseUrl}/service/${s.slug}`,
-    subCategoryId: s.subCategoryId,
-  }));
+  const flatServiceList: FlatService[] = servicesArr.map((s) => {
+    let pCatId = s.parentCategoryId;
+    if (!pCatId && s.subCategoryId) {
+      const sub = subCatsArr.find(sc => sc.id === s.subCategoryId);
+      if (sub) pCatId = sub.parentId;
+    }
+
+    return {
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      url: `${baseUrl}/service/${s.slug}`,
+      subCategoryId: s.subCategoryId,
+      parentCategoryId: pCatId,
+    };
+  });
 
   return { categories: categoriesArr, subCategories: subCatsArr, flatServiceList };
 }
@@ -285,17 +290,29 @@ function buildSystemPrompt(params: {
   locations: LocationData;
   websiteContent: string;
   baseUrl: string;
+  appConfig: AppSettings | null;
 }) {
-  const { name, bookings, flatServices, locations, websiteContent, baseUrl } = params;
+  const { name, bookings, flatServices, locations, websiteContent, baseUrl, appConfig } = params;
 
   const servicesText = flatServices.map(s => `${s.name}: ${s.url}`).join('\n');
   const citiesText = locations.cities.map(c => `${c.name}: ${c.url}`).join(', ');
   const areasText = locations.areas.map(a => `${a.name} (${a.cityName}): ${a.url}`).join('\n');
 
+  // Cancellation Policy Logic
+  let cancellationDetails = `Please refer to our [Cancellation Policy](${baseUrl}/cancellation-policy) for details.`;
+  if (appConfig) {
+    const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
+    const fee = appConfig.cancellationFeeType === 'fixed' ? `₹${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
+    cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply. Detailed policy: ${baseUrl}/cancellation-policy`;
+  }
+
   return `
 You are the official FixBro AI Support Specialist. Your goal is to provide accurate, helpful, and concise information about FixBro's services, locations, and policies.
 
 Current User: ${name}
+
+CANCELLATION & REFUND POLICY:
+${cancellationDetails}
 
 WEBSITE KNOWLEDGE BASE:
 ${websiteContent}
@@ -315,10 +332,11 @@ GUIDELINES:
 1. Always prioritize providing direct booking URLs for services.
 2. If asked about locations, confirm availability in the cities/areas listed above. If not listed, apologize and offer human support.
 3. For company info (About, Careers, etc.), use the summaries provided.
-4. Keep responses professional, friendly, and under 3-4 sentences unless listing services.
-5. Use full Markdown for links: [Service Name](${baseUrl}/service/slug).
-6. CRITICAL: If a user is frustrated, asks for a human, or you cannot solve their problem, say "I am connecting you to our human support team right now. They will be with you shortly." and nothing else.
-7. REFERRALS: If enabled, users can find their referral code in their profile to earn rewards.
+4. If a service or category is NOT found, apologize and say: "We don't offer that specific service yet, but you can submit a custom request at ${baseUrl}/custom-service and we'll try to help you!"
+5. Keep responses professional, friendly, and under 3-4 sentences unless listing services.
+6. Use full Markdown for links: [Service Name](${baseUrl}/service/slug).
+7. CRITICAL: If a user is frustrated, asks for a human, or you cannot solve their problem, say "I am connecting you to our human support team right now. They will be with you shortly." and nothing else.
+8. REFERRALS: If enabled, users can find their referral code in their profile to earn rewards.
 `;
 }
 
@@ -389,13 +407,24 @@ const chatAgentFlow = ai.defineFlow(
         return { response: `I understand, ${name}. I am connecting you to our human support team right now. They have been notified and will be with you shortly.` };
     }
 
-    // 3) Booking Status
+    // 3) Policy Questions (Cancellation/Refund)
+    if (isPolicyIntent(message)) {
+        let cancellationText = `You can view our full policy here: ${baseUrl}/cancellation-policy. `;
+        if (appConfig) {
+            const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
+            const fee = appConfig.cancellationFeeType === 'fixed' ? `₹${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
+            cancellationText = `Our policy allows free cancellation up to ${time} before the service starts. After that, a fee of ${fee} applies. Check details here: ${baseUrl}/cancellation-policy`;
+        }
+        return { response: cancellationText };
+    }
+
+    // 4) Booking Status
     if (/\b(booking|my booking|status|order|where is my)\b/i.test(message) && bookings.length > 0) {
       const latest = bookings[0];
       return { response: `Hi ${name}, your most recent booking (${latest.bookingId}) is currently ${latest.status}. It's scheduled for ${latest.scheduledDate} at ${latest.scheduledTimeSlot}. Would you like to check others?` };
     }
 
-    // 4) Location Check
+    // 5) Location Check
     if (isLocationIntent(message)) {
         const msg = normalizeText(message);
         const matchedCity = locations.cities.find(c => msg.includes(normalizeText(c.name)));
@@ -413,34 +442,62 @@ const chatAgentFlow = ai.defineFlow(
         }
     }
 
-    // 5) Custom Service
+    // 6) Custom Service
     if (isCustomServiceIntent(message)) {
-      return { response: `Looking for something unique, ${name}? You can submit a custom service request here, and our team will get back to you with a quote:\n${baseUrl}/custom-service` };
+      return { response: `Looking for something unique, ${name}? You can submit a custom request here: ${baseUrl}/custom-service, and our team will get back to you with a quote.` };
     }
 
-    // 6) Service Matching (Deterministic)
-    if (isServiceIntent(message) && !isTooShortForServiceMatch(message)) {
-      const best = findBestService(message, flatServiceList);
-      if (best) {
-        return { response: `I found the perfect match for you! You can book our ${best.name} service directly here: ${best.url}` };
+    // 7) Service Matching (Deterministic) - IMPROVED CATEGORY-FIRST
+    const matchedCatIntent = findCategoryIntent(message, categories);
+    const hasServiceIntent = isServiceIntent(message);
+
+    if ((hasServiceIntent || matchedCatIntent) && !isTooShortForServiceMatch(message)) {
+      // 1. Identify Target Category
+      let targetCat: FirestoreCategory | null = matchedCatIntent;
+      
+      // If no direct category match, check if any service matches well and use its parent category
+      if (!targetCat) {
+          const globalServiceMatch = findBestService(message, flatServiceList);
+          if (globalServiceMatch && globalServiceMatch.parentCategoryId) {
+              targetCat = categories.find(c => c.id === globalServiceMatch.parentCategoryId) || null;
+          }
       }
 
-      const sub = findSubCategoryIntent(message, subCategories);
-      if (sub) {
-        const linkedServices = flatServiceList.filter(s => s.subCategoryId === sub.id).slice(0, 5);
-        const list = linkedServices.map(s => `- [${s.name}](${s.url})`).join('\n');
-        return { response: `We have several options for ${sub.name}:\n${list}\n\nWhich one fits your needs best?` };
+      // 2. Handle Found Category
+      if (targetCat) {
+          // Search for best service match ONLY within this category
+          const servicesInCat = flatServiceList.filter(s => s.parentCategoryId === targetCat?.id);
+          const bestServiceInCat = findBestService(message, servicesInCat);
+
+          if (bestServiceInCat) {
+              return { response: `I found the perfect match for you in our ${targetCat.name} category! You can book our [${bestServiceInCat.name}](${bestServiceInCat.url}) service directly.` };
+          }
+
+          // If no specific service match but we have a category, list services in that category (ignoring sub-categories as requested)
+          const topServices = servicesInCat.slice(0, 6);
+          if (topServices.length > 0) {
+              const list = topServices.map(s => `- [${s.name}](${s.url})`).join('\n');
+              return { response: `We have several ${targetCat.name} services available! Here are some popular options:\n${list}\n\nDo any of these match what you're looking for?` };
+          } else {
+              return { response: `We offer ${targetCat.name} services, but I couldn't find a specific match for your request right now. You can browse the category here: ${baseUrl}/category/${targetCat.slug} or submit a custom request at ${baseUrl}/custom-service.` };
+          }
+      }
+
+      // 3. Category NOT Found for a Service Intent
+      if (hasServiceIntent) {
+          return { response: `We don't have that category related services yet, but you can submit a custom request at ${baseUrl}/custom-service and we'll try to help you! Alternatively, please contact our support for more assistance.` };
       }
     }
 
-    // 7) LLM Fallback (Genkit/Gemini)
+    // 8) LLM Fallback (Genkit/Gemini)
     const systemPrompt = buildSystemPrompt({
       name,
       bookings,
       flatServices: flatServiceList,
       locations,
       websiteContent,
-      baseUrl
+      baseUrl,
+      appConfig
     });
 
     const response = await ai.generate({
