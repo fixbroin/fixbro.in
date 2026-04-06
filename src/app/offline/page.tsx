@@ -1,9 +1,9 @@
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { WifiOff, RefreshCw, Home } from 'lucide-react';
+import { WifiOff, Home } from 'lucide-react';
 import React from 'react';
 import type { Metadata } from 'next';
+import OfflineRetryButton from '@/components/shared/OfflineRetryButton';
 
 export const metadata: Metadata = {
   title: 'Offline - No Internet Connection',
@@ -34,16 +34,9 @@ export default function OfflinePage() {
       </p>
       
       <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-sm">
-        {/* We use a standard button with window.location.reload() for real offline refresh */}
-        <Button 
-          size="lg" 
-          className="w-full sm:w-auto px-8 rounded-full shadow-lg shadow-primary/20 gap-2"
-          variant="default"
-          onClick={() => typeof window !== 'undefined' && window.location.reload()}
-        >
-          <RefreshCw className="h-4 w-4" />
-          Retry Connection
-        </Button>
+        {/* Client-side retry button */}
+        <OfflineRetryButton />
+
         <Link href="/" passHref className="w-full sm:w-auto">
           <Button variant="outline" size="lg" className="w-full sm:w-auto px-8 rounded-full gap-2">
             <Home className="h-4 w-4" />
