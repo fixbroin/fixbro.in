@@ -12,6 +12,7 @@ import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false;
 
@@ -123,6 +124,10 @@ export default async function CityHomePage({ params }: CityPageProps) {
   breadcrumbItems.push({ label: cityData.name });
 
   const appBaseUrl = getBaseUrl();
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: "Home", url: appBaseUrl },
+    { name: cityData.name, url: `${appBaseUrl}/${citySlug}` }
+  ]);
   const placeholderData = { cityName: cityData.name };
   const h1Title = replacePlaceholders(cityData.h1_title || seoSettings.cityPageH1Pattern, placeholderData) || `Best Professional Home Services in ${cityData.name}`;
 
@@ -162,6 +167,7 @@ export default async function CityHomePage({ params }: CityPageProps) {
   return (
     <>
       <JsonLdScript data={citySchema} idSuffix={`city-${cityData.id}`} />
+      <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-city-${cityData.id}`} />
       <div className="container mx-auto px-4 pt-4 md:pt-6">
         <Breadcrumbs items={breadcrumbItems} />
       </div>

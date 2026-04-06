@@ -11,6 +11,7 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { getAggregateRating } from '@/lib/homepageUtils';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false; // Persistent Cache (Smart Revalidation Only)
 
@@ -196,6 +197,13 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const rawSchemaImage = serviceData.imageUrl || `/android-chrome-512x512.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
 
+  const breadcrumbItems = [
+    { name: "Home", url: appBaseUrl },
+    ...(serviceData.parentCategorySlug ? [{ name: serviceData.parentCategoryName || "Category", url: `${appBaseUrl}/category/${serviceData.parentCategorySlug}` }] : []),
+    { name: serviceData.name, url: `${appBaseUrl}/service/${slug}` }
+  ];
+  const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItems);
+
   const serviceSchema = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -269,6 +277,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   return (
     <>
       <JsonLdScript data={serviceSchema} idSuffix={`service-${serviceData.id}`} />
+      <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-service-${serviceData.id}`} />
       {faqSchema && <JsonLdScript data={faqSchema} idSuffix={`faq-${serviceData.id}`} />}
       <ServiceDetailPageClient serviceSlug={slug} initialServiceData={serviceData} initialH1Title={h1Title} />
     </>

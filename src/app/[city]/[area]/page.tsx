@@ -12,6 +12,7 @@ import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false;
 
@@ -156,6 +157,11 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
 
   const seoSettings = homepageData.seoSettings;
   const appBaseUrl = getBaseUrl();
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: "Home", url: appBaseUrl },
+    { name: areaData.parentCityData!.name, url: `${appBaseUrl}/${citySlug}` },
+    { name: areaData.name, url: `${appBaseUrl}/${citySlug}/${areaSlug}` }
+  ]);
   const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
 
   const h1Title = replacePlaceholders(areaData.h1_title || seoSettings.areaPageH1Pattern, placeholderData) || `Expert Home Services in ${areaData.name}`;
@@ -192,6 +198,7 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
   return (
     <>
       <JsonLdScript data={areaSchema} idSuffix={`area-${areaData.id}`} />
+      <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-area-${areaData.id}`} />
       <HomePageClient citySlug={citySlug} areaSlug={areaSlug} breadcrumbItems={breadcrumbItems} initialData={homepageData} initialH1Title={h1Title} />
     </>
   );

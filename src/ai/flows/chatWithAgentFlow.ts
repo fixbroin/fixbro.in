@@ -419,9 +419,21 @@ const chatAgentFlow = ai.defineFlow(
     }
 
     // 4) Booking Status
-    if (/\b(booking|my booking|status|order|where is my)\b/i.test(message) && bookings.length > 0) {
-      const latest = bookings[0];
-      return { response: `Hi ${name}, your most recent booking (${latest.bookingId}) is currently ${latest.status}. It's scheduled for ${latest.scheduledDate} at ${latest.scheduledTimeSlot}. Would you like to check others?` };
+    if (/\b(booking|my booking|status|order|where is my|help with my booking)\b/i.test(message)) {
+      if (bookings.length > 0) {
+        const latest = bookings[0];
+        let responseText = `Hi ${name}, I found ${bookings.length} booking(s) in your account. Your most recent booking (${latest.bookingId}) is currently **${latest.status}**. It is scheduled for ${latest.scheduledDate} during the ${latest.scheduledTimeSlot} slot.`;
+        
+        if (bookings.length > 1) {
+            const others = bookings.slice(1, 3).map(b => `- ${b.bookingId}: ${b.status} (${b.scheduledDate})`).join('\n');
+            responseText += `\n\nYour other recent bookings:\n${others}\n\nYou can view full details in your account here: ${baseUrl}/my-bookings`;
+        } else {
+            responseText += `\n\nYou can track this booking here: ${baseUrl}/my-bookings`;
+        }
+        return { response: responseText };
+      } else {
+        return { response: `I checked your account, ${name}, but I don't have any bookings from your account at the moment. Would you like to explore our services and book something new?` };
+      }
     }
 
     // 5) Location Check

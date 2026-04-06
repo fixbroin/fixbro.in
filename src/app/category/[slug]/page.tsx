@@ -10,6 +10,7 @@ import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false;
 
@@ -150,6 +151,11 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (data) {
     breadcrumbItems.push({ label: data.category.name });
     
+    const breadcrumbSchema = generateBreadcrumbSchema([
+      { name: "Home", url: appBaseUrl },
+      { name: data.category.name, url: `${appBaseUrl}/category/${slug}` }
+    ]);
+
     const rawSchemaImage = data.category.imageUrl || `/android-chrome-512x512.png`;
     const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
     
@@ -186,6 +192,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     return (
       <>
         <JsonLdScript data={categorySchema} idSuffix={`category-${data.category.id}`} />
+        <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-category-${data.category.id}`} />
         <CategoryPageClient 
             categorySlug={slug} 
             breadcrumbItems={breadcrumbItems} 

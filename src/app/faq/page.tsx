@@ -11,6 +11,8 @@ import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { unstable_cache } from 'next/cache';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { serializeFirestoreData } from '@/lib/serializeUtils';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { getBaseUrl } from '@/lib/config';
 
 export const revalidate = false;
 
@@ -44,6 +46,12 @@ export default async function FAQPage() {
     { label: "FAQ" },
   ];
 
+  const appBaseUrl = getBaseUrl();
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: "Home", url: appBaseUrl },
+    { name: "FAQ", url: `${appBaseUrl}/faq` }
+  ]);
+
   const faqSchema = faqs.length > 0 ? {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -59,6 +67,7 @@ export default async function FAQPage() {
 
   return (
     <>
+      <JsonLdScript data={breadcrumbSchema} idSuffix="breadcrumb-faq" />
       {faqSchema && <JsonLdScript data={faqSchema} idSuffix="main-faq" />}
       <div className="container mx-auto px-4 py-16 min-h-screen">
       <div className="max-w-4xl mx-auto">

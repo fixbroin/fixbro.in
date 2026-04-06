@@ -15,6 +15,7 @@ import BlogPostCard from '@/components/blog/BlogPostCard';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
+import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false; // Persistent Cache
 
@@ -158,12 +159,19 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   }
 
   const relatedPosts = await getRelatedPosts(slug, post.categoryId);
+  const appBaseUrl = getBaseUrl();
 
   const breadcrumbItems = [
     { label: "Home", href: "/" },
     { label: "Blog", href: "/blog" },
     { label: post.title },
   ];
+
+  const breadcrumbSchema = generateBreadcrumbSchema([
+    { name: "Home", url: appBaseUrl },
+    { name: "Blog", url: `${appBaseUrl}/blog` },
+    { name: post.title, url: `${appBaseUrl}/blog/${slug}` }
+  ]);
 
   const getDisplayDate = (date: any): string => {
     const millis = getTimestampMillis(date);
@@ -187,7 +195,6 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
   const displayReadingTime = post.readingTime || calculateReadingTime(post.content);
 
-  const appBaseUrl = getBaseUrl();
   const rawSchemaImage = post.coverImageUrl || `/default-image.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
 
@@ -220,6 +227,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   return (
     <article className="min-h-screen bg-background pb-20">
       <JsonLdScript data={blogSchema} idSuffix={`blog-${post.id}`} />
+      <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-blog-${post.id}`} />
       
       {/* Header with Background */}
       <div className="relative bg-primary/5 py-16 md:py-24 overflow-hidden">

@@ -48,6 +48,9 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   reloadOnOnline: true,
+  fallbacks: {
+    document: '/offline',
+  },
 
   workboxOptions: {
     exclude: [
