@@ -68,13 +68,17 @@ Generate highly aggressive, intent-driven content based on the following:
 
 5. **h1_title**: Format: "Best Professional {{title}} in Bangalore | FixBro".
 
-6. **meta_title**: Format: "Best {{title}} Near Me in Bangalore | Top-Rated {{categoryName}}".
+6. **meta_title**: Generate a meta title under 70 characters. 
+Format: "Best {{title}} Near Me | FixBro" or "Top {{title}} Bangalore | FixBro". 
+Do NOT exceed 70 characters.
 
 7. **meta_description**: A compelling meta description (under 160 chars) starting with "Hire the best professional experts for {{title}} in Bangalore...".
 
 8. **meta_keywords**: Comma-separated: "{{title}}, Bangalore, Koramangala, Whitefield, best {{categoryName}} near me".
 
-9. **imageHint**: Provide "{{title}} Bangalore professional service" Max 50 characters.
+9. **imageHint**: Provide 2-4 words only (max 50 characters).
+Example: "TV installation technician", "electrician service Bangalore".
+Avoid repeating words like Bangalore twice.
 
 Return the entire response as a single, valid JSON object.
 `,
