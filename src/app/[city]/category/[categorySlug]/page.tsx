@@ -1,12 +1,12 @@
 import CategoryPageClient from '@/components/category/CategoryPageClient';
 import { adminDb } from '@/lib/firebaseAdmin';
-import type { FirestoreCategory, FirestoreCity } from '@/types/firestore';
+import type { FirestoreCategory, FirestoreCity, CityCategorySeoSetting } from '@/types/firestore';
 import type { BreadcrumbItem } from '@/types/ui';
 import { notFound } from 'next/navigation';
 import { getCategoryFullData, getAggregateRating } from '@/lib/homepageUtils';
 import type { Metadata, ResolvingMetadata } from 'next';
 import { replacePlaceholders } from '@/lib/seoUtils';
-import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
+import { getGlobalSEOSettings, getCityCategorySeoOverride } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { cache } from 'react';
@@ -20,11 +20,11 @@ interface PageProps {
 
 const RESERVED_SLUGS = ['api', 'admin', 'provider', 'auth', 'static', '_next'];
 
-const getPageData = cache(async (citySlug: string, categorySlug: string): Promise<{ city: FirestoreCity | null; category: FirestoreCategory | null }> => {
+const getPageData = cache(async (citySlug: string, categorySlug: string): Promise<{ city: FirestoreCity | null; category: FirestoreCategory | null; seoOverride: CityCategorySeoSetting | null }> => {
   return unstable_cache(
     async () => {
       if (RESERVED_SLUGS.includes(citySlug) || citySlug.includes('.') || categorySlug.includes('.')) {
-        return { city: null, category: null };
+        return { city: null, category: null, seoOverride: null };
       }
 
       let cityData: FirestoreCity | null = null;
@@ -51,10 +51,16 @@ const getPageData = cache(async (citySlug: string, categorySlug: string): Promis
       } catch (error) {
         console.error(`[CityCategoryPage] Page: Error fetching category data for slug ${categorySlug}:`, error);
       }
-      return { city: cityData, category: categoryData };
+
+      let seoOverride: CityCategorySeoSetting | null = null;
+      if (cityData && categoryData) {
+        seoOverride = await getCityCategorySeoOverride(cityData.id, categoryData.id);
+      }
+
+      return { city: cityData, category: categoryData, seoOverride };
     },
     [`city-category-data-${citySlug}-${categorySlug}`],
-    { tags: ['cities', 'categories', `city-cat-${citySlug}-${categorySlug}`, 'global-cache'] }
+    { tags: ['cities', 'categories', 'seo-settings', `city-cat-${citySlug}-${categorySlug}`, 'global-cache'] }
   )();
 });
 
@@ -64,7 +70,7 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { city: citySlug, categorySlug } = await params;
-  const { city: cityData, category: categoryData } = await getPageData(citySlug, categorySlug);
+  const { city: cityData, category: categoryData, seoOverride } = await getPageData(citySlug, categorySlug);
 
   if (!cityData || !categoryData) return {};
 
@@ -72,9 +78,21 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { cityName: cityData.name, categoryName: categoryData.name };
 
-  const title = replacePlaceholders(categoryData.metaTitle || seoSettings.cityCategoryPageTitlePattern, placeholderData) || `Best ${categoryData.name} Services in ${cityData.name} | Professional ${categoryData.name} Near Me`;
-  const description = replacePlaceholders(categoryData.metaDescription || seoSettings.cityCategoryPageDescriptionPattern, placeholderData) || `Hire the best professional ${categoryData.name} services in ${cityData.name}. Trusted experts, transparent pricing, and high-quality home solutions near you.`;
-  const keywords = (replacePlaceholders(categoryData.metaKeywords || seoSettings.cityCategoryPageKeywordsPattern, placeholderData) || `${categoryData.name} in ${cityData.name}, best ${categoryData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
+  // Use override if available, then category specific SEO, then pattern
+  const title = replacePlaceholders(
+    seoOverride?.meta_title || categoryData.metaTitle || categoryData.seo_title || seoSettings.cityCategoryPageTitlePattern, 
+    placeholderData
+  ) || `Best ${categoryData.name} Services in ${cityData.name} | Professional ${categoryData.name} Near Me`;
+
+  const description = replacePlaceholders(
+    seoOverride?.meta_description || categoryData.metaDescription || categoryData.seo_description || seoSettings.cityCategoryPageDescriptionPattern, 
+    placeholderData
+  ) || `Hire the best professional ${categoryData.name} services in ${cityData.name}. Trusted experts, transparent pricing, and high-quality home solutions near you.`;
+
+  const keywords = (replacePlaceholders(
+    seoOverride?.meta_keywords || categoryData.metaKeywords || categoryData.seo_keywords || seoSettings.cityCategoryPageKeywordsPattern, 
+    placeholderData
+  ) || `${categoryData.name} in ${cityData.name}, best ${categoryData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = categoryData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -113,7 +131,7 @@ export default async function CityCategoryPage({ params }: PageProps) {
     getAggregateRating()
   ]);
 
-  const { city: cityData, category: categoryData } = pageData;
+  const { city: cityData, category: categoryData, seoOverride } = pageData;
 
   if (!cityData || !categoryData) {
     notFound();
@@ -121,7 +139,12 @@ export default async function CityCategoryPage({ params }: PageProps) {
 
   const seoSettings = await getGlobalSEOSettings();
   const placeholderData = { cityName: cityData.name, categoryName: categoryData.name };
-  const h1Title = replacePlaceholders(categoryData.h1_title || seoSettings.cityCategoryPageH1Pattern, placeholderData) || `Best Professional ${categoryData.name} Services in ${cityData.name}`;
+  
+  // Use override H1 if available
+  const h1Title = replacePlaceholders(
+    seoOverride?.h1_title || categoryData.h1_title || seoSettings.cityCategoryPageH1Pattern, 
+    placeholderData
+  ) || `Best Professional ${categoryData.name} Services in ${cityData.name}`;
 
   const appBaseUrl = getBaseUrl();
   const breadcrumbItems: BreadcrumbItem[] = [{ label: "Home", href: "/" }];
@@ -135,7 +158,7 @@ export default async function CityCategoryPage({ params }: PageProps) {
     "@context": "https://schema.org",
     "@type": "Service",
     "name": `${categoryData.name} in ${cityData.name}`,
-    "description": categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by FixBro.`,
+    "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by FixBro.`,
     "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",

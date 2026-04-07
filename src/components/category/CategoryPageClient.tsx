@@ -96,8 +96,8 @@ export default function CategoryPageClient({
   const [manuallyAwakenedSubCats, setManuallyAwakenedSubCats] = useState<Set<string>>(new Set());
   const pendingScrollRef = useRef<string | null>(null);
 
-  const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.h1 || null);
-  const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.displayH1 || null);
+  const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.h1 || null);
+  const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.displayH1 || null);
 
   const subCategoryRefs = useRef<Record<string, HTMLElement | null>>({});
   const stickyNavRef = useRef<HTMLDivElement | null>(null);
@@ -163,12 +163,12 @@ export default function CategoryPageClient({
       setCache(cacheKey, {
         category: initialData.category,
         subCategories: initialData.subCategories.map(sc => ({ ...sc, isLoadingServices: false, hasStartedLoading: true })),
-        h1: initialData.category.h1_title || null,
-        displayH1: initialData.category.h1_title || null,
+        h1: initialH1Title || initialData.category.h1_title || null,
+        displayH1: initialH1Title || initialData.category.h1_title || null,
         breadcrumbs: initialBreadcrumbItems || []
       }, true);
     }
-  }, [initialData, cacheKey, initialBreadcrumbItems]);
+  }, [initialData, cacheKey, initialBreadcrumbItems, initialH1Title]);
   
   // Effect for scroll-responsive header and sub-nav bar
   useEffect(() => {

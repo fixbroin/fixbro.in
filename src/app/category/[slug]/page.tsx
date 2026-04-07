@@ -156,6 +156,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       { name: data.category.name, url: `${appBaseUrl}/category/${slug}` }
     ]);
 
+    const seoSettings = await getGlobalSEOSettings();
+    const placeholderData = { categoryName: data.category.name };
+    const h1Title = replacePlaceholders(data.category.h1_title || seoSettings.categoryPageH1Pattern, placeholderData) || `Expert ${data.category.name} Services`;
+
     const rawSchemaImage = data.category.imageUrl || `/android-chrome-512x512.png`;
     const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
     
@@ -197,6 +201,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
             categorySlug={slug} 
             breadcrumbItems={breadcrumbItems} 
             initialData={fullCategoryData || undefined}
+            initialH1Title={h1Title}
         />
       </>
     );

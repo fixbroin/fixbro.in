@@ -17,6 +17,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query,
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
+import { triggerRefresh } from '@/lib/revalidateUtils';
 
 const generateSeoSlug = (parts: (string | undefined)[]): string => {
     return parts.filter(Boolean).map(part => part!.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).join('/');
@@ -99,6 +100,7 @@ export default function SeoOverridesPage() {
     const collectionRef = type === 'cityCategory' ? cityCatSeoRef : areaCatSeoRef;
     try {
         await updateDoc(doc(collectionRef, setting.id!), { isActive: !setting.isActive, updatedAt: Timestamp.now() });
+        await triggerRefresh('seo-settings');
         toast({ title: "Success", description: "Status updated."});
         fetchData();
     } catch (error) {
@@ -147,6 +149,7 @@ export default function SeoOverridesPage() {
         }
         await addDoc(cityCatSeoRef, { ...basePayload, createdAt: Timestamp.now() });
       }
+      await triggerRefresh('seo-settings');
       toast({ title: "Success", description: "City-Category SEO setting saved." });
       setIsFormOpen(false); fetchData();
     } catch (e) {
@@ -187,6 +190,7 @@ export default function SeoOverridesPage() {
         }
         await addDoc(areaCatSeoRef, { ...basePayload, createdAt: Timestamp.now() });
       }
+      await triggerRefresh('seo-settings');
       toast({ title: "Success", description: "Area-Category SEO setting saved." });
       setIsFormOpen(false); fetchData();
     } catch (e) {
