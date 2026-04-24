@@ -231,7 +231,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
 
   if (authIsLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-background">
+      <div className="flex justify-center items-center min-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-3 text-muted-foreground font-black text-xs uppercase tracking-widest">FixBro Admin Secure Load...</p>
       </div>
@@ -257,7 +257,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                     <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-800 dark:text-slate-100">Admin Panel</h1>
                     <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
                        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                       <span className="text-[10px] font-black text-primary uppercase tracking-widest leading-none">Verified</span>
+                       <span className="text-[10px] font-black text-primary uppercase tracking-widest length-none">Verified</span>
                     </div>
                   </div>
                 </div>
@@ -376,3 +376,4 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     </ProtectedRoute>
   );
 }
+

@@ -11,12 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { FirestoreArea, FirestoreCity } from '@/types/firestore';
-import { useEffect, useState } from "react";
-import { Loader2, Wand2 } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, Wand2, Edit2, Lock } from "lucide-react";
 import { generateAreaSeo } from '@/ai/flows/generateAreaSeoFlow';
 import { useToast } from "@/hooks/use-toast";
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 const generateSlug = (name: string) => {
+  if (!name) return "";
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
@@ -44,6 +47,7 @@ interface AreaFormProps {
 
 export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel, cities, isSubmitting = false }: AreaFormProps) {
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isSlugEditable, setIsSlugEditable] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<AreaFormData>({
@@ -62,6 +66,35 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
 
   const watchedName = form.watch("name");
   const watchedCityId = form.watch("cityId");
+  const watchedSlug = form.watch("slug");
+
+  const checkSlugUniqueness = useCallback(async (baseSlug: string, currentId?: string) => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collection(db, "areas"),
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const doc = querySnapshot.docs[0];
+        if (currentId && doc.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -81,13 +114,36 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
         h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
       });
     }
+    setIsSlugEditable(false);
   }, [initialData, form]);
   
   useEffect(() => {
-    if (watchedName && !initialData && !form.getFieldState('slug').isDirty) { 
-      form.setValue('slug', generateSlug(watchedName));
+    if (watchedName && !isSlugEditable) {
+      const delayDebounceFn = setTimeout(async () => {
+        const baseSlug = generateSlug(watchedName);
+        const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+        form.setValue('slug', uniqueSlug, { shouldValidate: true });
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
     }
-  }, [watchedName, initialData, form]);
+  }, [watchedName, isSlugEditable, initialData, form, checkSlugUniqueness]);
+
+  // Handle manual slug changes to ensure uniqueness if needed
+  useEffect(() => {
+    if (isSlugEditable && watchedSlug && form.getFieldState('slug').isDirty) {
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSlug(watchedSlug);
+            if (baseSlug !== watchedSlug) {
+                form.setValue('slug', baseSlug, { shouldValidate: true });
+            }
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            if (uniqueSlug !== baseSlug) {
+                form.setValue('slug', uniqueSlug, { shouldValidate: true });
+            }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
   const handleGenerateSeo = async () => {
     const areaName = form.getValues("name");
@@ -150,15 +206,37 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
           name="slug"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Slug {initialData ? "(Non-editable)" : "(Auto-generated or custom)"}</FormLabel>
+              <div className="flex items-center justify-between">
+                <FormLabel>Slug {initialData ? "(Editing might affect SEO)" : "(Auto-generated or custom)"}</FormLabel>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSlugEditable(!isSlugEditable)}
+                  className="h-8 px-2 text-xs"
+                  disabled={isSubmitting || isGeneratingSeo}
+                >
+                  {isSlugEditable ? (
+                    <><Lock className="mr-1 h-3 w-3" /> Lock</>
+                  ) : (
+                    <><Edit2 className="mr-1 h-3 w-3" /> Edit Manually</>
+                  )}
+                </Button>
+              </div>
               <FormControl>
-                <Input 
-                    placeholder="e.g., whitefield" 
-                    {...field} 
-                    onChange={(e) => field.onChange(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}
-                    disabled={isSubmitting || isGeneratingSeo || !!initialData} 
+                <Input
+                  placeholder="e.g., whitefield"
+                  {...field}
+                  onChange={(e) => field.onChange(generateSlug(e.target.value))}
+                  disabled={isSubmitting || isGeneratingSeo || !isSlugEditable}
+                  className={!isSlugEditable ? "bg-muted/50 font-mono text-xs" : "font-mono text-xs"}
                 />
               </FormControl>
+              <FormDescription>
+                {isSlugEditable 
+                  ? "Lowercase, dash-separated. Uniqueness is automatically checked." 
+                  : "Automatically generated and unique. Click 'Edit Manually' to customize."}
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

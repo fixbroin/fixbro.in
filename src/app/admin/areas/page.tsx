@@ -98,38 +98,9 @@ export default function AdminAreasPage() {
         return;
     }
 
-    let finalSlug = data.slug || generateSlug(data.name);
-
-    if (!editingArea) { // Creating a new area
-      let isUnique = false;
-      let attempt = 0;
-      let slugToCheck = finalSlug;
-      const wasSlugManuallyEntered = !!data.slug;
-
-      while (!isUnique) {
-        const q = query(areasCollectionRef, where("slug", "==", slugToCheck), where("cityId", "==", data.cityId));
-        const snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-          isUnique = true;
-          finalSlug = slugToCheck;
-        } else {
-          if (wasSlugManuallyEntered && attempt === 0) { 
-            toast({ title: "Slug Exists", description: `The slug "${slugToCheck}" is already in use for this city. Please choose another.`, variant: "destructive" });
-            setIsSubmitting(false);
-            return; 
-          }
-          attempt++;
-          slugToCheck = `${generateSlug(data.name)}-${attempt + 1}`;
-        }
-      }
-    } else { // Editing existing area, slug is non-editable
-      finalSlug = editingArea.slug;
-    }
-
     const payload: Omit<FirestoreArea, 'id' | 'createdAt' | 'updatedAt'> = {
       name: data.name,
-      slug: finalSlug,
+      slug: data.slug || "",
       cityId: data.cityId,
       cityName: parentCity.name,
       isActive: data.isActive === undefined ? true : data.isActive,

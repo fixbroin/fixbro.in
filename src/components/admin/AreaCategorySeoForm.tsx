@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,10 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { FirestoreCity, FirestoreArea, FirestoreCategory, AreaCategorySeoSetting } from '@/types/firestore';
-import { useEffect, useState } from "react";
-import { Loader2, Wand2 } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, Wand2, Edit2, Lock } from "lucide-react";
 import { generateAreaCategorySeo } from '@/ai/flows/generateAreaCategorySeoFlow';
 import { useToast } from "@/hooks/use-toast";
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 const generateSeoSlug = (parts: (string | undefined)[]): string => {
     return parts.filter(Boolean).map(part => part!.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).join('/');
@@ -48,6 +49,7 @@ interface AreaCategorySeoFormProps {
 export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialData, cities, areas, categories, onCancel, isSubmitting = false }: AreaCategorySeoFormProps) {
   const [filteredAreas, setFilteredAreas] = useState<FirestoreArea[]>([]);
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isSlugEditable, setIsSlugEditable] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<AreaCategorySeoFormData>({
@@ -60,6 +62,35 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
   const watchedCityId = form.watch("cityId");
   const watchedAreaId = form.watch("areaId");
   const watchedCategoryId = form.watch("categoryId");
+  const watchedSlug = form.watch("slug");
+
+  const checkSlugUniqueness = useCallback(async (baseSlug: string, currentId?: string) => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collection(db, "areaCategorySeoSettings"),
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const doc = querySnapshot.docs[0];
+        if (currentId && doc.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  }, []);
 
   useEffect(() => {
     if (initialData) {
@@ -81,6 +112,7 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
       setFilteredAreas([]);
       form.reset({ cityId: undefined, areaId: undefined, categoryId: undefined, slug: "", h1_title: "", meta_title: "", meta_description: "", meta_keywords: "", imageHint: "", isActive: true });
     }
+    setIsSlugEditable(false);
   }, [initialData, form, areas]);
 
   useEffect(() => {
@@ -102,15 +134,38 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
 
 
   useEffect(() => {
-    if (watchedCityId && watchedAreaId && watchedCategoryId && !initialData && !form.getFieldState('slug').isDirty) {
+    if (watchedCityId && watchedAreaId && watchedCategoryId && !isSlugEditable) {
       const city = cities.find(c => c.id === watchedCityId);
       const area = areas.find(a => a.id === watchedAreaId);
       const category = categories.find(c => c.id === watchedCategoryId);
       if (city && area && category) {
-        form.setValue('slug', generateSeoSlug([city.slug, area.slug, category.slug]));
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSeoSlug([city.slug, area.slug, category.slug]);
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            form.setValue('slug', uniqueSlug, { shouldValidate: true });
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
       }
     }
-  }, [watchedCityId, watchedAreaId, watchedCategoryId, cities, areas, categories, initialData, form]);
+  }, [watchedCityId, watchedAreaId, watchedCategoryId, cities, areas, categories, isSlugEditable, initialData, form, checkSlugUniqueness]);
+
+  // Handle manual slug changes to ensure uniqueness if needed
+  useEffect(() => {
+    if (isSlugEditable && watchedSlug && form.getFieldState('slug').isDirty) {
+        const delayDebounceFn = setTimeout(async () => {
+            const parts = watchedSlug.split('/');
+            const baseSlug = generateSeoSlug(parts);
+            if (baseSlug !== watchedSlug) {
+                form.setValue('slug', baseSlug, { shouldValidate: true });
+            }
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            if (uniqueSlug !== baseSlug) {
+                form.setValue('slug', uniqueSlug, { shouldValidate: true });
+            }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
   const handleGenerateSeo = async () => {
     const cityId = form.getValues("cityId");
@@ -204,7 +259,41 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
           </FormItem>
         )}/>
         <FormField control={form.control} name="slug" render={({ field }) => (
-          <FormItem><FormLabel>Slug Segment {isEditing ? "(Non-editable)" : "(Auto-generated or custom)"}</FormLabel><FormControl><Input placeholder="e.g., bangalore/whitefield/plumbing" {...field} value={field.value || ""} onChange={(e) => field.onChange(generateSeoSlug(e.target.value.split('/')))} disabled={effectiveIsSubmitting || isEditing} /></FormControl><FormDescription>Final URL uses original city/area/category slugs. This is for internal reference.</FormDescription><FormMessage /></FormItem>
+          <FormItem>
+            <div className="flex items-center justify-between">
+              <FormLabel>Slug Segment {isEditing ? "(Editing might affect SEO)" : "(Auto-generated or custom)"}</FormLabel>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsSlugEditable(!isSlugEditable)}
+                className="h-8 px-2 text-xs"
+                disabled={effectiveIsSubmitting}
+              >
+                {isSlugEditable ? (
+                  <><Lock className="mr-1 h-3 w-3" /> Lock</>
+                ) : (
+                  <><Edit2 className="mr-1 h-3 w-3" /> Edit Manually</>
+                )}
+              </Button>
+            </div>
+            <FormControl>
+                <Input 
+                    placeholder="e.g., bangalore/whitefield/plumbing" 
+                    {...field} 
+                    value={field.value || ""} 
+                    onChange={(e) => field.onChange(generateSeoSlug(e.target.value.split('/')))} 
+                    disabled={effectiveIsSubmitting || !isSlugEditable} 
+                    className={!isSlugEditable ? "bg-muted/50 font-mono text-xs" : "font-mono text-xs"}
+                />
+            </FormControl>
+            <FormDescription>
+                {isSlugEditable 
+                  ? "Composite slug (city/area/category). Uniqueness is automatically checked." 
+                  : "Automatically generated from selected City, Area & Category. Click 'Edit Manually' to customize."}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
         )}/>
         <div className="space-y-4 pt-4 border-t">
           <div className="flex justify-between items-center">

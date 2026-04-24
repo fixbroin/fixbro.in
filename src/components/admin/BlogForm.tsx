@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,15 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { FirestoreBlogPost, FirestoreCategory } from '@/types/firestore';
-import { useEffect, useState, useRef } from "react";
-import { Loader2, Image as ImageIcon, Trash2, Wand2 } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock } from "lucide-react";
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
-import { storage } from '@/lib/firebase';
+import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Progress } from "@/components/ui/progress";
 import { generateBlogContent } from "@/ai/flows/generateBlogContentFlow";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 const generateSlug = (title: string) => {
   if (!title) return "";
@@ -77,6 +77,7 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const [isGeneratingAiContent, setIsGeneratingAiContent] = useState(false);
+  const [isSlugEditable, setIsSlugEditable] = useState(false);
 
   const form = useForm<BlogFormData>({
     resolver: zodResolver(blogFormSchema),
@@ -88,6 +89,38 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
     },
   });
   
+  const watchedTitle = form.watch("title");
+  const watchedCategoryId = form.watch("categoryId");
+  const watchedSlug = form.watch("slug");
+
+  const checkSlugUniqueness = useCallback(async (baseSlug: string, currentId?: string) => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collection(db, "blogPosts"),
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const doc = querySnapshot.docs[0];
+        if (currentId && doc.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  }, []);
+
   useEffect(() => {
     if (initialData) {
       // If initialData has a categoryId, use it. If not (meaning it had a custom name or no category), default to NO_CATEGORY_VALUE.
@@ -120,16 +153,36 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
           h1_title: "", meta_title: "", meta_description: "", meta_keywords: "",
       });
     }
+    setIsSlugEditable(false);
   }, [initialData, form]);
 
-  const watchedTitle = form.watch("title");
-  const watchedCategoryId = form.watch("categoryId");
-
   useEffect(() => {
-    if (watchedTitle && !initialData) {
-      form.setValue('slug', generateSlug(watchedTitle));
+    if (watchedTitle && !isSlugEditable) {
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSlug(watchedTitle);
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            form.setValue('slug', uniqueSlug, { shouldValidate: true });
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
     }
-  }, [watchedTitle, initialData, form]);
+  }, [watchedTitle, isSlugEditable, initialData, form, checkSlugUniqueness]);
+
+  // Handle manual slug changes to ensure uniqueness if needed
+  useEffect(() => {
+    if (isSlugEditable && watchedSlug && form.getFieldState('slug').isDirty) {
+        const delayDebounceFn = setTimeout(async () => {
+            const baseSlug = generateSlug(watchedSlug);
+            if (baseSlug !== watchedSlug) {
+                form.setValue('slug', baseSlug, { shouldValidate: true });
+            }
+            const uniqueSlug = await checkSlugUniqueness(baseSlug, initialData?.id);
+            if (uniqueSlug !== baseSlug) {
+                form.setValue('slug', uniqueSlug, { shouldValidate: true });
+            }
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }
+  }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
 
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -348,7 +401,46 @@ export default function BlogForm({ onSubmit: onSubmitProp, initialData, onCancel
           {isGeneratingAiContent ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4" />}
           Generate AI Content & SEO
         </Button>
-        <FormField control={form.control} name="slug" render={({ field }) => (<FormItem><FormLabel>Slug</FormLabel><FormControl><Input placeholder="your-blog-post-title" {...field} disabled={effectiveIsSubmitting || !!initialData}/></FormControl><FormMessage /></FormItem>)}/>
+        <FormField
+          control={form.control}
+          name="slug"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between">
+                <FormLabel>Slug {initialData ? "(Editing might affect SEO)" : "(Auto-generated or custom)"}</FormLabel>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsSlugEditable(!isSlugEditable)}
+                  className="h-8 px-2 text-xs"
+                  disabled={effectiveIsSubmitting}
+                >
+                  {isSlugEditable ? (
+                    <><Lock className="mr-1 h-3 w-3" /> Lock</>
+                  ) : (
+                    <><Edit2 className="mr-1 h-3 w-3" /> Edit Manually</>
+                  )}
+                </Button>
+              </div>
+              <FormControl>
+                <Input
+                  placeholder="e.g., my-blog-post"
+                  {...field}
+                  onChange={(e) => field.onChange(generateSlug(e.target.value))}
+                  disabled={effectiveIsSubmitting || !isSlugEditable}
+                  className={!isSlugEditable ? "bg-muted/50 font-mono text-xs" : "font-mono text-xs"}
+                />
+              </FormControl>
+              <FormDescription>
+                {isSlugEditable 
+                  ? "Lowercase, dash-separated. Uniqueness is automatically checked." 
+                  : "Automatically generated and unique. Click 'Edit Manually' to customize."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         
         <FormItem>
           <FormLabel>Cover Image</FormLabel>

@@ -88,39 +88,9 @@ export default function AdminCitiesPage() {
   const handleFormSubmit = async (data: Omit<FirestoreCity, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     setIsSubmitting(true);
     
-    let finalSlug = data.slug || generateSlug(data.name);
-
-    if (!editingCity) { // Creating a new city
-      let isUnique = false;
-      let attempt = 0;
-      let slugToCheck = finalSlug;
-
-      const wasSlugManuallyEntered = !!data.slug;
-
-      while (!isUnique) {
-        const q = query(citiesCollectionRef, where("slug", "==", slugToCheck));
-        const snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-          isUnique = true;
-          finalSlug = slugToCheck;
-        } else {
-          if (wasSlugManuallyEntered && attempt === 0) { 
-            toast({ title: "Slug Exists", description: `The slug "${slugToCheck}" is already in use. Please choose another.`, variant: "destructive" });
-            setIsSubmitting(false);
-            return; 
-          }
-          attempt++;
-          slugToCheck = `${generateSlug(data.name)}-${attempt + 1}`;
-        }
-      }
-    } else { // Editing existing city, slug is non-editable
-      finalSlug = editingCity.slug;
-    }
-    
     const payload: Omit<FirestoreCity, 'id' | 'createdAt' | 'updatedAt'> = {
       name: data.name,
-      slug: finalSlug,
+      slug: data.slug || "",
       isActive: data.isActive === undefined ? true : data.isActive,
       seo_title: data.seo_title,
       seo_description: data.seo_description,
