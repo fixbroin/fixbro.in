@@ -132,6 +132,8 @@ export default function SeoOverridesPage() {
         meta_title: data.meta_title,
         meta_description: data.meta_description,
         meta_keywords: data.meta_keywords,
+        seo_content: data.seo_content,
+        faqs: data.faqs,
         imageHint: data.imageHint,
         isActive: data.isActive,
     };
@@ -175,7 +177,10 @@ export default function SeoOverridesPage() {
       categoryId: data.categoryId, categoryName: category.name, 
       slug: data.slug || generateSeoSlug([city.slug, area.slug, category.slug]),
       h1_title: data.h1_title, meta_title: data.meta_title, meta_description: data.meta_description,
-      meta_keywords: data.meta_keywords, imageHint: data.imageHint, isActive: data.isActive,
+      meta_keywords: data.meta_keywords, 
+      seo_content: data.seo_content,
+      faqs: data.faqs,
+      imageHint: data.imageHint, isActive: data.isActive,
     };
 
     try {

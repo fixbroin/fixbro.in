@@ -30,6 +30,11 @@ const areaCategorySeoFormSchema = z.object({
   meta_title: z.string().optional().or(z.literal('')),
   meta_description: z.string().optional().or(z.literal('')),
   meta_keywords: z.string().optional().or(z.literal('')),
+  seo_content: z.string().optional().or(z.literal('')),
+  faqs: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).optional(),
   imageHint: z.string().max(50, "Image hint max 50 chars.").optional().or(z.literal('')),
   isActive: z.boolean().default(true),
 });
@@ -105,6 +110,7 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
         meta_title: initialData.meta_title || "",
         meta_description: initialData.meta_description || "",
         meta_keywords: initialData.meta_keywords || "",
+        seo_content: initialData.seo_content || "",
         imageHint: initialData.imageHint || "",
         isActive: initialData.isActive === undefined ? true : initialData.isActive,
       });
@@ -197,7 +203,9 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
       form.setValue("meta_title", result.meta_title, { shouldValidate: true });
       form.setValue("meta_description", result.meta_description, { shouldValidate: true });
       form.setValue("meta_keywords", result.meta_keywords, { shouldValidate: true });
-      toast({ title: "Content Generated!", description: "SEO fields have been populated.", className: "bg-green-100 border-green-300 text-green-700" });
+      form.setValue("seo_content", result.seo_content, { shouldValidate: true });
+      form.setValue("faqs", result.faqs, { shouldValidate: true });
+      toast({ title: "Content Generated!", description: "SEO fields and FAQs have been populated.", className: "bg-green-100 border-green-300 text-green-700" });
     } catch (error) {
       console.error("Error generating area-category SEO:", error);
       toast({ title: "AI Error", description: (error as Error).message || "Failed to generate SEO content.", variant: "destructive" });
@@ -309,6 +317,31 @@ export default function AreaCategorySeoForm({ onSubmit: onSubmitProp, initialDat
         <FormField control={form.control} name="meta_title" render={({ field }) => (<FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Plumbers Whitefield, Bangalore | FixBro" {...field} value={field.value || ""} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
         <FormField control={form.control} name="meta_description" render={({ field }) => (<FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="Find expert plumbers in Whitefield, Bangalore..." {...field} value={field.value || ""} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
         <FormField control={form.control} name="meta_keywords" render={({ field }) => (<FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., plumbers whitefield, whitefield plumbing" {...field} value={field.value || ""} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
+        <FormField control={form.control} name="seo_content" render={({ field }) => (<FormItem><FormLabel>SEO Bio / Page Content (HTML)</FormLabel><FormControl><Textarea placeholder="Long-form content for the bottom of the page..." {...field} value={field.value || ""} rows={8} disabled={effectiveIsSubmitting} /></FormControl><FormDescription>Detailed description for search engines. Use HTML tags for formatting.</FormDescription><FormMessage /></FormItem>)}/>
+        <FormField control={form.control} name="faqs" render={({ field }) => (
+          <FormItem>
+            <FormLabel>SEO FAQs (JSON)</FormLabel>
+            <FormControl>
+              <Textarea 
+                placeholder='[{"question": "How much?", "answer": "It depends..."}]' 
+                value={field.value ? JSON.stringify(field.value, null, 2) : "[]"} 
+                onChange={(e) => {
+                  try {
+                    const parsed = JSON.parse(e.target.value);
+                    field.onChange(parsed);
+                  } catch (err) {
+                    // Just update raw text if it's invalid JSON, validation will handle it
+                  }
+                }}
+                rows={8} 
+                className="font-mono text-xs"
+                disabled={effectiveIsSubmitting} 
+              />
+            </FormControl>
+            <FormDescription>JSON array of question/answer objects for Google FAQ Schema.</FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}/>
         <FormField control={form.control} name="imageHint" render={({ field }) => (<FormItem><FormLabel>Image Hint (Optional)</FormLabel><FormControl><Input placeholder="e.g., plumber working area" {...field} value={field.value || ""} disabled={effectiveIsSubmitting} /></FormControl><FormDescription>Keywords for OG image if specific image isn't set.</FormDescription><FormMessage /></FormItem>)}/>
         <FormField control={form.control} name="isActive" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Setting Active</FormLabel><FormDescription>Enable this SEO override.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={effectiveIsSubmitting} /></FormControl></FormItem>)}/>
         <div className="flex justify-end space-x-3 pt-4"><Button type="button" variant="outline" onClick={onCancel} disabled={effectiveIsSubmitting}>Cancel</Button><Button type="submit" disabled={effectiveIsSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{initialData ? 'Save Changes' : 'Create Setting'}</Button></div>

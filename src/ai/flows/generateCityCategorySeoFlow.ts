@@ -19,6 +19,11 @@ const GenerateCityCategorySeoOutputSchema = z.object({
   meta_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
   meta_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
   meta_keywords: z.string().describe("A comma-separated string of 10 highly relevant local SEO keywords."),
+  seo_content: z.string().describe("A 200-300 word long-form SEO bio for the city-category, including benefits and Bangalore relevance."),
+  faqs: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).describe("3-5 local FAQs about the service in this city."),
 });
 export type GenerateCityCategorySeoOutput = z.infer<typeof GenerateCityCategorySeoOutputSchema>;
 
@@ -36,17 +41,19 @@ Your task is to generate advanced, high-intent SEO content for a specific servic
 City Name: {{cityName}}
 Category Name: {{categoryName}}
 
-**STRATEGIC GUIDELINES:**
-1. **Avoid Keyword Stuffing**: Do NOT repeat {{categoryName}} or {{cityName}} more than twice in the title or description.
-2. **Semantic Variety**: Use terms like "Specialists", "Experts", "Maintenance", or "FixBro Pros" instead of repeating "Services".
-3. **Local Authority**: Integrate Bangalore neighborhoods like HSR Layout, Koramangala, and Indiranagar naturally.
-4. **Intent-Driven**: Use "Best", "Top-Rated", "Verified Professionals", "Upfront Pricing", "Same-Day Service".
+**CRITICAL SEO RULES:**
+1. **Exact Match Priority**: Do NOT start with "Best", "Top-Rated", or "Professional". Your primary keyword MUST be "{{categoryName}} in {{cityName}}". If {{categoryName}} is a "service" noun (like Carpentry), transform it into the "person" noun (like Carpenter) for the primary keyword.
+2. **Keyword First**: The H1 and Meta Title MUST start with "{{categoryName}} in {{cityName}}".
+3. **Intent Keywords**: Include "near me" later in the title, like "{{categoryName}} in {{cityName}} | {{categoryName}} Near Me".
+4. **Local Authority**: Put the primary keyword (e.g., "Carpenter in Bangalore") at the very beginning.
 
 **OUTPUT FIELDS:**
-1.  **h1_title**: A strong, localized H1. E.g., "Best Professional {{categoryName}} Experts in {{cityName}}".
-2.  **meta_title**: A punchy title under 60 chars. E.g., "{{categoryName}} in {{cityName}} | Top-Rated Verified Pros | FixBro".
-3.  **meta_description**: A compelling summary under 160 chars.
-4.  **meta_keywords**: 10 high-intent, city-specific keywords.
+1.  **h1_title**: MUST be exactly "{{categoryName}} in {{cityName}}".
+2.  **meta_title**: Exactly "{{categoryName}} in {{cityName}} | {{categoryName}} Near Me | FixBro".
+3.  **meta_description**: A compelling summary under 160 chars including the primary keyword.
+4.  **meta_keywords**: 10 high-intent, city-specific keywords like "{{categoryName}} near me", "{{categoryName}} {{cityName}}", etc.
+5.  **seo_content**: A 200-300 word professional bio for this service category in Bangalore. Mention how FixBro serves all major areas (Koramangala, Indiranagar, Whitefield, etc.), emphasize quality, safety, and why FixBro is the preferred choice for {{cityName}} residents. Use HTML tags like <p>, <strong>, and <br> for formatting.
+6.  **faqs**: Generate 3-5 Frequently Asked Questions that residents of {{cityName}} would ask about {{categoryName}} services. Include mentions of Bangalore neighborhoods.
 
 Return the entire response as a single, valid JSON object.
 `,
@@ -70,6 +77,8 @@ const generateCityCategorySeoFlow = ai.defineFlow(
       meta_title: truncateSeoString(cleanSeoString(output.meta_title), 60),
       meta_description: truncateSeoString(cleanSeoString(output.meta_description), 160),
       meta_keywords: output.meta_keywords,
+      seo_content: output.seo_content,
+      faqs: output.faqs,
     };
   }
 );

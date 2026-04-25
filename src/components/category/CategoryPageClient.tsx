@@ -11,7 +11,8 @@ import type {
   CityCategorySeoSetting, 
   AreaCategorySeoSetting, 
   FirestoreReview, 
-  FirestoreSEOSettings 
+  FirestoreSEOSettings,
+  FaqItem
 } from '@/types/firestore';
 import ServiceCard from '@/components/service/ServiceCard';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,10 @@ import SubCategoryCard from '@/components/category/SubCategoryCard';
 import SubCategoryFloatingButton from '@/components/category/SubCategoryFloatingButton';
 import type { FullCategoryData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
+import { getCategorySearchTerm } from '@/lib/seoAdvancedUtils';
+import JsonLdScript from '@/components/shared/JsonLdScript';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import LocalitiesInterlinking from '@/components/category/LocalitiesInterlinking';
 
 interface EnrichedSubCategory extends FirestoreSubCategory {
   services: FirestoreService[];
@@ -98,6 +103,22 @@ export default function CategoryPageClient({
 
   const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.h1 || null);
   const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.displayH1 || null);
+  const [seoContent, setSeoContent] = useState<string | null>(() => {
+    if (initialData) {
+        return initialData.areaCategorySeo?.seo_content || 
+               initialData.cityCategorySeo?.seo_content || 
+               initialData.category.seo_content || null;
+    }
+    return null;
+  });
+  const [faqs, setFaqs] = useState<FaqItem[]>(() => {
+    if (initialData) {
+        return initialData.areaCategorySeo?.faqs || 
+               initialData.cityCategorySeo?.faqs || 
+               initialData.category.faqs || [];
+    }
+    return [];
+  });
 
   const subCategoryRefs = useRef<Record<string, HTMLElement | null>>({});
   const stickyNavRef = useRef<HTMLDivElement | null>(null);
@@ -465,7 +486,10 @@ export default function CategoryPageClient({
       <h1 className="text-2xl md:text-4xl font-headline font-semibold mb-2 text-foreground">
         {displayPageH1}
       </h1>
-      <p className="text-muted-foreground mb-3">Browse services under {getOverriddenCategoryName(category.id, category.name)}{areaSlug && citySlug ? ` in ${areaSlug.replace(/-/g, ' ')}, ${citySlug.replace(/-/g, ' ')}` : citySlug ? ` in ${citySlug.replace(/-/g, ' ')}` : ""}.</p>
+      <p className="text-muted-foreground mb-3">
+        Professional {category ? getCategorySearchTerm(category.name) : 'Services'} in {areaSlug && citySlug ? `${areaSlug.replace(/-/g, ' ')}, ${citySlug.replace(/-/g, ' ')}` : citySlug ? citySlug.replace(/-/g, ' ') : "Bangalore"}. 
+        Reliable experts for all your home repair and installation needs.
+      </p>
 
       {hasAnyServices ? (
         <>
@@ -602,6 +626,69 @@ export default function CategoryPageClient({
       />
 
       <StickyCartContinueButton />
+
+      {seoContent && (
+        <LazySection>
+          <div className="mt-16 pt-8 border-t border-border">
+            <h2 className="text-xl md:text-2xl font-headline font-semibold mb-6 text-foreground">
+              About our {category ? getCategorySearchTerm(category.name) : 'Services'} in {areaSlug ? areaSlug.replace(/-/g, ' ') : citySlug ? citySlug.replace(/-/g, ' ') : "Bangalore"}
+            </h2>
+            <div 
+              className="prose prose-sm md:prose-base max-w-none text-muted-foreground"
+              dangerouslySetInnerHTML={{ __html: seoContent }}
+            />
+          </div>
+        </LazySection>
+      )}
+
+      {faqs && faqs.length > 0 && (
+        <LazySection>
+          <div className="mt-12 pt-8 border-t border-border">
+            <h2 className="text-xl md:text-2xl font-headline font-semibold mb-6 text-foreground">
+                Frequently Asked Questions
+            </h2>
+            <Accordion type="single" collapsible className="w-full">
+              {faqs.map((faq, index) => (
+                <AccordionItem key={index} value={`faq-${index}`}>
+                  <AccordionTrigger className="text-left font-medium">{faq.question}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+            
+            <JsonLdScript 
+              idSuffix={`faqs-${categorySlug}`}
+              data={{
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                "mainEntity": faqs.map(faq => ({
+                  "@type": "Question",
+                  "name": faq.question,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": faq.answer
+                  }
+                }))
+              }}
+            />
+          </div>
+        </LazySection>
+      )}
+
+      {initialData?.availableAreas && initialData.availableAreas.length > 0 && (
+        <LazySection>
+          <LocalitiesInterlinking 
+            categoryName={category?.name || "Services"}
+            categorySlug={categorySlug}
+            citySlug={citySlug || "bangalore"}
+            cityName={citySlug ? citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ') : "Bangalore"}
+            areas={initialData.availableAreas}
+            currentAreaSlug={areaSlug}
+          />
+        </LazySection>
+      )}
       
     </div>
   );

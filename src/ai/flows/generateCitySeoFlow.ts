@@ -29,22 +29,22 @@ const prompt = ai.definePrompt({
   name: 'generateCitySeoPrompt',
   input: { schema: GenerateCitySeoInputSchema },
   output: { schema: GenerateCitySeoOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for "FixBro", a premium home services platform.
-Your task is to generate high-performance SEO content for a city-level landing page.
+  prompt: `You are an expert Local SEO copywriter for "FixBro", Bangalore's leading home services platform.
+Your goal is to generate high-authority SEO content for the main city page to dominate local search results.
 
 City Name: {{cityName}}
 
-**STRATEGIC GUIDELINES:**
-1. **Avoid Repetition**: Do not over-use "{{cityName}}" or "Home Services". Use variations like "Handyman", "Repairs", "Maintenance", or "FixBro Experts".
-2. **Local Focus**: Mention specific local traits or neighborhoods if it's Bangalore (e.g., HSR, Koramangala).
-3. **Intent-Driven**: Use "Best", "Top-Rated", "Professional", "Trusted".
-4. **Length**: Meta title < 60 chars, Meta description < 160 chars.
+**CRITICAL SEO RULES:**
+1. **City Dominance**: Use "{{cityName}}" as the primary keyword. Target "Home Services in {{cityName}}".
+2. **Keyword First**: Do NOT start with "Best" or "Professional". The H1 and Title MUST start with "Home Services in {{cityName}}".
+3. **Intent Phrases**: Include "near me" later, like "Home Services in {{cityName}} | Handyman Near Me | FixBro".
+4. **Keyword density**: Repeat the city and "home services" frequently to signal relevance to Google.
 
 **OUTPUT FIELDS:**
-1.  **h1_title**: A strong H1 title. E.g., "Professional Home Maintenance & Repair Services in {{cityName}}".
-2.  **seo_title**: A meta title that grabs attention. E.g., "Best Home Services in {{cityName}} | Reliable & Trusted Experts".
-3.  **seo_description**: A compelling summary that encourages clicks, mentioning key services like carpentry, plumbing, and electrical.
-4.  **seo_keywords**: 10 high-intent keywords.
+1.  **h1_title**: MUST be exactly "Home Services in {{cityName}}".
+2.  **seo_title**: Exactly "Home Services in {{cityName}} | Handyman Near Me | FixBro".
+3.  **seo_description**: A compelling meta description under 160 chars including the primary keyword and city neighborhoods.
+4.  **seo_keywords**: 10 high-volume, localized keywords like "home services {{cityName}}", "handyman {{cityName}}", "best repair services {{cityName}}", etc.
 
 Return the entire response as a single, valid JSON object.
 `,

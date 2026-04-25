@@ -877,6 +877,26 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             />
         </LazySection>
         
+        <LazySection>
+            <section className="py-12 md:py-16 bg-background">
+                <div className="container mx-auto px-4">
+                    <div className="max-w-4xl mx-auto text-center">
+                        <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-6 text-foreground">
+                            Home Services in Bangalore
+                        </h2>
+                        <div className="prose prose-sm md:prose-base max-w-none text-muted-foreground">
+                            <p>
+                                FixBro is your one-stop solution for all <strong>home services in Bangalore</strong>. Whether you are looking for a <strong>carpenter near me</strong>, a professional <strong>plumber in Bangalore</strong>, or an <strong>electrician in Whitefield</strong>, we have you covered. Our platform connects you with verified, background-checked experts for over 50+ services including AC repair, house cleaning, painting, and appliance maintenance.
+                            </p>
+                            <p>
+                                We currently serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, and Jayanagar</strong>. With upfront pricing, same-day service availability, and a 100% satisfaction guarantee, FixBro is Bangalore's most trusted home maintenance partner.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </LazySection>
+
         {renderAdsByPlacement('BEFORE_FOOTER_CTA')}
         <section className="py-8 md:py-10 text-center bg-primary text-primary-foreground">
           <div className="container mx-auto px-4">

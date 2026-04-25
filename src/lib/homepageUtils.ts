@@ -10,7 +10,9 @@ import type {
     FirestoreCity, 
     FirestoreArea, 
     FirestoreSEOSettings,
-    FirestoreSubCategory
+    FirestoreSubCategory,
+    CityCategorySeoSetting,
+    AreaCategorySeoSetting
 } from '@/types/firestore';
 import { serializeFirestoreData } from './serializeUtils';
 import { unstable_cache } from 'next/cache';
@@ -195,9 +197,12 @@ export interface FullCategoryData {
     category: FirestoreCategory;
     subCategories: Array<FirestoreSubCategory & { services: FirestoreService[] }>;
     seoSettings: FirestoreSEOSettings;
+    cityCategorySeo?: CityCategorySeoSetting | null;
+    areaCategorySeo?: AreaCategorySeoSetting | null;
+    availableAreas?: Array<{ id: string, name: string, slug: string }>;
 }
 
-export const getCategoryFullData = cache(async (categorySlug: string): Promise<FullCategoryData | null> => {
+export const getCategoryFullData = cache(async (categorySlug: string, citySlug?: string, areaSlug?: string): Promise<FullCategoryData | null> => {
     return unstable_cache(
         async () => {
             try {
@@ -245,19 +250,69 @@ export const getCategoryFullData = cache(async (categorySlug: string): Promise<F
                     return { ...subCat, services };
                 }));
 
+                let cityCategorySeo: CityCategorySeoSetting | null = null;
+                let areaCategorySeo: AreaCategorySeoSetting | null = null;
+                let availableAreas: Array<{ id: string, name: string, slug: string }> = [];
+
+                if (citySlug) {
+                    const citySnapshot = await adminDb.collection('cities').where('slug', '==', citySlug).limit(1).get();
+                    if (!citySnapshot.empty) {
+                        const cityId = citySnapshot.docs[0].id;
+                        
+                        // Fetch areas for interlinking
+                        const areasSnapshot = await adminDb.collection('areas')
+                            .where('cityId', '==', cityId)
+                            .where('isActive', '==', true)
+                            .orderBy('name', 'asc')
+                            .get();
+                        
+                        availableAreas = areasSnapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return { id: doc.id, name: data.name, slug: data.slug };
+                        });
+
+                        const cityCategorySeoSnapshot = await adminDb.collection('cityCategorySeoSettings')
+                            .where('cityId', '==', cityId)
+                            .where('categoryId', '==', category.id)
+                            .limit(1)
+                            .get();
+                        if (!cityCategorySeoSnapshot.empty) {
+                            cityCategorySeo = serializeFirestoreData<CityCategorySeoSetting>(cityCategorySeoSnapshot.docs[0].data());
+                        }
+
+                        if (areaSlug) {
+                            const areaSnapshot = await adminDb.collection('areas').where('slug', '==', areaSlug).where('cityId', '==', cityId).limit(1).get();
+                            if (!areaSnapshot.empty) {
+                                const areaId = areaSnapshot.docs[0].id;
+                                const areaCategorySeoSnapshot = await adminDb.collection('areaCategorySeoSettings')
+                                    .where('areaId', '==', areaId)
+                                    .where('categoryId', '==', category.id)
+                                    .limit(1)
+                                    .get();
+                                if (!areaCategorySeoSnapshot.empty) {
+                                    areaCategorySeo = serializeFirestoreData<AreaCategorySeoSetting>(areaCategorySeoSnapshot.docs[0].data());
+                                }
+                            }
+                        }
+                    }
+                }
+
                 return {
                     category,
                     subCategories: subCategoriesWithServices,
-                    seoSettings
+                    seoSettings,
+                    cityCategorySeo,
+                    areaCategorySeo,
+                    availableAreas
                 };
             } catch (error) {
                 console.error(`Error in getCategoryFullData for slug ${categorySlug}:`, error);
                 return null;
             }
         },
-        [`category-data-${categorySlug}`],
+        [`category-data-${categorySlug}-${citySlug || 'no-city'}-${areaSlug || 'no-area'}`],
         { revalidate: false,
- tags: ['categories', 'services', `category-${categorySlug}`, 'global-cache'] }
+ tags: ['categories', 'services', `category-${categorySlug}`, 'seo-settings', 'global-cache'] }
     )();
 });
 

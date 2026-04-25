@@ -162,6 +162,8 @@ export default function AdminCategoriesPage() {
       seo_title: data.seo_title || undefined,
       seo_description: data.seo_description || undefined,
       seo_keywords: data.seo_keywords || undefined,
+      seo_content: data.seo_content || undefined,
+      faqs: data.faqs || [],
     };
 
     try {

@@ -235,6 +235,7 @@ const Footer = () => {
               <FooterLink href="/careers">Careers</FooterLink>
               <FooterLink href="/blog">Our Blog</FooterLink>
               <FooterLink href="/faq">FAQ</FooterLink>
+              <FooterLink href="/near-me">Near Me Services</FooterLink>
               <FooterLink href="/sitemap">Sitemap</FooterLink>
               <FooterLink href="/service-disclaimer">Service Disclaimer</FooterLink>
             </div>

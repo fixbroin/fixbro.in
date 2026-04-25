@@ -17,6 +17,11 @@ const GenerateCategorySeoOutputSchema = z.object({
   seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
   seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
   seo_keywords: z.string().describe("A comma-separated string of 10 highly relevant local SEO keywords."),
+  seo_content: z.string().describe("A 200-300 word long-form SEO bio for the category, including benefits and Bangalore relevance."),
+  faqs: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).describe("3-5 high-intent FAQs about the service category in Bangalore."),
   imageHint: z.string().describe("One or two keywords for an AI image search."),
 });
 export type GenerateCategorySeoOutput = z.infer<typeof GenerateCategorySeoOutputSchema>;
@@ -34,18 +39,20 @@ Your goal is to generate advanced, high-intent SEO content for a service categor
 
 Category Name: {{categoryName}}
 
-**STRATEGIC GUIDELINES:**
-1. **Avoid Repetition**: Do NOT repeat the category name more than twice in the title or description. If the category name is "{{categoryName}}", do not use "Professional {{categoryName}} Services" if "{{categoryName}}" already includes "Services".
-2. **Local Dominance**: Mention Bangalore naturally. Use high-intent modifiers like "Top-Rated", "Expert", "Verified", or "Same-Day".
-3. **Semantic Variety**: Use synonyms for home services like "repairs", "maintenance", "solutions", or "experts".
-4. **Formatting**: Ensure meta titles are under 60 characters and descriptions under 160.
+**CRITICAL SEO RULES:**
+1. **Exact Match Priority**: Do NOT start with "Best", "Top-Rated", or "Professional". Your primary keyword MUST be "{{categoryName}} in Bangalore". If {{categoryName}} is a "service" noun (like Carpentry), transform it into the "person" noun (like Carpenter).
+2. **Keyword First**: The H1 and Meta Title MUST start with "{{categoryName}} in Bangalore".
+3. **Intent Keywords**: Include "near me" later in the title, like "{{categoryName}} in Bangalore | {{categoryName}} Near Me".
+4. **Keyword Placement**: Place the primary keyword (e.g., "Carpenter in Bangalore") at the start.
 
 **OUTPUT FIELDS:**
-1.  **h1_title**: A compelling H1. Avoid just "Best {{categoryName}}". Try "Top-Rated {{categoryName}} Experts in Bangalore" or "{{categoryName}} Services: Trusted Professionals in Bangalore".
-2.  **seo_title**: A punchy meta title. Combine the service name with a strong benefit or location.
-3.  **seo_description**: A click-worthy description mentioning Bangalore and key neighborhoods like Indiranagar, Koramangala, or Whitefield. Focus on benefits like "Verified Pros", "Upfront Pricing", or "Same-Day Service".
-4.  **seo_keywords**: 10 high-volume, localized keywords. Vary the phrasing.
-5.  **imageHint**: Keywords for finding a relevant high-quality image.
+1.  **h1_title**: MUST be exactly "{{categoryName}} in Bangalore".
+2.  **seo_title**: Exactly "{{categoryName}} in Bangalore | {{categoryName}} Near Me | FixBro".
+3.  **seo_description**: A click-worthy description under 160 chars including the primary keyword and benefits like "Same-Day Service".
+4.  **seo_keywords**: 10 high-volume, localized keywords like "{{categoryName}} near me", "best {{categoryName}} bangalore", etc.
+5.  **seo_content**: A 200-300 word professional, keyword-rich bio. Describe the range of {{categoryName}} services offered in Bangalore, the expertise of FixBro pros, and why customers choose FixBro. Use HTML tags like <p>, <strong>, and <br> for formatting.
+6.  **faqs**: Generate 3-5 Frequently Asked Questions that people in Bangalore ask about {{categoryName}} services.
+7.  **imageHint**: Keywords for finding a relevant high-quality image.
 
 Return the entire response as a single, valid JSON object.
 `,
@@ -69,6 +76,8 @@ const generateCategorySeoFlow = ai.defineFlow(
       seo_title: truncateSeoString(cleanSeoString(output.seo_title), 60),
       seo_description: truncateSeoString(cleanSeoString(output.seo_description), 160),
       seo_keywords: output.seo_keywords,
+      seo_content: output.seo_content,
+      faqs: output.faqs,
       imageHint: output.imageHint,
     };
   }

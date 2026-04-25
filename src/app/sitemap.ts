@@ -36,7 +36,7 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   const staticPages = [
     '', '/about-us', '/contact-us', '/careers', '/terms-and-conditions',
     '/privacy-policy', '/faq', '/service-disclaimer', '/cancellation-policy', '/damage-and-claims-policy', '/categories', 
-    '/blog', '/sitemap',
+    '/blog', '/sitemap', '/near-me',
   ];
 
   staticPages.forEach(page => {
@@ -47,6 +47,24 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
       priority: page === '' ? 1.0 : 0.8,
     });
   });
+
+  // Add category-specific near-me pages
+  try {
+    const categoriesSnapshot = await adminDb.collection('adminCategories').where('isActive', '==', true).get();
+    categoriesSnapshot.forEach(docSnap => {
+      const categoryData = docSnap.data() as FirestoreCategory;
+      if (categoryData.slug) {
+        entries.push({
+          url: `${appBaseUrl}/near-me/${categoryData.slug}`,
+          lastModified: currentDate,
+          changeFrequency: 'daily',
+          priority: 0.8,
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Sitemap: Error adding near-me categories:", e);
+  }
 
   try {
     const contentPagesSnapshot = await adminDb.collection('contentPages').get();

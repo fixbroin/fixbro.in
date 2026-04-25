@@ -210,7 +210,7 @@ export default function SEOSettingsPage() {
             <Target className="mr-2 h-6 w-6 text-primary" /> SEO Settings
           </CardTitle>
           <CardDescription>
-            Manage Search Engine Optimization settings for your website. Use placeholders like <code>{"{{categoryName}}"}</code>, <code>{"{{serviceName}}"}</code>, <code>{"{{cityName}}"}</code>, <code>{"{{areaName}}"}</code> in patterns.
+            Manage Search Engine Optimization settings for your website. Use placeholders like <code>{"{{categorySearchTerm}}"}</code> (e.g., Carpenter), <code>{"{{categoryName}}"}</code> (e.g., Carpentry), <code>{"{{serviceName}}"}</code>, <code>{"{{cityName}}"}</code>, <code>{"{{areaName}}"}</code> in patterns.
           </CardDescription>
         </CardHeader>
       </Card>

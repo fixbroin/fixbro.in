@@ -11,6 +11,11 @@ declare global {
   }
 }
 
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 export interface FirestoreCategory {
   id: string; // Firestore document ID
   name: string;
@@ -23,6 +28,11 @@ export interface FirestoreCategory {
   seo_title?: string; // SEO: Meta title for the category page
   seo_description?: string; // SEO: Meta description
   seo_keywords?: string; // SEO: Meta keywords (comma-separated)
+  seo_content?: string; // NEW: Long-form SEO content/bio for the category
+  faqs?: FaqItem[]; // NEW: SEO FAQs for the category
+  meta_title?: string; // NEW: Consistency with other SEO models
+  meta_description?: string; // NEW: Consistency with other SEO models
+  meta_keywords?: string; // NEW: Consistency with other SEO models
   metaTitle?: string; // Legacy/Alternative SEO meta title
   metaDescription?: string; // Legacy/Alternative SEO meta description
   metaKeywords?: string; // Legacy/Alternative SEO meta keywords
@@ -1006,6 +1016,8 @@ export interface CityCategorySeoSetting {
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string;
+  seo_content?: string; // NEW: Long-form SEO content
+  faqs?: FaqItem[]; // NEW: SEO FAQs
   imageHint?: string;
   isActive: boolean;
   createdAt?: Timestamp; // Added createdAt
@@ -1025,6 +1037,8 @@ export interface AreaCategorySeoSetting {
   meta_title?: string;
   meta_description?: string;
   meta_keywords?: string;
+  seo_content?: string; // NEW: Long-form SEO content
+  faqs?: FaqItem[]; // NEW: SEO FAQs
   imageHint?: string;
   isActive: boolean;
   createdAt?: Timestamp; // Added createdAt

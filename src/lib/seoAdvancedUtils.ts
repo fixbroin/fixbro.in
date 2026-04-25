@@ -3,9 +3,44 @@
  */
 
 /**
+ * Maps category names to high-intent search terms (singular/person forms).
+ * This helps target keywords like "Carpenter in Whitefield" instead of "Carpentry in Whitefield".
+ */
+export function getCategorySearchTerm(categoryName: string): string {
+  const name = categoryName.trim();
+  const lowerName = name.toLowerCase();
+
+  const mapping: Record<string, string> = {
+    'carpentry': 'Carpenter',
+    'plumbing': 'Plumber',
+    'electrical': 'Electrician',
+    'painting': 'Painter',
+    'cleaning': 'Cleaning Services',
+    'appliance repair': 'Appliance Repair',
+    'pest control': 'Pest Control',
+    'ac service': 'AC Technician',
+    'ac services': 'AC Technician',
+    'home cleaning': 'Home Cleaners',
+    'bathroom cleaning': 'Bathroom Cleaners',
+    'sofa cleaning': 'Sofa Cleaners',
+    'kitchen cleaning': 'Kitchen Cleaners',
+    'waterproofing': 'Waterproofing Experts',
+  };
+
+  if (mapping[lowerName]) return mapping[lowerName];
+
+  // Simple plural to singular or "y" to "er" rules for common cases
+  if (lowerName.endsWith('ing')) {
+    // Plumbing -> Plumber (handled in mapping, but as a backup)
+  }
+  
+  return name;
+}
+
+/**
  * Removes redundant words and cleans up SEO strings.
- * It removes duplicate words within a sentence and ensures 
- * keywords like "Bangalore" or "Professional" aren't over-repeated.
+ * It removes duplicate words within a sentence but is now more 
+ * careful not to break SEO-critical repetition.
  */
 export function cleanSeoString(text: string | undefined | null): string {
   if (!text) return '';
@@ -14,22 +49,13 @@ export function cleanSeoString(text: string | undefined | null): string {
   let cleaned = text.replace(/\s+/g, ' ').trim();
 
   // 2. Remove common over-repeated patterns (e.g., "Professional Professional")
-  // Case-insensitive check for adjacent identical words
+  // Only remove if it's EXACTLY the same word repeated consecutively.
+  // We allow "Carpenter in Whitefield | Carpenter near me" because they are not adjacent.
   cleaned = cleaned.replace(/\b(\w+)\s+\1\b/gi, '$1');
 
-  // 3. Remove "Services Services" or "Repair Repair" etc.
-  // This is a more aggressive version that works across punctuation too.
-  // For now, let's stick to simple word cleaning.
-
-  // 4. Handle "Bangalore" repetition in short titles
-  // If "Bangalore" appears more than twice in a string under 70 chars, remove the last one.
-  const bangaloreMatches = (cleaned.match(/Bangalore/gi) || []).length;
-  if (cleaned.length < 80 && bangaloreMatches > 1) {
-    // If it's a title format like "X in Bangalore | Y in Bangalore", 
-    // keep only the first Bangalore if they are close.
-    // However, sometimes "X in Bangalore | FixBro Bangalore" is intended.
-    // Let's be careful.
-  }
+  // 3. Specific cleanup for FixBro
+  // If "FixBro" is at the end of multiple segments, it's fine. 
+  // e.g., "Carpenter in Whitefield | FixBro"
 
   return cleaned;
 }
@@ -38,13 +64,14 @@ export function cleanSeoString(text: string | undefined | null): string {
  * Ensures a string doesn't exceed a certain length while keeping it natural.
  */
 export function truncateSeoString(text: string, maxLength: number): string {
+  if (!text) return '';
   if (text.length <= maxLength) return text;
   
   // Try to cut at the last full word
   const truncated = text.slice(0, maxLength);
   const lastSpace = truncated.lastIndexOf(' ');
   
-  if (lastSpace > maxLength * 0.8) {
+  if (lastSpace > maxLength * 0.7) { // Increased tolerance to 70%
     return truncated.slice(0, lastSpace).trim();
   }
   

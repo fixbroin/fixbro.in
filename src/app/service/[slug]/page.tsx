@@ -144,8 +144,8 @@ export async function generateMetadata(
     cityName: cityName
   };
 
-  const title = replacePlaceholders(serviceData.seo_title || seoSettings.servicePageTitlePattern, placeholderData) || `${serviceData.name} | Best Professional ${serviceData.parentCategoryName} in ${cityName}`;
-  const description = replacePlaceholders(serviceData.seo_description || seoSettings.servicePageDescriptionPattern, placeholderData) || `Book professional ${serviceData.name} in ${cityName}. Trusted experts, transparent pricing, and quality home solutions by FixBro.`;
+  const title = replacePlaceholders(serviceData.seo_title || seoSettings.servicePageTitlePattern, placeholderData) || `${serviceData.name} in ${cityName} | FixBro`;
+  const description = replacePlaceholders(serviceData.seo_description || seoSettings.servicePageDescriptionPattern, placeholderData) || `${serviceData.name} in ${cityName}. Trusted experts, transparent pricing, and quality home solutions by FixBro.`;
   const keywords = (replacePlaceholders(serviceData.seo_keywords || seoSettings.servicePageKeywordsPattern, placeholderData) || `${serviceData.name}, best ${serviceData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = serviceData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
@@ -191,7 +191,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     cityName: cityName
   };
   
-  const h1Title = replacePlaceholders(serviceData.h1_title || seoSettings.servicePageH1Pattern, placeholderData) || `Best Professional ${serviceData.name} in ${cityName}`;
+  const h1Title = replacePlaceholders(serviceData.h1_title || seoSettings.servicePageH1Pattern, placeholderData) || `${serviceData.name} in ${cityName}`;
 
   const appBaseUrl = getBaseUrl();
   const rawSchemaImage = serviceData.imageUrl || `/android-chrome-512x512.png`;

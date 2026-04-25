@@ -40,6 +40,11 @@ const categoryFormSchema = z.object({
   seo_title: z.string().optional().or(z.literal('')),
   seo_description: z.string().optional().or(z.literal('')),
   seo_keywords: z.string().optional().or(z.literal('')),
+  seo_content: z.string().optional().or(z.literal('')),
+  faqs: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).optional(),
 });
 
 type CategoryFormData = z.infer<typeof categoryFormSchema>;
@@ -136,6 +141,8 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_title: initialData.seo_title || "",
         seo_description: initialData.seo_description || "",
         seo_keywords: initialData.seo_keywords || "",
+        seo_content: initialData.seo_content || "",
+        faqs: initialData.faqs || [],
       });
       setCurrentImagePreview(initialData.imageUrl || null);
       setOriginalImageUrlFromInitialData(initialData.imageUrl || null);
@@ -229,8 +236,10 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         form.setValue("seo_title", result.seo_title, { shouldValidate: true });
         form.setValue("seo_description", result.seo_description, { shouldValidate: true });
         form.setValue("seo_keywords", result.seo_keywords, { shouldValidate: true });
+        form.setValue("seo_content", result.seo_content, { shouldValidate: true });
+        form.setValue("faqs", result.faqs, { shouldValidate: true });
         form.setValue("imageHint", result.imageHint, { shouldValidate: true });
-        toast({ title: "Content Generated!", description: "SEO fields have been populated.", className: "bg-green-100 border-green-300 text-green-700" });
+        toast({ title: "Content Generated!", description: "SEO fields and FAQs have been populated.", className: "bg-green-100 border-green-300 text-green-700" });
     } catch (error) {
         console.error("AI Generation Error:", error);
         toast({ title: "AI Error", description: (error as Error).message, variant: "destructive" });
@@ -306,6 +315,8 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_title: formData.seo_title,
         seo_description: formData.seo_description,
         seo_keywords: formData.seo_keywords,
+        seo_content: formData.seo_content,
+        faqs: formData.faqs,
         id: initialData?.id,
       });
 
@@ -511,6 +522,33 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
           )}/>
           <FormField control={form.control} name="seo_keywords" render={({ field }) => (
             <FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., home repair, plumbing, electrical services" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="seo_content" render={({ field }) => (
+            <FormItem><FormLabel>SEO Bio / Page Content (HTML)</FormLabel><FormControl><Textarea placeholder="Long-form content for the bottom of the page..." {...field} value={field.value || ""} rows={8} disabled={effectiveIsSubmitting} /></FormControl><FormDescription>Detailed description for search engines. Use HTML tags for formatting.</FormDescription><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="faqs" render={({ field }) => (
+            <FormItem>
+              <FormLabel>SEO FAQs (JSON)</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder='[{"question": "How much?", "answer": "It depends..."}]' 
+                  value={field.value ? JSON.stringify(field.value, null, 2) : "[]"} 
+                  onChange={(e) => {
+                    try {
+                      const parsed = JSON.parse(e.target.value);
+                      field.onChange(parsed);
+                    } catch (err) {
+                      // Just update raw text if it's invalid JSON
+                    }
+                  }}
+                  rows={8} 
+                  className="font-mono text-xs"
+                  disabled={effectiveIsSubmitting} 
+                />
+              </FormControl>
+              <FormDescription>JSON array of question/answer objects for Google FAQ Schema.</FormDescription>
+              <FormMessage />
+            </FormItem>
           )}/>
            <FormField
             control={form.control}

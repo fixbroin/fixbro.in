@@ -97,9 +97,9 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { categoryName: data.category.name };
 
-  const title = replacePlaceholders(data.category.metaTitle || seoSettings.categoryPageTitlePattern, placeholderData) || `${data.category.name} Services | FixBro`;
-  const description = replacePlaceholders(data.category.metaDescription || seoSettings.categoryPageDescriptionPattern, placeholderData) || `Professional ${data.category.name} services near you.`;
-  const keywords = replacePlaceholders(data.category.metaKeywords || seoSettings.categoryPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
+  const title = replacePlaceholders(data.category.meta_title || data.category.metaTitle || data.category.seo_title || seoSettings.categoryPageTitlePattern, placeholderData) || `${data.category.name} Services | FixBro`;
+  const description = replacePlaceholders(data.category.meta_description || data.category.metaDescription || data.category.seo_description || seoSettings.categoryPageDescriptionPattern, placeholderData) || `Professional ${data.category.name} services near you.`;
+  const keywords = replacePlaceholders(data.category.meta_keywords || data.category.metaKeywords || data.category.seo_keywords || seoSettings.categoryPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = data.category.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;

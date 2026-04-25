@@ -122,7 +122,7 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
 
   const [pageData, fullCategoryData, aggregateRating] = await Promise.all([
     getPageData(citySlug, areaSlug, catSlug),
-    getCategoryFullData(catSlug),
+    getCategoryFullData(catSlug, citySlug, areaSlug),
     getAggregateRating()
   ]);
 

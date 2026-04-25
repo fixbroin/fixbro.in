@@ -31,22 +31,22 @@ const prompt = ai.definePrompt({
   input: { schema: GenerateAreaSeoInputSchema },
   output: { schema: GenerateAreaSeoOutputSchema },
   prompt: `You are an expert Local SEO copywriter for "FixBro", the leading home services platform in Bangalore, India.
-Your task is to generate high-performance SEO content for a specific locality or neighborhood within Bangalore to rank #1 on Google for hyper-local searches.
+Your task is to generate high-performance SEO content for a specific locality or neighborhood within Bangalore.
 
 Area Name: {{areaName}}
 City Name: {{cityName}} (usually Bangalore)
 
-**STRATEGIC GUIDELINES:**
-1. **Hyper-Local Focus**: Emphasize {{areaName}} as the primary location. Use phrases like "Trusted by residents in {{areaName}}" or "Best professionals in {{areaName}}".
-2. **Avoid Repetition**: Do not use "Bangalore" or "{{areaName}}" more than twice in the same field. If the area is already a well-known part of Bangalore (like Whitefield), use that.
-3. **Intent Modifiers**: Use "Best", "Professional", "Verified Pros", "Same-Day".
-4. **Natural Flow**: Titles and descriptions should feel like a human wrote them, not a template.
+**CRITICAL SEO RULES:**
+1. **Locality Focus**: Use "{{areaName}}" as the primary location signal. Target phrases like "Home Services in {{areaName}}".
+2. **Keyword First**: Do NOT start with "Best" or "Top-Rated". The H1 and Title MUST start with "Home Services in {{areaName}}".
+3. **Intent Keywords**: Include "near me" later, like "Home Services in {{areaName}} | Handyman Near Me | FixBro".
+4. **Keyword density**: Repeat the area name naturally but frequently.
 
 **OUTPUT FIELDS:**
-1.  **h1_title**: A localized H1. E.g., "Top-Rated Home Services & Repairs in {{areaName}}".
-2.  **seo_title**: A meta title that highlights locality and trust. E.g., "Best Handyman & Home Services in {{areaName}} | FixBro".
-3.  **seo_description**: A compelling summary mentioning {{areaName}}, the parent city, and service reliability.
-4.  **seo_keywords**: 10 hyper-local keywords.
+1.  **h1_title**: MUST be exactly "Home Services in {{areaName}}".
+2.  **seo_title**: Exactly "Home Services in {{areaName}} | Handyman Near Me | FixBro".
+3.  **seo_description**: A compelling summary mentioning {{areaName}} and the reliability of FixBro experts. Max 160 chars.
+4.  **seo_keywords**: 10 hyper-local keywords like "handyman {{areaName}}", "home repair {{areaName}}", "best services in {{areaName}}", etc.
 
 Return the entire response as a single, valid JSON object.
 `,
