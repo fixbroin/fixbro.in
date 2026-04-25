@@ -35,9 +35,9 @@ const cityFormSchema = z.object({
   slug: z.string().min(2, "Slug must be at least 2 characters.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug format (e.g., new-delhi).").optional().or(z.literal('')),
   isActive: z.boolean().default(true),
   // SEO Fields
-  h1_title: z.string().max(100, "H1 title too long.").optional().or(z.literal('')),
-  seo_title: z.string().max(70, "Meta title too long.").optional().or(z.literal('')),
-  seo_description: z.string().max(300, "Meta description too long.").optional().or(z.literal('')),
+  h1_title: z.string().optional().or(z.literal('')),
+  seo_title: z.string().optional().or(z.literal('')),
+  seo_description: z.string().optional().or(z.literal('')),
   seo_keywords: z.string().optional().or(z.literal('')),
 });
 

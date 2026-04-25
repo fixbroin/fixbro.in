@@ -44,9 +44,9 @@ const blogFormSchema = z.object({
   isPublished: z.boolean().default(false),
   categoryId: z.string().optional(),
   customCategory: z.string().optional(),
-  h1_title: z.string().max(150).optional(),
-  meta_title: z.string().max(70).optional(),
-  meta_description: z.string().max(160).optional(),
+  h1_title: z.string().optional(),
+  meta_title: z.string().optional(),
+  meta_description: z.string().optional(),
   meta_keywords: z.string().optional(),
 }).refine(data => {
   if (data.categoryId === OTHER_CATEGORY_VALUE) {

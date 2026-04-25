@@ -29,9 +29,9 @@ const areaFormSchema = z.object({
   cityId: z.string({ required_error: "Please select a parent city." }),
   isActive: z.boolean().default(true),
   // SEO Fields
-  h1_title: z.string().max(100, "H1 title too long.").optional().or(z.literal('')),
-  seo_title: z.string().max(70, "Meta title too long.").optional().or(z.literal('')),
-  seo_description: z.string().max(300, "Meta description too long.").optional().or(z.literal('')),
+  h1_title: z.string().optional().or(z.literal('')),
+  seo_title: z.string().optional().or(z.literal('')),
+  seo_description: z.string().optional().or(z.literal('')),
   seo_keywords: z.string().optional().or(z.literal('')),
 });
 
