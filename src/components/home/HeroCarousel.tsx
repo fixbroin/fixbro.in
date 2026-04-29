@@ -13,7 +13,7 @@ import {
 import Autoplay from "embla-carousel-autoplay";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
-import { collection, query, where, orderBy, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import type { FirestoreSlide, SlideButtonLinkType } from "@/types/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlaySquare, ChevronRight, ChevronLeft } from "lucide-react";
@@ -26,10 +26,14 @@ import { useLoading } from '@/contexts/LoadingContext';
 import { getCache, setCache } from '@/lib/client-cache';
 import { cn } from "@/lib/utils";
 
-export function HeroCarousel() {
+interface HeroCarouselProps {
+  initialSlides?: FirestoreSlide[];
+}
+
+export function HeroCarousel({ initialSlides = [] }: HeroCarouselProps) {
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
-  const [slides, setSlides] = useState<FirestoreSlide[]>([]);
-  const [isLoadingSlides, setIsLoadingSlides] = useState(() => !getCache('hero-slides', true));
+  const [slides, setSlides] = useState<FirestoreSlide[]>(initialSlides);
+  const [isLoadingSlides, setIsLoadingSlides] = useState(() => initialSlides.length === 0 && !getCache('hero-slides', true));
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   
@@ -51,37 +55,43 @@ export function HeroCarousel() {
     return [];
   }, [autoplayEnabled, autoplayDelay, slides.length]);
 
-  // Real-time listener for slides
+  // Hydrate from server data first; use Firestore only as a fallback for uncached client visits.
   useEffect(() => {
+    if (initialSlides.length > 0) {
+      setSlides(initialSlides);
+      setCache('hero-slides', initialSlides, true);
+      setIsLoadingSlides(false);
+      return;
+    }
+
     // Initial Hydration from Cache
     const cached = getCache<FirestoreSlide[]>('hero-slides', true);
-    if (cached) setSlides(cached);
+    if (cached) {
+      setSlides(cached);
+      setIsLoadingSlides(false);
+      return;
+    }
 
     const slidesCollectionRef = collection(db, "adminSlideshows");
     const q = query(slidesCollectionRef, where("isActive", "==", true), orderBy("order", "asc"));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    let cancelled = false;
+    getDocs(q).then((snapshot) => {
+        if (cancelled) return;
         const fetchedSlides = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreSlide));
         setSlides(fetchedSlides);
         setCache('hero-slides', fetchedSlides, true);
         setIsLoadingSlides(false);
 
-        // --- PRE-LOAD IMAGES FOR CACHING ---
-        if (typeof window !== 'undefined') {
-            fetchedSlides.forEach(slide => {
-                if (slide.imageUrl) {
-                    const img = new Image();
-                    img.src = slide.imageUrl;
-                }
-            });
-        }
-    }, (err) => {
+    }).catch((err) => {
         console.error("Error listening to slides:", err);
         setIsLoadingSlides(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSlides]);
 
   useEffect(() => {
     if (!api) return;
@@ -153,7 +163,7 @@ export function HeroCarousel() {
                         fill
                         priority={index === 0}
                         loading={index === 0 ? "eager" : "lazy"}
-                        sizes="100vw"
+                        sizes="(max-width: 768px) 100vw, 1200px"
                         className="object-cover"
                     />
                   </div>

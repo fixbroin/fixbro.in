@@ -35,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
 import CategoryCard from './CategoryCard';
+import { HeroCarousel } from '@/components/home/HeroCarousel';
 
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
@@ -48,10 +49,6 @@ const isBot = (): boolean => {
 };
 
 // Lazy load components
-const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then((mod) => mod.HeroCarousel), {
-  loading: () => <Skeleton className="h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px] w-full rounded-lg" />,
-});
-
 const HomeCategoriesSection = dynamic(() => import('@/components/home/HomeCategoriesSection'), {
   ssr: true,
   loading: () => (
@@ -617,6 +614,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setCache('categoryWiseServices', initialData.categoryWiseServices, true);
       setCache('seoSettings', initialData.seoSettings, true);
       setCache('citiesWithAreas', initialData.citiesWithAreas, true);
+      setCache('hero-slides', initialData.heroSlides, true);
     }
     
     if (!isLoadingAppSettings) {
@@ -693,10 +691,11 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       handleSimpleNavigation("/categories");
   }, [handleSimpleNavigation]);
 
-  const displayHeroCarousel = !isLoadingAppSettings && (appConfig.enableHeroCarousel ?? true);
+  const displayHeroCarousel = appConfig.enableHeroCarousel ?? true;
   const finalH1 = pageH1 || initialH1Title || (citySlug || areaSlug 
     ? `Professional Home Services in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     : "Discover Our Services");
+  const footerCTA = (isMounted ? settings.homepageContent?.footerCTA : undefined) || initialData?.webSettings?.homepageContent?.footerCTA;
   
   const renderAdsByPlacement = (placement: AdPlacement) => {
     const adsForPlacement = activeAds.filter(ad => ad.placement === placement);
@@ -747,7 +746,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     );
   };
 
-  if (!isMounted || isLoadingPageData) { // Simplified initial skeleton
+  if (isLoadingPageData && !initialData) { // Simplified initial skeleton
     return (
         <div className="flex flex-col">
             <div className="container mx-auto px-4 pt-4 md:pt-6 mb-4 md:mb-6">
@@ -783,7 +782,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         {displayHeroCarousel && (
           <section className="py-6 md:py-10">
             <div className="container mx-auto px-4 overflow-hidden">
-              <HeroCarousel />
+              <HeroCarousel initialSlides={initialData?.heroSlides} />
             </div>
           </section>
         )}
@@ -796,7 +795,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                 isH1={true}
                 subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
             />
-            <HomeCategoriesSection />
+            <HomeCategoriesSection initialCategories={initialData?.allCategories} />
             
             <div className="text-center mt-8 md:mt-12">
               <Button
@@ -901,25 +900,25 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <section className="py-8 md:py-10 text-center bg-primary text-primary-foreground">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-4">
-              {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
+              {footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
+              {footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
             </p>
             <Button
               size="lg"
               variant="secondary"
               className="bg-background text-primary hover:bg-background/90"
               onClick={() => {
-                if (settings.homepageContent?.footerCTA?.buttonLink) {
+                if (footerCTA?.buttonLink) {
                     showLoading();
-                    router.push(settings.homepageContent.footerCTA.buttonLink);
+                    router.push(footerCTA.buttonLink);
                 } else {
                     handleBookServiceCtaClick();
                 }
               }}
             >
-              {settings.homepageContent?.footerCTA?.buttonText || "Book a Service"}
+              {footerCTA?.buttonText || "Book a Service"}
             </Button>
           </div>
         </section>

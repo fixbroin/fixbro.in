@@ -15,23 +15,37 @@ const getItemsLimit = (width: number): number => {
   return 11; // Desktop
 };
 
-const HomeCategoriesSection = () => {
-  const [categories, setCategories] = useState<FirestoreCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface HomeCategoriesSectionProps {
+  initialCategories?: FirestoreCategory[];
+}
+
+const HomeCategoriesSection = ({ initialCategories = [] }: HomeCategoriesSectionProps) => {
+  const [categories, setCategories] = useState<FirestoreCategory[]>(initialCategories);
+  const [isLoading, setIsLoading] = useState(initialCategories.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [itemsLimit, setItemsLimit] = useState(getItemsLimit(typeof window !== 'undefined' ? window.innerWidth : 1024));
+  const [itemsLimit, setItemsLimit] = useState(getItemsLimit(1024));
 
   useEffect(() => {
     const handleResize = () => {
       setItemsLimit(getItemsLimit(window.innerWidth));
     };
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
+      if (initialCategories.length > 0) {
+        setCache('home-categories', initialCategories, true);
+        try {
+          localStorage.setItem('home-categories-last-fetch', Date.now().toString());
+        } catch {}
+        setIsLoading(false);
+        return;
+      }
+
       const cacheKey = 'home-categories';
       const lastFetchKey = 'home-categories-last-fetch';
       const cachedCategories = getCache<FirestoreCategory[]>(cacheKey, true);
@@ -62,7 +76,7 @@ const HomeCategoriesSection = () => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [initialCategories]);
 
   const displayedCategories = showAll ? categories : categories.slice(0, itemsLimit);
 

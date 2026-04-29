@@ -12,7 +12,8 @@ import type {
     FirestoreSEOSettings,
     FirestoreSubCategory,
     CityCategorySeoSetting,
-    AreaCategorySeoSetting
+    AreaCategorySeoSetting,
+    FirestoreSlide
 } from '@/types/firestore';
 import { serializeFirestoreData } from './serializeUtils';
 import { unstable_cache } from 'next/cache';
@@ -27,6 +28,7 @@ export interface HomepageData {
     webSettings: GlobalWebSettings | null;
     citiesWithAreas: Array<FirestoreCity & { areas: FirestoreArea[] }>;
     allCategories: FirestoreCategory[];
+    heroSlides: FirestoreSlide[];
 }
 
 export const getHomepageData = cache(async (): Promise<HomepageData> => {
@@ -34,12 +36,13 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
         async () => {
             try {
                 // Fetch Features Configuration, Global Settings, Cities, and ALL Categories in parallel
-                const [featuresConfigDoc, seoSettingsDoc, webSettingsDoc, citiesSnapshot, allCatsSnapshot] = await Promise.all([
+                const [featuresConfigDoc, seoSettingsDoc, webSettingsDoc, citiesSnapshot, allCatsSnapshot, heroSlidesSnapshot] = await Promise.all([
                     adminDb.collection('webSettings').doc('featuresConfiguration').get(),
                     adminDb.collection('seoSettings').doc('global').get(),
                     adminDb.collection('webSettings').doc('global').get(),
                     adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
-                    adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order', 'asc').get()
+                    adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order', 'asc').get(),
+                    adminDb.collection('adminSlideshows').where('isActive', '==', true).orderBy('order', 'asc').get()
                 ]);
 
                 const featuresConfig = featuresConfigDoc.exists 
@@ -63,6 +66,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     : null;
 
                 const allCategories = allCatsSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCategory));
+                const heroSlides = heroSlidesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Record<string, unknown>>(doc.data()), id: doc.id } as FirestoreSlide));
 
                 const citiesData = citiesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCity));
                 
@@ -179,7 +183,8 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     seoSettings,
                     webSettings,
                     citiesWithAreas,
-                    allCategories
+                    allCategories,
+                    heroSlides
                 };
 
             } catch (error) {
