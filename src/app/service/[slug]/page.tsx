@@ -229,23 +229,16 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   };
 
   // Add Aggregate Rating if available
-  if (aggregateRating) {
-    (serviceSchema as any).aggregateRating = {
-      "@type": "AggregateRating",
-      "ratingValue": serviceData.rating || aggregateRating.ratingValue || "4.8",
-      "reviewCount": serviceData.reviewCount || aggregateRating.reviewCount || "85",
-      "bestRating": "5",
-      "worstRating": "1"
-    };
-  } else {
-    (serviceSchema as any).aggregateRating = {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "reviewCount": "92",
-      "bestRating": "5",
-      "worstRating": "1"
-    };
-  }
+  const ratingValue = serviceData.rating || aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8";
+  const reviewCount = serviceData.reviewCount || aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156";
+
+  (serviceSchema as any).aggregateRating = {
+    "@type": "AggregateRating",
+    "ratingValue": ratingValue,
+    "reviewCount": reviewCount,
+    "bestRating": "5",
+    "worstRating": "1"
+  };
 
   // Add Pricing Info if available
   if (serviceData.price) {

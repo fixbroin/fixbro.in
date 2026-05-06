@@ -108,8 +108,8 @@ export default function AdminSlideshowsPage() {
       setSlides(slides.filter(s => s.id !== slideId));
       toast({ title: "Success", description: "Slide deleted successfully." });
       await triggerRefresh('slideshows');
-      await triggerRefresh('global-cache');
       await triggerRefresh('sitemap');
+      // Removed global-cache trigger to save reads
     } catch (error) {
       console.error("Error deleting slide: ", error);
       toast({ title: "Error", description: "Could not delete slide.", variant: "destructive" });
@@ -145,8 +145,8 @@ export default function AdminSlideshowsPage() {
         toast({ title: "Success", description: "Slide added successfully." });
       }
       await triggerRefresh('slideshows');
-      await triggerRefresh('global-cache');
       await triggerRefresh('sitemap');
+      // Removed global-cache trigger to save reads
       setIsFormOpen(false);
       setEditingSlide(null);
       await fetchSlides(); 

@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import AppImage from '@/components/ui/AppImage';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Star, ShoppingCart, Clock, Users, Ban, Percent, ChevronRight, Info } from 'lucide-react';
@@ -213,9 +214,17 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
   const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
 
   return (
-    <div 
-      onClick={handleNavigation}
-      className="relative block p-3 my-2 gap-3 bg-card border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full cursor-pointer group"
+    <div className="relative block my-2 w-full group">
+    <Link 
+      href={`/service/${service.slug}`}
+      onClick={(e: React.MouseEvent) => {
+        if (currentPathname === `/service/${service.slug}`) {
+          e.preventDefault();
+        } else {
+          showLoading();
+        }
+      }}
+      className="relative flex p-3 gap-3 bg-card border rounded-xl shadow-sm hover:shadow-md transition-all duration-300 w-full cursor-pointer"
     >
         {/* Mobile-only Layout Container */}
         <div className="flex flex-row md:hidden w-full gap-3">
@@ -258,11 +267,11 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
             <div className="relative w-full h-28">
                 <AppImage src={displayImageUrl} alt={service.name} fill sizes="112px" className="object-cover rounded-lg group-hover:scale-105 transition-transform duration-500" data-ai-hint={aiHintValue} priority={priority}/>
             </div>
-            <div className="w-full mt-2" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full mt-2" onClick={(e) => e.preventDefault()}>
                 {!isAvailable ? (
                     <Button size="sm" className="h-9 rounded-md px-4 w-full" disabled><Ban className="mr-1.5 h-4 w-4"/>Unavailable</Button>
                 ) : quantity === 0 ? (
-                    <Button size="sm" className="h-9 rounded-md px-4 w-full" onClick={handleInitialAddToCart}>
+                    <Button size="sm" className="h-9 rounded-md px-4 w-full" onClick={(e) => { e.preventDefault(); handleInitialAddToCart(e); }}>
                         <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add
                     </Button>
                 ) : (
@@ -326,11 +335,11 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                 </div>
             </div>
              {/* Desktop Add to Cart Button */}
-            <div className="flex flex-col items-center justify-center pl-4 w-32" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center justify-center pl-4 w-32" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                  {!isAvailable ? (
                     <Button size="lg" className="h-10 rounded-md w-full" disabled><Ban className="mr-1.5 h-4 w-4"/>Unavailable</Button>
                  ) : quantity === 0 ? (
-                    <Button size="lg" className="h-10 rounded-md w-full" onClick={handleInitialAddToCart}>
+                    <Button size="lg" className="h-10 rounded-md w-full" onClick={(e) => { e.preventDefault(); handleInitialAddToCart(e); }}>
                         <ShoppingCart className="mr-1.5 h-4 w-4" />Add
                     </Button>
                  ) : (
@@ -338,6 +347,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                  )}
             </div>
         </div>
+    </Link>
     </div>
   );
 };

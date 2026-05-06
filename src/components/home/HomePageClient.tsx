@@ -9,6 +9,7 @@ import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { doc, getDoc, collection, query, where, limit, getDocs, orderBy, Timestamp, documentId, onSnapshot } from 'firebase/firestore';
@@ -35,7 +36,6 @@ import { Badge } from '@/components/ui/badge';
 import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
 import CategoryCard from './CategoryCard';
-import { HeroCarousel } from '@/components/home/HeroCarousel';
 
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
@@ -49,6 +49,10 @@ const isBot = (): boolean => {
 };
 
 // Lazy load components
+const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then((mod) => mod.HeroCarousel), {
+  loading: () => <Skeleton className="h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px] w-full rounded-lg" />,
+});
+
 const HomeCategoriesSection = dynamic(() => import('@/components/home/HomeCategoriesSection'), {
   ssr: true,
   loading: () => (
@@ -143,6 +147,69 @@ interface HomePageClientProps {
   initialH1Title?: string;
 }
 
+// --- START: TIERED PRICING LOGIC ---
+const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
+  if (!service.hasPriceVariants || !service.priceVariants || service.priceVariants.length === 0 || n <= 0) {
+    return service.discountedPrice ?? service.price;
+  }
+
+  const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
+
+  const applicableTier = sortedVariants.find(tier => {
+    const start = tier.fromQuantity;
+    const end = tier.toQuantity ?? Infinity;
+    return n >= start && n <= end;
+  });
+
+  if (applicableTier) {
+    return applicableTier.price;
+  }
+  
+  const lastApplicableTier = sortedVariants.slice().reverse().find(tier => n >= tier.fromQuantity);
+  if (lastApplicableTier) {
+    return lastApplicableTier.price;
+  }
+
+  return service.discountedPrice ?? service.price;
+};
+
+const getPriceDisplayInfo = (service: FirestoreService, quantity: number) => {
+    if (!service.hasPriceVariants || !service.priceVariants || service.priceVariants.length === 0) {
+        const unitSaving = service.discountedPrice && service.discountedPrice < service.price ? service.price - service.discountedPrice : 0;
+        const totalSaving = unitSaving * (quantity > 0 ? quantity : 1);
+        
+        return {
+            mainPrice: `₹${service.discountedPrice ?? service.price}`,
+            priceSuffix: unitSaving > 0 ? `₹${service.price}` : null,
+            promoText: unitSaving > 0 ? `Save ₹${totalSaving.toFixed(0)}!` : null,
+        };
+    }
+
+    const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
+    const nextQuantity = quantity + 1;
+    const currentPriceForNext = getPriceForNthUnit(service, nextQuantity);
+    const nextCheaperTier = sortedVariants.find(v => v.fromQuantity >= nextQuantity && v.price < currentPriceForNext);
+
+    let promoText = null;
+    if (nextCheaperTier) {
+        const needed = nextCheaperTier.fromQuantity - quantity;
+        promoText = `Add ${needed} more to unlock ₹${nextCheaperTier.price} price!`;
+    } else {
+        const finalTier = sortedVariants[sortedVariants.length - 1];
+        if (quantity >= finalTier.fromQuantity) {
+            promoText = `Price continues at ₹${finalTier.price} each.`;
+        }
+    }
+
+    const displayPrice = getPriceForNthUnit(service, nextQuantity);
+
+    return {
+        mainPrice: `₹${displayPrice}`,
+        priceSuffix: quantity > 0 ? 'per next unit' : 'onwards',
+        promoText,
+    };
+};
+
 const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service }) => {
   const router = useRouter();
   const { showLoading } = useLoading();
@@ -169,18 +236,6 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [service.id]);
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    showLoading();
-    const targetUrl = `/service/${service.slug}`;
-    if (!user) {
-      triggerAuthRedirect(targetUrl);
-    } else {
-      router.push(targetUrl);
-    }
-  };
-
-  
   const updateCart = (newQuantity: number) => {
     const cartEntries = getCartEntries();
     const existingEntryIndex = cartEntries.findIndex(entry => entry.serviceId === service.id);
@@ -239,127 +294,75 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
     return `${value} ${unit}`;
   };
   const taskTimeDisplay = formatTaskTime(service.taskTimeValue, service.taskTimeUnit);
-  
 
-const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
-  if (!service.hasPriceVariants || !service.priceVariants || service.priceVariants.length === 0 || n <= 0) {
-    return service.discountedPrice ?? service.price;
-  }
+  const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity);
 
-  const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
-
-  const applicableTier = sortedVariants.find(tier => {
-    const start = tier.fromQuantity;
-    const end = tier.toQuantity ?? Infinity;
-    return n >= start && n <= end;
-  });
-
-  if (applicableTier) {
-    return applicableTier.price;
-  }
-  
-  const lastApplicableTier = sortedVariants.slice().reverse().find(tier => n >= tier.fromQuantity);
-  if (lastApplicableTier) {
-    return lastApplicableTier.price;
-  }
-
-  return service.discountedPrice ?? service.price;
-};
-
-
-const getPriceDisplayInfo = (service: FirestoreService, quantity: number) => {
-    if (!service.hasPriceVariants || !service.priceVariants || service.priceVariants.length === 0) {
-        const priceSaved = service.discountedPrice && service.discountedPrice < service.price ? service.price - service.discountedPrice : 0;
-        return {
-            mainPrice: `₹${service.discountedPrice ?? service.price}`,
-            priceSuffix: priceSaved > 0 ? `₹${service.price}` : null,
-            promoText: priceSaved > 0 ? `Save ₹${priceSaved.toFixed(0)}!` : null,
-        };
-    }
-
-    const sortedVariants = [...service.priceVariants].sort((a, b) => a.fromQuantity - b.fromQuantity);
-    const nextQuantity = quantity + 1;
-
-    const currentPriceForNext = getPriceForNthUnit(service, nextQuantity);
-
-    const nextCheaperTier = sortedVariants.find(v => v.fromQuantity >= nextQuantity && v.price < currentPriceForNext);
-
-    let promoText = null;
-    if (nextCheaperTier) {
-        const needed = nextCheaperTier.fromQuantity - quantity;
-        promoText = `Add ${needed} more to unlock ₹${nextCheaperTier.price} price!`;
-    } else {
-        const finalTier = sortedVariants[sortedVariants.length - 1];
-        if (quantity >= finalTier.fromQuantity) {
-            promoText = `Price continues at ₹${finalTier.price} each.`;
-        }
-    }
-
-    const displayPrice = getPriceForNthUnit(service, nextQuantity);
-
-    return {
-        mainPrice: `₹${displayPrice}`,
-        priceSuffix: quantity > 0 ? 'per next unit' : 'onwards',
-        promoText,
-    };
-};
-
- const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity);
-
-const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
+  const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
   
   return (
-    <Card onClick={handleClick} className="cursor-pointer h-full flex flex-col hover:shadow-lg transition-shadow ">
-        <div className="relative w-full aspect-square bg-muted border-b border-border overflow-hidden rounded-t-lg">
-            <AppImage src={service.imageUrl || "/default-image.png"} alt={service.name} fill sizes="200px" className="object-cover" />
-        </div>
-        <CardContent className="p-2 flex-grow flex flex-col justify-between">
-            <div className="flex-grow">
-                <h4 className="text-xs sm:text-sm font-semibold truncate text-foreground group-hover:text-primary">{service.name}</h4>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
-                <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
-                {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
-                {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
-                {service.reviewCount !== undefined && service.reviewCount > 0 && <span className="text-muted-foreground/80">({service.reviewCount})</span>}
-            </div>
+    <Link 
+      href={`/service/${service.slug}`}
+      onClick={(e: React.MouseEvent) => {
+        if (currentPathname === `/service/${service.slug}`) {
+          e.preventDefault();
+        } else {
+          showLoading();
+        }
+      }}
+      className="block h-full"
+    >
+      <Card className="cursor-pointer h-full flex flex-col hover:shadow-lg transition-shadow">
+          <div className="relative w-full aspect-square bg-muted border-b border-border overflow-hidden rounded-t-lg">
+              <AppImage src={service.imageUrl || "/default-image.png"} alt={service.name} fill sizes="200px" className="object-cover" />
           </div>
-            <div className="flex items-center justify-between mt-2">
-             <div className="flex items-center gap-2">
-                <div className="flex flex-wrap items-baseline gap-2 mt-2">
-                  <p className="text-lg font-bold text-foreground">{mainPrice}</p>
-                   {priceSuffix && (
-                     <p className="text-sm text-muted-foreground"><span className="line-through">
-                        {priceSuffix.replace(/[^\d₹.,]/g, "")}</span>{" "}{priceSuffix.replace(/[\d₹.,]/g, "")}
-                    </p>
-                   )}
-                </div>
-                {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
-                  <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-1 py-0.5 rounded border border-amber-100 w-fit">
-                    Min. {service.minQuantity} units
-                  </div>
-                )}
+          <CardContent className="p-2 flex-grow flex flex-col justify-between">
+              <div className="flex-grow">
+                  <h4 className="text-xs sm:text-sm font-semibold truncate text-foreground group-hover:text-primary">{service.name}</h4>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-2">
+                  <div className="flex items-center gap-1" title="Members required"><Users className="h-3.5 w-3.5 text-primary"/><span>{service.membersRequired || 1}</span></div>
+                  {taskTimeDisplay && (<div className="flex items-center gap-1" title={`Estimated time: ${taskTimeDisplay}`}><Clock className="h-3.5 w-3.5 text-primary" /><span>{taskTimeDisplay}</span></div>)}
+                  {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
+                  {service.reviewCount !== undefined && service.reviewCount > 0 && <span className="text-muted-foreground/80">({service.reviewCount})</span>}
               </div>
-
-                {!isAvailable ? (
-                    <Button size="sm" className="h-7 px-2 text-xs" disabled><Ban className="mr-1.5 h-3 w-3"/>Unavailable</Button>
-                ) : quantity === 0 ? (
-                    <Button size="sm" className="h-7 px-2 text-xs" onClick={(e) => {  e.stopPropagation();  handleInitialAdd(e);  }} >
-                        <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add
-                    </Button>
-                ) : (
-                  <div  onClick={(e) => {  e.stopPropagation();  e.preventDefault();  }} >
-                    <QuantitySelector 
-                        initialQuantity={quantity} 
-                        onQuantityChange={handleQuantityChange}
-                        minQuantity={0}
-                        enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0}
-                        maxQuantity={service.maxQuantity}
-                    /> 
-                  </div>
-                )}
             </div>
-        </CardContent>
-    </Card>
+              <div className="flex items-center justify-between mt-2">
+               <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-baseline gap-2 mt-2">
+                    <p className="text-lg font-bold text-foreground">{mainPrice}</p>
+                     {priceSuffix && (
+                       <p className="text-sm text-muted-foreground"><span className="line-through">
+                          {priceSuffix.replace(/[^\d₹.,]/g, "")}</span>{" "}{priceSuffix.replace(/[\d₹.,]/g, "")}
+                      </p>
+                     )}
+                  </div>
+                  {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
+                    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-1 py-0.5 rounded border border-amber-100 w-fit">
+                      Min. {service.minQuantity} units
+                    </div>
+                  )}
+                </div>
+
+                  {!isAvailable ? (
+                      <Button size="sm" className="h-7 px-2 text-xs" disabled><Ban className="mr-1.5 h-3 w-3"/>Unavailable</Button>
+                  ) : quantity === 0 ? (
+                      <Button size="sm" className="h-7 px-2 text-xs" onClick={(e) => { e.preventDefault(); handleInitialAdd(e); }} >
+                          <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add
+                      </Button>
+                  ) : (
+                    <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} >
+                      <QuantitySelector 
+                          initialQuantity={quantity} 
+                          onQuantityChange={handleQuantityChange}
+                          minQuantity={0}
+                          enforcedMinQuantity={service.hasMinQuantity ? service.minQuantity : 0}
+                          maxQuantity={service.maxQuantity}
+                      /> 
+                    </div>
+                  )}
+              </div>
+          </CardContent>
+      </Card>
+    </Link>
   );
 };
 
@@ -521,8 +524,8 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         // Brand-level rating for the homepage
         aggregateRating: {
           "@type": "AggregateRating",
-          "ratingValue": "4.8",
-          "reviewCount": "1250"
+          "ratingValue": fetchedSeoSettings.fallbackRatingValue || "4.8",
+          "reviewCount": fetchedSeoSettings.fallbackReviewCount || "1250"
         }
       };
       if (webSettingsData?.contactEmail) ldData.email = webSettingsData.contactEmail;
@@ -614,7 +617,6 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setCache('categoryWiseServices', initialData.categoryWiseServices, true);
       setCache('seoSettings', initialData.seoSettings, true);
       setCache('citiesWithAreas', initialData.citiesWithAreas, true);
-      setCache('hero-slides', initialData.heroSlides, true);
     }
     
     if (!isLoadingAppSettings) {
@@ -691,11 +693,10 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       handleSimpleNavigation("/categories");
   }, [handleSimpleNavigation]);
 
-  const displayHeroCarousel = appConfig.enableHeroCarousel ?? true;
+  const displayHeroCarousel = !isLoadingAppSettings && (appConfig.enableHeroCarousel ?? true);
   const finalH1 = pageH1 || initialH1Title || (citySlug || areaSlug 
     ? `Professional Home Services in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     : "Discover Our Services");
-  const footerCTA = (isMounted ? settings.homepageContent?.footerCTA : undefined) || initialData?.webSettings?.homepageContent?.footerCTA;
   
   const renderAdsByPlacement = (placement: AdPlacement) => {
     const adsForPlacement = activeAds.filter(ad => ad.placement === placement);
@@ -746,7 +747,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     );
   };
 
-  if (isLoadingPageData && !initialData) { // Simplified initial skeleton
+  if (!isMounted || isLoadingPageData) { // Simplified initial skeleton
     return (
         <div className="flex flex-col">
             <div className="container mx-auto px-4 pt-4 md:pt-6 mb-4 md:mb-6">
@@ -782,7 +783,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         {displayHeroCarousel && (
           <section className="py-6 md:py-10">
             <div className="container mx-auto px-4 overflow-hidden">
-              <HeroCarousel initialSlides={initialData?.heroSlides} />
+              <HeroCarousel />
             </div>
           </section>
         )}
@@ -795,7 +796,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                 isH1={true}
                 subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
             />
-            <HomeCategoriesSection initialCategories={initialData?.allCategories} />
+            <HomeCategoriesSection />
             
             <div className="text-center mt-8 md:mt-12">
               <Button
@@ -900,25 +901,25 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <section className="py-8 md:py-10 text-center bg-primary text-primary-foreground">
           <div className="container mx-auto px-4">
             <h2 className="text-2xl md:text-3xl font-headline font-semibold mb-4">
-              {footerCTA?.title || "Ready to get started?"}
+              {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              {footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
+              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
             </p>
             <Button
               size="lg"
               variant="secondary"
               className="bg-background text-primary hover:bg-background/90"
               onClick={() => {
-                if (footerCTA?.buttonLink) {
+                if (settings.homepageContent?.footerCTA?.buttonLink) {
                     showLoading();
-                    router.push(footerCTA.buttonLink);
+                    router.push(settings.homepageContent.footerCTA.buttonLink);
                 } else {
                     handleBookServiceCtaClick();
                 }
               }}
             >
-              {footerCTA?.buttonText || "Book a Service"}
+              {settings.homepageContent?.footerCTA?.buttonText || "Book a Service"}
             </Button>
           </div>
         </section>

@@ -172,27 +172,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       "provider": {
         "@type": "LocalBusiness",
         "name": "FixBro"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": data.aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8",
+        "reviewCount": data.aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156",
+        "bestRating": "5",
+        "worstRating": "1"
       }
     };
-
-    if (data.aggregateRating) {
-      (categorySchema as any).aggregateRating = {
-        "@type": "AggregateRating",
-        "ratingValue": data.aggregateRating.ratingValue || "4.8",
-        "reviewCount": data.aggregateRating.reviewCount || "120",
-        "bestRating": "5",
-        "worstRating": "1"
-      };
-    } else {
-      (categorySchema as any).aggregateRating = {
-        "@type": "AggregateRating",
-        "ratingValue": "4.8",
-        "reviewCount": "142",
-        "bestRating": "5",
-        "worstRating": "1"
-      };
-    }
-
     return (
       <>
         <JsonLdScript data={categorySchema} idSuffix={`category-${data.category.id}`} />

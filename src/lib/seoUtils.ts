@@ -52,6 +52,8 @@ export const defaultSeoValues: FirestoreSEOSettings = {
     linkedin: 'https://www.linkedin.com/company/fixbro-in',
     youtube: 'https://www.youtube.com/@fixbro-in',
   },
+  fallbackRatingValue: '4.8',
+  fallbackReviewCount: '850',
 };
 
 /**

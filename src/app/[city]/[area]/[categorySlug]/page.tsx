@@ -166,18 +166,15 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
     "areaServed": {
       "@type": "AdministrativeArea",
       "name": areaData.name
-    }
-  };
-
-  if (aggregateRating) {
-    (areaCategorySchema as any).aggregateRating = {
+    },
+    "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": aggregateRating.ratingValue,
-      "reviewCount": aggregateRating.reviewCount,
+      "ratingValue": aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8",
+      "reviewCount": aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156",
       "bestRating": "5",
       "worstRating": "1"
-    };
-  }
+    }
+  };
 
   return (
     <>

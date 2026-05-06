@@ -689,6 +689,9 @@ export interface FirestoreSEOSettings {
   structuredDataImage?: string; // URL to a default business logo/image
   socialProfileUrls?: StructuredDataSocialProfiles;
 
+  fallbackRatingValue?: string;
+  fallbackReviewCount?: string;
+
   updatedAt?: Timestamp;
 }
 

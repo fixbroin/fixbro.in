@@ -22,9 +22,6 @@ Disallow: /api/*
 Disallow: /auth/
 Disallow: /auth/*
 
-# Disallow build files and internal next.js folders
-Disallow: /_next/
-Disallow: /_next/*
 
 Sitemap: ${baseUrl}/sitemap.xml
   `.trim();

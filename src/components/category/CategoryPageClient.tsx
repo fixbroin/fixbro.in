@@ -42,6 +42,7 @@ import { getCategorySearchTerm } from '@/lib/seoAdvancedUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import LocalitiesInterlinking from '@/components/category/LocalitiesInterlinking';
+import CitiesInterlinking from '@/components/category/CitiesInterlinking';
 
 interface EnrichedSubCategory extends FirestoreSubCategory {
   services: FirestoreService[];
@@ -686,6 +687,16 @@ export default function CategoryPageClient({
             cityName={citySlug ? citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ') : "Bangalore"}
             areas={initialData.availableAreas}
             currentAreaSlug={areaSlug}
+          />
+        </LazySection>
+      )}
+
+      {initialData?.availableCities && initialData.availableCities.length > 0 && (
+        <LazySection>
+          <CitiesInterlinking 
+            categoryName={category?.name || "Services"}
+            categorySlug={categorySlug}
+            cities={initialData.availableCities}
           />
         </LazySection>
       )}

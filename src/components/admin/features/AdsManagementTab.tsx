@@ -17,7 +17,6 @@ import { nanoid } from 'nanoid';
 import AppImage from '@/components/ui/AppImage'; // For displaying ad image in table
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { triggerRefresh } from '@/lib/revalidateUtils';
 
 const FEATURES_CONFIG_COLLECTION = "webSettings";
 const FEATURES_CONFIG_DOC_ID = "featuresConfiguration";
@@ -79,7 +78,6 @@ export default function AdsManagementTab({ allCategories, allServices, isLoading
         updatedAt: Timestamp.now(),
       };
       await setDoc(configDocRef, newConfig, { merge: true });
-      await triggerRefresh('global-cache');
       setFeaturesConfig(prev => ({ ...prev, ads: updatedAds })); // Update local state
       toast({ title: "Success", description: "Ad configuration saved." });
       return true;

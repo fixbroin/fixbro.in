@@ -173,19 +173,15 @@ export default async function CityCategoryPage({ params }: PageProps) {
     "areaServed": {
       "@type": "City",
       "name": cityData.name
-    }
-  };
-
-  // Add Aggregate Rating to Schema if available
-  if (aggregateRating) {
-    (categoryCitySchema as any).aggregateRating = {
+    },
+    "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": aggregateRating.ratingValue,
-      "reviewCount": aggregateRating.reviewCount,
+      "ratingValue": aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8",
+      "reviewCount": aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156",
       "bestRating": "5",
       "worstRating": "1"
-    };
-  }
+    }
+  };
 
   return (
     <>

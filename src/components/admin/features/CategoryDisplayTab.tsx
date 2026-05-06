@@ -12,7 +12,6 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, query, orderBy, getDocs } from "firebase/firestore";
 import type { FeaturesConfiguration, FirestoreCategory } from '@/types/firestore';
 import AppImage from '@/components/ui/AppImage';
-import { triggerRefresh } from '@/lib/revalidateUtils';
 
 const FEATURES_CONFIG_COLLECTION = "webSettings";
 const FEATURES_CONFIG_DOC_ID = "featuresConfiguration";
@@ -74,7 +73,6 @@ export default function CategoryDisplayTab() {
     try {
       const configDocRef = doc(db, FEATURES_CONFIG_COLLECTION, FEATURES_CONFIG_DOC_ID);
       await setDoc(configDocRef, { homepageCategoryVisibility: categoryVisibility, updatedAt: Timestamp.now() }, { merge: true });
-      await triggerRefresh('global-cache');
       toast({ title: "Success", description: "Homepage category visibility saved." });
     } catch (error) {
       console.error("Error saving category visibility:", error);

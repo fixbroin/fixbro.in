@@ -12,8 +12,7 @@ import type {
     FirestoreSEOSettings,
     FirestoreSubCategory,
     CityCategorySeoSetting,
-    AreaCategorySeoSetting,
-    FirestoreSlide
+    AreaCategorySeoSetting
 } from '@/types/firestore';
 import { serializeFirestoreData } from './serializeUtils';
 import { unstable_cache } from 'next/cache';
@@ -28,7 +27,6 @@ export interface HomepageData {
     webSettings: GlobalWebSettings | null;
     citiesWithAreas: Array<FirestoreCity & { areas: FirestoreArea[] }>;
     allCategories: FirestoreCategory[];
-    heroSlides: FirestoreSlide[];
 }
 
 export const getHomepageData = cache(async (): Promise<HomepageData> => {
@@ -36,13 +34,12 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
         async () => {
             try {
                 // Fetch Features Configuration, Global Settings, Cities, and ALL Categories in parallel
-                const [featuresConfigDoc, seoSettingsDoc, webSettingsDoc, citiesSnapshot, allCatsSnapshot, heroSlidesSnapshot] = await Promise.all([
+                const [featuresConfigDoc, seoSettingsDoc, webSettingsDoc, citiesSnapshot, allCatsSnapshot] = await Promise.all([
                     adminDb.collection('webSettings').doc('featuresConfiguration').get(),
                     adminDb.collection('seoSettings').doc('global').get(),
                     adminDb.collection('webSettings').doc('global').get(),
                     adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
-                    adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order', 'asc').get(),
-                    adminDb.collection('adminSlideshows').where('isActive', '==', true).orderBy('order', 'asc').get()
+                    adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order', 'asc').get()
                 ]);
 
                 const featuresConfig = featuresConfigDoc.exists 
@@ -66,7 +63,6 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     : null;
 
                 const allCategories = allCatsSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCategory));
-                const heroSlides = heroSlidesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Record<string, unknown>>(doc.data()), id: doc.id } as FirestoreSlide));
 
                 const citiesData = citiesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCity));
                 
@@ -183,8 +179,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     seoSettings,
                     webSettings,
                     citiesWithAreas,
-                    allCategories,
-                    heroSlides
+                    allCategories
                 };
 
             } catch (error) {
@@ -205,6 +200,7 @@ export interface FullCategoryData {
     cityCategorySeo?: CityCategorySeoSetting | null;
     areaCategorySeo?: AreaCategorySeoSetting | null;
     availableAreas?: Array<{ id: string, name: string, slug: string }>;
+    availableCities?: Array<{ id: string, name: string, slug: string }>;
 }
 
 export const getCategoryFullData = cache(async (categorySlug: string, citySlug?: string, areaSlug?: string): Promise<FullCategoryData | null> => {
@@ -258,6 +254,15 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                 let cityCategorySeo: CityCategorySeoSetting | null = null;
                 let areaCategorySeo: AreaCategorySeoSetting | null = null;
                 let availableAreas: Array<{ id: string, name: string, slug: string }> = [];
+                let availableCities: Array<{ id: string, name: string, slug: string }> = [];
+
+                if (!citySlug) {
+                    const citiesSnapshot = await adminDb.collection('cities').where('isActive', '==', true).orderBy('name', 'asc').get();
+                    availableCities = citiesSnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return { id: doc.id, name: data.name, slug: data.slug };
+                    });
+                }
 
                 if (citySlug) {
                     const citySnapshot = await adminDb.collection('cities').where('slug', '==', citySlug).limit(1).get();
@@ -308,7 +313,8 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                     seoSettings,
                     cityCategorySeo,
                     areaCategorySeo,
-                    availableAreas
+                    availableAreas,
+                    availableCities
                 };
             } catch (error) {
                 console.error(`Error in getCategoryFullData for slug ${categorySlug}:`, error);
