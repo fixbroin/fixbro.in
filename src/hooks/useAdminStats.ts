@@ -8,6 +8,7 @@ import { db } from '@/lib/firebase';
 export interface AdminStats {
   completedRevenue: number;
   totalBookings: number;
+  completedBookings: number;
   activeUsers: number;
   newSignups30d: number;
   earnedCommission: number;
@@ -18,6 +19,7 @@ export function useAdminStats() {
   const [stats, setStats] = useState<AdminStats>({
     completedRevenue: 0,
     totalBookings: 0,
+    completedBookings: 0,
     activeUsers: 0,
     newSignups30d: 0,
     earnedCommission: 0,
@@ -34,6 +36,7 @@ export function useAdminStats() {
         setStats({
           completedRevenue: data.totalRevenue || 0,
           totalBookings: data.totalBookings || 0,
+          completedBookings: data.completedBookings || 0,
           activeUsers: data.totalUsers || 0,
           newSignups30d: data.newSignups30d || 0,
           earnedCommission: data.earnedCommission || 0,

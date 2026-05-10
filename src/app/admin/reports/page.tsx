@@ -11,6 +11,7 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminStats } from "@/hooks/useAdminStats";
 
 
 
@@ -30,6 +31,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function AdminReportsPage() {
+  const { stats: globalStats } = useAdminStats();
   const [reportData, setReportData] = useState<ReportData>({
     totalRevenue: 0,
     totalBookings: 0,
@@ -79,10 +81,12 @@ export default function AdminReportsPage() {
       const monthlyBookingsData: { [key: string]: { monthYear: string; bookings: number } } = {};
 
       fetchedBookings.forEach(booking => {
-        newTotalRevenue += booking.totalAmount || 0;
+        // Only count revenue for COMPLETED bookings to match Dashboard logic
         if (booking.status === "Completed") {
+          newTotalRevenue += booking.totalAmount || 0;
           newCompletedBookings++;
         }
+        
         if (booking.status === "Confirmed" || booking.status === "Processing") {
           newActiveBookings++;
         }
@@ -189,7 +193,7 @@ export default function AdminReportsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{reportData.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">₹{(globalStats?.completedRevenue ?? reportData.totalRevenue).toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card>
@@ -198,7 +202,7 @@ export default function AdminReportsPage() {
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{reportData.totalBookings}</div>
+            <div className="text-2xl font-bold">{globalStats?.totalBookings ?? reportData.totalBookings}</div>
           </CardContent>
         </Card>
         <Card>
@@ -207,7 +211,7 @@ export default function AdminReportsPage() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{reportData.completedBookings}</div>
+            <div className="text-2xl font-bold">{globalStats?.completedBookings ?? reportData.completedBookings}</div>
           </CardContent>
         </Card>
         <Card>
