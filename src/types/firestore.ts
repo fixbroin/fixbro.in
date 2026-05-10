@@ -217,6 +217,8 @@ export interface FirestoreBooking {
   isReviewedByCustomer?: boolean;
   cancellationFeePaid?: number;
   cancellationPaymentId?: string;
+  isStatsTracked?: boolean;
+  isCompletionStatsTracked?: boolean;
 }
 
 export interface Address {

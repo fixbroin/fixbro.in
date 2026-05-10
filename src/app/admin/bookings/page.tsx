@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Tag, Eye, Loader2, PackageSearch, XIcon, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -351,7 +351,30 @@ export default function AdminBookingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div><h1 className="text-3xl font-bold flex items-center"><ListOrdered className="mr-2 h-8 w-8 text-primary" /> Manage Bookings</h1><p className="text-muted-foreground">Real-time service management dashboard.</p></div>
-        <div className="flex flex-col sm:flex-row gap-2"><Button onClick={() => router.push('/admin/bookings/create')} className="bg-primary h-10 font-bold"><PlusCircle className="mr-2 h-4 w-4" /> Create Booking</Button><div className="relative w-full sm:w-64"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="ID, Name, Phone..." className="pl-9 h-10 w-full bg-background" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div><Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as BookingStatus | "All")}><SelectTrigger className="h-10 sm:w-44 bg-background font-bold"><SelectValue placeholder="All Statuses" /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem>{statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={() => router.push('/admin/bookings/create')} className="bg-primary h-10 font-bold">
+            <PlusCircle className="mr-2 h-4 w-4" /> Create Booking
+          </Button>
+          <div className="relative w-full sm:w-64 group">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input 
+              placeholder="ID, Name, Phone..." 
+              className="pl-9 pr-9 h-10 w-full bg-background border-muted/50 focus-visible:ring-primary/20 shadow-sm" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors" 
+                onClick={() => setSearchTerm('')}
+              >
+                <XCircle className="h-4 w-4 text-muted-foreground"/>
+              </Button>
+            )}
+          </div>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as BookingStatus | "All")}><SelectTrigger className="h-10 sm:w-44 bg-background font-bold"><SelectValue placeholder="All Statuses" /></SelectTrigger><SelectContent><SelectItem value="All">All Statuses</SelectItem>{statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
       </div>
 
       <Card><CardContent className="p-0">
