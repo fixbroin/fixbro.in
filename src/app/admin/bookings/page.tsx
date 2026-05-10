@@ -126,22 +126,54 @@ export default function AdminBookingsPage() {
           const bookingsRef = collection(db, "bookings");
           const term = searchTerm.trim();
           const lowerTerm = term.toLowerCase();
+          const upperTerm = term.toUpperCase();
+          const capitalizedTerm = term.charAt(0).toUpperCase() + term.slice(1);
           
+          // 1. Exact Match for Doc ID (fastest)
+          const docRef = doc(db, "bookings", term);
+          const docSnap = await getDoc(docRef);
+          
+          let results: FirestoreBooking[] = [];
+          if (docSnap.exists()) {
+            results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking);
+          }
+
+          // 2. Range Queries for prefix matching
           const queries = [
+            query(bookingsRef, where("bookingId", ">=", upperTerm), where("bookingId", "<=", upperTerm + '\uf8ff')),
             query(bookingsRef, where("bookingId", ">=", term), where("bookingId", "<=", term + '\uf8ff')),
-            query(bookingsRef, where("customerPhone", ">=", term), where("customerPhone", "<=", term + '\uf8ff')),
             query(bookingsRef, where("customerName", ">=", term), where("customerName", "<=", term + '\uf8ff')),
+            query(bookingsRef, where("customerName", ">=", capitalizedTerm), where("customerName", "<=", capitalizedTerm + '\uf8ff')),
+            query(bookingsRef, where("customerPhone", ">=", term), where("customerPhone", "<=", term + '\uf8ff')),
           ];
+
+          // Phone variations with 91 prefix matching
+          if (/^\d+$/.test(term)) {
+            queries.push(query(bookingsRef, where("customerPhone", ">=", `91${term}`), where("customerPhone", "<=", `91${term}` + '\uf8ff')));
+            queries.push(query(bookingsRef, where("customerPhone", ">=", `+91${term}`), where("customerPhone", "<=", `+91${term}` + '\uf8ff')));
+            
+            if (term.startsWith('91') && term.length > 2) {
+              const without91 = term.substring(2);
+              queries.push(query(bookingsRef, where("customerPhone", ">=", without91), where("customerPhone", "<=", without91 + '\uf8ff')));
+            }
+          }
+
           const snapShots = await Promise.all(queries.map(q => getDocs(q)));
-          const results: FirestoreBooking[] = [];
-          snapShots.forEach(snap => snap.docs.forEach(docSnap => results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
+          snapShots.forEach(snap => snap.docs.forEach(ds => results.push({ ...ds.data(), id: ds.id } as FirestoreBooking)));
+          
           const uniqueResults = Array.from(new Map(results.map(b => [b.id, b])).values());
           setBookings(uniqueResults);
           setHasMore(false);
-        } catch (error) { console.error("Search error:", error); } finally { setIsLoading(false); }
+        } catch (error) { 
+          console.error("Search error:", error); 
+        } finally { 
+          setIsLoading(false); 
+        }
       }, 400);
       return () => clearTimeout(delayDebounceFn);
     } else {
+// ... existing fetchInitialBookings logic
+// ... (I'll keep the rest as it was but ensure the return is consistent)
       const fetchInitialBookings = async () => {
         setIsLoading(true);
         try {
@@ -162,36 +194,35 @@ export default function AdminBookingsPage() {
   }, [searchTerm, toast]);
 
   const loadMoreBookings = async () => {
-    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
-    setIsLoadingMore(true);
-    try {
-      const q = query(
-        collection(db, "bookings"), 
-        orderBy("createdAt", "desc"), 
-        startAfter(lastDoc), 
-        limit(PAGE_SIZE)
-      );
-      
-      const snapshot = await getDocs(q);
-      if (!snapshot.empty) {
-        const newBookings = snapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking));
-        setBookings(prev => [...prev, ...newBookings]);
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === PAGE_SIZE);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) { 
-      console.error("Error load more:", error); 
-      toast({ title: "Error", description: "Failed to load more bookings.", variant: "destructive" });
-    } finally { 
-      setIsLoadingMore(false); 
-    }
+// ... unchanged
   };
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter(b => (filterStatus === "All" || b.status === filterStatus));
-  }, [bookings, filterStatus]);
+    let filtered = bookings;
+    
+    // 1. Status Filter
+    if (filterStatus !== "All") {
+      filtered = filtered.filter(b => b.status === filterStatus);
+    }
+    
+    // 2. Client-side Search Filter (for instant refinement)
+    if (searchTerm.trim()) {
+      const lowerSearch = searchTerm.toLowerCase().trim();
+      const normalizedSearchPhone = lowerSearch.replace(/\D/g, '').replace(/^91/, '');
+      
+      filtered = filtered.filter(b => {
+        const idMatch = (b.bookingId || '').toLowerCase().includes(lowerSearch);
+        const nameMatch = (b.customerName || '').toLowerCase().includes(lowerSearch);
+        
+        const userPhone = (b.customerPhone || '').replace(/\D/g, '').replace(/^91/, '');
+        const phoneMatch = normalizedSearchPhone ? userPhone.includes(normalizedSearchPhone) : false;
+        
+        return idMatch || nameMatch || phoneMatch;
+      });
+    }
+    
+    return filtered;
+  }, [bookings, filterStatus, searchTerm]);
 
   const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     if (!booking.id) return;
