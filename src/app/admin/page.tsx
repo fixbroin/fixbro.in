@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   BarChart, DollarSign, ShoppingBag, Users, Loader2, AlertTriangle, 
-  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight, Trash2
+  UserPlus, TagIcon, History, HandCoins, Search, TrendingUp, Plus, Calendar, ChevronRight, ArrowUpRight, Trash2, RefreshCw
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import PwaInstallButton from '@/components/shared/PwaInstallButton';
 import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingServiceCard';
 import { getDashboardData, type DashboardData, clearSearchHotspots } from '@/lib/adminDashboardUtils';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminStats } from '@/hooks/useAdminStats';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -57,11 +58,28 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: { title: s
 );
 
 export default function AdminDashboardPage() {
+  const { stats: realtimeStats } = useAdminStats();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
+
+  const handleSyncStats = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/admin/stats/sync', { method: 'POST' });
+      if (res.ok) {
+        toast({ title: "Stats Synced", description: "System totals have been updated based on current database records." });
+        loadData();
+      }
+    } catch (err) {
+      toast({ title: "Sync Failed", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleClearSearches = async () => {
     if (!confirm("Are you sure you want to delete all search hotspots? This cannot be undone.")) return;
@@ -161,6 +179,15 @@ const { user, firestoreUser } = useAuth();
         </div>
         <div className="flex items-center gap-3">
           <PwaInstallButton />
+          <Button 
+            variant="outline" 
+            className="rounded-2xl h-12 px-4 border-primary/20 text-primary font-bold hidden sm:flex items-center" 
+            onClick={handleSyncStats}
+            disabled={isSyncing}
+          >
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sync Totals
+          </Button>
           <Link href="/admin/bookings/create" passHref>
             <Button className="rounded-2xl h-12 px-6 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
               <Plus className="mr-2 h-4 w-4" /> Create Booking
@@ -176,7 +203,7 @@ const { user, firestoreUser } = useAuth();
         <motion.div variants={itemVariants}>
           <StatCard 
             title="Revenue" 
-            value={`₹${stats.completedRevenue.toLocaleString()}`} 
+            value={`₹${(realtimeStats?.completedRevenue ?? stats.completedRevenue).toLocaleString()}`} 
             icon={DollarSign} 
             colorClass="bg-blue-500/10 text-blue-500" 
             subtitle="Total Completed Sales"
@@ -185,7 +212,7 @@ const { user, firestoreUser } = useAuth();
         <motion.div variants={itemVariants}>
           <StatCard 
             title="Earnings" 
-            value={`₹${stats.earnedCommission.toLocaleString(undefined, {maximumFractionDigits: 0})}`} 
+            value={`₹${(realtimeStats?.earnedCommission ?? stats.earnedCommission).toLocaleString(undefined, {maximumFractionDigits: 0})}`} 
             icon={HandCoins} 
             colorClass="bg-primary/10 text-primary" 
             subtitle="Net Platform Profit"
@@ -194,7 +221,7 @@ const { user, firestoreUser } = useAuth();
         <motion.div variants={itemVariants}>
           <StatCard 
             title="Orders" 
-            value={stats.totalBookings} 
+            value={realtimeStats?.totalBookings ?? stats.totalBookings} 
             icon={ShoppingBag} 
             colorClass="bg-amber-500/10 text-amber-500" 
             subtitle="Total System Bookings"
@@ -203,7 +230,7 @@ const { user, firestoreUser } = useAuth();
         <motion.div variants={itemVariants}>
           <StatCard 
             title="Active Base" 
-            value={stats.activeUsers} 
+            value={realtimeStats?.activeUsers ?? stats.activeUsers} 
             icon={Users} 
             colorClass="bg-emerald-500/10 text-emerald-500" 
             subtitle="Verified Active Users"
@@ -212,7 +239,7 @@ const { user, firestoreUser } = useAuth();
         <motion.div variants={itemVariants}>
           <StatCard 
             title="Growth" 
-            value={`+${stats.newSignups}`} 
+            value={`+${realtimeStats?.newSignups30d ?? stats.newSignups}`} 
             icon={UserPlus} 
             colorClass="bg-indigo-500/10 text-indigo-500" 
             subtitle="New signups (30d)"

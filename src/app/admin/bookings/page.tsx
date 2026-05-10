@@ -33,6 +33,7 @@ import AppImage from '@/components/ui/AppImage';
 import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import { useAdminStats } from '@/hooks/useAdminStats';
 
 const statusOptions: BookingStatus[] = [
   "Pending Payment", "Confirmed", "AssignedToProvider", "ProviderAccepted", 
@@ -86,6 +87,7 @@ const getPaymentLabel = (method: string | undefined, status: string) => {
 const PAGE_SIZE = 10;
 
 export default function AdminBookingsPage() {
+  const { stats } = useAdminStats();
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -140,27 +142,51 @@ export default function AdminBookingsPage() {
       }, 400);
       return () => clearTimeout(delayDebounceFn);
     } else {
-      setIsLoading(true);
-      const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setBookings(snapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-        setHasMore(snapshot.docs.length === PAGE_SIZE);
-        setIsLoading(false);
-      }, (err) => { console.error("Error fetching bookings:", err); setIsLoading(false); });
-      return () => unsubscribe();
+      const fetchInitialBookings = async () => {
+        setIsLoading(true);
+        try {
+          const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+          const snapshot = await getDocs(q);
+          setBookings(snapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking)));
+          setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+          setHasMore(snapshot.docs.length === PAGE_SIZE);
+        } catch (error) {
+          console.error("Error fetching bookings:", error);
+          toast({ title: "Error", description: "Failed to load bookings.", variant: "destructive" });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchInitialBookings();
     }
   }, [searchTerm, toast]);
 
   const loadMoreBookings = async () => {
-    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0) return;
+    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
     setIsLoadingMore(true);
     try {
-      const moreBookings = await getArchivedBookings();
-      const existingIds = new Set(bookings.map(b => b.id));
-      setBookings(prev => [...prev, ...moreBookings.filter(b => !existingIds.has(b.id))]);
-      setHasMore(false);
-    } catch (error) { console.error("Error load more:", error); } finally { setIsLoadingMore(false); }
+      const q = query(
+        collection(db, "bookings"), 
+        orderBy("createdAt", "desc"), 
+        startAfter(lastDoc), 
+        limit(PAGE_SIZE)
+      );
+      
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const newBookings = snapshot.docs.map(docSnap => ({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking));
+        setBookings(prev => [...prev, ...newBookings]);
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(snapshot.docs.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) { 
+      console.error("Error load more:", error); 
+      toast({ title: "Error", description: "Failed to load more bookings.", variant: "destructive" });
+    } finally { 
+      setIsLoadingMore(false); 
+    }
   };
 
   const filteredBookings = useMemo(() => {
@@ -197,10 +223,30 @@ export default function AdminBookingsPage() {
     } catch (error) { console.error(error); toast({ title: "Update Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
   };
 
-  const handleDeleteBooking = async (id: string) => {
-    setIsDeleting(id);
+  const handleDeleteBooking = async (booking: FirestoreBooking) => {
+    if (!booking.id) return;
+    setIsDeleting(booking.id);
     try {
-      await deleteDoc(doc(db, "bookings", id));
+      await deleteDoc(doc(db, "bookings", booking.id));
+      
+      // DECREMENT STATS
+      const statsUpdates: any = {};
+      if (booking.isStatsTracked) {
+        statsUpdates.totalBookings = 1;
+      }
+      if (booking.isCompletionStatsTracked && booking.status === 'Completed') {
+        statsUpdates.completedBookings = 1;
+        statsUpdates.totalRevenue = booking.totalAmount || 0;
+      }
+      
+      if (Object.keys(statsUpdates).length > 0) {
+        fetch('/api/admin/stats/decrement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(statsUpdates),
+        }).catch(err => console.error("Error decrementing stats:", err));
+      }
+
       await triggerRefresh('bookings');
       toast({ title: "Deleted", description: "Record removed." });
     } catch (err) { toast({ title: "Error", variant: "destructive" }); } finally { setIsDeleting(null); }
@@ -217,12 +263,15 @@ export default function AdminBookingsPage() {
     } catch (err) { toast({ title: "Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
   };
 
-  const renderBookingCard = (booking: FirestoreBooking) => (
+  const renderBookingCard = (booking: FirestoreBooking, rowNumber: number) => (
     <Card key={booking.id} className="mb-4 border-l-4 shadow-md overflow-hidden" style={{ borderLeftColor: getStatusBadgeClass(booking.status).split(' ')[0].replace('bg-', 'var(--') }}>
       <CardHeader className="p-4 bg-muted/20 pb-3">
         <div className="flex justify-between items-start">
             <div className="space-y-1">
-                <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{rowNumber}</span>
+                  <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
+                </div>
                 <div className="text-sm font-bold">{booking.customerName}</div>
             </div>
             <Badge className={cn("capitalize px-3 py-0.5 font-bold shadow-sm", getStatusBadgeClass(booking.status))}>{booking.status}</Badge>
@@ -263,7 +312,7 @@ export default function AdminBookingsPage() {
           </Select>
         </div>
       </CardContent>
-      <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap"><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => router.push(`/admin/bookings/edit/${booking.id}`)}>Edit</Button><Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>Assign</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent className="w-[90vw] rounded-2xl"><AlertDialogHeader><AlertDialogTitle className="font-bold">Delete Booking?</AlertDialogTitle><AlertDialogDescription>Remove #{booking.bookingId} from system?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(booking.id!)} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></CardFooter>
+      <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap"><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button><Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => router.push(`/admin/bookings/edit/${booking.id}`)}>Edit</Button><Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>Assign</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent className="w-[90vw] rounded-2xl"><AlertDialogHeader><AlertDialogTitle className="font-bold">Delete Booking?</AlertDialogTitle><AlertDialogDescription>Remove #{booking.bookingId} from system?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(booking)} className="bg-destructive hover:bg-destructive/90 rounded-xl">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></CardFooter>
     </Card>
   );
 
@@ -279,22 +328,93 @@ export default function AdminBookingsPage() {
           ) : filteredBookings.length === 0 ? ( <div className="text-center py-20"><PackageSearch className="h-10 w-10 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-semibold">No bookings found</h3></div>
           ) : (
             <><div className="hidden md:block">
-                <Table><TableHeader><TableRow><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
+                <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {filteredBookings.map((b) => (
-                    <React.Fragment key={b.id}>
-                      <TableRow className="hover:bg-transparent border-b-0"><TableCell className="font-mono text-xs font-bold text-primary">{b.bookingId}</TableCell><TableCell><div className="font-bold">{b.customerName}</div><div className="flex items-center gap-1.5 mt-0.5"><span className="text-xs text-muted-foreground">{b.customerPhone}</span>{b.customerPhone && (<Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-primary/10" onClick={() => handleWhatsAppClick(b)} title="WhatsApp"><AppImage src="/whatsapp.png" alt="WA" width={14} height={14} /></Button>)}</div></TableCell><TableCell><div className="text-sm font-bold">{formatDateForDisplay(b.scheduledDate)}</div><div className="text-xs">{b.scheduledTimeSlot}</div>{b.estimatedEndTime && (<div className="text-[10px] font-black flex items-center mt-1 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit"><History className="h-3 w-3 mr-1" />Ends: {new Date(b.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(b.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>)}</TableCell>
-                      <TableCell><Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter shadow-sm", getPaymentBadgeClass(b.paymentMethod, b.status))}>{getPaymentLabel(b.paymentMethod, b.status)}</Badge></TableCell>
-                      <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
-<TableCell className="text-right pr-6 font-black text-lg">{b.totalAmount.toLocaleString()}</TableCell></TableRow>
-                      <TableRow className="bg-muted/5 border-b-2"><TableCell colSpan={5} className="py-3 px-4"><div className="flex flex-wrap items-center gap-3"><Select value={b.status} onValueChange={(s) => handleStatusChange(b, s as BookingStatus)} disabled={isUpdatingStatus === b.id}><SelectTrigger className="h-9 w-44 bg-background font-bold text-xs shadow-sm"><Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge></SelectTrigger><SelectContent>{statusOptions.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent></Select><Button variant="default" size="sm" className="h-9 px-4 font-bold shadow-sm" onClick={() => { setBookingToAssign(b); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(b.status)}><Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}</Button><Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button><Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => router.push(`/admin/bookings/edit/${b.id}`)}>Edit</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === b.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete?</AlertDialogTitle><AlertDialogDescription>Remove #{b.bookingId}?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBooking(b.id!)} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></TableCell></TableRow>
-                    </React.Fragment>
-                  ))}
+                  {filteredBookings.map((b, index) => {
+                    const rowNumber = (stats?.totalBookings || 0) - index;
+                    return (
+                      <React.Fragment key={b.id}>
+                        <TableRow className="hover:bg-transparent border-b-0">
+                          <TableCell className="text-xs font-bold text-muted-foreground">{rowNumber}</TableCell>
+                          <TableCell className="font-mono text-xs font-bold text-primary">{b.bookingId}</TableCell>
+                          <TableCell>
+                            <div className="font-bold">{b.customerName}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-muted-foreground">{b.customerPhone}</span>
+                              {b.customerPhone && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-primary/10" onClick={() => handleWhatsAppClick(b)} title="WhatsApp">
+                                  <AppImage src="/whatsapp.png" alt="WA" width={14} height={14} />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm font-bold">{formatDateForDisplay(b.scheduledDate)}</div>
+                            <div className="text-xs">{b.scheduledTimeSlot}</div>
+                            {b.estimatedEndTime && (
+                              <div className="text-[10px] font-black flex items-center mt-1 text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
+                                <History className="h-3 w-3 mr-1" />Ends: {new Date(b.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' })} {new Date(b.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tighter shadow-sm", getPaymentBadgeClass(b.paymentMethod, b.status))}>
+                              {getPaymentLabel(b.paymentMethod, b.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
+                          <TableCell className="text-right pr-6 font-black text-lg">{b.totalAmount.toLocaleString()}</TableCell>
+                        </TableRow>
+                        <TableRow className="bg-muted/5 border-b-2">
+                          <TableCell colSpan={7} className="py-3 px-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <Select value={b.status} onValueChange={(s) => handleStatusChange(b, s as BookingStatus)} disabled={isUpdatingStatus === b.id}>
+                                <SelectTrigger className="h-9 w-44 bg-background font-bold text-xs shadow-sm">
+                                  <Badge className={cn("capitalize px-3 py-0.5", getStatusBadgeClass(b.status))}>{b.status}</Badge>
+                                </SelectTrigger>
+                                <SelectContent>{statusOptions.map(s => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
+                              </Select>
+                              <Button variant="default" size="sm" className="h-9 px-4 font-bold shadow-sm" onClick={() => { setBookingToAssign(b); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(b.status)}>
+                                <Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}
+                              </Button>
+                              <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button>
+                              <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => router.push(`/admin/bookings/edit/${b.id}`)}>Edit</Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === b.id}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader><AlertDialogTitle>Delete?</AlertDialogTitle><AlertDialogDescription>Remove #{b.bookingId}?</AlertDialogDescription></AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteBooking(b)} className="bg-destructive">Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    );
+                  })}
                 </TableBody></Table>
-              </div><div className="md:hidden p-4 space-y-4">{filteredBookings.map(renderBookingCard)}</div>
-              {hasMore && !searchTerm && (<div className="p-6 text-center border-t"><Button variant="outline" onClick={loadMoreBookings} disabled={isLoadingMore}>Load More</Button></div>)}
+                </div>
+                <div className="md:hidden p-4 space-y-4">
+                {filteredBookings.map((b, index) => renderBookingCard(b, (stats?.totalBookings || 0) - index))}
+              </div>
+              {hasMore && !searchTerm && (
+                <div className="p-6 text-center border-t">
+                  <Button variant="outline" onClick={loadMoreBookings} disabled={isLoadingMore}>
+                    Load More
+                  </Button>
+                </div>
+              )}
             </>
-          )}</CardContent></Card>
+          )}
+        </CardContent>
+      </Card>
 
       {selectedBooking && (<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}><DialogContent className="max-w-3xl w-[90vw] max-h-[90vh] flex flex-col p-0"><DialogHeader className="p-6 pb-4 border-b"><DialogTitle>Details: {selectedBooking.bookingId}</DialogTitle></DialogHeader><div className="overflow-y-auto flex-grow p-6"><BookingDetailsModalContent booking={selectedBooking} /></div><div className="p-6 border-t flex justify-end"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></div></DialogContent></Dialog>)}
       {bookingToAssign && (<AssignProviderModal isOpen={isAssignModalOpen} onClose={() => { setIsAssignModalOpen(false); setBookingToAssign(null); }} booking={bookingToAssign} onAssignConfirm={handleConfirmAssignment} />)}
