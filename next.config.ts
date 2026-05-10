@@ -4,7 +4,7 @@ import withPWAInit from '@ducanh2912/next-pwa';
 
 // Safely handles responses
 const cacheUpdatePlugin = {
-  cacheWillUpdate: async ({ response }: { response: Response }) => {
+  cacheWillUpdate: ({ response }: { response: Response }) => {
     if (!response || response.status !== 200) return null;
     return response;
   },
@@ -19,7 +19,7 @@ const userRuntimeCaching = [
       cacheName: 'api-cache',
       networkTimeoutSeconds: 10,
       expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 },
-      
+      plugins: [cacheUpdatePlugin],
     },
   },
   {
@@ -28,7 +28,7 @@ const userRuntimeCaching = [
     options: {
       cacheName: 'next-image',
       expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-      
+      plugins: [cacheUpdatePlugin],
     },
   },
   {
@@ -37,7 +37,7 @@ const userRuntimeCaching = [
     options: {
       cacheName: 'images-cache',
       expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 14 },
-      
+      plugins: [cacheUpdatePlugin],
     },
   },
 ];
