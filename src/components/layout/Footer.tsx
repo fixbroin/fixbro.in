@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import type { FirestoreNotification } from '@/types/firestore';
+import LocalSiloLinks from './LocalSiloLinks';
 
 interface FooterServiceLink {
   name: string;
@@ -179,6 +180,7 @@ const Footer = () => {
 
   return (
     <footer className="bg-muted/30 border-t text-foreground">
+      <LocalSiloLinks />
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-12">
           {/* Brand Column */}

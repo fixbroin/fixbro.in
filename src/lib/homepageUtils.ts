@@ -62,9 +62,9 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     ? serializeFirestoreData<GlobalWebSettings>(webSettingsDoc.data())
                     : null;
 
-                const allCategories = allCatsSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCategory));
+                const allCategories = allCatsSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreCategory, 'id'>>(doc.data() as any), id: doc.id } as FirestoreCategory));
 
-                const citiesData = citiesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreCity));
+                const citiesData = citiesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreCity, 'id'>>(doc.data() as any), id: doc.id } as FirestoreCity));
                 
                 const citiesWithAreasPromise = Promise.all(citiesData.map(async (city) => {
                     const areasSnapshot = await adminDb.collection('areas')
@@ -72,11 +72,11 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         .where('isActive', '==', true)
                         .orderBy('name')
                         .get();
-                    const areasData = areasSnapshot.docs.map(doc => ({ ...serializeFirestoreData<any>(doc.data()), id: doc.id } as FirestoreArea));
+                    const areasData = areasSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreArea, 'id'>>(doc.data() as any), id: doc.id } as FirestoreArea));
                     return { ...city, areas: areasData };
                 }));
 
-                const promises: Promise<any>[] = [];
+                const promises: Promise<FirestoreService[] | { category: FirestoreCategory; services: FirestoreService[] }[]>[] = [];
 
                 // 1. Popular Services
                 if (featuresConfig.showMostPopularServices) {
@@ -87,10 +87,10 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                             .orderBy('reviewCount', 'desc')
                             .limit(10)
                             .get()
-                            .then(snap => snap.docs.map(doc => ({ id: doc.id, ...serializeFirestoreData<any>(doc.data()) } as FirestoreService)))
+                            .then(snap => snap.docs.map(doc => ({ id: doc.id, ...serializeFirestoreData<Omit<FirestoreService, 'id'>>(doc.data() as any) } as FirestoreService)))
                     );
                 } else {
-                    promises.push(Promise.resolve([]));
+                    promises.push(Promise.resolve([] as FirestoreService[]));
                 }
 
                 // 2. Recent Services
@@ -101,10 +101,10 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                             .orderBy('createdAt', 'desc')
                             .limit(10)
                             .get()
-                            .then(snap => snap.docs.map(doc => ({ id: doc.id, ...serializeFirestoreData<any>(doc.data()) } as FirestoreService)))
+                            .then(snap => snap.docs.map(doc => ({ id: doc.id, ...serializeFirestoreData<Omit<FirestoreService, 'id'>>(doc.data() as any) } as FirestoreService)))
                     );
                 } else {
-                    promises.push(Promise.resolve([]));
+                    promises.push(Promise.resolve([] as FirestoreService[]));
                 }
 
                 // 3. Category Wise Services
@@ -121,7 +121,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                                 .orderBy('order', 'asc')
                                 .get()
                                 .then(async categoriesSnapshot => {
-                                    const enabledCategories = categoriesSnapshot.docs.map(d => ({ ...serializeFirestoreData<any>(d.data()), id: d.id } as FirestoreCategory));
+                                    const enabledCategories = categoriesSnapshot.docs.map(d => ({ ...serializeFirestoreData<Omit<FirestoreCategory, 'id'>>(d.data() as any), id: d.id } as FirestoreCategory));
                                     
                                     const categoryServicesPromises = enabledCategories.map(async (cat) => {
                                         const subCategoriesSnapshot = await adminDb.collection('adminSubCategories')
@@ -149,8 +149,10 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
 
                                             const servicesSnapshots = await Promise.all(servicesPromises);
                                             servicesForCategory = servicesSnapshots.flatMap(snap => 
-                                                snap.docs.map(sDoc => ({ ...serializeFirestoreData<any>(sDoc.data()), id: sDoc.id } as FirestoreService))
-                                            ).slice(0, 10);
+                                                snap.docs.map(sDoc => ({ ...serializeFirestoreData<Omit<FirestoreService, 'id'>>(sDoc.data() as any), id: sDoc.id } as FirestoreService))
+                                            )
+                                            .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name))
+                                            .slice(0, 10);
                                         }
                                         return { category: cat, services: servicesForCategory };
                                     });
@@ -160,14 +162,16 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                                 })
                         );
                     } else {
-                        promises.push(Promise.resolve([]));
+                        promises.push(Promise.resolve([] as { category: FirestoreCategory; services: FirestoreService[] }[]));
                     }
                 } else {
-                    promises.push(Promise.resolve([]));
+                    promises.push(Promise.resolve([] as { category: FirestoreCategory; services: FirestoreService[] }[]));
                 }
 
                 const [popularServices, recentServices, categoryWiseServices, citiesWithAreas] = await Promise.all([
-                    ...promises,
+                    promises[0] as Promise<FirestoreService[]>,
+                    promises[1] as Promise<FirestoreService[]>,
+                    promises[2] as Promise<{ category: FirestoreCategory; services: FirestoreService[] }[]>,
                     citiesWithAreasPromise
                 ]);
 
@@ -219,7 +223,7 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                 if (categorySnapshot.empty) return null;
 
                 const categoryDoc = categorySnapshot.docs[0];
-                const category = { id: categoryDoc.id, ...serializeFirestoreData<any>(categoryDoc.data()) } as FirestoreCategory;
+                const category = { id: categoryDoc.id, ...serializeFirestoreData<Omit<FirestoreCategory, 'id'>>(categoryDoc.data() as any) } as FirestoreCategory;
 
                 const seoSettings = seoSettingsDoc.exists
                     ? serializeFirestoreData<FirestoreSEOSettings>(seoSettingsDoc.data())
@@ -233,7 +237,7 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
 
                 const subCategories = subCategoriesSnapshot.docs.map(doc => ({ 
                     id: doc.id, 
-                    ...serializeFirestoreData<any>(doc.data()) 
+                    ...serializeFirestoreData<Omit<FirestoreSubCategory, 'id'>>(doc.data() as any) 
                 } as FirestoreSubCategory));
 
                 const subCategoriesWithServices = await Promise.all(subCategories.map(async (subCat) => {
@@ -245,8 +249,9 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                     
                     const services = servicesSnapshot.docs.map(doc => ({ 
                         id: doc.id, 
-                        ...serializeFirestoreData<any>(doc.data()) 
-                    } as FirestoreService));
+                        ...serializeFirestoreData<Omit<FirestoreService, 'id'>>(doc.data() as any) 
+                    } as FirestoreService))
+                    .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
 
                     return { ...subCat, services };
                 }));

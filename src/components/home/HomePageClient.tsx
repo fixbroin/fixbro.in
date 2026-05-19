@@ -656,9 +656,12 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
 
                 let servicesForCategory: FirestoreService[] = [];
                 if (subCategoryIds.length > 0) {
-                        const servicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), where("subCategoryId", "in", subCategoryIds), orderBy("name", "asc"), limit(10));
+                        const servicesQuery = query(collection(db, "adminServices"), where("isActive", "==", true), where("subCategoryId", "in", subCategoryIds), orderBy("name", "asc"));
                         const servicesSnapshot = await getDocs(servicesQuery);
-                        servicesForCategory = servicesSnapshot.docs.map(sDoc => ({...sDoc.data() as Omit<FirestoreService, 'id'>, id: sDoc.id} as FirestoreService));
+                        servicesForCategory = servicesSnapshot.docs
+                            .map(sDoc => ({...sDoc.data() as Omit<FirestoreService, 'id'>, id: sDoc.id} as FirestoreService))
+                            .sort((a, b) => (a.order || 0) - (b.order || 0))
+                            .slice(0, 10);
                 }
                 return { category: cat, services: servicesForCategory };
             });

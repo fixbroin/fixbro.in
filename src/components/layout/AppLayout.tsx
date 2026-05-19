@@ -215,21 +215,14 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
         '/privacy-policy', '/cancellation-policy', '/account'];
       const shouldShowBottomNav = isMobile && bottomNavActivePaths.includes(pathname);
 
-      const pathSegments = pathname.split('/').filter(Boolean);
-      const isCityAreaCategoryPage = pathSegments.length === 3 && pathSegments[0] !== 'category' && pathSegments[0] !== 'service';
-      const isCityCategoryPage = pathSegments.length === 3 && pathSegments[1] === 'category';
-
       const hideFooterPaths: string[] = [];
       const hideFooterPrefixes = [
-        '/category/', 
-        '/service/',  
         '/custom-service',
       ];
 
       const shouldHideFooterForSpecificPaths = 
         hideFooterPaths.includes(pathname) || 
-        hideFooterPrefixes.some(prefix => pathname.startsWith(prefix)) ||
-        isCityAreaCategoryPage || isCityCategoryPage;
+        hideFooterPrefixes.some(prefix => pathname.startsWith(prefix));
       
       setShowFooter(
         !currentIsAdminRoute &&

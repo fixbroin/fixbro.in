@@ -145,7 +145,9 @@ export default function CategoryPageClient({
         const servicesRef = collection(db, "adminServices");
         const qServices = query(servicesRef, where("subCategoryId", "==", subCategoryId), where("isActive", "==", true), orderBy("name", "asc"));
         const snapshot = await getDocs(qServices);
-        const services = snapshot.docs.map(serviceDoc => ({ id: serviceDoc.id, ...serviceDoc.data() } as FirestoreService));
+        const services = snapshot.docs
+            .map(serviceDoc => ({ id: serviceDoc.id, ...serviceDoc.data() } as FirestoreService))
+            .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
         
         setSubCategoriesWithServices(prevSubCats => {
             const updated = prevSubCats.map(subCat => 
@@ -234,8 +236,21 @@ export default function CategoryPageClient({
           return;
       }
 
+      // --- SmartSync: Version Checking ---
+      let remoteVersion = 0;
+      try {
+        const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
+        const versionSnap = await getDoc(versionDocRef);
+        if (versionSnap.exists()) {
+          remoteVersion = versionSnap.data().services || 0;
+        }
+      } catch (e) { console.warn("Failed to fetch cache versions:", e); }
+
+      const localVersionKey = `category-version-${categorySlug}`;
+      const localVersion = parseInt(localStorage.getItem(localVersionKey) || "0");
       const cachedData = getCache<CategoryPageCache>(cacheKey, true);
-      if (cachedData) {
+
+      if (cachedData && remoteVersion <= localVersion) {
         setCategory(cachedData.category);
         setSubCategoriesWithServices(cachedData.subCategories);
         setSeoPageH1(cachedData.h1);
@@ -276,7 +291,7 @@ export default function CategoryPageClient({
         const subCategoriesSnapshot = await getDocs(qSubCategories);
         
         const initialSubCats: EnrichedSubCategory[] = subCategoriesSnapshot.docs
-          .map(doc => ({ ...(doc.data() as FirestoreSubCategory), id: doc.id, services: [], isLoadingServices: true, hasStartedLoading: false }))
+          .map(d => ({ ...(d.data() as FirestoreSubCategory), id: d.id, services: [], isLoadingServices: true, hasStartedLoading: false }))
           .filter(subCat => subCat.isActive !== false);
 
         setSubCategoriesWithServices(initialSubCats);
@@ -346,6 +361,7 @@ export default function CategoryPageClient({
             displayH1: finalDisplayH1,
             breadcrumbs: dynamicBreadcrumbs,
         }, true);
+        localStorage.setItem(localVersionKey, remoteVersion.toString());
 
         // Fetch services for the first subcategory immediately
         if (initialSubCats.length > 0) {
@@ -528,7 +544,7 @@ export default function CategoryPageClient({
               <div className="flex flex-row md:hidden w-full gap-3">
                 <div className="flex-1 flex flex-col">
                   <h3 className="font-bold text-base leading-tight text-foreground group-hover:text-primary transition-colors">Need Something Else?</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-4 mt-1">Can't find the service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
+                  <p className="text-xs text-muted-foreground line-clamp-4 mt-1">Can&apos;t find the service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
                 </div>
                 <div className="flex flex-col items-center justify-between flex-shrink-0 w-28">
                   <div className="relative w-full h-28 bg-muted/30 rounded-lg flex items-center justify-center overflow-hidden">
@@ -541,12 +557,12 @@ export default function CategoryPageClient({
               </div>
               {/* DESKTOP VIEW */}
               <div className="hidden md:flex flex-row items-center w-full gap-4">
-                <div className="relative w-32 h-40 flex-shrink-0 bg-muted/30 rounded-lg flex items-center justify-center overflow-hidden">
+                <div className="relative w-40 h-40 flex-shrink-0 bg-muted/30 rounded-lg flex items-center justify-center overflow-hidden">
                   <AppImage src="/custom.png" alt="Custom Service" fill className="object-contain p-3 transition-transform duration-300 group-hover:scale-105" />
                 </div>
                 <div className="flex-1 flex flex-col justify-center pt-4">
                   <h3 className="font-bold text-lg leading-tight text-foreground group-hover:text-primary transition-colors">Need Something Else?</h3>
-                  <p className="text-sm text-muted-foreground mt-3 max-w-md">Can't find the specific service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
+                  <p className="text-sm text-muted-foreground mt-3 max-w-md">Can&apos;t find the specific service you’re looking for? Tell us what you need, and we’ll do our best to arrange it for you.</p>
                 </div>
                 <div className="flex flex-col justify-center pl-4 w-1/4">
                     <Button size="lg" className="h-10 rounded-md w-full">Request a Custom Service</Button>
@@ -606,7 +622,7 @@ export default function CategoryPageClient({
             </div>
             <h3 className="text-3xl font-headline font-bold text-foreground mb-4">Coming Soon!</h3>
             <p className="text-muted-foreground max-w-md mx-auto mb-8 text-lg">
-                We're working hard to bring trusted professionals for this category to your area. Please check back soon.
+                We&apos;re working hard to bring trusted professionals for this category to your area. Please check back soon.
             </p>
             
             <div className="space-y-4">

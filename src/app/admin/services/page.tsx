@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Edit, Trash2, ShoppingBag, CheckCircle, XCircle, Loader2, Percent, PackageSearch } from "lucide-react";
-import type { FirestoreService, FirestoreSubCategory, FirestoreTax, FirestoreCategory, PriceVariant } from '@/types/firestore';
+import { PlusCircle, Edit, Trash2, ShoppingBag, Loader2 } from "lucide-react";
+import type { FirestoreService, FirestoreSubCategory, FirestoreTax, FirestoreCategory } from '@/types/firestore';
 import ServiceForm from '@/components/admin/ServiceForm';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy, query, Timestamp, where } from "firebase/firestore";
@@ -29,20 +29,6 @@ const isFirebaseStorageUrl = (url: string): boolean => {
   if (!url) return false;
   return typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
 };
-
-interface SubCategoryGroupForServices {
-  id: string;
-  name: string;
-  slug: string; // SubCategory data
-  services: FirestoreService[];
-}
-interface ParentCategoryGroupForServices {
-  id: string;
-  name: string;
-  slug: string; // Parent category data
-  subCategories: SubCategoryGroupForServices[];
-}
-
 
 export default function AdminServicesPage() {
   const [services, setServices] = useState<FirestoreService[]>([]);
@@ -117,9 +103,10 @@ export default function AdminServicesPage() {
         setServices(prev => prev.map(s => s.id === service.id ? { ...s, isActive: !s.isActive } : s));
         toast({ title: "Status Updated", description: `Service "${service.name}" ${!service.isActive ? "enabled" : "disabled"}.` });
         await triggerRefresh('services');
+        await triggerRefresh('global-cache');
         await triggerRefresh('sitemap');
         // Removed global-cache trigger to save reads
-    } catch (error) {
+    } catch (_error) {
         toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
@@ -136,6 +123,7 @@ export default function AdminServicesPage() {
         setServices(prev => prev.map(s => s.id === service.id ? { ...s, allowPayLater: !service.allowPayLater } : s));
         toast({ title: "Pay Later Updated", description: `Pay later for "${service.name}" ${!service.allowPayLater ? "enabled" : "disabled"}.` });
         await triggerRefresh('services');
+        await triggerRefresh('global-cache');
         await triggerRefresh('sitemap');
         // Removed global-cache trigger to save reads
     } catch (error) {
@@ -156,7 +144,7 @@ export default function AdminServicesPage() {
         try {
           const imageToDeleteRef = storageRef(storage, serviceData.imageUrl);
           await deleteObject(imageToDeleteRef);
-        } catch (imgError: any) { console.warn("Error deleting image: ", imgError); }
+        } catch (imgError: unknown) { console.warn("Error deleting image: ", imgError); }
       }
       await deleteDoc(serviceDocRef);
       await triggerRefresh('services'); // SmartSync: Invalidate cache
@@ -191,6 +179,7 @@ export default function AdminServicesPage() {
       hasMinQuantity: data.hasMinQuantity,
       minQuantity: data.hasMinQuantity ? Number(data.minQuantity || 0) : null,
       maxQuantity: data.maxQuantity === null ? null : Number(data.maxQuantity),
+      order: Number(data.order || 0),
       isActive: data.isActive === undefined ? true : data.isActive,
       imageUrl: data.imageUrl || "", 
       imageHint: data.imageHint || "", 
@@ -217,8 +206,8 @@ export default function AdminServicesPage() {
       if (data.id) { // Editing existing service
         const serviceDoc = doc(db, "adminServices", data.id);
         const updateData = { ...payloadForFirestore, updatedAt: Timestamp.now() };
-        delete (updateData as any).id; // Ensure 'id' isn't part of the update payload itself
-        await updateDoc(serviceDoc, updateData);
+        const { id: _, ...dataToSave } = updateData as { id?: string } & typeof updateData;
+        await updateDoc(serviceDoc, dataToSave);
         toast({ title: "Success", description: "Service updated successfully." });
       } else { // Adding new service
         const newServicePayload = { ...payloadForFirestore, createdAt: Timestamp.now() };
@@ -226,20 +215,26 @@ export default function AdminServicesPage() {
         toast({ title: "Success", description: "Service added successfully." });
       }
       await triggerRefresh('services'); // SmartSync: Invalidate main services cache
+      await triggerRefresh('global-cache');
       if (data.slug) {
         await triggerRefresh(`service-${data.slug}`); // Invalidate specific service page cache
       }
       await triggerRefresh('sitemap');
       // Removed global-cache trigger to save reads
       setIsFormOpen(false); setEditingService(null); await fetchData();
-    } catch (error) {
-      console.error("Error saving service: ", error);
-      toast({ title: "Error", description: (error as Error).message || "Could not save service.", variant: "destructive" });
+    } catch (_error) {
+      console.error("Error saving service: ", _error);
+      toast({ title: "Error", description: (_error as Error).message || "Could not save service.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
   
+  const nextOrder = useMemo(() => {
+    if (services.length === 0) return 0;
+    return Math.max(...services.map(s => s.order || 0)) + 1;
+  }, [services]);
+
   const groupedServices = useMemo(() => {
     if (!parentCategories.length) return [];
     return parentCategories
@@ -251,7 +246,7 @@ export default function AdminServicesPage() {
         const subCategoriesWithTheirServices = relevantSubCategories.map(subCat => {
           const servicesForSubCat = services
             .filter(service => service.subCategoryId === subCat.id)
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
           return { ...subCat, services: servicesForSubCat };
         });
         return { ...parent, subCategories: subCategoriesWithTheirServices };
@@ -315,6 +310,7 @@ export default function AdminServicesPage() {
                           <TableRow>
                             <TableHead className="w-[50px] p-2">Img</TableHead>
                             <TableHead className="p-2">Name</TableHead>
+                            <TableHead className="p-2 text-center">Order</TableHead>
                             <TableHead className="p-2">Slug</TableHead>
                             <TableHead className="text-right p-2">Price (₹)</TableHead>
                             <TableHead className="text-right p-2">Tax</TableHead>
@@ -336,6 +332,7 @@ export default function AdminServicesPage() {
                                   ) : ( <IconComponent className="h-5 w-5 text-muted-foreground" /> )}
                                 </TableCell>
                                 <TableCell className="font-medium p-2 text-xs">{service.name}</TableCell>
+                                <TableCell className="text-center p-2 text-xs text-muted-foreground">{service.order || 0}</TableCell>
                                 <TableCell className="p-2 text-xs text-muted-foreground">{service.slug}</TableCell>
                                 <TableCell className="text-right p-2 text-xs">
                                   <div>₹{service.price.toLocaleString()}</div>
@@ -370,7 +367,7 @@ export default function AdminServicesPage() {
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-7 w-7" disabled={isSubmitting}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
                                       <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{service.name}".</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete &quot;{service.name}&quot;.</AlertDialogDescription></AlertDialogHeader>
                                         <AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteService(service.id)} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete</AlertDialogAction></AlertDialogFooter>
                                       </AlertDialogContent>
                                     </AlertDialog>
@@ -399,7 +396,7 @@ export default function AdminServicesPage() {
           {(parentCategories.length === 0 && !editingService && !isLoadingData) || (subCategories.length === 0 && !editingService && !isLoadingData) ? (
              <div className="p-6 py-8 text-center"><p className="text-destructive">{(parentCategories.length === 0 && "No parent categories exist. ")}{(subCategories.length === 0 && "No sub-categories exist. ")}</p><p className="text-muted-foreground text-sm mt-2">Please add categories/sub-categories first.</p></div>
           ) : (
-            <ServiceForm onSubmit={handleFormSubmit} initialData={editingService} parentCategories={parentCategories} subCategories={subCategories} taxes={taxes} onCancel={() => { setIsFormOpen(false); setEditingService(null); }} isSubmitting={isSubmitting}/>
+            <ServiceForm onSubmit={handleFormSubmit} initialData={editingService} parentCategories={parentCategories} subCategories={subCategories} taxes={taxes} allServices={services} onCancel={() => { setIsFormOpen(false); setEditingService(null); }} isSubmitting={isSubmitting}/>
           )}
         </DialogContent>
       </Dialog>

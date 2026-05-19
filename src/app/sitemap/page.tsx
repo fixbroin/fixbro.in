@@ -66,8 +66,8 @@ const getSitemapData = cache(async (): Promise<SitemapData> => {
         blogsSnap
       ] = await Promise.all([
         adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
-        adminDb.collection('adminCategories').orderBy('order').get(),
-        adminDb.collection('adminSubCategories').orderBy('name').get(),
+        adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order').get(),
+        adminDb.collection('adminSubCategories').where('isActive', '==', true).orderBy('name').get(),
         adminDb.collection('adminServices').where('isActive', '==', true).orderBy('name').get(),
         adminDb.collection('blogPosts').where('isPublished', '==', true).orderBy('createdAt', 'desc').get()
       ]);
