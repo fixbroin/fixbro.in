@@ -93,7 +93,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
-      h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
+      h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
     },
   });
 
@@ -150,7 +150,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
     } else {
       form.reset({
         name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
-        h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
+        h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
       });
       setCurrentImagePreview(null);
       setOriginalImageUrlFromInitialData(null);
