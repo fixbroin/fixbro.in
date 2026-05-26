@@ -6,6 +6,7 @@ import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { sendBookingConfirmationEmail } from '@/ai/flows/sendBookingEmailFlow';
 import { getBaseUrl } from '@/lib/config';
 import { generateInvoicePdf } from '@/lib/invoiceGenerator';
+import { triggerRefresh } from '@/lib/revalidateUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
 const ADMIN_EMAIL = "fixbro.in@gmail.com"; 
@@ -26,8 +27,10 @@ export async function POST(request: Request) {
 
     const booking = bookingDoc.data() as any;
     const userId = booking.userId;
-    const isCompleted = booking.status === 'Completed';
-    const isCancelled = booking.status === 'Cancelled';
+    const currentStatus = booking.status;
+    const isCompleted = currentStatus === 'Completed';
+    const isCancelled = currentStatus === 'Cancelled';
+    const isRescheduled = currentStatus === 'Rescheduled';
 
     // 2. Fetch App Settings for Email/WhatsApp
     const [appConfigDoc, marketingConfigDoc, seoSettingsDoc] = await Promise.all([
@@ -42,6 +45,24 @@ export async function POST(request: Request) {
 
     // --- EXECUTE ALL TASKS IN PARALLEL ON SERVER ---
     const tasks: Promise<any>[] = [];
+
+    // --- Determine Email Type ---
+    let emailType: 'booking_confirmation' | 'booking_completion' | 'booking_rescheduled' | 'booking_cancelled_by_admin' | 'booking_status_update' = 'booking_status_update';
+
+    if (isCompleted) {
+        emailType = 'booking_completion';
+    } else if (isCancelled) {
+        emailType = 'booking_cancelled_by_admin';
+    } else if (isRescheduled) {
+        emailType = 'booking_rescheduled';
+    } else if (!booking.isConfirmationEmailSent) {
+        // First time booking is processed, send confirmation
+        emailType = 'booking_confirmation';
+        tasks.push(adminDb.collection('bookings').doc(bookingDocId).update({ isConfirmationEmailSent: true }));
+    } else {
+        // Subsequent status updates
+        emailType = 'booking_status_update';
+    }
 
     // --- NEW: Track Total Bookings (First time only) ---
     if (!booking.isStatsTracked) {
@@ -115,12 +136,20 @@ export async function POST(request: Request) {
 
     // B. User Dashboard Notification
     if (userId) {
+        let notificationTitle = isCompleted ? "Service Completed!" : "Booking Update";
+        let notificationMessage = isCompleted 
+            ? `Your booking ${booking.bookingId} has been successfully completed. Thank you!`
+            : `Your booking ${booking.bookingId} is ${booking.status}.`;
+        
+        if (isRescheduled) {
+            notificationTitle = "Booking Rescheduled!";
+            notificationMessage = `Your booking ${booking.bookingId} has been rescheduled to ${booking.scheduledDate} at ${booking.scheduledTimeSlot}.`;
+        }
+
         tasks.push(adminDb.collection('userNotifications').add({
             userId,
-            title: isCompleted ? "Service Completed!" : "Booking Confirmed!",
-            message: isCompleted 
-                ? `Your booking ${booking.bookingId} has been successfully completed. Thank you!`
-                : `Your booking ${booking.bookingId} is ${booking.status}.`,
+            title: notificationTitle,
+            message: notificationMessage,
             type: isCompleted ? 'success' : 'info',
             href: `/my-bookings`,
             read: false,
@@ -132,13 +161,21 @@ export async function POST(request: Request) {
     const adminQuery = await adminDb.collection('users').where('email', '==', ADMIN_EMAIL).limit(1).get();
     if (!adminQuery.empty) {
         const adminUid = adminQuery.docs[0].id;
+        let adminTitle = isCompleted ? "Job Completed!" : "Booking Update";
+        let adminMessage = isCompleted 
+            ? `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ₹${booking.totalAmount.toFixed(2)}.`
+            : `ID: ${booking.bookingId} by ${booking.customerName} is ${booking.status}.`;
+
+        if (isRescheduled) {
+            adminTitle = "Booking Rescheduled";
+            adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${booking.scheduledDate} at ${booking.scheduledTimeSlot}.`;
+        }
+
         tasks.push(adminDb.collection('userNotifications').add({
             userId: adminUid,
-            title: isCompleted ? "Job Completed!" : "New Booking Received!",
-            message: isCompleted 
-                ? `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ₹${booking.totalAmount.toFixed(2)}.`
-                : `ID: ${booking.bookingId} by ${booking.customerName}. Total: ₹${booking.totalAmount.toFixed(2)}.`,
-            type: isCompleted ? 'info' : 'admin_alert',
+            title: adminTitle,
+            message: adminMessage,
+            type: isCompleted ? 'info' : (isRescheduled ? 'info' : 'admin_alert'),
             href: `/admin/bookings`,
             read: false,
             createdAt: Timestamp.now()
@@ -212,7 +249,7 @@ export async function POST(request: Request) {
     }
 
     const emailFlowInput = {
-        emailType: isCompleted ? ('booking_completion' as const) : ('booking_confirmation' as const),
+        emailType: emailType,
         bookingId: booking.bookingId,
         customerName: booking.customerName,
         customerEmail: booking.customerEmail,
@@ -226,6 +263,8 @@ export async function POST(request: Request) {
         longitude: booking.longitude,
         scheduledDate: booking.scheduledDate,
         scheduledTimeSlot: booking.scheduledTimeSlot,
+        previousScheduledDate: booking.previousScheduledDate,
+        previousScheduledTimeSlot: booking.previousScheduledTimeSlot,
         services: booking.services,
         subTotal: booking.subTotal,
         visitingCharge: booking.visitingCharge || 0,
@@ -249,7 +288,13 @@ export async function POST(request: Request) {
             amount: fee.calculatedFeeAmount + fee.taxAmountOnFee 
         })),
     };
-    tasks.push(sendBookingConfirmationEmail(emailFlowInput));
+
+    // Only send if it's NOT a generic status update, OR if the toggle is enabled
+    const shouldSendEmail = emailType !== 'booking_status_update' || appConfig.enableStatusUpdateEmails !== false;
+    
+    if (shouldSendEmail) {
+        tasks.push(sendBookingConfirmationEmail(emailFlowInput));
+    }
 
     // G. Send WhatsApp
     if (marketingConfig?.isWhatsAppEnabled) {
@@ -362,6 +407,7 @@ export async function POST(request: Request) {
         });
         tasks.push(referralTask);
     }
+    tasks.push(triggerRefresh('bookings'));
 
     return NextResponse.json({ success: true });
 

@@ -211,6 +211,8 @@ export interface FirestoreBooking {
   razorpaySignature?: string;
   status: BookingStatus;
   notes?: string; // Any special instructions from customer
+  previousScheduledDate?: string; // NEW: Store previous date before reschedule
+  previousScheduledTimeSlot?: string; // NEW: Store previous slot before reschedule
   estimatedEndTime?: string; // Work-only completion time (ISO string)
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -219,6 +221,7 @@ export interface FirestoreBooking {
   cancellationPaymentId?: string;
   isStatsTracked?: boolean;
   isCompletionStatsTracked?: boolean;
+  isConfirmationEmailSent?: boolean;
 }
 
 export interface Address {
@@ -588,6 +591,8 @@ export interface AppSettings {
   // Provider Fee Settings
   providerFeeType?: ProviderFeeType;
   providerFeeValue?: number;
+
+  enableStatusUpdateEmails?: boolean; // New: Toggle for generic status update emails
 
   loaderType?: string; // Added for compatibility with appDefaults.ts
 

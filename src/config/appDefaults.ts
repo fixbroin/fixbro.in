@@ -73,6 +73,8 @@ export const defaultAppSettings: AppSettings = {
   providerFeeType: 'fixed', // 'fixed' or 'percentage'
   providerFeeValue: 0, // Default to 0, meaning no fee
 
+  enableStatusUpdateEmails: true,
+
   // UI/UX
   loaderType: 'logo-pulse',
 

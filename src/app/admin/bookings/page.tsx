@@ -33,6 +33,7 @@ import AppImage from '@/components/ui/AppImage';
 import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import RescheduleBookingDialog from '@/components/shared/RescheduleBookingDialog';
 import { useAdminStats } from '@/hooks/useAdminStats';
 
 const statusOptions: BookingStatus[] = [
@@ -108,6 +109,9 @@ export default function AdminBookingsPage() {
 
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+
+  const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
+  const [bookingToReschedule, setBookingToReschedule] = useState<FirestoreBooking | null>(null);
 
   const handleWhatsAppClick = (booking: FirestoreBooking) => {
     if (booking.customerPhone) {
@@ -233,6 +237,12 @@ export default function AdminBookingsPage() {
         return;
     }
 
+    if (newStatus === 'Rescheduled') {
+        setBookingToReschedule(booking);
+        setIsRescheduleDialogOpen(true);
+        return;
+    }
+
     setIsUpdatingStatus(booking.id);
     try {
       const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
@@ -246,6 +256,13 @@ export default function AdminBookingsPage() {
       }
 
       await updateDoc(doc(db, "bookings", booking.id), updateData);
+
+      // Manually update local state to reflect changes immediately
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === booking.id) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+
       await triggerRefresh('bookings');
       fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: booking.id }), }).catch(err => console.error(err));
       toast({ title: "Success", description: `Booking is now ${newStatus}.` });
@@ -260,6 +277,13 @@ export default function AdminBookingsPage() {
     try {
       await deleteDoc(doc(db, "bookings", booking.id));
       
+      // Manually update local state to remove the deleted booking immediately
+      setBookings(prev => prev.filter(b => b.id !== booking.id));
+      if (selectedBooking?.id === booking.id) {
+        setIsDetailsModalOpen(false);
+        setSelectedBooking(null);
+      }
+
       // DECREMENT STATS
       const statsUpdates: any = {};
       if (booking.isStatsTracked) {
@@ -286,12 +310,58 @@ export default function AdminBookingsPage() {
   const handleConfirmAssignment = async (bookingId: string, providerId: string, providerName: string) => {
     setIsUpdatingStatus(bookingId);
     try {
-      await updateDoc(doc(db, "bookings", bookingId), { providerId, status: "AssignedToProvider", updatedAt: Timestamp.now() });
+      const updateData = { providerId, status: "AssignedToProvider" as BookingStatus, updatedAt: Timestamp.now() };
+      await updateDoc(doc(db, "bookings", bookingId), updateData);
+      
+      // Manually update local state to reflect changes immediately
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+
       await triggerRefresh('bookings');
       fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: bookingId }) });
       toast({ title: "Assigned", description: `Assigned to ${providerName}.` });
       setIsAssignModalOpen(false);
     } catch (err) { toast({ title: "Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
+  };
+
+  const handleRescheduleConfirm = async (newDate: string, newSlot: string, newEndTime: string) => {
+    if (!bookingToReschedule?.id) return;
+    
+    setIsUpdatingStatus(bookingToReschedule.id);
+    try {
+        const updateData = {
+            status: "Rescheduled" as BookingStatus,
+            scheduledDate: newDate,
+            scheduledTimeSlot: newSlot,
+            estimatedEndTime: newEndTime,
+            previousScheduledDate: bookingToReschedule.scheduledDate,
+            previousScheduledTimeSlot: bookingToReschedule.scheduledTimeSlot,
+            updatedAt: Timestamp.now()
+        };
+
+        await updateDoc(doc(db, "bookings", bookingToReschedule.id), updateData);
+
+        // Update local state
+        setBookings(prev => prev.map(b => b.id === bookingToReschedule.id ? { ...b, ...updateData } : b));
+        
+        await triggerRefresh('bookings');
+        fetch('/api/bookings/post-process', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ bookingDocId: bookingToReschedule.id }) 
+        });
+
+        toast({ title: "Success", description: "Booking rescheduled successfully." });
+        setIsRescheduleDialogOpen(false);
+        setBookingToReschedule(null);
+    } catch (error) {
+        console.error("Reschedule failed:", error);
+        toast({ title: "Error", description: "Failed to reschedule booking.", variant: "destructive" });
+    } finally {
+        setIsUpdatingStatus(null);
+    }
   };
 
   const renderBookingCard = (booking: FirestoreBooking, rowNumber: number) => (
@@ -473,6 +543,7 @@ export default function AdminBookingsPage() {
       {selectedBooking && (<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}><DialogContent className="max-w-3xl w-[90vw] max-h-[90vh] flex flex-col p-0"><DialogHeader className="p-6 pb-4 border-b"><DialogTitle>Details: {selectedBooking.bookingId}</DialogTitle></DialogHeader><div className="overflow-y-auto flex-grow p-6"><BookingDetailsModalContent booking={selectedBooking} /></div><div className="p-6 border-t flex justify-end"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></div></DialogContent></Dialog>)}
       {bookingToAssign && (<AssignProviderModal isOpen={isAssignModalOpen} onClose={() => { setIsAssignModalOpen(false); setBookingToAssign(null); }} booking={bookingToAssign} onAssignConfirm={handleConfirmAssignment} />)}
       {bookingToComplete && (<CompleteBookingDialog isOpen={isCompleteDialogOpen} onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }} onConfirm={(charges, pMethod) => handleStatusChange(bookingToComplete, 'Completed', charges, pMethod)} originalAmount={bookingToComplete.totalAmount} currentPaymentMethod={bookingToComplete.paymentMethod || "Cash"} isProcessing={isUpdatingStatus === bookingToComplete.id} />)}
+      {bookingToReschedule && (<RescheduleBookingDialog isOpen={isRescheduleDialogOpen} onClose={() => { setIsRescheduleDialogOpen(false); setBookingToReschedule(null); }} booking={bookingToReschedule} onRescheduleComplete={(newDate, newSlot, newEndTime) => handleRescheduleConfirm(newDate, newSlot, newEndTime)} />)}
     </div>
   );
 }
