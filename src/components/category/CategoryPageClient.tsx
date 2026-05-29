@@ -695,7 +695,6 @@ export default function CategoryPageClient({
       )}
 
       {initialData?.availableAreas && initialData.availableAreas.length > 0 && (
-        <LazySection>
           <LocalitiesInterlinking 
             categoryName={category?.name || "Services"}
             categorySlug={categorySlug}
@@ -704,17 +703,14 @@ export default function CategoryPageClient({
             areas={initialData.availableAreas}
             currentAreaSlug={areaSlug}
           />
-        </LazySection>
       )}
 
       {initialData?.availableCities && initialData.availableCities.length > 0 && (
-        <LazySection>
           <CitiesInterlinking 
             categoryName={category?.name || "Services"}
             categorySlug={categorySlug}
             cities={initialData.availableCities}
           />
-        </LazySection>
       )}
       
     </div>
