@@ -12,6 +12,7 @@ export async function incrementSystemStats(updates: {
   totalUsers?: number;
   newSignups30d?: number;
   lastUserNumber?: number;
+  lastBookingNumber?: number;
 }) {
   try {
     const statsRef = adminDb.collection('appConfiguration').doc('stats');
@@ -26,10 +27,53 @@ export async function incrementSystemStats(updates: {
     if (updates.totalUsers) payload.totalUsers = FieldValue.increment(updates.totalUsers);
     if (updates.newSignups30d) payload.newSignups30d = FieldValue.increment(updates.newSignups30d);
     if (updates.lastUserNumber) payload.lastUserNumber = FieldValue.increment(updates.lastUserNumber);
+    if (updates.lastBookingNumber) payload.lastBookingNumber = FieldValue.increment(updates.lastBookingNumber);
 
     await statsRef.set(payload, { merge: true });
   } catch (error) {
     console.error("Error incrementing system stats:", error);
+  }
+}
+
+/**
+ * One-time utility to backfill booking numbers for existing bookings
+ * and set the initial lastBookingNumber counter.
+ */
+export async function initializeBookingNumbers() {
+  try {
+    const statsRef = adminDb.collection('appConfiguration').doc('stats');
+    const bookingsSnap = await adminDb.collection('bookings').orderBy('createdAt', 'asc').get();
+    const totalBookings = bookingsSnap.size;
+    
+    const batchSize = 500;
+    let count = 0;
+    let batch = adminDb.batch();
+
+    for (let i = 0; i < bookingsSnap.docs.length; i++) {
+      const doc = bookingsSnap.docs[i];
+      batch.update(doc.ref, { bookingNumber: i + 1 });
+      count++;
+
+      if (count === batchSize) {
+        await batch.commit();
+        batch = adminDb.batch();
+        count = 0;
+      }
+    }
+    
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    await statsRef.set({ 
+      lastBookingNumber: totalBookings,
+      updatedAt: Timestamp.now() 
+    }, { merge: true });
+
+    return { success: true, count: totalBookings };
+  } catch (error) {
+    console.error("Error initializing booking numbers:", error);
+    return { success: false, error: String(error) };
   }
 }
 

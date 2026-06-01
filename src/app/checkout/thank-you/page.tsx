@@ -22,6 +22,8 @@ import { getGuestId } from '@/lib/guestIdManager';
 import { sendWhatsAppFlow } from '@/ai/flows/sendWhatsAppFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { getTimestampMillis } from '@/lib/utils';
+import { assignNewBookingNumber } from '@/lib/webServerUtils';
+import { incrementSystemStats } from '@/lib/systemStatsUtils';
 
 // Add type declarations for GTM dataLayer and gtag
 declare global {
@@ -301,8 +303,13 @@ export default function ThankYouPage() {
 
         const bookingStatus: FirestoreBooking['status'] = (paymentMethod === 'later' || paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed";
 
+        // Assign Sequential Booking Number
+        const nextBookingNumber = await assignNewBookingNumber();
+
         const newBookingData: Omit<FirestoreBooking, 'id'> = {
-          bookingId: newBookingId, ...(currentUser?.uid && { userId: currentUser.uid }),
+          bookingId: newBookingId, 
+          bookingNumber: nextBookingNumber,
+          ...(currentUser?.uid && { userId: currentUser.uid }),
           customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
           ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
           scheduledDate: scheduledDateStored,
@@ -324,6 +331,8 @@ export default function ThankYouPage() {
         };
 
         const docRef = await addDoc(collection(db, "bookings"), newBookingData);
+        // Track stats for new booking
+        incrementSystemStats({ totalBookings: 1, lastBookingNumber: 1 }).catch(e => console.error("Stats increment error:", e));
         
         // --- SEND BOOKING NOTIFICATIONS (Push + In-App) ---
         try {

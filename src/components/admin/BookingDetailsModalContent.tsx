@@ -117,7 +117,8 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-            <div><strong>Booking ID:</strong> <Badge variant="secondary" className="text-xs">{booking.bookingId}</Badge></div>
+            <div><strong>Booking No:</strong> <Badge className="text-xs bg-primary text-white font-black px-2 shadow-sm">#{booking.bookingNumber || "N/A"}</Badge></div>
+            <div><strong>Booking ID:</strong> <Badge variant="secondary" className="text-xs font-mono">{booking.bookingId}</Badge></div>
             <div><strong>Status:</strong> <Badge variant={booking.status === "Completed" ? "default" : booking.status === "Confirmed" ? "default" : "outline"} className={ booking.status === "Confirmed" ? "bg-green-500 text-white hover:bg-green-600" : booking.status === "Completed" ? "bg-blue-500 text-white hover:bg-blue-600" : booking.status === "Cancelled" ? "bg-red-500 text-white hover:bg-red-600" : ""}>{booking.status}</Badge></div>
             <p><strong>Scheduled Date:</strong> {booking.scheduledDate}</p>
             <p><strong>Scheduled Time:</strong> {booking.scheduledTimeSlot}</p>

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -35,6 +35,7 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import RescheduleBookingDialog from '@/components/shared/RescheduleBookingDialog';
 import { useAdminStats } from '@/hooks/useAdminStats';
+import { initializeBookingNumbers } from '@/lib/systemStatsUtils';
 
 const statusOptions: BookingStatus[] = [
   "Pending Payment", "Confirmed", "AssignedToProvider", "ProviderAccepted", 
@@ -96,6 +97,7 @@ export default function AdminBookingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<BookingStatus | "All">("All");
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
@@ -112,6 +114,23 @@ export default function AdminBookingsPage() {
 
   const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false);
   const [bookingToReschedule, setBookingToReschedule] = useState<FirestoreBooking | null>(null);
+
+  const handleInitialize = async () => {
+    setIsInitializing(true);
+    try {
+      const result = await initializeBookingNumbers();
+      if (result.success) {
+        toast({ title: "Initialization Complete", description: `Successfully assigned Booking IDs to ${result.count} bookings.` });
+        window.location.reload(); 
+      } else {
+        toast({ title: "Initialization Failed", description: result.error, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   const handleWhatsAppClick = (booking: FirestoreBooking) => {
     if (booking.customerPhone) {
@@ -151,8 +170,10 @@ export default function AdminBookingsPage() {
             query(bookingsRef, where("customerPhone", ">=", term), where("customerPhone", "<=", term + '\uf8ff')),
           ];
 
-          // Phone variations with 91 prefix matching
+          // Phone variations and bookingNumber matching
           if (/^\d+$/.test(term)) {
+            const numTerm = parseInt(term, 10);
+            queries.push(query(bookingsRef, where("bookingNumber", "==", numTerm)));
             queries.push(query(bookingsRef, where("customerPhone", ">=", `91${term}`), where("customerPhone", "<=", `91${term}` + '\uf8ff')));
             queries.push(query(bookingsRef, where("customerPhone", ">=", `+91${term}`), where("customerPhone", "<=", `+91${term}` + '\uf8ff')));
             
@@ -220,8 +241,10 @@ export default function AdminBookingsPage() {
         
         const userPhone = (b.customerPhone || '').replace(/\D/g, '').replace(/^91/, '');
         const phoneMatch = normalizedSearchPhone ? userPhone.includes(normalizedSearchPhone) : false;
+
+        const numberMatch = b.bookingNumber?.toString() === lowerSearch;
         
-        return idMatch || nameMatch || phoneMatch;
+        return idMatch || nameMatch || phoneMatch || numberMatch;
       });
     }
     
@@ -364,13 +387,13 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const renderBookingCard = (booking: FirestoreBooking, rowNumber: number) => (
+  const renderBookingCard = (booking: FirestoreBooking) => (
     <Card key={booking.id} className="mb-4 border-l-4 shadow-md overflow-hidden" style={{ borderLeftColor: getStatusBadgeClass(booking.status).split(' ')[0].replace('bg-', 'var(--') }}>
       <CardHeader className="p-4 bg-muted/20 pb-3">
         <div className="flex justify-between items-start">
             <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{rowNumber}</span>
+                  <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded-lg shadow-sm">#{booking.bookingNumber || '...'}</span>
                   <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
                 </div>
                 <div className="text-sm font-bold">{booking.customerName}</div>
@@ -428,7 +451,7 @@ export default function AdminBookingsPage() {
           <div className="relative w-full sm:w-64 group">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input 
-              placeholder="ID, Name, Phone..." 
+              placeholder="ID, Name, Phone, # Number..." 
               className="pl-9 pr-9 h-10 w-full bg-background border-muted/50 focus-visible:ring-primary/20 shadow-sm" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -455,11 +478,10 @@ export default function AdminBookingsPage() {
                 <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredBookings.map((b, index) => {
-                    const rowNumber = (stats?.totalBookings || 0) - index;
                     return (
                       <React.Fragment key={b.id}>
                         <TableRow className="hover:bg-transparent border-b-0">
-                          <TableCell className="text-xs font-bold text-muted-foreground">{rowNumber}</TableCell>
+                          <TableCell className="text-xs font-black text-primary bg-primary/5 rounded-lg text-center h-8 w-8 flex items-center justify-center mt-3 ml-2">{b.bookingNumber || '...'}</TableCell>
                           <TableCell className="font-mono text-xs font-bold text-primary">{b.bookingId}</TableCell>
                           <TableCell>
                             <div className="font-bold">{b.customerName}</div>
@@ -526,7 +548,7 @@ export default function AdminBookingsPage() {
                 </TableBody></Table>
                 </div>
                 <div className="md:hidden p-4 space-y-4">
-                {filteredBookings.map((b, index) => renderBookingCard(b, (stats?.totalBookings || 0) - index))}
+                {filteredBookings.map((b) => renderBookingCard(b))}
               </div>
               {hasMore && !searchTerm && (
                 <div className="p-6 text-center border-t">
