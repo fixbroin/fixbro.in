@@ -441,7 +441,10 @@ export default function AdminBookingsPage() {
                         </Button>
                     )}
                 </div>
-                <div className="font-black text-base text-primary"><IndianRupee className="h-3.5 w-3.5" />{booking.totalAmount.toLocaleString()}</div>
+                <div className="font-black text-base text-foreground flex items-center gap-1">
+                    <IndianRupee className="h-3.5 w-3.5" />
+                    {booking.totalAmount.toLocaleString()}
+                </div>
             </div>
             <div className="flex justify-between items-center text-xs py-1 border-t border-muted/30 mt-1 pt-1">
                 <span className="text-muted-foreground">Payment:</span>
@@ -538,7 +541,12 @@ export default function AdminBookingsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
-                          <TableCell className="text-right pr-6 font-black text-lg">{b.totalAmount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right pr-6">
+                            <div className="flex items-center justify-end gap-1 font-black text-lg">
+                                <IndianRupee className="h-4 w-4 text-foreground" />
+                                {b.totalAmount.toLocaleString()}
+                            </div>
+                          </TableCell>
                         </TableRow>
                         <TableRow className="bg-muted/5 border-b-2">
                           <TableCell colSpan={7} className="py-3 px-4">
