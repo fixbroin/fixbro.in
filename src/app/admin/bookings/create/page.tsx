@@ -259,7 +259,7 @@ export default function AdminCreateBookingPage() {
 
       const docRef = await addDoc(collection(db, "bookings"), bookingData);
       // Track stats for new booking
-      incrementSystemStats({ totalBookings: 1, lastBookingNumber: 1 }).catch(e => console.error("Stats increment error:", e));
+      incrementSystemStats({ totalBookings: 1 }).catch(e => console.error("Stats increment error:", e));
       await triggerRefresh('bookings');
       fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: docRef.id }) });
       setCreatedBookingId(newBookingId); setIsSuccessDialogOpen(true);

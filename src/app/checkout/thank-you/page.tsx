@@ -332,7 +332,7 @@ export default function ThankYouPage() {
 
         const docRef = await addDoc(collection(db, "bookings"), newBookingData);
         // Track stats for new booking
-        incrementSystemStats({ totalBookings: 1, lastBookingNumber: 1 }).catch(e => console.error("Stats increment error:", e));
+        incrementSystemStats({ totalBookings: 1 }).catch(e => console.error("Stats increment error:", e));
         
         // --- SEND BOOKING NOTIFICATIONS (Push + In-App) ---
         try {

@@ -362,7 +362,7 @@ if (
         };
         transaction.set(newUserDocRef, newUserFirestoreData);
         // Track stats for new user
-        incrementSystemStats({ totalUsers: 1, newSignups30d: 1, lastUserNumber: 1 }).catch(e => console.error("Stats increment error:", e));
+        incrementSystemStats({ totalUsers: 1, newSignups30d: 1 }).catch(e => console.error("Stats increment error:", e));
       });
   
       const guestIdBeforeAuth = getGuestId();
