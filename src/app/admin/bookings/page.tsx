@@ -35,7 +35,7 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import RescheduleBookingDialog from '@/components/shared/RescheduleBookingDialog';
 import { useAdminStats } from '@/hooks/useAdminStats';
-import { initializeBookingNumbers } from '@/lib/systemStatsUtils';
+import { initializeBookingNumbers, resequenceBookingNumbers } from '@/lib/systemStatsUtils';
 
 const statusOptions: BookingStatus[] = [
   "Pending Payment", "Confirmed", "AssignedToProvider", "ProviderAccepted", 
@@ -98,7 +98,25 @@ export default function AdminBookingsPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<BookingStatus | "All">("All");
+
+  const handleSyncIDs = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await resequenceBookingNumbers();
+      if (result.success) {
+        toast({ title: "Sync Complete", description: `Successfully re-sequenced ${result.count} bookings.` });
+        window.location.reload(); 
+      } else {
+        toast({ title: "Sync Failed", description: result.error, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const router = useRouter();
@@ -477,6 +495,15 @@ export default function AdminBookingsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div><h1 className="text-3xl font-bold flex items-center"><ListOrdered className="mr-2 h-8 w-8 text-primary" /> Manage Bookings</h1><p className="text-muted-foreground">Real-time service management dashboard.</p></div>
         <div className="flex flex-col sm:flex-row gap-2">
+          <Button 
+            variant="outline" 
+            className="h-10 border-2 border-primary/20 text-primary font-bold hover:bg-primary hover:text-white transition-all duration-300"
+            onClick={handleSyncIDs}
+            disabled={isSyncing}
+          >
+            {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+            Sync Booking IDs
+          </Button>
           <Button onClick={() => router.push('/admin/bookings/create')} className="bg-primary h-10 font-bold">
             <PlusCircle className="mr-2 h-4 w-4" /> Create Booking
           </Button>

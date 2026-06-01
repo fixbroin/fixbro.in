@@ -29,6 +29,8 @@ import { getTimestampMillis } from '@/lib/utils';
 
 import { initializeUserNumbers } from '@/lib/systemStatsUtils';
 
+import { resequenceUserNumbers } from '@/lib/systemStatsUtils';
+
 const formatUserTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
@@ -78,12 +80,30 @@ export default function AdminUsersPage() {
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [selectedFields, setSelectedFields] = useState<Partial<Record<SelectableUserField, boolean>>>({
     displayName: true, email: true, mobileNumber: true, fullAddress: false, 
     walletBalance: false, isActive: true, createdAt: false, lastLoginAt: false,
     id: false, uid: false,
   });
+
+  const handleSyncIDs = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await resequenceUserNumbers();
+      if (result.success) {
+        toast({ title: "Sync Complete", description: `Successfully re-sequenced ${result.count} users.` });
+        window.location.reload(); // Refresh to show new numbers
+      } else {
+        toast({ title: "Sync Failed", description: result.error, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (searchTerm.trim().length > 0) {
@@ -431,7 +451,17 @@ export default function AdminUsersPage() {
           <h1 className="text-4xl font-black tracking-tight">User Directory</h1>
           <p className="text-muted-foreground text-sm font-medium">Manage and audit your registered user ecosystem.</p>
         </div>
-        
+        <div className="flex items-center gap-3">
+            <Button 
+                variant="outline" 
+                className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
+                onClick={handleSyncIDs}
+                disabled={isSyncing}
+            >
+                {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-2 h-3 w-3" />}
+                Sync Member IDs
+            </Button>
+        </div>
       </header>
 
       <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">

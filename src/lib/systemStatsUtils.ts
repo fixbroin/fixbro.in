@@ -36,10 +36,9 @@ export async function incrementSystemStats(updates: {
 }
 
 /**
- * One-time utility to backfill booking numbers for existing bookings
- * and set the initial lastBookingNumber counter.
+ * Resequences all booking numbers to remove gaps from deletions.
  */
-export async function initializeBookingNumbers() {
+export async function resequenceBookingNumbers() {
   try {
     const statsRef = adminDb.collection('appConfiguration').doc('stats');
     const bookingsSnap = await adminDb.collection('bookings').orderBy('createdAt', 'asc').get();
@@ -47,12 +46,14 @@ export async function initializeBookingNumbers() {
     
     const batchSize = 500;
     let count = 0;
+    let processed = 0;
     let batch = adminDb.batch();
 
     for (let i = 0; i < bookingsSnap.docs.length; i++) {
       const doc = bookingsSnap.docs[i];
       batch.update(doc.ref, { bookingNumber: i + 1 });
       count++;
+      processed++;
 
       if (count === batchSize) {
         await batch.commit();
@@ -70,38 +71,32 @@ export async function initializeBookingNumbers() {
       updatedAt: Timestamp.now() 
     }, { merge: true });
 
-    return { success: true, count: totalBookings };
+    return { success: true, count: processed };
   } catch (error) {
-    console.error("Error initializing booking numbers:", error);
+    console.error("Error resequencing booking numbers:", error);
     return { success: false, error: String(error) };
   }
 }
 
 /**
- * One-time utility to backfill user numbers for existing users
- * and set the initial lastUserNumber counter.
+ * Resequences all user numbers to remove gaps from deletions.
  */
-export async function initializeUserNumbers() {
+export async function resequenceUserNumbers() {
   try {
     const statsRef = adminDb.collection('appConfiguration').doc('stats');
-    const statsDoc = await statsRef.get();
-    
-    // Safety: If already initialized, we can skip or force re-run
-    if (statsDoc.exists && statsDoc.data()?.lastUserNumber !== undefined) {
-      // return { success: true, message: "Already initialized" };
-    }
-
     const usersSnap = await adminDb.collection('users').orderBy('createdAt', 'asc').get();
     const totalUsers = usersSnap.size;
     
     const batchSize = 500;
     let count = 0;
+    let processed = 0;
     let batch = adminDb.batch();
 
     for (let i = 0; i < usersSnap.docs.length; i++) {
       const doc = usersSnap.docs[i];
       batch.update(doc.ref, { userNumber: i + 1 });
       count++;
+      processed++;
 
       if (count === batchSize) {
         await batch.commit();
@@ -119,9 +114,17 @@ export async function initializeUserNumbers() {
       updatedAt: Timestamp.now() 
     }, { merge: true });
 
-    return { success: true, count: totalUsers };
+    return { success: true, count: processed };
   } catch (error) {
-    console.error("Error initializing user numbers:", error);
+    console.error("Error resequencing user numbers:", error);
     return { success: false, error: String(error) };
   }
+}
+
+export async function initializeBookingNumbers() {
+  return resequenceBookingNumbers();
+}
+
+export async function initializeUserNumbers() {
+  return resequenceUserNumbers();
 }
