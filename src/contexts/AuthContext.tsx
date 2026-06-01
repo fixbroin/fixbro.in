@@ -178,7 +178,7 @@ if (
         mobileNumber: userData?.mobileNumber || user.phoneNumber || undefined,
         loginMethod: user.providerData[0]?.providerId || 'password',
         sourceGuestId: guestIdBeforeAuth
-      }, user.uid, null);
+      }, user.uid, null, userData?.displayName);
       
       clearGuestId();
       await syncCartOnLogin(user.uid);

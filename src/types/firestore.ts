@@ -870,6 +870,7 @@ export interface UserActivity {
   id?: string; // Firestore document ID
   userId?: string | null; // Firebase Auth UID if logged in
   guestId?: string | null; // localStorage UID if anonymous
+  userDisplayName?: string; // Denormalized name
   eventType: UserActivityEventType;
   eventData: UserActivityEventData;
   userAgent?: string;
