@@ -219,7 +219,36 @@ export default function AdminBookingsPage() {
   }, [searchTerm, toast]);
 
   const loadMoreBookings = async () => {
-// ... unchanged
+    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
+    setIsLoadingMore(true);
+    try {
+      const bookingsCollectionRef = collection(db, "bookings");
+      const q = query(
+        bookingsCollectionRef, 
+        orderBy("createdAt", "desc"), 
+        startAfter(lastDoc), 
+        limit(PAGE_SIZE)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const newBookings = querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id, 
+      } as FirestoreBooking));
+      
+      if (newBookings.length > 0) {
+        setBookings(prev => [...prev, ...newBookings]);
+        setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+        setHasMore(querySnapshot.docs.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more bookings:", error);
+      toast({ title: "Error", description: "Failed to load more bookings.", variant: "destructive" });
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   const filteredBookings = useMemo(() => {
@@ -551,9 +580,16 @@ export default function AdminBookingsPage() {
                 {filteredBookings.map((b) => renderBookingCard(b))}
               </div>
               {hasMore && !searchTerm && (
-                <div className="p-6 text-center border-t">
-                  <Button variant="outline" onClick={loadMoreBookings} disabled={isLoadingMore}>
-                    Load More
+                <div className="p-8 text-center border-t border-muted/40">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={loadMoreBookings}
+                    disabled={isLoadingMore}
+                    className="min-w-[200px] rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm font-black uppercase text-xs tracking-widest h-12"
+                  >
+                    {isLoadingMore ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ChevronDown className="h-5 w-5 mr-2" />}
+                    Load More Bookings
                   </Button>
                 </div>
               )}

@@ -61,7 +61,7 @@ const availableFields: { key: SelectableUserField; label: string }[] = [
   { key: 'lastLoginAt', label: 'Last Login' },
 ];
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<FirestoreUser[]>([]);
