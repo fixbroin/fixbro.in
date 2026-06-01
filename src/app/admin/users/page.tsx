@@ -31,6 +31,8 @@ import { initializeUserNumbers } from '@/lib/systemStatsUtils';
 
 import { resequenceUserNumbers } from '@/lib/systemStatsUtils';
 
+import { useAdminStats } from '@/hooks/useAdminStats';
+
 const formatUserTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
@@ -66,6 +68,7 @@ const availableFields: { key: SelectableUserField; label: string }[] = [
 const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
+  const { stats } = useAdminStats();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -81,6 +84,7 @@ export default function AdminUsersPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [selectedFields, setSelectedFields] = useState<Partial<Record<SelectableUserField, boolean>>>({
     displayName: true, email: true, mobileNumber: true, fullAddress: false, 
@@ -159,7 +163,7 @@ export default function AdminUsersPage() {
       const fetchInitialUsers = async () => {
         try {
           const usersCollectionRef = collection(db, "users");
-          const q = query(usersCollectionRef, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+          const q = query(usersCollectionRef, orderBy("createdAt", sortOrder), limit(PAGE_SIZE));
           const querySnapshot = await getDocs(q);
           const fetchedUsers = querySnapshot.docs.map(doc => ({
             ...doc.data(),
@@ -178,7 +182,7 @@ export default function AdminUsersPage() {
 
       fetchInitialUsers();
     }
-  }, [searchTerm]);
+  }, [searchTerm, sortOrder]);
 
   const loadMoreUsers = async () => {
     if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
@@ -187,7 +191,7 @@ export default function AdminUsersPage() {
       const usersCollectionRef = collection(db, "users");
       const q = query(
         usersCollectionRef, 
-        orderBy("createdAt", "desc"), 
+        orderBy("createdAt", sortOrder), 
         startAfter(lastDoc), 
         limit(PAGE_SIZE)
       );
@@ -448,10 +452,18 @@ export default function AdminUsersPage() {
             <Users className="h-4 w-4" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Community Database</span>
           </div>
-          <h1 className="text-4xl font-black tracking-tight">User Directory</h1>
+          <h1 className="text-4xl font-black tracking-tight">User Directory <span className="text-primary/40 ml-2">({stats.activeUsers})</span></h1>
           <p className="text-muted-foreground text-sm font-medium">Manage and audit your registered user ecosystem.</p>
         </div>
         <div className="flex items-center gap-3">
+            <Button 
+                variant="outline" 
+                className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            >
+                {sortOrder === 'desc' ? <ChevronDown className="mr-2 h-3 w-3" /> : <UserPlus className="mr-2 h-3 w-3 rotate-180" />}
+                {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
+            </Button>
             <Button 
                 variant="outline" 
                 className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
