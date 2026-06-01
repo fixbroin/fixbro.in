@@ -27,6 +27,8 @@ import { getArchivedUsers } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getTimestampMillis } from '@/lib/utils';
 
+import { initializeUserNumbers } from '@/lib/systemStatsUtils';
+
 const formatUserTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
@@ -45,9 +47,10 @@ const StatusBadge = ({ isActive, isLoading }: { isActive: boolean, isLoading: bo
   </div>
 );
 
-type SelectableUserField = keyof Omit<FirestoreUser, 'addresses' | 'fcmTokens' | 'marketingStatus' | 'roles' | 'photoURL'> | 'fullAddress';
+type SelectableUserField = Extract<keyof Omit<FirestoreUser, 'addresses' | 'fcmTokens' | 'marketingStatus' | 'roles' | 'photoURL'>, string> | 'fullAddress';
 
 const availableFields: { key: SelectableUserField; label: string }[] = [
+  { key: 'userNumber', label: 'Member #' },
   { key: 'displayName', label: 'Name' },
   { key: 'email', label: 'Email' },
   { key: 'mobileNumber', label: 'Mobile Number' },
@@ -58,7 +61,7 @@ const availableFields: { key: SelectableUserField; label: string }[] = [
   { key: 'lastLoginAt', label: 'Last Login' },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<FirestoreUser[]>([]);
@@ -100,8 +103,10 @@ export default function AdminUsersPage() {
             query(usersRef, where("displayName", ">=", capitalizedTerm), where("displayName", "<=", capitalizedTerm + '\uf8ff')),
           ];
 
-          // Add phone variations with 91 prefix matching
+          // Add phone variations and userNumber matching
           if (/^\d+$/.test(term)) {
+            const numTerm = parseInt(term, 10);
+            queries.push(query(usersRef, where("userNumber", "==", numTerm)));
             queries.push(query(usersRef, where("mobileNumber", ">=", `91${term}`), where("mobileNumber", "<=", `91${term}` + '\uf8ff')));
             queries.push(query(usersRef, where("mobileNumber", ">=", `+91${term}`), where("mobileNumber", "<=", `+91${term}` + '\uf8ff')));
             
@@ -131,40 +136,58 @@ export default function AdminUsersPage() {
       return () => clearTimeout(delayDebounceFn);
     } else {
       setIsLoading(true);
-      const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+      const fetchInitialUsers = async () => {
+        try {
+          const usersCollectionRef = collection(db, "users");
+          const q = query(usersCollectionRef, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+          const querySnapshot = await getDocs(q);
+          const fetchedUsers = querySnapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id, 
+          } as FirestoreUser));
+          setUsers(fetchedUsers);
+          setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
+          setHasMore(querySnapshot.docs.length === PAGE_SIZE);
+        } catch (error) {
+          console.error("Error fetching users: ", error);
+          toast({ title: "Fetch Error", description: "Could not load users.", variant: "destructive" });
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedUsers = querySnapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id, 
-        } as FirestoreUser));
-        setUsers(fetchedUsers);
-        setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1] || null);
-        setHasMore(querySnapshot.docs.length === PAGE_SIZE);
-        setIsLoading(false);
-      }, (error) => {
-        console.error("Error fetching users: ", error);
-        setIsLoading(false);
-      });
-
-      return () => unsubscribe();
+      fetchInitialUsers();
     }
   }, [searchTerm]);
 
   const loadMoreUsers = async () => {
-    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0) return;
+    if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
     setIsLoadingMore(true);
     try {
-      const moreUsers = await getArchivedUsers();
+      const usersCollectionRef = collection(db, "users");
+      const q = query(
+        usersCollectionRef, 
+        orderBy("createdAt", "desc"), 
+        startAfter(lastDoc), 
+        limit(PAGE_SIZE)
+      );
       
-      const existingIds = new Set(users.map(u => u.id));
-      const newItems = moreUsers.filter(u => !existingIds.has(u.id));
+      const querySnapshot = await getDocs(q);
+      const newUsers = querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id, 
+      } as FirestoreUser));
       
-      setUsers(prev => [...prev, ...newItems]);
-      setHasMore(false);
+      if (newUsers.length > 0) {
+        setUsers(prev => [...prev, ...newUsers]);
+        setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+        setHasMore(querySnapshot.docs.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
     } catch (error) {
       console.error("Error loading more users:", error);
+      toast({ title: "Error", description: "Failed to load more users.", variant: "destructive" });
     } finally {
       setIsLoadingMore(false);
     }
@@ -184,8 +207,11 @@ export default function AdminUsersPage() {
       // Normalize user phone for comparison
       const userPhone = (user.mobileNumber || '').replace(/\D/g, '').replace(/^91/, '');
       const phoneMatch = normalizedSearchPhone ? userPhone.includes(normalizedSearchPhone) : false;
+
+      // Member ID match
+      const numberMatch = user.userNumber?.toString() === lowerSearch;
       
-      return nameMatch || emailMatch || phoneMatch;
+      return nameMatch || emailMatch || phoneMatch || numberMatch;
     });
   }, [users, searchTerm]);
 
@@ -326,6 +352,10 @@ export default function AdminUsersPage() {
 
       <div className="grid grid-cols-1 gap-2 mb-5">
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <CheckCircle2 className="h-3.5 w-3.5 text-primary/60" />
+          <span className="font-bold text-primary">Member #{user.userNumber || '...'}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <Mail className="h-3.5 w-3.5 text-primary/60" />
           <span className="truncate">{user.email || 'N/A'}</span>
         </div>
@@ -401,6 +431,7 @@ export default function AdminUsersPage() {
           <h1 className="text-4xl font-black tracking-tight">User Directory</h1>
           <p className="text-muted-foreground text-sm font-medium">Manage and audit your registered user ecosystem.</p>
         </div>
+        
       </header>
 
       <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
@@ -442,7 +473,8 @@ export default function AdminUsersPage() {
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent border-none">
-                      <TableHead className="w-[80px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Profile</TableHead>
+                      <TableHead className="w-[80px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest text-foreground"># ID</TableHead>
+                      <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-foreground text-center">Profile</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Legal Name & UID</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Communications</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Registered</TableHead>
@@ -455,8 +487,13 @@ export default function AdminUsersPage() {
                       {filteredUsers.map((user, idx) => (
                         <motion.tr key={user.id} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: idx < 15 ? idx * 0.03 : 0 }} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
                           <TableCell className="pl-8">
+                            <div className="bg-primary/5 text-primary font-black text-xs h-9 w-9 rounded-xl flex items-center justify-center border border-primary/10 shadow-sm">
+                                {user.userNumber || '...'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
                             <Avatar 
-                              className="h-10 w-10 border shadow-sm group-hover:scale-110 transition-transform cursor-zoom-in"
+                              className="h-10 w-10 border shadow-sm group-hover:scale-110 transition-transform cursor-zoom-in mx-auto"
                               onClick={() => user.photoURL && setSelectedImage(user.photoURL)}
                             >
                               <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || undefined} />

@@ -243,6 +243,7 @@ export interface Address {
 export interface FirestoreUser {
   id: string; // Firestore document ID, should be same as Firebase Auth UID
   uid: string;
+  userNumber?: number; // Sequential Member ID
   email: string | null;
   displayName: string | null;
   mobileNumber?: string | null;

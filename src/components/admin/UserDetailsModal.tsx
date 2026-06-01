@@ -152,6 +152,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><strong>Member ID:</strong> <span className="font-bold text-primary">#{user.userNumber || "N/A"}</span></div>
                   <div><strong>Display Name:</strong> {user.displayName || "N/A"}</div>
                   <div><strong>Email:</strong> {user.email || "N/A"}</div>
                   <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ export async function incrementSystemStats(updates: {
   earnedCommission?: number;
   totalUsers?: number;
   newSignups30d?: number;
+  lastUserNumber?: number;
 }) {
   try {
     const statsRef = adminDb.collection('appConfiguration').doc('stats');
@@ -24,9 +25,59 @@ export async function incrementSystemStats(updates: {
     if (updates.earnedCommission) payload.earnedCommission = FieldValue.increment(updates.earnedCommission);
     if (updates.totalUsers) payload.totalUsers = FieldValue.increment(updates.totalUsers);
     if (updates.newSignups30d) payload.newSignups30d = FieldValue.increment(updates.newSignups30d);
+    if (updates.lastUserNumber) payload.lastUserNumber = FieldValue.increment(updates.lastUserNumber);
 
     await statsRef.set(payload, { merge: true });
   } catch (error) {
     console.error("Error incrementing system stats:", error);
+  }
+}
+
+/**
+ * One-time utility to backfill user numbers for existing users
+ * and set the initial lastUserNumber counter.
+ */
+export async function initializeUserNumbers() {
+  try {
+    const statsRef = adminDb.collection('appConfiguration').doc('stats');
+    const statsDoc = await statsRef.get();
+    
+    // Safety: If already initialized, we can skip or force re-run
+    if (statsDoc.exists && statsDoc.data()?.lastUserNumber !== undefined) {
+      // return { success: true, message: "Already initialized" };
+    }
+
+    const usersSnap = await adminDb.collection('users').orderBy('createdAt', 'asc').get();
+    const totalUsers = usersSnap.size;
+    
+    const batchSize = 500;
+    let count = 0;
+    let batch = adminDb.batch();
+
+    for (let i = 0; i < usersSnap.docs.length; i++) {
+      const doc = usersSnap.docs[i];
+      batch.update(doc.ref, { userNumber: i + 1 });
+      count++;
+
+      if (count === batchSize) {
+        await batch.commit();
+        batch = adminDb.batch();
+        count = 0;
+      }
+    }
+    
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    await statsRef.set({ 
+      lastUserNumber: totalUsers,
+      updatedAt: Timestamp.now() 
+    }, { merge: true });
+
+    return { success: true, count: totalUsers };
+  } catch (error) {
+    console.error("Error initializing user numbers:", error);
+    return { success: false, error: String(error) };
   }
 }
