@@ -259,13 +259,24 @@ export default function AddressPage() {
   const handleProceed = () => {
     const addressToProceed = savedAddresses.find(a => a.id === selectedAddressId);
     if (addressToProceed) {
-      if (isServiceable === true) {
+      // Re-verify serviceability just before proceeding to be absolutely sure
+      const serviceable = applicableServiceZones.some(zone => {
+        const distance = getHaversineDistance(
+          addressToProceed.latitude!,
+          addressToProceed.longitude!,
+          zone.center.latitude,
+          zone.center.longitude
+        );
+        return distance <= zone.radiusKm;
+      });
+
+      if (serviceable) {
         showLoading();
         localStorage.setItem('fixbroCustomerAddress', JSON.stringify(addressToProceed));
         localStorage.setItem('fixbroCustomerEmail', addressToProceed.email || "");
         router.push('/checkout/payment');
       } else {
-        toast({ title: "Area Not Serviceable", description: "Sorry, we're not available in your area yet. We're expanding soon!", variant: "destructive", duration: 7000 });
+        toast({ title: "Area Not Serviceable", description: "Sorry, the selected address is outside our service area for this category.", variant: "destructive", duration: 7000 });
       }
     } else {
       toast({ title: "No Address Selected", description: "Please select or add a service address.", variant: "destructive" });
