@@ -1339,6 +1339,7 @@ export interface ServiceZone {
     longitude: number;
   };
   radiusKm: number;
+  categoryIds?: string[]; // New: IDs of categories this zone applies to
   isActive: boolean;
   createdAt: Timestamp;
   updatedAt?: Timestamp;

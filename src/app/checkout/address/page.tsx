@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -21,9 +21,9 @@ import type { Address, FirestoreUser, ServiceZone } from '@/types/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
 import AddressForm, { type AddressFormData } from '@/components/forms/AddressForm';
-import { getHaversineDistance } from '@/lib/locationUtils'; // Import distance utility
-import dynamic from 'next/dynamic'; // Import dynamic
-import { useApplicationConfig } from '@/hooks/useApplicationConfig'; // Import the missing hook
+import { getHaversineDistance } from '@/lib/locationUtils'; 
+import dynamic from 'next/dynamic'; 
+import { useApplicationConfig } from '@/hooks/useApplicationConfig'; 
 
 const MapAddressSelector = dynamic(() => import('@/components/checkout/MapAddressSelector'), {
   loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin" /></div>,
@@ -38,7 +38,7 @@ export default function AddressPage() {
   const { showLoading } = useLoading(); 
   const { user, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
-  const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig(); // Call the hook
+  const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig(); 
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -54,8 +54,19 @@ export default function AddressPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [isServiceable, setIsServiceable] = useState<boolean | null>(null); // null: unchecked, true: yes, false: no
-  const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
+  const [allServiceZones, setAllServiceZones] = useState<ServiceZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
+
+  const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null;
+
+  const applicableServiceZones = useMemo(() => {
+    return allServiceZones.filter(zone => {
+      if (!zone.categoryIds || zone.categoryIds.length === 0) {
+        return true; // Global zone
+      }
+      return currentCategoryId && zone.categoryIds.includes(currentCategoryId);
+    });
+  }, [allServiceZones, currentCategoryId]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -67,7 +78,7 @@ export default function AddressPage() {
         const zonesQuery = query(collection(db, 'serviceZones'), where('isActive', '==', true));
         const snapshot = await getDocs(zonesQuery);
         const zonesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone));
-        setServiceZones(zonesData);
+        setAllServiceZones(zonesData);
       } catch (error) {
         console.error("Error fetching service zones:", error);
         toast({ title: "Error", description: "Could not verify serviceability.", variant: "destructive" });
@@ -84,7 +95,6 @@ export default function AddressPage() {
         setIsLoadingAddresses(false);
         const guestAddressRaw = localStorage.getItem('fixbroCustomerAddress');
         if (!guestAddressRaw) {
-          // Open map first for guests with no address
           handleOpenMapClick();
         }
       }
@@ -102,11 +112,10 @@ export default function AddressPage() {
             const defaultAddress = userAddresses.find(a => a.isDefault);
             setSelectedAddressId(defaultAddress ? defaultAddress.id : userAddresses[0].id);
         } else if (userAddresses.length === 0) {
-            // Automatically trigger map selection for new users
             handleOpenMapClick();
         }
       } else {
-         handleOpenMapClick(); // User doc doesn't exist, prompt for address via map
+         handleOpenMapClick(); 
       }
       setIsLoadingAddresses(false);
     });
@@ -129,7 +138,8 @@ export default function AddressPage() {
 
   const checkServiceability = useCallback((address: Address | Partial<AddressFormData>) => {
     if (isLoadingZones) return; 
-    if (serviceZones.length === 0) {
+
+    if (allServiceZones.length === 0) {
       setIsServiceable(true); 
       return;
     }
@@ -138,7 +148,13 @@ export default function AddressPage() {
       return;
     }
 
-    const serviceable = serviceZones.some(zone => {
+    if (applicableServiceZones.length === 0) {
+      setIsServiceable(false);
+      toast({ title: "Area Not Serviceable", description: "Sorry, we don't serve this category in your area yet.", variant: "destructive"});
+      return;
+    }
+
+    const serviceable = applicableServiceZones.some(zone => {
       const distance = getHaversineDistance(
         address.latitude!,
         address.longitude!,
@@ -149,9 +165,9 @@ export default function AddressPage() {
     });
     setIsServiceable(serviceable);
     if (!serviceable) {
-       toast({ title: "Address Not Serviceable", description: "The selected location is outside our service area.", variant: "destructive"});
+       toast({ title: "Address Not Serviceable", description: "The selected location is outside our service area for this category.", variant: "destructive"});
     }
-  }, [serviceZones, isLoadingZones, toast]);
+  }, [allServiceZones, applicableServiceZones, isLoadingZones, toast]);
 
   useEffect(() => {
     const selectedAddress = savedAddresses.find(a => a.id === selectedAddressId);
@@ -180,7 +196,7 @@ export default function AddressPage() {
                     setIsMapModalOpen(true);
                 },
                 (error) => {
-                    setInitialMapCenter(null); // Fallback to default map center
+                    setInitialMapCenter(null); 
                     setIsLocating(false);
                     setIsMapModalOpen(true);
                 },
@@ -199,16 +215,15 @@ export default function AddressPage() {
   }, []);
 
   const handleReselectOnMap = useCallback(() => {
-    setIsFormOpen(false); // Close the form
-    handleOpenMapClick(); // Open the map
+    setIsFormOpen(false); 
+    handleOpenMapClick(); 
   }, [handleOpenMapClick]);
 
   const handleMapAddressSelect = useCallback((addressData: Partial<AddressFormData>) => {
-    checkServiceability(addressData); // Check serviceability right away
+    checkServiceability(addressData); 
     setEditingAddress(prev => ({
         ...prev,
         ...addressData,
-        // Pre-fill user data if available and not already editing
         ...(!editingAddress && user ? {
             fullName: firestoreUser?.displayName || user?.displayName || "",
             email: firestoreUser?.email || user?.email || "",
@@ -216,7 +231,7 @@ export default function AddressPage() {
         } : {})
     }));
     setIsMapModalOpen(false);
-    setIsFormOpen(true); // Open the form after map selection
+    setIsFormOpen(true); 
   }, [checkServiceability, user, firestoreUser, editingAddress]);
 
 
@@ -341,7 +356,7 @@ export default function AddressPage() {
               onSubmit={handleAddressSubmit}
               onCancel={() => setIsFormOpen(false)}
               isSubmitting={isSubmitting}
-              serviceZones={serviceZones}
+              serviceZones={applicableServiceZones}
               onReselectOnMap={handleReselectOnMap}
             />
           </div>
@@ -368,7 +383,7 @@ export default function AddressPage() {
                     onAddressSelect={handleMapAddressSelect} 
                     onClose={() => setIsMapModalOpen(false)} 
                     initialCenter={initialMapCenter} 
-                    serviceZones={serviceZones} 
+                    serviceZones={applicableServiceZones} 
                     
                 />
             )}
