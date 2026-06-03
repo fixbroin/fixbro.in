@@ -156,7 +156,8 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                   <div><strong>Display Name:</strong> {user.displayName || "N/A"}</div>
                   <div><strong>Email:</strong> {user.email || "N/A"}</div>
                   <div className="flex items-center gap-2">
-                    <strong>Mobile:</strong> {user.mobileNumber || "N/A"}
+                    <strong>Mobile:</strong> 
+                    <a href={`tel:${user.mobileNumber}`} className="text-primary hover:underline font-medium">{user.mobileNumber || "N/A"}</a>
                     {user.mobileNumber && (
                         <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber)} title="Chat on WhatsApp">
                            <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={24} height={24} />
@@ -188,7 +189,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                       <p className="font-semibold">{address.fullName}</p>
                       <p>{address.addressLine1}{address.addressLine2 ? `, ${address.addressLine2}` : ''}</p>
                       <p>{address.city}, {address.state} - {address.pincode}</p>
-                      <p>Ph: {address.phone}</p>
+                      <p>Ph: <a href={`tel:${address.phone}`} className="hover:underline">{address.phone}</a></p>
                       {address.latitude && address.longitude && (
                         <a href={`https://www.google.com/maps?q=${address.latitude},${address.longitude}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 mt-1">
                           <MapPin size={12}/> View on Map

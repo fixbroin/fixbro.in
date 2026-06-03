@@ -223,6 +223,12 @@ export interface FirestoreBooking {
   isStatsTracked?: boolean;
   isCompletionStatsTracked?: boolean;
   isConfirmationEmailSent?: boolean;
+  
+  // Smart Tagging & Auto-Dispatch Fields
+  coverageType?: 'provider_match' | 'admin_only';
+  suggestedProviderIds?: string[];
+  autoAssigned?: boolean;
+  isProviderNotified?: boolean;
 }
 
 export interface Address {
@@ -580,6 +586,7 @@ export interface AppSettings {
   isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
   maxProviderRadiusKm?: number; // New for provider work area
+  autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
   
   // Login Settings
   enableEmailPasswordLogin?: boolean;
@@ -700,6 +707,12 @@ export interface FirestoreSEOSettings {
 
   fallbackRatingValue?: string;
   fallbackReviewCount?: string;
+
+  // Dynamic Content Templates (NEW)
+  cityCategorySeoContentTemplate?: string;
+  cityCategoryFaqsTemplate?: FaqItem[];
+  areaCategorySeoContentTemplate?: string;
+  areaCategoryFaqsTemplate?: FaqItem[];
 
   updatedAt?: Timestamp;
 }

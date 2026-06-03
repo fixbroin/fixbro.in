@@ -16,7 +16,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { useAuth } from '@/hooks/useAuth';
 import { getGuestId } from '@/lib/guestIdManager';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import type { Address, FirestoreUser, ServiceZone } from '@/types/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
@@ -55,39 +55,71 @@ export default function AddressPage() {
   
   const [isServiceable, setIsServiceable] = useState<boolean | null>(null); // null: unchecked, true: yes, false: no
   const [allServiceZones, setAllServiceZones] = useState<ServiceZone[]>([]);
+  const [providerZones, setProviderZones] = useState<ServiceZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
   const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null;
 
   const applicableServiceZones = useMemo(() => {
-    return allServiceZones.filter(zone => {
+    const adminZones = allServiceZones.filter(zone => {
       if (!zone.categoryIds || zone.categoryIds.length === 0) {
         return true; // Global zone
       }
       return currentCategoryId && zone.categoryIds.includes(currentCategoryId);
     });
-  }, [allServiceZones, currentCategoryId]);
+
+    // Combine Admin Zones and Provider Zones
+    return [...adminZones, ...providerZones];
+  }, [allServiceZones, providerZones, currentCategoryId]);
 
   useEffect(() => {
     setIsMounted(true);
     logUserActivity('checkoutStep', { checkoutStepName: 'address', pageUrl: pathname }, user?.uid, !user ? getGuestId() : null);
 
-    const fetchZones = async () => {
+    const fetchZonesAndProviders = async () => {
       setIsLoadingZones(true);
       try {
+        // 1. Fetch Admin Service Zones
         const zonesQuery = query(collection(db, 'serviceZones'), where('isActive', '==', true));
-        const snapshot = await getDocs(zonesQuery);
-        const zonesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone));
-        setAllServiceZones(zonesData);
+        const zonesSnapshot = await getDocs(zonesQuery);
+        const adminZonesData = zonesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone));
+        setAllServiceZones(adminZonesData);
+
+        // 2. Fetch Approved Providers for the current category
+        if (currentCategoryId) {
+          const providersQuery = query(
+            collection(db, 'providerApplications'), 
+            where('status', '==', 'approved'),
+            where('workCategoryId', '==', currentCategoryId)
+          );
+          const providersSnapshot = await getDocs(providersQuery);
+          const providersZonesData: ServiceZone[] = providersSnapshot.docs
+            .filter(doc => doc.data().workAreaCenter && doc.data().workAreaRadiusKm)
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: `provider_${doc.id}`,
+                name: data.fullName || 'Service Provider',
+                center: {
+                  latitude: data.workAreaCenter.latitude,
+                  longitude: data.workAreaCenter.longitude,
+                },
+                radiusKm: data.workAreaRadiusKm,
+                isActive: true,
+                createdAt: data.createdAt || Timestamp.now(),
+              } as ServiceZone;
+            });
+          setProviderZones(providersZonesData);
+        }
       } catch (error) {
-        console.error("Error fetching service zones:", error);
+        console.error("Error fetching serviceability data:", error);
         toast({ title: "Error", description: "Could not verify serviceability.", variant: "destructive" });
       } finally {
         setIsLoadingZones(false);
       }
     };
-    fetchZones();
-  }, [pathname, user, toast]);
+    fetchZonesAndProviders();
+  }, [pathname, user, toast, currentCategoryId]);
 
   useEffect(() => {
     if (!user) {

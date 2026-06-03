@@ -386,7 +386,7 @@ export default function AdminUsersPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Phone className="h-3.5 w-3.5 text-primary/60" />
-            <span>{user.mobileNumber || 'No Phone'}</span>
+            <a href={`tel:${user.mobileNumber}`} className="text-primary hover:underline font-medium">{user.mobileNumber || 'No Phone'}</a>
           </div>
           {user.mobileNumber && (
             <Button variant="ghost" size="sm" className="h-7 px-2 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)}>
@@ -552,7 +552,8 @@ export default function AdminUsersPage() {
                             <div className="flex flex-col gap-1">
                               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground truncate max-w-[200px]"><Mail className="h-3 w-3 text-primary/60 shrink-0" /> {user.email}</div>
                               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                <Phone className="h-3 w-3 text-primary/60 shrink-0" /> <span>{user.mobileNumber || "No Contact"}</span>
+                                <Phone className="h-3 w-3 text-primary/60 shrink-0" /> 
+                                <a href={`tel:${user.mobileNumber}`} className="hover:underline">{user.mobileNumber || "No Contact"}</a>
                                 {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors"><AppImage src="/whatsapp.png" alt="WA" width={14} height={14} /></button>}
                               </div>
                             </div>

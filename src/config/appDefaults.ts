@@ -59,6 +59,7 @@ export const defaultAppSettings: AppSettings = {
   
   isProviderRegistrationEnabled: true, // Added default
   maxProviderRadiusKm: 50, // Added default max provider radius
+  autoDispatchRadiusKm: 5, // Default auto-dispatch radius (km)
   
   // Login Settings
   enableEmailPasswordLogin: true,

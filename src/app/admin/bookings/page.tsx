@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck, AlertTriangle } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -69,6 +69,16 @@ const getStatusBadgeClass = (status: BookingStatus) => {
         case 'Cancelled': case 'ProviderRejected': return 'bg-red-500 text-white hover:bg-red-600';
         default: return '';
     }
+};
+
+const getCoverageBadge = (booking: FirestoreBooking) => {
+    if (booking.coverageType === 'provider_match') {
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">Provider Match</Badge>;
+    }
+    if (booking.coverageType === 'admin_only') {
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Manual Dispatch</Badge>;
+    }
+    return null;
 };
 
 const getPaymentBadgeClass = (method: string | undefined, status: string) => {
@@ -316,6 +326,9 @@ export default function AdminBookingsPage() {
     setIsUpdatingStatus(booking.id);
     try {
       const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
+      if (newStatus === "AssignedToProvider") {
+        updateData.isProviderNotified = false; // Force re-notification
+      }
       if (newStatus === "Completed") {
         if (additionalCharges && additionalCharges.length > 0) {
             updateData.additionalCharges = additionalCharges;
@@ -380,7 +393,12 @@ export default function AdminBookingsPage() {
   const handleConfirmAssignment = async (bookingId: string, providerId: string, providerName: string) => {
     setIsUpdatingStatus(bookingId);
     try {
-      const updateData = { providerId, status: "AssignedToProvider" as BookingStatus, updatedAt: Timestamp.now() };
+      const updateData = { 
+        providerId, 
+        status: "AssignedToProvider" as BookingStatus, 
+        isProviderNotified: false, // RESET so post-process notifies the new provider
+        updatedAt: Timestamp.now() 
+      };
       await updateDoc(doc(db, "bookings", bookingId), updateData);
       
       // Manually update local state to reflect changes immediately
@@ -442,6 +460,7 @@ export default function AdminBookingsPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black bg-primary text-white px-2 py-0.5 rounded-lg shadow-sm">#{booking.bookingNumber || '...'}</span>
                   <CardTitle className="text-sm font-mono text-primary font-bold">{booking.bookingId}</CardTitle>
+                  <div className="ml-auto">{getCoverageBadge(booking)}</div>
                 </div>
                 <div className="text-sm font-bold">{booking.customerName}</div>
             </div>
@@ -452,7 +471,8 @@ export default function AdminBookingsPage() {
         <div className="space-y-2 bg-muted/10 p-2 rounded-lg border border-muted/50">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-medium">
-                    <Phone className="h-4 w-4 text-primary" /> {booking.customerPhone}
+                    <Phone className="h-4 w-4 text-primary" /> 
+                    <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline">{booking.customerPhone}</a>
                     {booking.customerPhone && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-primary/10" onClick={() => handleWhatsAppClick(booking)} title="Chat on WhatsApp">
                             <AppImage src="/whatsapp.png" alt="WhatsApp" width={18} height={18} />
@@ -541,11 +561,16 @@ export default function AdminBookingsPage() {
                       <React.Fragment key={b.id}>
                         <TableRow className="hover:bg-transparent border-b-0">
                           <TableCell className="text-xs font-black text-primary bg-primary/5 rounded-lg text-center h-8 w-8 flex items-center justify-center mt-3 ml-2">{b.bookingNumber || '...'}</TableCell>
-                          <TableCell className="font-mono text-xs font-bold text-primary">{b.bookingId}</TableCell>
+                          <TableCell>
+                            <div className="font-mono text-xs font-bold text-primary">{b.bookingId}</div>
+                            <div className="mt-1">{getCoverageBadge(b)}</div>
+                          </TableCell>
                           <TableCell>
                             <div className="font-bold">{b.customerName}</div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-xs text-muted-foreground">{b.customerPhone}</span>
+                              <span className="text-xs text-muted-foreground">
+                                <a href={`tel:${b.customerPhone}`} className="hover:underline">{b.customerPhone}</a>
+                              </span>
                               {b.customerPhone && (
                                 <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-primary/10" onClick={() => handleWhatsAppClick(b)} title="WhatsApp">
                                   <AppImage src="/whatsapp.png" alt="WA" width={14} height={14} />

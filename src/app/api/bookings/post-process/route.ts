@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { sendBookingConfirmationEmail } from '@/ai/flows/sendBookingEmailFlow';
+import { sendProviderBookingAssignmentEmail } from '@/ai/flows/sendProviderBookingAssignmentFlow';
 import { getBaseUrl } from '@/lib/config';
 import { generateInvoicePdf } from '@/lib/invoiceGenerator';
 import { triggerRefresh } from '@/lib/revalidateUtils';
@@ -64,10 +65,84 @@ export async function POST(request: Request) {
         emailType = 'booking_status_update';
     }
 
-    // --- NEW: Track Total Bookings (First time only) ---
+    // --- Track Total Bookings (First time only) ---
     if (!booking.isStatsTracked) {
         tasks.push(incrementSystemStats({ totalBookings: 1 }));
         tasks.push(adminDb.collection('bookings').doc(bookingDocId).update({ isStatsTracked: true }));
+    }
+
+    // --- NEW: Notify Assigned Provider ---
+    if (booking.providerId && (currentStatus === 'AssignedToProvider' || currentStatus === 'Confirmed') && !booking.isProviderNotified) {
+        const notifyProviderTask = (async () => {
+            try {
+                // 1. Fetch Provider Details
+                const pAppDoc = await adminDb.collection('providerApplications').doc(booking.providerId).get();
+                if (!pAppDoc.exists) {
+                    console.warn(`Provider application not found for ID: ${booking.providerId}`);
+                    return;
+                }
+                const pData = pAppDoc.data() as any;
+
+                // 2. Add Dashboard Notification
+                await adminDb.collection('userNotifications').add({
+                    userId: booking.providerId,
+                    title: "New Job Assigned!",
+                    message: `You have been assigned to booking ${booking.bookingId} for ${booking.customerName}.`,
+                    type: 'info',
+                    href: `/provider/booking/${bookingDocId}`,
+                    read: false,
+                    createdAt: Timestamp.now()
+                });
+
+                // 3. Trigger Push
+                try {
+                    await fetch(`${getBaseUrl()}/api/send-push`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            userId: booking.providerId, 
+                            title: "New Job Assigned!", 
+                            body: `Booking ${booking.bookingId} is assigned to you. Check details now.`, 
+                            href: `/provider/booking/${bookingDocId}` 
+                        }),
+                    });
+                } catch (pushErr) {
+                    console.error("Error triggering provider push notification:", pushErr);
+                }
+
+                // 4. Send Email
+                try {
+                    const servicesSummary = booking.services.map((s: any) => `${s.name} (x${s.quantity})`).join(', ');
+                    await sendProviderBookingAssignmentEmail({
+                        providerName: pData.fullName || "Service Provider",
+                        providerEmail: pData.email,
+                        bookingId: booking.bookingId,
+                        bookingDocId: bookingDocId,
+                        serviceName: servicesSummary,
+                        scheduledDate: booking.scheduledDate,
+                        scheduledTimeSlot: booking.scheduledTimeSlot,
+                        customerName: booking.customerName,
+                        customerAddress: `${booking.addressLine1}, ${booking.addressLine2 ? booking.addressLine2 + ', ' : ''}${booking.city}`,
+                        smtpHost: appConfig.smtpHost,
+                        smtpPort: appConfig.smtpPort,
+                        smtpUser: appConfig.smtpUser,
+                        smtpPass: appConfig.smtpPass,
+                        senderEmail: appConfig.senderEmail,
+                        siteName: seoSettings?.websiteName || "FixBro",
+                        logoUrl: seoSettings?.logoUrl,
+                    });
+                } catch (emailErr) {
+                    console.error("Error sending provider assignment email:", emailErr);
+                }
+
+                // 5. Mark as notified in Firestore
+                await adminDb.collection('bookings').doc(bookingDocId).update({ isProviderNotified: true });
+
+            } catch (err) {
+                console.error("Critical error in notifyProviderTask:", err);
+            }
+        })();
+        tasks.push(notifyProviderTask);
     }
 
     // A. Update User "hasBooking" status
@@ -408,6 +483,9 @@ export async function POST(request: Request) {
         tasks.push(referralTask);
     }
     tasks.push(triggerRefresh('bookings'));
+
+    // --- CRITICAL: Wait for all parallel tasks to finish ---
+    await Promise.allSettled(tasks);
 
     return NextResponse.json({ success: true });
 

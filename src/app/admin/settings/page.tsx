@@ -57,6 +57,7 @@ export default function AdminSettingsPage() {
           cancellationFeeType: firestoreData.cancellationFeeType ?? defaultAppSettings.cancellationFeeType,
           cancellationFeeValue: firestoreData.cancellationFeeValue ?? defaultAppSettings.cancellationFeeValue,
           maxProviderRadiusKm: firestoreData.maxProviderRadiusKm ?? defaultAppSettings.maxProviderRadiusKm, // Merge new field
+          autoDispatchRadiusKm: firestoreData.autoDispatchRadiusKm ?? defaultAppSettings.autoDispatchRadiusKm, // Merge auto dispatch field
         };
         setSettings(mergedSettings);
       } else {
@@ -93,7 +94,7 @@ export default function AdminSettingsPage() {
     setSettings(prev => {
       const newSettings = JSON.parse(JSON.stringify(prev)); 
 
-      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes'].includes(name)) {
+      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes'].includes(name)) {
         const keys = name.split('.');
         if (keys.length > 1) {
           (newSettings as any)[keys[0]][keys[1]] = parseFloat(value) || 0;
@@ -651,6 +652,22 @@ export default function AdminSettingsPage() {
                         min="1"
                       />
                       <p className="text-xs text-muted-foreground">Sets the maximum service radius a provider can select during registration.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="autoDispatchRadiusKm">Auto-Dispatch Radius (km)</Label>
+                      <Input
+                        id="autoDispatchRadiusKm"
+                        name="autoDispatchRadiusKm"
+                        type="number"
+                        value={settings.autoDispatchRadiusKm ?? 5}
+                        onChange={handleInputChange}
+                        placeholder="e.g., 5"
+                        disabled={isSaving}
+                        min="1"
+                        max="50"
+                      />
+                      <p className="text-xs text-muted-foreground">Nearby providers within this radius will be automatically assigned to new bookings.</p>
                     </div>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
