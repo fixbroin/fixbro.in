@@ -105,7 +105,10 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { city: citySlug, area: areaSlug, categorySlug } = await params;
-  const pageData = await getPageData(citySlug, areaSlug, categorySlug);
+  const [pageData, fullCategoryData] = await Promise.all([
+    getPageData(citySlug, areaSlug, categorySlug),
+    getCategoryFullData(categorySlug, citySlug, areaSlug)
+  ]);
   
   if (!pageData) return {};
   const { cityData, areaData, categoryData, seoOverride } = pageData;
@@ -113,7 +116,28 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
   const searchTerm = getCategorySearchTerm(categoryData.name);
-  const placeholderData = { cityName: cityData.name, areaName: areaData.name, categoryName: categoryData.name, categorySearchTerm: searchTerm };
+  
+  // NEW: Calculate dynamic data for Metadata Uniqueness
+  const otherAreas = fullCategoryData?.availableAreas
+    ?.filter(a => a.slug !== areaSlug)
+    ?.sort(() => 0.5 - Math.random())
+    ?.slice(0, 4)
+    ?.map(a => a.name) || [];
+  const nearbyAreas = otherAreas.length > 0 ? `${otherAreas.slice(0, -1).join(', ')}${otherAreas.length > 1 ? ', and ' : ''}${otherAreas.slice(-1)}` : "all major sectors";
+  
+  const subs = fullCategoryData?.subCategories?.map(s => s.name) || [];
+  const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : categoryData.name;
+
+  const placeholderData = { 
+    cityName: cityData.name, 
+    areaName: areaData.name, 
+    categoryName: categoryData.name, 
+    categorySearchTerm: searchTerm,
+    nearbyAreas,
+    popularServices,
+    averageRating: seoSettings.fallbackRatingValue || "4.8",
+    completedJobs: seoSettings.fallbackReviewCount || "2,500"
+  };
 
   // PRIORITY: 1. Manual Override | 2. Global Pattern (Dynamic) | 3. Generic Category SEO
   const title = replacePlaceholders(
@@ -176,7 +200,28 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
 
   const seoSettings = await getGlobalSEOSettings();
   const searchTerm = getCategorySearchTerm(categoryData.name);
-  const placeholderData = { cityName: cityData.name, areaName: areaData.name, categoryName: categoryData.name, categorySearchTerm: searchTerm };
+
+  // NEW: Calculate dynamic data for H1 & Page Content Uniqueness
+  const otherAreas = fullCategoryData?.availableAreas
+    ?.filter(a => a.slug !== areaSlug)
+    ?.sort(() => 0.5 - Math.random())
+    ?.slice(0, 4)
+    ?.map(a => a.name) || [];
+  const nearbyAreas = otherAreas.length > 0 ? `${otherAreas.slice(0, -1).join(', ')}${otherAreas.length > 1 ? ', and ' : ''}${otherAreas.slice(-1)}` : "all major sectors";
+  
+  const subs = fullCategoryData?.subCategories?.map(s => s.name) || [];
+  const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : categoryData.name;
+
+  const placeholderData = { 
+    cityName: cityData.name, 
+    areaName: areaData.name, 
+    categoryName: categoryData.name, 
+    categorySearchTerm: searchTerm,
+    nearbyAreas,
+    popularServices,
+    averageRating: seoSettings.fallbackRatingValue || "4.8",
+    completedJobs: seoSettings.fallbackReviewCount || "2,500"
+  };
   
   // PRIORITY: 1. Manual Override | 2. Global Pattern (Dynamic) | 3. Generic Category SEO
   const h1Title = replacePlaceholders(

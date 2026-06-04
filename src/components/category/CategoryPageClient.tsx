@@ -108,41 +108,67 @@ export default function CategoryPageClient({
 
   const [seoPageH1, setSeoPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.h1 || null);
   const [displayPageH1, setDisplayPageH1] = useState<string | null>(() => initialH1Title || initialData?.category.h1_title || getCache<CategoryPageCache>(cacheKey, true)?.displayH1 || null);
-  
+
+  // NEW: Calculate deterministic rich data for SEO Uniqueness
+  const getRichSeoData = useCallback(() => {
+    const cityName = propCityName || initialData?.availableCities?.find(c => c.slug === citySlug)?.name || citySlug?.replace(/-/g, ' ') || "Bangalore";
+    const areaName = propAreaName || initialData?.availableAreas?.find(a => a.slug === areaSlug)?.name || areaSlug?.replace(/-/g, ' ') || "";
+    const catName = category?.name || initialData?.category.name || "Services";
+    const sSettings = { ...defaultSeoValues, ...initialData?.seoSettings };
+
+    // Deterministic Nearby Areas (pick first 4 from the same city)
+    const otherAreas = initialData?.availableAreas
+      ?.filter(a => a.slug !== areaSlug)
+      ?.slice(0, 4)
+      ?.map(a => a.name) || [];
+    const nearbyAreas = otherAreas.length > 0 ? `${otherAreas.slice(0, -1).join(', ')}${otherAreas.length > 1 ? ', and ' : ''}${otherAreas.slice(-1)}` : "all major sectors";
+
+    // Deterministic Popular Services (pick first 3 subcategories)
+    const subs = initialData?.subCategories?.map(s => s.name) || [];
+    const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : catName;
+
+    return {
+        cityName,
+        areaName,
+        categoryName: catName,
+        categorySearchTerm: getCategorySearchTerm(catName),
+        nearbyAreas,
+        popularServices,
+        averageRating: sSettings.fallbackRatingValue || "4.8",
+        completedJobs: sSettings.fallbackReviewCount || "2,500"
+    };
+  }, [propCityName, propAreaName, initialData, citySlug, areaSlug, category?.name]);
+
   const [seoContent, setSeoContent] = useState<string | null>(() => {
-    // Merge DB settings with system defaults, but ensure empty strings in DB don't wipe out defaults
     const sSettings = { ...defaultSeoValues, ...initialData?.seoSettings };
     const areaTemplate = initialData?.seoSettings?.areaCategorySeoContentTemplate || defaultSeoValues.areaCategorySeoContentTemplate;
     const cityTemplate = initialData?.seoSettings?.cityCategorySeoContentTemplate || defaultSeoValues.cityCategorySeoContentTemplate;
 
-    // PRIORITY FOR AREA PAGES:
-    // 1. Manual Area Override (The most specific)
-    // 2. Dynamic Area Template (localized to the specific area)
-    // 3. Manual City Override (Backup)
-    // 4. Dynamic City Template (Backup)
-    // 5. Generic Category Content (Last resort)
-    
     let raw: string | null = null;
-    
     if (areaSlug) {
-        raw = initialData?.areaCategorySeo?.seo_content || 
-              areaTemplate || 
-              initialData?.cityCategorySeo?.seo_content || 
-              cityTemplate || 
-              initialData?.category.seo_content || null;
+        raw = initialData?.areaCategorySeo?.seo_content || areaTemplate || initialData?.cityCategorySeo?.seo_content || cityTemplate || initialData?.category.seo_content || null;
     } else if (citySlug) {
-        raw = initialData?.cityCategorySeo?.seo_content || 
-              cityTemplate || 
-              initialData?.category.seo_content || null;
+        raw = initialData?.cityCategorySeo?.seo_content || cityTemplate || initialData?.category.seo_content || null;
     } else {
         raw = initialData?.category.seo_content || null;
     }
     
     if (raw && initialData) {
+        // Calculate data inline for the initializer to be safe and deterministic
+        const otherAreas = initialData.availableAreas?.filter(a => a.slug !== areaSlug)?.slice(0, 4)?.map(a => a.name) || [];
+        const nearbyAreas = otherAreas.length > 0 ? `${otherAreas.slice(0, -1).join(', ')}${otherAreas.length > 1 ? ', and ' : ''}${otherAreas.slice(-1)}` : "all major sectors";
+        const subs = initialData.subCategories?.map(s => s.name) || [];
+        const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : initialData.category.name;
+
         return replacePlaceholders(raw, {
             cityName: propCityName || initialData.availableCities?.find(c => c.slug === citySlug)?.name || citySlug?.replace(/-/g, ' ') || "Bangalore",
             areaName: propAreaName || initialData.availableAreas?.find(a => a.slug === areaSlug)?.name || areaSlug?.replace(/-/g, ' ') || "",
-            categoryName: initialData.category.name
+            categoryName: initialData.category.name,
+            categorySearchTerm: getCategorySearchTerm(initialData.category.name),
+            nearbyAreas,
+            popularServices,
+            averageRating: sSettings.fallbackRatingValue || "4.8",
+            completedJobs: sSettings.fallbackReviewCount || "2,500"
         });
     }
     return raw;
@@ -153,26 +179,30 @@ export default function CategoryPageClient({
     const cityFaqsTemplate = initialData?.seoSettings?.cityCategoryFaqsTemplate || defaultSeoValues.cityCategoryFaqsTemplate;
     
     let rawFaqs: FaqItem[] = [];
-    
     if (areaSlug) {
-        rawFaqs = initialData?.areaCategorySeo?.faqs || 
-                  (areaFaqsTemplate && areaFaqsTemplate.length > 0 ? areaFaqsTemplate : []) ||
-                  initialData?.cityCategorySeo?.faqs || 
-                  (cityFaqsTemplate && cityFaqsTemplate.length > 0 ? cityFaqsTemplate : []) ||
-                  initialData?.category.faqs || [];
+        rawFaqs = initialData?.areaCategorySeo?.faqs || (areaFaqsTemplate && areaFaqsTemplate.length > 0 ? areaFaqsTemplate : []) || initialData?.cityCategorySeo?.faqs || (cityFaqsTemplate && cityFaqsTemplate.length > 0 ? cityFaqsTemplate : []) || initialData?.category.faqs || [];
     } else if (citySlug) {
-        rawFaqs = initialData?.cityCategorySeo?.faqs || 
-                  (cityFaqsTemplate && cityFaqsTemplate.length > 0 ? cityFaqsTemplate : []) ||
-                  initialData?.category.faqs || [];
+        rawFaqs = initialData?.cityCategorySeo?.faqs || (cityFaqsTemplate && cityFaqsTemplate.length > 0 ? cityFaqsTemplate : []) || initialData?.category.faqs || [];
     } else {
         rawFaqs = initialData?.category.faqs || [];
     }
     
     if (rawFaqs.length > 0 && initialData) {
+        const sSettings = { ...defaultSeoValues, ...initialData.seoSettings };
+        const otherAreas = initialData.availableAreas?.filter(a => a.slug !== areaSlug)?.slice(0, 4)?.map(a => a.name) || [];
+        const nearbyAreas = otherAreas.length > 0 ? `${otherAreas.slice(0, -1).join(', ')}${otherAreas.length > 1 ? ', and ' : ''}${otherAreas.slice(-1)}` : "all major sectors";
+        const subs = initialData.subCategories?.map(s => s.name) || [];
+        const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : initialData.category.name;
+
         const pData = {
             cityName: propCityName || initialData.availableCities?.find(c => c.slug === citySlug)?.name || citySlug?.replace(/-/g, ' ') || "Bangalore",
             areaName: propAreaName || initialData.availableAreas?.find(a => a.slug === areaSlug)?.name || areaSlug?.replace(/-/g, ' ') || "",
-            categoryName: initialData.category.name
+            categoryName: initialData.category.name,
+            categorySearchTerm: getCategorySearchTerm(initialData.category.name),
+            nearbyAreas,
+            popularServices,
+            averageRating: sSettings.fallbackRatingValue || "4.8",
+            completedJobs: sSettings.fallbackReviewCount || "2,500"
         };
         return rawFaqs.map(f => ({
             question: replacePlaceholders(f.question, pData),
