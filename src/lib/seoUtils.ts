@@ -167,7 +167,7 @@ export const defaultSeoValues: FirestoreSEOSettings = {
         <li><strong>Hyper-Local to {{areaName}}</strong>: Quick arrival and neighborhood-specific expertise.</li>
         <li><strong>Comprehensive Range</strong>: Expert handling of {{popularServices}} and more.</li>
         <li><strong>Transparent Pricing</strong>: Standardized rates across {{areaName}}, {{cityName}}.</li>
-        <li><strong>Satisfaction Guaranteed</strong>: We ensure you are 100% happy with the work.</li>
+        <li><strong>Satisfaction Guaranteed</strong>: We ensure you are 99% happy with the work.</li>
       </ul>
     </div>
   `,
