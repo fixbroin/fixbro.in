@@ -99,35 +99,13 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const { city: citySlug, categorySlug } = await params;
-  const [{ city: cityData, category: categoryData, seoOverride }, fullCategoryData] = await Promise.all([
-    getPageData(citySlug, categorySlug),
-    getCategoryFullData(categorySlug, citySlug)
-  ]);
+  const { city: cityData, category: categoryData, seoOverride } = await getPageData(citySlug, categorySlug);
 
   if (!cityData || !categoryData) return {};
 
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-
-  // NEW: Calculate dynamic data for Metadata Uniqueness
-  const otherCities = fullCategoryData?.availableCities
-    ?.filter(c => c.slug !== citySlug)
-    ?.sort(() => 0.5 - Math.random())
-    ?.slice(0, 4)
-    ?.map(c => c.name) || [];
-  const nearbyAreas = otherCities.length > 0 ? `${otherCities.slice(0, -1).join(', ')}${otherCities.length > 1 ? ', and ' : ''}${otherCities.slice(-1)}` : "all major regions";
-  
-  const subs = fullCategoryData?.subCategories?.map(s => s.name) || [];
-  const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : categoryData.name;
-
-  const placeholderData = { 
-    cityName: cityData.name, 
-    categoryName: categoryData.name,
-    nearbyAreas,
-    popularServices,
-    averageRating: seoSettings.fallbackRatingValue || "4.8",
-    completedJobs: seoSettings.fallbackReviewCount || "2,500"
-  };
+  const placeholderData = { cityName: cityData.name, categoryName: categoryData.name };
 
   // PRIORITY: 1. Manual Override | 2. Global Pattern (Dynamic) | 3. Generic Category SEO
   const title = replacePlaceholders(
@@ -190,26 +168,7 @@ export default async function CityCategoryPage({ params }: PageProps) {
   }
 
   const seoSettings = await getGlobalSEOSettings();
-
-  // NEW: Calculate dynamic data for H1 & Page Content Uniqueness
-  const otherCities = fullCategoryData?.availableCities
-    ?.filter(c => c.slug !== citySlugParam)
-    ?.sort(() => 0.5 - Math.random())
-    ?.slice(0, 4)
-    ?.map(c => c.name) || [];
-  const nearbyAreas = otherCities.length > 0 ? `${otherCities.slice(0, -1).join(', ')}${otherCities.length > 1 ? ', and ' : ''}${otherCities.slice(-1)}` : "all major regions";
-  
-  const subs = fullCategoryData?.subCategories?.map(s => s.name) || [];
-  const popularServices = subs.length > 0 ? `${subs.slice(0, 3).join(', ')}${subs.length > 3 ? ', and more' : ''}` : categoryData.name;
-
-  const placeholderData = { 
-    cityName: cityData.name, 
-    categoryName: categoryData.name,
-    nearbyAreas,
-    popularServices,
-    averageRating: seoSettings.fallbackRatingValue || "4.8",
-    completedJobs: seoSettings.fallbackReviewCount || "2,500"
-  };
+  const placeholderData = { cityName: cityData.name, categoryName: categoryData.name };
   
   // PRIORITY: 1. Manual Override | 2. Global Pattern (Dynamic) | 3. Generic Category SEO
   const h1Title = replacePlaceholders(
