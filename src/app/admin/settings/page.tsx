@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, PlaySquare, Percent, Ban, Users, Clock, DollarSign, CreditCard, Bell } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import type { AppSettings, DayAvailability } from '@/types/firestore'; 
 import { defaultAppSettings } from '@/config/appDefaults'; 
@@ -19,16 +20,77 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const APP_CONFIG_COLLECTION = "webSettings";
 const APP_CONFIG_DOC_ID = "applicationConfig";
 
+interface TimezoneOption {
+  label: string;
+  subLabel: string;
+  value: string;
+  searchLabel: string;
+}
+
+// Generate a comprehensive list of world timezones with offsets
+const generateTimezones = (): TimezoneOption[] => {
+  try {
+    const tzList = (Intl as any).supportedValuesOf ? (Intl as any).supportedValuesOf('timeZone') : [
+      'Asia/Kolkata', 'Asia/Dubai', 'UTC', 'America/New_York', 'Europe/London', 'Asia/Singapore', 'Australia/Sydney'
+    ];
+    
+    return tzList.map((tz: string): TimezoneOption => {
+      try {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          timeZoneName: 'shortOffset',
+        });
+        const parts = formatter.formatToParts(now);
+        const offset = parts.find(p => p.type === 'timeZoneName')?.value || "";
+        
+        let label = tz.replace(/_/g, ' ');
+        let extraSearch = "";
+        
+        // India specific aliases
+        if (tz === 'Asia/Kolkata' || tz === 'Asia/Calcutta') {
+          label = "India (IST)";
+          extraSearch = "kolkata calcutta india ist";
+        }
+        
+        return {
+          label: `${label} (${offset})`,
+          subLabel: tz,
+          value: tz,
+          searchLabel: `${label} ${tz} ${offset} ${extraSearch}`.toLowerCase().replace(/\//g, ' ')
+        };
+      } catch (e) {
+        return { label: tz, subLabel: tz, value: tz, searchLabel: tz.toLowerCase() };
+      }
+    }).sort((a: TimezoneOption, b: TimezoneOption) => a.label.localeCompare(b.label));
+  } catch (e) {
+    console.error("Timezone generation failed", e);
+    return [{ label: "UTC (Offset +0)", subLabel: "UTC", value: "UTC", searchLabel: "utc" }];
+  }
+};
+
+const ALL_TIMEZONES = generateTimezones();
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [timezoneSearch, setTimezoneSearch] = useState("");
+  const [isTimezonePopoverOpen, setIsTimezonePopoverOpen] = useState(false);
+
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneSearch) return ALL_TIMEZONES;
+    const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
+    return ALL_TIMEZONES.filter((tz: TimezoneOption) => tz.searchLabel.includes(search));
+  }, [timezoneSearch]);
 
   const loadSettingsFromFirestore = useCallback(async () => {
     setIsLoadingSettings(true);
@@ -321,6 +383,75 @@ export default function AdminSettingsPage() {
               <CardDescription>Basic application-wide configurations.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Timezone Configuration */}
+              <div className="space-y-4 p-4 border rounded-md shadow-sm bg-muted/5">
+                <h3 className="text-lg font-semibold flex items-center">
+                  <Clock className="mr-2 h-5 w-5 text-primary" /> Application Timezone
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Select Timezone</Label>
+                  <Popover open={isTimezonePopoverOpen} onOpenChange={setIsTimezonePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="timezone"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isTimezonePopoverOpen}
+                        className="w-full justify-between font-normal"
+                        disabled={isSaving}
+                      >
+                        {settings.timezone
+                          ? ALL_TIMEZONES.find((tz) => tz.value === settings.timezone)?.label || settings.timezone
+                          : "Select application timezone..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="flex items-center border-b px-3">
+                        <SearchIcon className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <input
+                          className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          placeholder="Search timezone..."
+                          value={timezoneSearch}
+                          onChange={(e) => setTimezoneSearch(e.target.value)}
+                        />
+                      </div>
+                      <ScrollArea className="h-72">
+                        <div className="p-1">
+                          {filteredTimezones.length === 0 ? (
+                            <div className="py-6 text-center text-sm">No timezone found.</div>
+                          ) : (
+                            filteredTimezones.map((tz) => (
+                              <Button
+                                key={tz.value}
+                                variant="ghost"
+                                className="w-full justify-start font-normal"
+                                onClick={() => {
+                                  handleSelectChange('timezone', tz.value);
+                                  setIsTimezonePopoverOpen(false);
+                                  setTimezoneSearch("");
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    settings.timezone === tz.value ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {tz.label}
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs text-muted-foreground">
+                    Search and select from all world timezones. This will be used for booking slots, email timestamps, and all date/time calculations.
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-4 p-4 border rounded-md shadow-sm">
                 <h3 className="text-lg font-semibold">Minimum Booking Policy</h3>
                 <div className="flex items-center justify-between rounded-lg border p-4">

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { AppSettings, FirestoreService, FirestoreSubCategory, TimeSlotCategoryLimit, FirestoreBooking } from '@/types/firestore';
 import { defaultAppSettings } from '@/config/appDefaults';
+import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC } from '@/lib/utils';
 
 interface CartEntry {
   serviceId: string;
@@ -53,10 +54,9 @@ const formatTimeFromMinutes = (totalMinutes: number): string => {
     return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
 };
 
-const getDayName = (date: Date): keyof AppSettings['timeSlotSettings']['weeklyAvailability'] => {
-    const dayIndex = date.getDay();
-    const days: (keyof AppSettings['timeSlotSettings']['weeklyAvailability'])[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    return days[dayIndex];
+const getDayName = (date: Date, timeZone: string = 'Asia/Kolkata'): keyof AppSettings['timeSlotSettings']['weeklyAvailability'] => {
+    // Robust way to get weekday name in a specific timezone
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone }).format(date).toLowerCase() as any;
 };
 
 const getSlotKey = (dateISO: string, minutes: number) => `${dateISO}:${minutes}`;
@@ -72,19 +72,26 @@ function calculateEndDateTime(
     bufferDuration: number,
     appConfig: AppSettings
 ): string {
+    const timezone = appConfig.timezone || 'Asia/Kolkata';
     let remainingMinutes = workDuration + bufferDuration;
     let currentMinutes = startMinutes;
-    const currentDate = new Date(startDateISO);
+    
+    // Parse the date as UTC midnight to start, then we'll advance it
+    const [y, m, d] = startDateISO.split('-').map(Number);
+    const currentDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0)); 
     
     let daysSearched = 0;
     while (remainingMinutes > 0 && daysSearched < 30) {
-        let dayName = getDayName(currentDate);
+        // We use a date at 12:00 UTC to safely get the day name in the target timezone without DST or offset overlap issues
+        const sampleDate = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+        let dayName = getDayName(sampleDate, timezone);
         let dayAvailability = appConfig.timeSlotSettings?.weeklyAvailability[dayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[dayName];
 
         let loopGuard = 0;
         while (!dayAvailability.isEnabled && loopGuard < 7) {
-            currentDate.setDate(currentDate.getDate() + 1);
-            dayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            dayName = getDayName(nextSample, timezone);
             dayAvailability = appConfig.timeSlotSettings?.weeklyAvailability[dayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[dayName];
             currentMinutes = parseTimeToMinutes(dayAvailability.startTime);
             loopGuard++;
@@ -99,8 +106,9 @@ function calculateEndDateTime(
         const minutesAvailableToday = dayEnd - currentMinutes;
 
         if (minutesAvailableToday <= 0) {
-            currentDate.setDate(currentDate.getDate() + 1);
-            const nextDayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            const nextDayName = getDayName(nextSample, timezone);
             const nextDayAvail = appConfig.timeSlotSettings?.weeklyAvailability[nextDayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[nextDayName];
             currentMinutes = parseTimeToMinutes(nextDayAvail.startTime);
             daysSearched++;
@@ -112,17 +120,24 @@ function calculateEndDateTime(
             remainingMinutes = 0;
         } else {
             remainingMinutes -= minutesAvailableToday;
-            currentDate.setDate(currentDate.getDate() + 1);
-            const nextDayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            const nextDayName = getDayName(nextSample, timezone);
             const nextDayAvail = appConfig.timeSlotSettings?.weeklyAvailability[nextDayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[nextDayName];
             currentMinutes = parseTimeToMinutes(nextDayAvail.startTime);
         }
         daysSearched++;
     }
     
-    const finalDate = new Date(currentDate);
-    finalDate.setHours(Math.floor(currentMinutes / 60), currentMinutes % 60, 0, 0);
-    return finalDate.toISOString();
+    // Construct final result by combining the date components and the final minutes
+    const finalDateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    const finalHours = Math.floor(currentMinutes / 60);
+    const finalMins = currentMinutes % 60;
+    
+    // Create a date string that represents the wall-clock time in the target timezone
+    // "YYYY-MM-DDTHH:mm:ss" - then we'll convert it to absolute UTC
+    const wallClockDate = new Date(`${finalDateStr}T${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}:00`);
+    return convertWallClockToUTC(wallClockDate, timezone).toISOString();
 }
 
 /**
@@ -136,25 +151,30 @@ function* simulateProgression(
     bufferDuration: number,
     appConfig: AppSettings
 ) {
+    const timezone = appConfig.timezone || 'Asia/Kolkata';
     let remainingMinutesToBlock = workDuration;
     let bufferRemaining = bufferDuration;
     let isWorkCompleted = false;
     let currentMinutes = startMinutes;
-    const currentDate = new Date(startDateISO);
+    
+    const [y, m, d] = startDateISO.split('-').map(Number);
+    const currentDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
     
     const slotInterval = appConfig.timeSlotSettings?.slotIntervalMinutes || DEFAULT_SLOT_INTERVAL_MINUTES;
 
     let daysSearched = 0;
     while (remainingMinutesToBlock > 0 && daysSearched < 30) {
-        let dateISO = currentDate.toLocaleDateString('en-CA');
-        let dayName = getDayName(currentDate);
+        let dateISO = currentDate.toISOString().split('T')[0];
+        const sampleDate = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+        let dayName = getDayName(sampleDate, timezone);
         let dayAvailability = appConfig.timeSlotSettings?.weeklyAvailability[dayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[dayName];
 
         let loopGuard = 0;
         while (!dayAvailability.isEnabled && loopGuard < 7) {
-            currentDate.setDate(currentDate.getDate() + 1);
-            dateISO = currentDate.toLocaleDateString('en-CA');
-            dayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            dateISO = currentDate.toISOString().split('T')[0];
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            dayName = getDayName(nextSample, timezone);
             dayAvailability = appConfig.timeSlotSettings?.weeklyAvailability[dayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[dayName];
             currentMinutes = parseTimeToMinutes(dayAvailability.startTime);
             loopGuard++;
@@ -167,8 +187,9 @@ function* simulateProgression(
         if (currentMinutes < dayStart) currentMinutes = dayStart;
 
         if (currentMinutes >= dayEnd) {
-            currentDate.setDate(currentDate.getDate() + 1);
-            const nextDayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            const nextDayName = getDayName(nextSample, timezone);
             const nextDayAvail = appConfig.timeSlotSettings?.weeklyAvailability[nextDayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[nextDayName];
             currentMinutes = parseTimeToMinutes(nextDayAvail.startTime);
             daysSearched++;
@@ -181,9 +202,6 @@ function* simulateProgression(
         const segmentStart = currentMinutes;
         const segmentEnd = currentMinutes + minutesToConsumeToday;
 
-        // 🔥 Yield ALL standard slot boundaries that overlap with this work segment
-        // A standard slot is: dayStart, dayStart + slotInterval, etc.
-        // It overlaps if: slotStart < segmentEnd AND slotStart + slotInterval > segmentStart
         let slotStart = dayStart;
         while (slotStart < segmentEnd) {
             if (slotStart + slotInterval > segmentStart) {
@@ -196,36 +214,27 @@ function* simulateProgression(
         remainingMinutesToBlock -= minutesToConsumeToday;
         currentMinutes += minutesToConsumeToday;
 
-        // ✅ When work finishes, start buffer ONLY if there is time left TODAY
         if (!isWorkCompleted && remainingMinutesToBlock <= 0) {
             isWorkCompleted = true;
-
             const minutesLeftToday = dayEnd - currentMinutes;
             if (minutesLeftToday > 0) {
-                // Only take as much buffer as fits in the current day
                 remainingMinutesToBlock = Math.min(bufferRemaining, minutesLeftToday);
             } else {
-                // Work ended exactly at or after dayEnd, no buffer needed for next day
                 remainingMinutesToBlock = 0;
             }
         }
 
         if (currentMinutes >= dayEnd) {
-            // If we just finished work and were about to start buffer, 
-            // but we hit the end of the day, we stop here.
             if (isWorkCompleted) {
                 remainingMinutesToBlock = 0; 
                 break;
             }
 
-            // Move to next day
-            currentDate.setDate(currentDate.getDate() + 1);
-            
-            // 🔥 CRITICAL FIX: Reset currentMinutes to the START of the next day
-            const nextDayName = getDayName(currentDate);
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+            const nextSample = new Date(currentDate.getTime() + (12 * 60 * 60 * 1000));
+            const nextDayName = getDayName(nextSample, timezone);
             const nextDayAvail = appConfig.timeSlotSettings?.weeklyAvailability[nextDayName] || defaultAppSettings.timeSlotSettings.weeklyAvailability[nextDayName];
             currentMinutes = parseTimeToMinutes(nextDayAvail.startTime);
-            
             daysSearched++;
         }
     }
@@ -239,15 +248,38 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
         }
 
-        const dateObj = new Date(selectedDate);
-        const dateISO = dateObj.toLocaleDateString('en-CA');
+        // Fetch config first to get timezone
+        const appConfigSnap = await adminDb.collection("webSettings").doc("applicationConfig").get();
+        const appConfig = (appConfigSnap.exists ? appConfigSnap.data() : defaultAppSettings) as AppSettings;
+        const timezone = appConfig.timezone || 'Asia/Kolkata';
+
+        // Robust parsing: Extract "YYYY-MM-DD" part even if it's a full ISO string
+        let dateStr = selectedDate;
+        if (selectedDate.includes('T')) {
+            dateStr = formatZonedDateToISO(new Date(selectedDate), timezone);
+        }
+
+        const dateParts = dateStr.split('-');
+        if (dateParts.length < 3) {
+            return NextResponse.json({ error: "Invalid date format. Expected YYYY-MM-DD." }, { status: 400 });
+        }
+
+        const y = parseInt(dateParts[0], 10);
+        const m = parseInt(dateParts[1], 10);
+        const d = parseInt(dateParts[2], 10);
+
+        if (isNaN(y) || isNaN(m) || isNaN(d)) {
+            return NextResponse.json({ error: "Invalid date components." }, { status: 400 });
+        }
+
+        const dateObj = new Date(Date.UTC(y, m - 1, d, 0, 0, 0)); 
+        const dateISO = formatZonedDateToISO(dateObj, timezone);
 
         const lookBackDate = new Date(dateObj);
         lookBackDate.setDate(lookBackDate.getDate() - 7);
-        const lookBackISO = lookBackDate.toLocaleDateString('en-CA');
+        const lookBackISO = formatZonedDateToISO(lookBackDate, timezone);
 
-        const [appConfigSnap, limitsSnap, servicesSnap, subCatsSnap, bookingsSnap] = await Promise.all([
-            adminDb.collection("webSettings").doc("applicationConfig").get(),
+        const [limitsSnap, servicesSnap, subCatsSnap, bookingsSnap] = await Promise.all([
             adminDb.collection("timeSlotCategoryLimits").get(),
             adminDb.collection("adminServices").get(),
             adminDb.collection("adminSubCategories").get(),
@@ -257,7 +289,6 @@ export async function POST(req: NextRequest) {
                 .get()
         ]);
 
-        const appConfig = (appConfigSnap.exists ? appConfigSnap.data() : defaultAppSettings) as AppSettings;
         const limitsData = Object.fromEntries(limitsSnap.docs.map(doc => [doc.data().categoryId, { id: doc.id, ...doc.data() } as TimeSlotCategoryLimit]));
         const servicesData = Object.fromEntries(servicesSnap.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FirestoreService]));
         const subCatsData = Object.fromEntries(subCatsSnap.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FirestoreSubCategory]));
@@ -348,13 +379,13 @@ export async function POST(req: NextRequest) {
         }
         // --- Cache Logic End ---
 
-        const selectedDayName = getDayName(dateObj);
+        const selectedDayName = getDayName(dateObj, timezone);
         const selectedDayAvail = weeklyAvailability[selectedDayName];
         if (!selectedDayAvail?.isEnabled) {
             return NextResponse.json({ availableTimeSlots: [], totalCartDuration });
         }
 
-        const now = new Date();
+        const now = getZonedDate(new Date(), timezone);
         const earliestBookableTime = new Date(now.getTime() + (limitLateBookingHours * 60 * 60 * 1000));
         const dayStartMinutes = parseTimeToMinutes(selectedDayAvail.startTime);
         const dayEndMinutes = parseTimeToMinutes(selectedDayAvail.endTime);
@@ -363,7 +394,8 @@ export async function POST(req: NextRequest) {
 
         let potentialStart = dayStartMinutes;
         while (potentialStart < dayEndMinutes) {
-            const slotDateTime = new Date(dateObj);
+            // Construct slotDateTime in target timezone
+            const slotDateTime = getZonedDate(new Date(selectedDate), timezone);
             slotDateTime.setHours(Math.floor(potentialStart / 60), potentialStart % 60, 0, 0);
 
             if (slotDateTime < earliestBookableTime) {
