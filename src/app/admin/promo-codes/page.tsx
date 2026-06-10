@@ -7,21 +7,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Edit, Trash2, Loader2, Percent, CheckCircle, XCircle, CalendarDays, EyeOff, Eye } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, Percent, XCircle, EyeOff, Eye, History, Search, User, Mail, Tag } from "lucide-react";
 import type { FirestorePromoCode, DiscountType } from '@/types/firestore';
 import PromoCodeForm, { type PromoCodeFormData } from '@/components/admin/PromoCodeForm';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, runTransaction } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { getTimestampMillis } from '@/lib/utils';
+import { getPromoCodeUsageHistory, type PromoCodeUsageRecord } from '@/lib/adminDashboardUtils';
+import { getCache, setCache } from '@/lib/client-cache';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminPromoCodesPage() {
   const [promoCodes, setPromoCodes] = useState<FirestorePromoCode[]>([]);
+  const [usageHistory, setUsageHistory] = useState<PromoCodeUsageRecord[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<FirestorePromoCode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
   const { toast } = useToast();
 
   const promoCodesCollectionRef = collection(db, "adminPromoCodes");
@@ -41,8 +48,30 @@ export default function AdminPromoCodesPage() {
     }
   };
 
+  const fetchUsageHistory = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = getCache<PromoCodeUsageRecord[]>('promo-usage-history', true);
+      if (cached) {
+        setUsageHistory(cached);
+        setIsHistoryLoading(false);
+        // Still fetch in background to keep it "smart"
+      }
+    }
+
+    try {
+      const history = await getPromoCodeUsageHistory();
+      setUsageHistory(history);
+      setCache('promo-usage-history', history, true);
+    } catch (error) {
+      console.error("Error fetching usage history:", error);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchPromoCodes();
+    fetchUsageHistory();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -147,6 +176,17 @@ export default function AdminPromoCodesPage() {
     return String(value);
   };
 
+  const filteredHistory = useMemo(() => {
+    if (!historySearchTerm.trim()) return usageHistory;
+    const term = historySearchTerm.toLowerCase();
+    return usageHistory.filter(record => 
+      record.customerName.toLowerCase().includes(term) ||
+      record.customerEmail.toLowerCase().includes(term) ||
+      record.discountCode.toLowerCase().includes(term) ||
+      record.bookingId.toLowerCase().includes(term)
+    );
+  }, [usageHistory, historySearchTerm]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -228,7 +268,7 @@ export default function AdminPromoCodesPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This will permanently delete the promo code "{code.code}".
+                                  This will permanently delete the promo code &quot;{code.code}&quot;.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -249,6 +289,92 @@ export default function AdminPromoCodesPage() {
                 )}
               </TableBody>
             </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-2xl flex items-center"><History className="mr-2 h-6 w-6 text-primary" />Promo Code Usage History</CardTitle>
+            <CardDescription>Track who has redeemed promo codes across all bookings.</CardDescription>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by customer, email or code..."
+                className="pl-9 h-9"
+                value={historySearchTerm}
+                onChange={(e) => setHistorySearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isHistoryLoading ? (
+            <div className="flex justify-center items-center h-48">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Loading usage history...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Promo Code</TableHead>
+                    <TableHead className="text-center">Discount</TableHead>
+                    <TableHead className="text-center">Booking ID</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                        {historySearchTerm ? "No matching usage records found." : "No promo code usage recorded yet."}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredHistory.map((record, index) => (
+                      <TableRow key={record.id}>
+                        <TableCell className="font-mono text-muted-foreground text-xs">
+                          {filteredHistory.length - index}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium flex items-center"><User className="h-3.5 w-3.5 mr-1 text-muted-foreground" /> {record.customerName}</span>
+                            <span className="text-xs text-muted-foreground flex items-center"><Mail className="h-3 w-3 mr-1" /> {record.customerEmail}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-bold flex w-fit items-center gap-1">
+                            <Tag className="h-3 w-3" /> {record.discountCode}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-green-600">
+                          ₹{record.discountAmount.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-center text-xs font-mono">
+                          {record.bookingId}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={record.status === 'Completed' ? 'default' : 'outline'} className={record.status === 'Completed' ? 'bg-green-500' : ''}>
+                            {record.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {record.createdAt ? new Date(record.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

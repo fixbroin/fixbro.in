@@ -4,8 +4,9 @@
 import { adminDb } from './firebaseAdmin';
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { Timestamp } from 'firebase-admin/firestore';
-import type { FirestoreBooking, FirestoreUser, FirestoreService, UserActivity } from '@/types/firestore';
+import type { FirestoreBooking, FirestoreUser, UserActivity } from '@/types/firestore';
 import { serializeFirestoreData } from './serializeUtils';
+import { triggerRefresh } from './revalidateUtils';
 
 export interface DashboardData {
   stats: {
@@ -194,7 +195,7 @@ export const getDashboardData = unstable_cache(
     }
   },
   ['admin-dashboard-stats'],
-  { revalidate: 900, tags: ['global-cache'] }
+  { revalidate: false, tags: ['bookings', 'users', 'global-cache'] }
 );
 
 export const getArchivedBookings = unstable_cache(
@@ -215,7 +216,7 @@ export const getArchivedBookings = unstable_cache(
     }
   },
   ['archived-bookings', 'bookings'],
-  { revalidate: 86400, tags: ['global-cache'] } // 24 hours
+  { revalidate: false, tags: ['bookings', 'global-cache'] } // Changed to false
 );
 
 export const getArchivedUsers = unstable_cache(
@@ -236,7 +237,7 @@ export const getArchivedUsers = unstable_cache(
     }
   },
   ['archived-users', 'users'],
-  { revalidate: 86400, tags: ['users', 'global-cache'] }
+  { revalidate: false, tags: ['users', 'global-cache'] }
 );
 
 export const getArchivedActivities = unstable_cache(
@@ -257,8 +258,92 @@ export const getArchivedActivities = unstable_cache(
     }
   },
   ['archived-activities'],
-  { revalidate: 86400, tags: ['users', 'global-cache'] }
+  { revalidate: false, tags: ['global-cache'] }
 );
+
+export interface PromoCodeUsageRecord {
+  id: string;
+  bookingId: string;
+  customerName: string;
+  customerEmail: string;
+  discountCode: string;
+  discountAmount: number;
+  status: string;
+  createdAt: string;
+}
+
+export const getPromoCodeUsageHistory = unstable_cache(
+  async (): Promise<PromoCodeUsageRecord[]> => {
+    try {
+      // METHOD B: Read from specialized promoCodeUsage collection
+      // This collection only contains usage records, so 50 records = 50 reads.
+      // Limit to 200 to keep reads predictable as the business grows.
+      const snapshot = await adminDb.collection('promoCodeUsage')
+        .orderBy('createdAt', 'desc')
+        .limit(200) 
+        .get();
+
+      if (snapshot.empty) return [];
+
+      return serializeFirestoreData(snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      } as PromoCodeUsageRecord)));
+    } catch (error) {
+      console.error("Error in getPromoCodeUsageHistory:", error);
+      return [];
+    }
+  },
+  ['promo-code-usage-history'],
+  { revalidate: false, tags: ['promo-usage', 'global-cache'] }
+);
+
+/**
+ * MIGRATION TOOL: Moves existing promo usage from 'bookings' to 'promoCodeUsage'
+ */
+export async function migratePromoCodeUsage() {
+  try {
+    // Read all bookings (limit to 5000) and filter in memory to be 100% sure we catch everything
+    const bookingsSnap = await adminDb.collection('bookings')
+      .orderBy('createdAt', 'desc')
+      .limit(5000)
+      .get();
+    
+    const batch = adminDb.batch();
+    let count = 0;
+    
+    for (const doc of bookingsSnap.docs) {
+      const data = doc.data();
+      const dCode = data.discountCode || data.promoCode || data.appliedPromoCode;
+      
+      if (dCode || (data.discountAmount > 0)) {
+        count++;
+        const usageId = `usage_${doc.id}`;
+        const usageRef = adminDb.collection('promoCodeUsage').doc(usageId);
+        
+        batch.set(usageRef, {
+          bookingId: data.bookingId || "N/A",
+          customerName: data.customerName || "Unknown",
+          customerEmail: data.customerEmail || "No Email",
+          discountCode: dCode ? String(dCode) : "Legacy/Applied",
+          discountAmount: Number(data.discountAmount || 0),
+          status: data.status || "Pending",
+          createdAt: data.createdAt || Timestamp.now()
+        }, { merge: true });
+      }
+    }
+    
+    if (count > 0) {
+      await batch.commit();
+    }
+    
+    await triggerRefresh('promo-usage');
+    return { success: true, count };
+  } catch (error) {
+    console.error("Migration Error:", error);
+    return { success: false, error: String(error) };
+  }
+}
 
 export async function clearSearchHotspots() {
   try {
