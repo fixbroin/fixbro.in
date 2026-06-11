@@ -83,6 +83,7 @@ export async function POST(request: Request) {
                 status: booking.status || "Pending",
                 createdAt: booking.createdAt || Timestamp.now()
             }));
+            tasks.push(incrementSystemStats({ totalDiscountGiven: Number(booking.discountAmount || 0) }));
             tasks.push(triggerRefresh('promo-usage'));
         }
     }

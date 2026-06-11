@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Edit, Trash2, Loader2, Percent, XCircle, EyeOff, Eye, History, Search, User, Mail, Tag } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, Percent, XCircle, EyeOff, Eye, History, Search, User, Mail, Tag, IndianRupee } from "lucide-react";
 import type { FirestorePromoCode, DiscountType } from '@/types/firestore';
 import PromoCodeForm, { type PromoCodeFormData } from '@/components/admin/PromoCodeForm';
 import { db } from '@/lib/firebase';
@@ -19,8 +19,10 @@ import { getPromoCodeUsageHistory, type PromoCodeUsageRecord } from '@/lib/admin
 import { getCache, setCache } from '@/lib/client-cache';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { useAdminStats } from "@/hooks/useAdminStats";
 
 export default function AdminPromoCodesPage() {
+  const { stats } = useAdminStats();
   const [promoCodes, setPromoCodes] = useState<FirestorePromoCode[]>([]);
   const [usageHistory, setUsageHistory] = useState<PromoCodeUsageRecord[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -292,6 +294,44 @@ export default function AdminPromoCodesPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-primary/5 border-primary/20 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Savings Given</p>
+              <h3 className="text-2xl font-black text-primary mt-1">₹{(stats as any).totalDiscountGiven?.toLocaleString() || '0'}</h3>
+            </div>
+            <div className="p-3 rounded-2xl bg-primary/10 text-primary">
+              <IndianRupee className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-emerald-50 border-emerald-200 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Total Redemptions</p>
+              <h3 className="text-2xl font-black text-emerald-700 mt-1">{usageHistory.length >= 200 ? '200+' : usageHistory.length}</h3>
+            </div>
+            <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-600">
+              <User className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-blue-50 border-blue-200 shadow-sm">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Active Codes</p>
+              <h3 className="text-2xl font-black text-blue-700 mt-1">{promoCodes.filter(c => c.isActive).length}</h3>
+            </div>
+            <div className="p-3 rounded-2xl bg-blue-100 text-blue-600">
+              <Tag className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

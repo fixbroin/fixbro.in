@@ -311,13 +311,16 @@ export async function migratePromoCodeUsage() {
     
     const batch = adminDb.batch();
     let count = 0;
+    let totalDiscount = 0;
     
     for (const doc of bookingsSnap.docs) {
       const data = doc.data();
       const dCode = data.discountCode || data.promoCode || data.appliedPromoCode;
+      const discountVal = Number(data.discountAmount || 0);
       
-      if (dCode || (data.discountAmount > 0)) {
+      if (dCode || (discountVal > 0)) {
         count++;
+        totalDiscount += discountVal;
         const usageId = `usage_${doc.id}`;
         const usageRef = adminDb.collection('promoCodeUsage').doc(usageId);
         
@@ -326,7 +329,7 @@ export async function migratePromoCodeUsage() {
           customerName: data.customerName || "Unknown",
           customerEmail: data.customerEmail || "No Email",
           discountCode: dCode ? String(dCode) : "Legacy/Applied",
-          discountAmount: Number(data.discountAmount || 0),
+          discountAmount: discountVal,
           status: data.status || "Pending",
           createdAt: data.createdAt || Timestamp.now()
         }, { merge: true });
@@ -335,9 +338,16 @@ export async function migratePromoCodeUsage() {
     
     if (count > 0) {
       await batch.commit();
+      // Set the initial total discount in stats
+      const statsRef = adminDb.collection('appConfiguration').doc('stats');
+      await statsRef.set({ 
+        totalDiscountGiven: totalDiscount,
+        updatedAt: Timestamp.now()
+      }, { merge: true });
     }
     
     await triggerRefresh('promo-usage');
+    await triggerRefresh('global-cache'); // Refresh stats
     return { success: true, count };
   } catch (error) {
     console.error("Migration Error:", error);
