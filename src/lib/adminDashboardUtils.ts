@@ -96,7 +96,7 @@ export const getDashboardData = unstable_cache(
       }
 
       // 3. Analytics: Trending Services (Top 10 bookings - OPTIMIZED to reduce massive reads)
-      const trendingBookings = await adminDb.collection('bookings').orderBy('createdAt', 'desc').limit(100).get();
+      const trendingBookings = await adminDb.collection('bookings').orderBy('createdAt', 'desc').limit(500).get();
       
       // Only fetch details for services that actually appear in recent bookings
       const uniqueServiceIds = new Set<string>();
@@ -122,12 +122,15 @@ export const getDashboardData = unstable_cache(
 
       const topServices = Object.entries(serviceCounts)
         .map(([serviceId, count]) => {
-          const serviceDetails = servicesDataMap.get(serviceId);
-          return serviceDetails ? { ...serializeFirestoreData<any>(serviceDetails), count } : null;
+          const serviceSnap = serviceSnaps.find(s => s.id === serviceId);
+          if (!serviceSnap || !serviceSnap.exists) return null;
+          
+          const serviceDetails = serviceSnap.data();
+          return serviceDetails ? { ...serializeFirestoreData<any>(serviceDetails), id: serviceSnap.id, count } : null;
         })
         .filter(item => item !== null)
         .sort((a, b) => (b as any).count - (a as any).count)
-        .slice(0, 10);
+        .slice(0, 50); // Increased from 10 to 50 to show more services
 
       // 4. Analytics: Search Hotspots
       const searchCounts: { [key: string]: number } = {};
@@ -195,7 +198,7 @@ export const getDashboardData = unstable_cache(
     }
   },
   ['admin-dashboard-stats'],
-  { revalidate: false, tags: ['bookings', 'users', 'global-cache'] }
+  { revalidate: false, tags: ['bookings', 'users', 'global-cache', 'admin-dashboard-stats'] }
 );
 
 export const getArchivedBookings = unstable_cache(
