@@ -38,7 +38,7 @@ interface ReviewSubmissionModalProps {
 export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitted }: ReviewSubmissionModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { appConfig } = useApplicationConfig();
+  const { config } = useApplicationConfig();
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [serviceToReview, setServiceToReview] = useState<FirestoreService | null>(null);
   const [isLoadingService, setIsLoadingService] = useState(true);
@@ -143,7 +143,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
             });
 
             // Send Email Notification
-            if (appConfig.smtpHost && appConfig.senderEmail) {
+            if (config.smtpHost && config.senderEmail) {
                 await sendNewReviewAdminNotificationEmail({
                     reviewId: reviewDocRef.id,
                     bookingId: booking.bookingId,
@@ -152,11 +152,11 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
                     rating: data.rating,
                     comment: data.comment,
                     adminUrl: `${getBaseUrl()}/admin/reviews`,
-                    smtpHost: appConfig.smtpHost,
-                    smtpPort: appConfig.smtpPort,
-                    smtpUser: appConfig.smtpUser,
-                    smtpPass: appConfig.smtpPass,
-                    senderEmail: appConfig.senderEmail,
+                    smtpHost: config.smtpHost,
+                    smtpPort: config.smtpPort,
+                    smtpUser: config.smtpUser,
+                    smtpPass: config.smtpPass,
+                    senderEmail: config.senderEmail,
                     siteName: "FixBro", // Or from webSettings if available
                 });
             }
