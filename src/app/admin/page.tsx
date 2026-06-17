@@ -19,6 +19,7 @@ import DashboardTrendingServiceCard from '@/components/admin/DashboardTrendingSe
 import { getDashboardData, type DashboardData, clearSearchHotspots } from '@/lib/adminDashboardUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminStats } from '@/hooks/useAdminStats';
+import PermissionGuard from '@/components/admin/PermissionGuard';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -69,7 +70,13 @@ export default function AdminDashboardPage() {
   const handleSyncStats = async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch('/api/admin/stats/sync', { method: 'POST' });
+      const token = await user?.getIdToken();
+      const res = await fetch('/api/admin/stats/sync', { 
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         toast({ title: "Stats Synced", description: "System totals have been updated based on current database records." });
         loadData();

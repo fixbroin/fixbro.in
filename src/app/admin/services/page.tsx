@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { hasActionPermission } from '@/config/rbac';
 import AppImage from '@/components/ui/AppImage';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Edit, Trash2, ShoppingBag, Loader2 } from "lucide-react";
+import { PlusCircle, Edit, Trash2, ShoppingBag, Loader2, Search } from "lucide-react";
 import type { FirestoreService, FirestoreSubCategory, FirestoreTax, FirestoreCategory } from '@/types/firestore';
 import ServiceForm from '@/components/admin/ServiceForm';
 import { db, storage } from '@/lib/firebase';
@@ -19,6 +21,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { Switch } from '@/components/ui/switch';
+import { Input } from "@/components/ui/input";
+import PermissionGuard from '@/components/admin/PermissionGuard';
+import { getCache, setCache } from '@/lib/client-cache';
+import { getAdminServices, getAdminCategories, getAdminSubCategories, getTaxes } from '@/lib/webServerUtils';
 
 const generateSlug = (name: string) => {
   if (!name) return "";
@@ -40,16 +46,46 @@ export default function AdminServicesPage() {
   const [isLoadingData, setIsLoadingData] = useState(true); // Combined loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { adminPermissions } = useAuth();
 
   const servicesCollectionRef = collection(db, "adminServices");
   const categoriesCollectionRef = collection(db, "adminCategories");
   const subCategoriesCollectionRef = collection(db, "adminSubCategories");
   const taxesCollectionRef = collection(db, "adminTaxes");
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     setIsLoadingData(true);
     try {
+      // --- SmartSync: Version Checking ---
+      let remoteVersion = 0;
+      if (!forceRefresh) {
+        try {
+          const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
+          const versionSnap = await getDoc(versionDocRef);
+          if (versionSnap.exists()) {
+            remoteVersion = versionSnap.data().services || 0;
+          }
+        } catch (e) { console.warn("Failed to fetch cache versions:", e); }
+
+        const localVersionKey = 'admin-services-full-version';
+        const localVersion = parseInt(localStorage.getItem(localVersionKey) || "0");
+        const cachedServices = getCache<FirestoreService[]>('admin-services-list', true);
+        const cachedCats = getCache<FirestoreCategory[]>('admin-categories-list', true);
+        const cachedSubCats = getCache<FirestoreSubCategory[]>('admin-subcategories-list', true);
+        const cachedTaxes = getCache<FirestoreTax[]>('admin-taxes-list', true);
+
+        if (cachedServices && cachedCats && cachedSubCats && cachedTaxes && remoteVersion <= localVersion) {
+          setServices(cachedServices);
+          setParentCategories(cachedCats);
+          setSubCategories(cachedSubCats);
+          setTaxes(cachedTaxes);
+          setIsLoadingData(false);
+          return;
+        }
+      }
+
       const catQuery = query(categoriesCollectionRef, orderBy("order", "asc"));
       const subCatQuery = query(subCategoriesCollectionRef, orderBy("order", "asc"));
       const serviceQuery = query(servicesCollectionRef, orderBy("name", "asc"));
@@ -60,10 +96,24 @@ export default function AdminServicesPage() {
         getDocs(catQuery), getDocs(subCatQuery), getDocs(serviceQuery), getDocs(taxQuery)
       ]);
       
-      setParentCategories(catData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreCategory)));
-      setSubCategories(subCatData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreSubCategory)));
-      setServices(serviceData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreService)));
-      setTaxes(taxData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreTax)));
+      const fetchedCats = catData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
+      const fetchedSubCats = subCatData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreSubCategory));
+      const fetchedServices = serviceData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreService));
+      const fetchedTaxes = taxData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreTax));
+
+      setParentCategories(fetchedCats);
+      setSubCategories(fetchedSubCats);
+      setServices(fetchedServices);
+      setTaxes(fetchedTaxes);
+
+      // Update cache
+      if (!forceRefresh) {
+        setCache('admin-services-list', fetchedServices, true);
+        setCache('admin-categories-list', fetchedCats, true);
+        setCache('admin-subcategories-list', fetchedSubCats, true);
+        setCache('admin-taxes-list', fetchedTaxes, true);
+        localStorage.setItem('admin-services-full-version', remoteVersion.toString());
+      }
 
     } catch (error) {
       console.error("Error fetching prerequisite data: ", error);
@@ -79,7 +129,7 @@ export default function AdminServicesPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    fetchData();
+    fetchData(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -221,7 +271,7 @@ export default function AdminServicesPage() {
       }
       await triggerRefresh('sitemap');
       // Removed global-cache trigger to save reads
-      setIsFormOpen(false); setEditingService(null); await fetchData();
+      setIsFormOpen(false); setEditingService(null); await fetchData(true);
     } catch (_error) {
       console.error("Error saving service: ", _error);
       toast({ title: "Error", description: (_error as Error).message || "Could not save service.", variant: "destructive" });
@@ -237,6 +287,9 @@ export default function AdminServicesPage() {
 
   const groupedServices = useMemo(() => {
     if (!parentCategories.length) return [];
+    
+    const search = searchQuery.toLowerCase();
+
     return parentCategories
       .map(parent => {
         const relevantSubCategories = subCategories
@@ -245,14 +298,24 @@ export default function AdminServicesPage() {
 
         const subCategoriesWithTheirServices = relevantSubCategories.map(subCat => {
           const servicesForSubCat = services
-            .filter(service => service.subCategoryId === subCat.id)
+            .filter(service => {
+              if (service.subCategoryId !== subCat.id) return false;
+              if (!search) return true;
+              
+              return (
+                service.name.toLowerCase().includes(search) ||
+                (subCat.name || "").toLowerCase().includes(search) ||
+                (parent.name || "").toLowerCase().includes(search) ||
+                (service.slug || "").toLowerCase().includes(search)
+              );
+            })
             .sort((a, b) => (a.order || 0) - (b.order || 0) || a.name.localeCompare(b.name));
           return { ...subCat, services: servicesForSubCat };
         });
         return { ...parent, subCategories: subCategoriesWithTheirServices };
       })
       .sort((a,b) => a.order - b.order);
-  }, [parentCategories, subCategories, services]);
+  }, [parentCategories, subCategories, services, searchQuery]);
 
 
   if (!isMounted) {
@@ -273,10 +336,23 @@ export default function AdminServicesPage() {
             <CardTitle className="text-2xl flex items-center"><ShoppingBag className="mr-2 h-6 w-6 text-primary" /> Manage Services</CardTitle>
             <CardDescription>Add, edit, or delete services. Grouped by category and sub-category.</CardDescription>
           </div>
-          <Button onClick={handleAddService} disabled={isSubmitting || isLoadingData || parentCategories.length === 0 || subCategories.length === 0} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Service
-          </Button>
+          <PermissionGuard moduleId="services" action="create">
+            <Button onClick={handleAddService} disabled={isSubmitting || isLoadingData || parentCategories.length === 0 || subCategories.length === 0} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Service
+            </Button>
+          </PermissionGuard>
         </CardHeader>
+        <CardContent>
+           <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search by name, sub-category, or category..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                />
+            </div>
+        </CardContent>
       </Card>
 
       {isLoadingData ? (
@@ -349,7 +425,7 @@ export default function AdminServicesPage() {
                                   <Switch 
                                     checked={service.allowPayLater === undefined ? true : service.allowPayLater}
                                     onCheckedChange={() => handleTogglePayLater(service)}
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || !hasActionPermission(adminPermissions, 'services', 'write')}
                                     className="scale-75"
                                   />
                                 </TableCell>
@@ -357,20 +433,24 @@ export default function AdminServicesPage() {
                                   <Switch 
                                     checked={service.isActive === undefined ? true : service.isActive}
                                     onCheckedChange={() => handleToggleActive(service)}
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || !hasActionPermission(adminPermissions, 'services', 'write')}
                                     className="scale-75"
                                   />
                                 </TableCell>
                                 <TableCell className="p-2">
                                   <div className="flex items-center justify-end gap-1">
-                                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleEditService(service)} disabled={isSubmitting}><Edit className="h-3.5 w-3.5" /></Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-7 w-7" disabled={isSubmitting}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete &quot;{service.name}&quot;.</AlertDialogDescription></AlertDialogHeader>
-                                        <AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteService(service.id)} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete</AlertDialogAction></AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
+                                    <PermissionGuard moduleId="services" action="write">
+                                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleEditService(service)} disabled={isSubmitting}><Edit className="h-3.5 w-3.5" /></Button>
+                                    </PermissionGuard>
+                                    <PermissionGuard moduleId="services" action="delete">
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-7 w-7" disabled={isSubmitting}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete &quot;{service.name}&quot;.</AlertDialogDescription></AlertDialogHeader>
+                                          <AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteService(service.id)} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete</AlertDialogAction></AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </PermissionGuard>
                                   </div>
                                 </TableCell>
                               </TableRow>

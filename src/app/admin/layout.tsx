@@ -7,14 +7,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
-  SidebarContent,
   SidebarTrigger,
   SidebarInset,
 } from '@/components/ui/sidebar';
 import AdminSidebarContent from '@/components/admin/AdminSidebarContent';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
-import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { UserCircle, KeyRound, LogOut, Loader2, Bell, ShieldCheck, ChevronDown, Settings2 } from 'lucide-react';
+import { UserCircle, KeyRound, LogOut, Loader2, Bell, ShieldCheck, ChevronDown } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; 
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -37,10 +35,9 @@ import AdminFloatingChatButton from '@/components/admin/AdminFloatingChatButton'
 import FloatingAdminChatWindow from '@/components/admin/FloatingAdminChatWindow';
 import { useTotalAdminUnreadChatCount } from '@/hooks/useTotalAdminUnreadChatCount';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
-import { collection, query, where, onSnapshot, orderBy, limit, Timestamp, doc, updateDoc } from 'firebase/firestore'; 
+import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } from 'firebase/firestore'; 
 import type { FirestoreNotification } from '@/types/firestore'; 
 import NewBookingAdminPopup from '@/components/admin/NewBookingAdminPopup'; 
-import { cn } from '@/lib/utils';
 
 const AdminPageLoader = () => (
   <div className="flex justify-center items-center min-h-[calc(100vh-120px)]">
@@ -50,21 +47,28 @@ const AdminPageLoader = () => (
 );
 
 export default function AdminLayout({ children }: PropsWithChildren) {
-  const { user: adminUser, firestoreUser, isLoading: authIsLoading, logOut: handleLogoutAuth } = useAuth();
+  const { user: adminUser, adminRole, isLoading: authIsLoading, isAdminLoading, logOut: handleLogoutAuth } = useAuth();
   const { toast } = useToast();
   const pathname = usePathname();
   const router = useRouter();
   const { showLoading, hideLoading } = useLoading();
   const [isFloatingChatOpen, setIsFloatingChatOpen] = useState(false);
 
-  // Derived isAdmin check from firestoreUser for better reliability on refresh
-  const isAdmin = useMemo(() => {
-    return firestoreUser && firestoreUser.email && ADMIN_EMAIL && firestoreUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  }, [firestoreUser]);
+  // isAdmin is now defined as having any valid adminRole
+  const isAdmin = !!adminRole;
+  
+  // Format role name for display (e.g. "super_admin" -> "Master")
+  const roleDisplayLabel = useMemo(() => {
+    if (adminRole === 'super_admin') return "Master";
+    if (adminRole === 'booking_admin') return "Operations";
+    if (adminRole === 'finance_admin') return "Finance";
+    if (adminRole === 'content_admin') return "Content";
+    return "Staff";
+  }, [adminRole]);
 
-  const { count: unreadAdminNotificationsCount, isLoading: isLoadingAdminNotifications } = useUnreadNotificationsCount(adminUser?.uid);
+  const { count: unreadAdminNotificationsCount, isLoading: isLoadingAdminNotifications } = useUnreadNotificationsCount();
 
-  const { totalUnreadCount, isLoading: isLoadingTotalUnread } = useTotalAdminUnreadChatCount(adminUser?.uid);
+  const { isLoading: isLoadingTotalUnread } = useTotalAdminUnreadChatCount(adminUser?.uid);
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const adminChatAudioRef = useRef<HTMLAudioElement | null>(null);
   const previousTotalUnreadCountRef = useRef<number>(0);
@@ -229,30 +233,40 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     return <>{children}</>;
   }
 
-  if (authIsLoading) {
+  // 1. While we are still verifying the user (Auth or Database check in progress)
+  // we show the full-screen secure loader.
+  if (authIsLoading || isAdminLoading) {
     return (
-      <div className="flex justify-center items-center min-screen bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-3 text-muted-foreground font-black text-xs uppercase tracking-widest">FixBro Admin Secure Load...</p>
+      <div className="flex justify-center items-center min-h-screen bg-background text-center flex-col">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">FixBro Admin Secure Load...</p>
       </div>
     );
   }
 
+  // 2. If the check is DONE and the user is NOT an admin:
+  // We return ONLY the ProtectedRoute without the Sidebar/Header shell.
+  // This lets ProtectedRoute handle the redirect to login without any "Flash of Dashboard".
+  if (!isAdmin) {
+    return <ProtectedRoute>{children}</ProtectedRoute>;
+  }
+
+  // 3. Normal Admin Shell (Only for verified admins)
   return (
     <ProtectedRoute>
       <SidebarProvider defaultOpen={true}>
         <Sidebar collapsible="icon" variant="sidebar" className="border-r bg-card text-card-foreground">
           <AdminSidebarContent />
         </Sidebar>
-        <SidebarInset className="bg-muted/30 overflow-x-hidden flex flex-col min-h-screen">
-          <header className="bg-background/95 backdrop-blur-xl sticky top-0 z-[30] border-b border-border/40 transition-all duration-300 shrink-0">
+        <SidebarInset className="bg-muted/30 overflow-x-hidden flex flex-col min-h-screen transition-all duration-200">
+          <header className="bg-background/95 backdrop-blur-xl sticky top-0 z-[30] border-b border-border/40 transition-all duration-200 shrink-0">
             <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               <div className="flex items-center gap-4">
                 <div className="bg-muted/50 p-1.5 rounded-xl border border-border/40 shadow-sm hover:bg-muted transition-colors cursor-pointer group md:hidden" onClick={() => router.push('/admin')}>
                    <ShieldCheck className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
                 </div>
                 <div className="flex items-center gap-3">
-                  <SidebarTrigger className="hidden md:inline-flex rounded-full h-10 w-10 bg-muted/50 hover:bg-primary hover:text-primary-foreground transition-all duration-300" />
+                  <SidebarTrigger className="hidden md:inline-flex rounded-full h-10 w-10 bg-muted/50 hover:bg-primary hover:text-primary-foreground transition-all duration-200" />
                   <div className="flex items-center gap-2">
                     <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-800 dark:text-slate-100">Admin Panel</h1>
                     <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
@@ -295,7 +309,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                         </Avatar>
                         <div className="hidden lg:flex flex-col items-start leading-none gap-1">
                            <span className="text-xs font-black truncate max-w-[100px]">{adminUser.displayName || "Admin"}</span>
-                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Master</span>
+                           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{roleDisplayLabel}</span>
                         </div>
                         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                       </Button>

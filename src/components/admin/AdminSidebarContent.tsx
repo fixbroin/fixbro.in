@@ -12,19 +12,21 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight, RefreshCw } from 'lucide-react';
+import { LayoutGrid, List, Layers, Settings, Users, ShoppingBag, Tag, BarChart3, PlaySquare, Settings2, HelpCircle, MessageSquare, ListChecks, Percent, UserCircle as UserProfileIcon, Target, Map, HandCoins, Megaphone, Bell, Activity, Palette, MessageCircle as ChatIcon, Mail, Zap, Receipt, Tv, Users2, MapPin, Cookie, Globe2, KeyRound, Database, FileText, Construction, Handshake, Banknote, ChevronRight, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { hasPathAccess } from '@/config/rbac';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutGrid },
   { href: '/admin/profile', label: 'Admin Profile', icon: UserProfileIcon },
   { href: '/admin/notifications', label: 'Admin Notifications', icon: Bell },
   { href: '/admin/activity-feed', label: 'Activity Feed', icon: Activity },
+  { href: '/admin/manage-admins', label: 'Staff Management', icon: ShieldCheck },
   { type: 'separator', label: 'Core Management' },
   { href: '/admin/bookings', label: 'Bookings', icon: Tag },
   { href: '/admin/users', label: 'Users', icon: Users },
@@ -78,9 +80,24 @@ export default function AdminSidebarContent() {
   const { settings: globalSettings } = useGlobalSettings();
   const { isMobile, setOpenMobile } = useSidebar();
   const { showLoading } = useLoading();
-  const { user } = useAuth();
+  const { user, adminPermissions, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Filter navItems based on granular permissions
+  const filteredNavItems = navItems.filter(item => {
+    if (item.type === 'separator') return true;
+    return hasPathAccess(adminPermissions, item.href!);
+  });
+
+  // Remove trailing separators or double separators
+  const cleanedNavItems = filteredNavItems.filter((item, index, self) => {
+    if (item.type === 'separator') {
+      const nextItem = self[index + 1];
+      if (!nextItem || nextItem.type === 'separator') return false;
+    }
+    return true;
+  });
 
   const handleLinkClick = () => {
     showLoading();
@@ -147,19 +164,20 @@ export default function AdminSidebarContent() {
 
   return (
     <>
-      <SidebarHeader className="p-6 border-b bg-card">
+      <SidebarHeader className="p-4 md:p-6 border-b bg-card transition-all duration-300 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:items-center">
         <Logo
           logoUrl={globalSettings?.logoUrl}
           websiteName={globalSettings?.websiteName}
           href="/admin"
+          className="group-data-[collapsible=icon]:mr-0 group-data-[collapsible=icon]:justify-center"
         />
       </SidebarHeader>
-      <SidebarContent className="pb-8">
-        <SidebarMenu className="gap-1 px-2 pt-4">
-          {navItems.map((item, index) => {
+      <SidebarContent className="pb-8 overflow-x-hidden">
+        <SidebarMenu className="gap-1 px-2 pt-4 group-data-[collapsible=icon]:px-1">
+          {cleanedNavItems.map((item, index) => {
             if (item.type === 'separator') {
               return (
-                <div key={`sep-${index}`} className="px-4 py-4 mt-4 mb-1">
+                <div key={`sep-${index}`} className="px-4 py-4 mt-4 mb-1 group-data-[collapsible=icon]:hidden">
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] whitespace-nowrap">{item.label}</span>
                     <div className="h-px w-full bg-accent/20" />
@@ -182,16 +200,16 @@ export default function AdminSidebarContent() {
                 asChild
                 tooltip={{ children: item.label, side: 'right', align: 'center' }}
                 className={cn(
-                  "h-11 transition-all duration-300 rounded-xl px-4 group mb-1 border shadow-sm",
+                  "h-11 transition-all duration-300 rounded-xl px-4 group mb-1 border shadow-sm group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg",
                   isActiveRoute 
                     ? "bg-primary text-primary-foreground font-bold shadow-lg border-primary !opacity-100 hover:bg-primary hover:text-primary-foreground" 
                     : "bg-muted/30 text-slate-700 dark:text-slate-300 hover:bg-muted/60 hover:text-primary hover:translate-x-1 opacity-90 hover:opacity-100 border-border/40 hover:border-primary/20"
                 )}
               >
-                <Link href={item.href!} onClick={handleLinkClick} className="flex items-center w-full">
+                <Link href={item.href!} onClick={handleLinkClick} className="flex items-center w-full group-data-[collapsible=icon]:justify-center">
                   {IconComponent && <IconComponent className={cn("h-4 w-4 shrink-0 transition-transform duration-300", isActiveRoute ? "text-primary-foreground scale-110" : "text-slate-500 dark:text-slate-400 group-hover:text-primary group-hover:scale-110")} />} 
-                  <span className="ml-3 truncate flex-grow">{item.label}</span>
-                  {isActiveRoute && <ChevronRight className="h-3 w-3 text-primary-foreground opacity-80" />}
+                  <span className="ml-3 truncate flex-grow group-data-[collapsible=icon]:hidden">{item.label}</span>
+                  {isActiveRoute && <ChevronRight className="h-3 w-3 text-primary-foreground opacity-80 group-data-[collapsible=icon]:hidden" />}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -199,20 +217,23 @@ export default function AdminSidebarContent() {
         })}
         </SidebarMenu>
 
-        <div className="px-4 mt-8 mb-4">
-            <div className="flex items-center gap-3 mb-4">
-                <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] whitespace-nowrap">Cache Control</span>
-                <div className="h-px w-full bg-accent/20" />
-            </div>
-            <button
-                onClick={handleRefreshCache}
-                disabled={isRefreshing}
-                className="w-full flex items-center h-11 transition-all duration-300 rounded-xl px-4 group bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-white shadow-sm disabled:opacity-50"
-            >
-                <RefreshCw className={cn("h-4 w-4 shrink-0 transition-transform duration-700", isRefreshing && "animate-spin")} />
-                <span className="ml-3 truncate font-bold text-sm">Clear System Cache</span>
-            </button>
-        </div>
+        {isSuperAdmin && (
+          <div className="px-4 mt-8 mb-4 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+              <div className="flex items-center gap-3 mb-4 group-data-[collapsible=icon]:hidden">
+                  <span className="text-[10px] font-black text-accent uppercase tracking-[0.2em] whitespace-nowrap">Cache Control</span>
+                  <div className="h-px w-full bg-accent/20" />
+              </div>
+              <button
+                  onClick={handleRefreshCache}
+                  disabled={isRefreshing}
+                  title="Clear System Cache"
+                  className="w-full flex items-center h-11 transition-all duration-300 rounded-xl px-4 group bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive hover:text-white shadow-sm disabled:opacity-50 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10"
+              >
+                  <RefreshCw className={cn("h-4 w-4 shrink-0 transition-transform duration-700", isRefreshing && "animate-spin")} />
+                  <span className="ml-3 truncate font-bold text-sm group-data-[collapsible=icon]:hidden">Clear System Cache</span>
+              </button>
+          </div>
+        )}
       </SidebarContent>
     </>
   );

@@ -12,6 +12,8 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, orderBy, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminStats } from "@/hooks/useAdminStats";
+import { useAuth } from "@/hooks/useAuth";
+import PermissionGuard from "@/components/admin/PermissionGuard";
 
 
 

@@ -1,39 +1,26 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import AppImage from '@/components/ui/AppImage';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Layers, Loader2, PackageSearch } from "lucide-react"; // Added PackageSearch
+import { PlusCircle, Edit, Trash2, Loader2, Layers, Search, ChevronRight } from "lucide-react";
 import type { FirestoreSubCategory, FirestoreCategory } from '@/types/firestore';
 import SubCategoryForm from '@/components/admin/SubCategoryForm';
-import { getOverriddenCategoryName } from '@/lib/adminDataOverrides';
-import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy, query, Timestamp, where } from "firebase/firestore";
-import { ref as storageRef, deleteObject } from "firebase/storage";
+import { db } from '@/lib/firebase';
+import { collection, getDocs, getDoc, doc, deleteDoc, query, orderBy, onSnapshot, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import { getIconComponent } from '@/lib/iconMap';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from "@/components/ui/input";
 import { Switch } from '@/components/ui/switch';
-
-const generateSlug = (name: string) => {
-  if (!name) return "";
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-};
-
-const isFirebaseStorageUrl = (url: string): boolean => {
-  if (!url) return false;
-  return typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
-};
-
-interface GroupedSubCategoryData extends FirestoreCategory {
-  subCategories: FirestoreSubCategory[];
-}
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import AppImage from '@/components/ui/AppImage';
+import { Skeleton } from '@/components/ui/skeleton';
+import PermissionGuard from '@/components/admin/PermissionGuard';
+import { getCache, setCache } from '@/lib/client-cache';
+import { getAdminSubCategories, getAdminCategories } from '@/lib/webServerUtils';
 
 export default function AdminSubCategoriesPage() {
   const [subCategories, setSubCategories] = useState<FirestoreSubCategory[]>([]);
@@ -43,35 +30,55 @@ export default function AdminSubCategoriesPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const subCategoriesCollectionRef = collection(db, "adminSubCategories");
-  const categoriesCollectionRef = collection(db, "adminCategories");
-
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     setIsLoadingData(true);
     try {
-      const catQuery = query(categoriesCollectionRef, orderBy("order", "asc"));
-      const catDataPromise = getDocs(catQuery);
+      // --- SmartSync: Version Checking ---
+      let remoteVersion = 0;
+      if (!forceRefresh) {
+        try {
+          const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
+          const versionSnap = await getDoc(versionDocRef);
+          if (versionSnap.exists()) {
+            remoteVersion = versionSnap.data().categories || 0;
+          }
+        } catch (e) { console.warn("Failed to fetch cache versions:", e); }
 
-      const subCatQuery = query(subCategoriesCollectionRef, orderBy("order", "asc"));
-      const subCatDataPromise = getDocs(subCatQuery);
+        const localVersionKey = 'admin-subcategories-full-version';
+        const localVersion = parseInt(localStorage.getItem(localVersionKey) || "0");
+        const cachedSubCats = getCache<FirestoreSubCategory[]>('admin-subcategories-list-full', true);
+        const cachedCats = getCache<FirestoreCategory[]>('admin-parent-categories-list', true);
 
-      const [catData, subCatData] = await Promise.all([catDataPromise, subCatDataPromise]);
-      
-      const fetchedCategories = catData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
-      setParentCategories(fetchedCategories);
+        if (cachedSubCats && cachedCats && remoteVersion <= localVersion) {
+          setSubCategories(cachedSubCats);
+          setParentCategories(cachedCats);
+          setIsLoadingData(false);
+          return;
+        }
+      }
 
-      const fetchedSubCategories = subCatData.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreSubCategory));
-      setSubCategories(fetchedSubCategories);
+      const [subData, catData] = await Promise.all([
+        getDocs(query(collection(db, "adminSubCategories"), orderBy("order", "asc"))),
+        getDocs(query(collection(db, "adminCategories"), orderBy("order", "asc")))
+      ]);
 
+      const fetchedSubCats = subData.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreSubCategory));
+      const fetchedCats = catData.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
+
+      setSubCategories(fetchedSubCats);
+      setParentCategories(fetchedCats);
+
+      if (!forceRefresh) {
+        setCache('admin-subcategories-list-full', fetchedSubCats, true);
+        setCache('admin-parent-categories-list', fetchedCats, true);
+        localStorage.setItem('admin-subcategories-full-version', remoteVersion.toString());
+      }
     } catch (error) {
-      console.error("Error fetching data: ", error);
-      toast({
-        title: "Error",
-        description: "Could not fetch categories or sub-categories.",
-        variant: "destructive",
-      });
+      console.error("Error fetching sub-categories data: ", error);
+      toast({ title: "Error", description: "Could not fetch data.", variant: "destructive" });
     } finally {
       setIsLoadingData(false);
     }
@@ -79,78 +86,59 @@ export default function AdminSubCategoriesPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    fetchData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    fetchData(true);
+  }, [toast]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !isMounted) return;
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'fixbroCategoryNameOverrides') {
-        fetchData(); // Re-fetch all data if category names might have changed
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [isMounted]);
-
+  if (!isMounted) {
+    return (
+      <div className="space-y-6">
+        <Card><CardHeader><Skeleton className="h-8 w-1/2" /><Skeleton className="h-4 w-3/4 mt-2" /></CardHeader>
+          <CardContent><Skeleton className="h-64 w-full" /></CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleAddSubCategory = () => {
     setEditingSubCategory(null);
     setIsFormOpen(true);
   };
 
-  const handleEditSubCategory = (subCategory: FirestoreSubCategory) => {
-    setEditingSubCategory(subCategory);
+  const handleEditSubCategory = (subCat: FirestoreSubCategory) => {
+    setEditingSubCategory(subCat);
     setIsFormOpen(true);
   };
 
-  const handleToggleActive = async (subCategory: FirestoreSubCategory) => {
+  const handleToggleActive = async (sub: FirestoreSubCategory) => {
     setIsSubmitting(true);
     try {
-        await updateDoc(doc(db, "adminSubCategories", subCategory.id), { 
-          isActive: !subCategory.isActive, 
-          updatedAt: Timestamp.now() 
-        });
-        setSubCategories(prev => prev.map(s => s.id === subCategory.id ? { ...s, isActive: !s.isActive } : s));
-        toast({ title: "Status Updated", description: `Sub-category "${subCategory.name}" ${!subCategory.isActive ? "enabled" : "disabled"}.` });
-
-        // Refresh the cache
-        await triggerRefresh('categories');
-        await triggerRefresh('sitemap');
-        // Removed global-cache trigger to save reads
+      const newStatus = !(sub.isActive === undefined ? true : sub.isActive);
+      await updateDoc(doc(db, "adminSubCategories", sub.id!), { 
+        isActive: newStatus,
+        updatedAt: serverTimestamp() 
+      });
+      toast({ 
+        title: "Status Updated", 
+        description: `Sub-category "${sub.name}" is now ${newStatus ? 'active' : 'inactive'}.` 
+      });
+      await triggerRefresh('categories');
+      await triggerRefresh('services');
     } catch (error) {
-        toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
+      console.error("Error toggling sub-category status: ", error);
+      toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteSubCategory = async (subCategoryId: string) => {
+  const handleDeleteSubCategory = async (id: string) => {
     setIsSubmitting(true);
     try {
-      const subCategoryDocRef = doc(db, "adminSubCategories", subCategoryId);
-      const subCategorySnap = await getDoc(subCategoryDocRef);
-      const subCategoryData = subCategorySnap.data() as FirestoreSubCategory | undefined;
-
-      if (subCategoryData?.imageUrl && isFirebaseStorageUrl(subCategoryData.imageUrl)) {
-        try {
-          const imageToDeleteRef = storageRef(storage, subCategoryData.imageUrl);
-          await deleteObject(imageToDeleteRef);
-        } catch (imgError: any) {
-          console.warn("Error deleting image from Firebase Storage during sub-category delete:", imgError);
-        }
-      }
-      await deleteDoc(subCategoryDocRef);
-      setSubCategories(prev => prev.filter(sub => sub.id !== subCategoryId)); // Update local state
+      await deleteDoc(doc(db, "adminSubCategories", id));
       toast({ title: "Success", description: "Sub-category deleted successfully." });
-
-      // Refresh the cache
       await triggerRefresh('categories');
+      await triggerRefresh('services');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
     } catch (error) {
       console.error("Error deleting sub-category: ", error);
       toast({ title: "Error", description: "Could not delete sub-category.", variant: "destructive" });
@@ -159,145 +147,173 @@ export default function AdminSubCategoriesPage() {
     }
   };
 
-  const handleFormSubmit = async (data: Omit<FirestoreSubCategory, 'id' | 'createdAt'> & { id?: string, slug?: string }) => {
+  const handleFormSubmit = async (data: any) => {
     setIsSubmitting(true);
-    
-    const payloadForFirestore: Omit<FirestoreSubCategory, 'id' | 'createdAt' | 'updatedAt'> = {
-      name: data.name, 
-      slug: data.slug || generateSlug(data.name), 
-      parentId: data.parentId, 
-      order: Number(data.order),
-      isActive: data.isActive === undefined ? true : data.isActive,
-      imageUrl: data.imageUrl || "", 
-      imageHint: data.imageHint || "",
-    };
     try {
-      if (editingSubCategory && data.id) {
-        const subCategoryDoc = doc(db, "adminSubCategories", data.id);
-        await updateDoc(subCategoryDoc, { ...payloadForFirestore, updatedAt: Timestamp.now() } as any);
+      const { id, ...cleanData } = data;
+      if (id) {
+        await updateDoc(doc(db, "adminSubCategories", id), {
+          ...cleanData,
+          updatedAt: serverTimestamp(),
+        });
         toast({ title: "Success", description: "Sub-category updated successfully." });
       } else {
-        await addDoc(subCategoriesCollectionRef, { ...payloadForFirestore, createdAt: Timestamp.now() });
-        toast({ title: "Success", description: "Sub-category added successfully." });
+        await addDoc(collection(db, "adminSubCategories"), {
+          ...cleanData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        toast({ title: "Success", description: "Sub-category created successfully." });
       }
-
-      // Refresh the cache
       await triggerRefresh('categories');
+      await triggerRefresh('services');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
-
-      setIsFormOpen(false); setEditingSubCategory(null); await fetchData();
+      setIsFormOpen(false);
+      setEditingSubCategory(null);
     } catch (error) {
       console.error("Error saving sub-category: ", error);
-      toast({ title: "Error", description: (error as Error).message || "Could not save sub-category.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not save sub-category.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const nextOrder = useMemo(() => {
-    if (subCategories.length === 0) return 0;
-    return Math.max(...subCategories.map(s => s.order || 0)) + 1;
-  }, [subCategories]);
+  const filteredSubCategories = subCategories.filter(sub => 
+    sub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (sub.parentCategoryName || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const groupedSubCategories = useMemo(() => {
-    if (!parentCategories.length) return [];
-    return parentCategories
-      .map(parent => ({
-        ...parent,
-        subCategories: subCategories
-          .filter(sub => sub.parentId === parent.id)
-          .sort((a, b) => a.order - b.order)
-      }))
-      .sort((a, b) => a.order - b.order); // Sort parent categories by their order
-  }, [parentCategories, subCategories]);
-
-  if (!isMounted) {
-     return (
-      <div className="space-y-6">
-        <Card><CardHeader><CardTitle className="animate-pulse h-8 w-1/2 bg-muted rounded"></CardTitle><CardDescription className="animate-pulse h-4 w-3/4 bg-muted rounded mt-2"></CardDescription></CardHeader>
-          <CardContent><Skeleton className="h-64 w-full" /></CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const subCategoriesByCategory = parentCategories.reduce((acc, cat) => {
+    // Check both parentCategoryId and parentId for backward compatibility
+    const subs = filteredSubCategories.filter(sub => sub.parentCategoryId === cat.id || sub.parentId === cat.id);
+    if (subs.length > 0 || !searchQuery) {
+        acc.push({ category: cat, subs });
+    }
+    return acc;
+  }, [] as { category: FirestoreCategory, subs: FirestoreSubCategory[] }[]);
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-2xl flex items-center"><Layers className="mr-2 h-6 w-6 text-primary" /> Manage Sub-Categories</CardTitle>
-            <CardDescription>Add, edit, or delete service sub-categories. Manage images and SEO fields.</CardDescription>
+            <CardTitle className="text-2xl flex items-center">
+              <Layers className="mr-2 h-6 w-6 text-primary" />
+              Sub-Categories
+            </CardTitle>
+            <CardDescription>
+              Organize your services into detailed sub-groups within parent categories.
+            </CardDescription>
           </div>
-          <Button onClick={handleAddSubCategory} disabled={isSubmitting || isLoadingData || parentCategories.length === 0} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Sub-Category
-          </Button>
+          <PermissionGuard moduleId="sub_categories" action="create">
+            <Button onClick={handleAddSubCategory} disabled={isSubmitting || isLoadingData} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Sub-Category
+            </Button>
+          </PermissionGuard>
         </CardHeader>
+        <CardContent>
+           <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search by name or category..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                />
+            </div>
+        </CardContent>
       </Card>
 
       {isLoadingData ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-2">Loading data...</p>
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
-      ) : parentCategories.length === 0 ? (
-        <Card><CardContent className="pt-6 text-center text-muted-foreground py-10">No parent categories found. Please add parent categories first to create sub-categories under them.</CardContent></Card>
-      ) : groupedSubCategories.every(group => group.subCategories.length === 0) && subCategories.length === 0 ? (
-         <Card><CardContent className="pt-6 text-center text-muted-foreground py-10">No sub-categories found yet. Add one to get started.</CardContent></Card>
+      ) : subCategoriesByCategory.length === 0 ? (
+        <Card>
+          <CardContent className="py-20 text-center text-muted-foreground">
+            <p>No sub-categories found.</p>
+          </CardContent>
+        </Card>
       ) : (
-        groupedSubCategories.map((group) => (
-          <Card key={group.id} className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-xl text-primary/90">{getOverriddenCategoryName(group.id, group.name)}</CardTitle>
+        subCategoriesByCategory.map(({ category, subs }) => (
+          <Card key={category.id} className="overflow-hidden border-l-4 border-l-primary">
+            <CardHeader className="bg-muted/30 py-4 flex flex-row items-center gap-3">
+               <div className="relative w-8 h-8 rounded overflow-hidden flex-shrink-0">
+                  <AppImage src={category.imageUrl} alt={category.name} fill sizes="32px" className="object-cover" />
+               </div>
+               <CardTitle className="text-lg font-bold">{category.name}</CardTitle>
+               <ChevronRight className="h-4 w-4 text-muted-foreground" />
+               <CardDescription className="font-medium text-primary">
+                 {subs.length} Sub-categories
+               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {group.subCategories.length === 0 ? (
-                <p className="text-muted-foreground text-sm pl-1">No sub-categories under {getOverriddenCategoryName(group.id, group.name)}.</p>
+            <CardContent className="p-0">
+              {subs.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground italic">
+                  No sub-categories in this group matching your search.
+                </div>
               ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-muted/10">
                     <TableRow>
-                      <TableHead className="w-[60px]">Image</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Slug</TableHead>
+                      <TableHead className="pl-6">Image</TableHead>
+                      <TableHead>Sub-Category Name</TableHead>
                       <TableHead className="text-center">Order</TableHead>
                       <TableHead className="text-center">Active</TableHead>
-                      <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                      <TableHead className="text-right pr-6 min-w-[120px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {group.subCategories.map((subCategory) => {
-                      const IconComponent = getIconComponent(undefined);
+                    {subs.map((sub) => {
                       return (
-                        <TableRow key={subCategory.id}>
-                          <TableCell>
-                            {subCategory.imageUrl ? (
-                              <div className="w-10 h-10 relative rounded-md overflow-hidden">
-                                <AppImage src={subCategory.imageUrl} alt={subCategory.name} fill sizes="40px" className="object-cover" aiHint={subCategory.imageHint || "sub-category"}/>
-                              </div>
-                            ) : ( <IconComponent className="h-6 w-6 text-muted-foreground" /> )}
+                        <TableRow key={sub.id}>
+                          <TableCell className="pl-6">
+                            <div className="relative w-10 h-10 rounded border overflow-hidden">
+                               <AppImage src={sub.imageUrl} alt={sub.name} fill sizes="40px" className="object-cover" />
+                            </div>
                           </TableCell>
-                          <TableCell className="font-medium">{subCategory.name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{subCategory.slug}</TableCell>
-                          <TableCell className="text-center">{subCategory.order}</TableCell>
+                          <TableCell className="font-medium">{sub.name}</TableCell>
+                          <TableCell className="text-center">{sub.order || 0}</TableCell>
                           <TableCell className="text-center">
                             <Switch 
-                                checked={subCategory.isActive === undefined ? true : subCategory.isActive}
-                                onCheckedChange={() => handleToggleActive(subCategory)}
+                                checked={sub.isActive === undefined ? true : sub.isActive}
+                                onCheckedChange={() => handleToggleActive(sub)}
                                 disabled={isSubmitting}
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="pr-6">
                             <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                              <Button variant="outline" size="icon" onClick={() => handleEditSubCategory(subCategory)} disabled={isSubmitting}><Edit className="h-4 w-4" /></Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><Button variant="destructive" size="icon" disabled={isSubmitting}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{subCategory.name}".</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSubCategory(subCategory.id)} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <PermissionGuard moduleId="sub_categories" action="write">
+                                <Button variant="outline" size="icon" onClick={() => handleEditSubCategory(sub)} disabled={isSubmitting}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </PermissionGuard>
+                              <PermissionGuard moduleId="sub_categories" action="delete">
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete "{sub.name}". This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeleteSubCategory(sub.id!)}
+                                        disabled={isSubmitting}
+                                        className="bg-destructive hover:bg-destructive/90">
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </PermissionGuard>
                             </div>
                           </TableCell>
                         </TableRow>

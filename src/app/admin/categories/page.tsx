@@ -20,6 +20,11 @@ import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch'; // Import Switch
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
+import { hasActionPermission } from '@/config/rbac';
+import PermissionGuard from '@/components/admin/PermissionGuard';
+import { getCache, setCache } from '@/lib/client-cache';
+import { getAdminCategories } from '@/lib/webServerUtils';
 
 const generateSlug = (name: string) => {
   if (!name) return "";
@@ -40,16 +45,44 @@ export default function AdminCategoriesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false); 
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
+  const { adminPermissions } = useAuth();
 
   const categoriesCollectionRef = collection(db, "adminCategories");
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const q = query(categoriesCollectionRef, orderBy("order", "asc"));
-      const data = await getDocs(q);
-      const fetchedCategories = data.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
+      // --- SmartSync: Version Checking ---
+      let remoteVersion = 0;
+      if (!forceRefresh) {
+        try {
+          const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
+          const versionSnap = await getDoc(versionDocRef);
+          if (versionSnap.exists()) {
+            remoteVersion = versionSnap.data().categories || 0;
+          }
+        } catch (e) { console.warn("Failed to fetch cache versions:", e); }
+
+        const localVersionKey = 'admin-categories-version';
+        const localVersion = parseInt(localStorage.getItem(localVersionKey) || "0");
+        const cachedData = getCache<FirestoreCategory[]>('admin-categories', true);
+
+        if (cachedData && remoteVersion <= localVersion) {
+          setCategories(cachedData);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Use Server-Side Cache + Client-Side Cache
+      const fetchedCategories = await getAdminCategories();
       setCategories(fetchedCategories);
+
+      // Update local cache
+      if (!forceRefresh) {
+        setCache('admin-categories', fetchedCategories, true);
+        localStorage.setItem('admin-categories-version', remoteVersion.toString());
+      }
     } catch (error) {
       console.error("Error fetching categories: ", error);
       toast({
@@ -112,9 +145,10 @@ export default function AdminCategoriesPage() {
           const imageToDeleteRef = storageRef(storage, categoryData.imageUrl);
           await deleteObject(imageToDeleteRef);
           toast({ title: "Image Deleted", description: "Associated image removed from storage." });
-        } catch (imgError: any) {
+        } catch (imgError: unknown) {
           console.warn("Error deleting image from Firebase Storage during category delete:", imgError);
-          toast({ title: "Image Deletion Warning", description: `Category will be deleted, but failed to remove image from storage: ${imgError.message}`, variant: "default", duration: 7000 });
+          const errorMessage = imgError instanceof Error ? imgError.message : "Unknown error";
+          toast({ title: "Image Deletion Warning", description: `Category will be deleted, but failed to remove image from storage: ${errorMessage}`, variant: "default", duration: 7000 });
         }
       }
 
@@ -125,6 +159,7 @@ export default function AdminCategoriesPage() {
 
       // Refresh the cache
       await triggerRefresh('categories');
+      await triggerRefresh('services');
       await triggerRefresh('sitemap');
       // Removed global-cache trigger to save reads
     } catch (error) {
@@ -185,6 +220,7 @@ export default function AdminCategoriesPage() {
 
       // Refresh the cache
       await triggerRefresh('categories');
+      await triggerRefresh('services');
       await triggerRefresh('sitemap');
       // Removed global-cache trigger to save reads
 
@@ -226,9 +262,11 @@ export default function AdminCategoriesPage() {
             <CardTitle className="text-2xl flex items-center"><List className="mr-2 h-6 w-6 text-primary" />Manage Categories</CardTitle>
             <CardDescription>Add, edit, or delete service categories from Firestore.</CardDescription>
           </div>
-          <Button onClick={handleAddCategory} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Category
-          </Button>
+          <PermissionGuard moduleId="categories" action="create">
+            <Button onClick={handleAddCategory} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Category
+            </Button>
+          </PermissionGuard>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -283,44 +321,48 @@ export default function AdminCategoriesPage() {
                             <Switch 
                                 checked={category.isActive === undefined ? true : category.isActive}
                                 onCheckedChange={() => handleToggleActive(category)}
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || !hasActionPermission(adminPermissions, 'categories', 'write')}
                                 aria-label={`Toggle status for ${category.name}`}
                             />
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                            <Button variant="outline" size="icon" onClick={() => handleEditCategory(category)} disabled={isSubmitting}>
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" disabled={isSubmitting}>
-                                  <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Delete</span>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the category
-                                    {category.imageUrl && isFirebaseStorageUrl(category.imageUrl) ? " and its associated image from storage." : "."}
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteCategory(category.id)}
-                                    disabled={isSubmitting}
-                                    className="bg-destructive hover:bg-destructive/90"
-                                  >
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <PermissionGuard moduleId="categories" action="write">
+                              <Button variant="outline" size="icon" onClick={() => handleEditCategory(category)} disabled={isSubmitting}>
+                                <Edit className="h-4 w-4" />
+                                <span className="sr-only">Edit</span>
+                              </Button>
+                            </PermissionGuard>
+                            <PermissionGuard moduleId="categories" action="delete">
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Delete</span>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the category
+                                      {category.imageUrl && isFirebaseStorageUrl(category.imageUrl) ? " and its associated image from storage." : "."}
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteCategory(category.id)}
+                                      disabled={isSubmitting}
+                                      className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </PermissionGuard>
                           </div>
                         </TableCell>
                       </TableRow>
