@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
-import { CheckCircle2, Home, ListOrdered, Mail, Download, Loader2, MapPin, Tag, HandCoins, Ban, Hash, Package, Calendar, Clock, CreditCard, Activity, IndianRupee, Wallet } from 'lucide-react';
+import { CheckCircle2, Home, ListOrdered, Mail, Download, Loader2, MapPin, Tag, HandCoins, Ban, Hash, Package, Calendar, Clock, CreditCard, Activity, IndianRupee, Wallet, AlertTriangle } from 'lucide-react';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -260,6 +260,8 @@ export default function ThankYouPage() {
         let storedAppliedPlatformFees: AppliedPlatformFeeItem[] = [];
         let estimatedEndTime: string | undefined;
         let currentCategoryId: string | null = null;
+        let storedInterveningBreaks: any[] = [];
+        let storedDailyTimeline: any[] = [];
 
         if (typeof window !== 'undefined') {
           customerEmail = localStorage.getItem('fixbroCustomerEmail') || customerEmail;
@@ -267,6 +269,10 @@ export default function ThankYouPage() {
           scheduledDateStored = localStorage.getItem('fixbroScheduledDate') || scheduledDateStored; 
           scheduledTimeSlot = localStorage.getItem('fixbroScheduledTimeSlot') || scheduledTimeSlot;
           estimatedEndTime = localStorage.getItem('fixbroEstimatedEndTime') || undefined;
+          const breaksStr = localStorage.getItem('fixbroInterveningBreaks');
+          if (breaksStr) { try { storedInterveningBreaks = JSON.parse(breaksStr); } catch (e) {} }
+          const dailyTimelineStr = localStorage.getItem('fixbroDailyTimeline');
+          if (dailyTimelineStr) { try { storedDailyTimeline = JSON.parse(dailyTimelineStr); } catch (e) {} }
           bookingDiscountCode = localStorage.getItem('fixbroBookingDiscountCode') || undefined;
           const discountAmountStr = localStorage.getItem('fixbroBookingDiscountAmount');
           bookingDiscountAmount = discountAmountStr ? parseFloat(discountAmountStr) : undefined;
@@ -335,6 +341,8 @@ export default function ThankYouPage() {
           scheduledDate: scheduledDateStored,
           scheduledTimeSlot, 
           ...(estimatedEndTime && { estimatedEndTime }),
+          interveningBreaks: storedInterveningBreaks,
+          dailyTimeline: storedDailyTimeline,
           services: resolvedServiceItems.map(({ _basePriceForBooking, ...rest }) => rest),
           subTotal: baseSubTotalForBooking,
           ...(baseVisitingChargeForBooking > 0 && { visitingCharge: baseVisitingChargeForBooking }),
@@ -555,6 +563,50 @@ export default function ThankYouPage() {
                   </>
                 )}
 
+                {bookingDetailsForDisplay.dailyTimeline && bookingDetailsForDisplay.dailyTimeline.length > 1 && (
+                  <>
+                    <div className="py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground my-2">
+                      <p className="font-bold text-xs text-blue-800 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Day-by-Day Work Schedule
+                      </p>
+                      <div className="space-y-1.5 pl-1">
+                        {bookingDetailsForDisplay.dailyTimeline.map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap text-sm py-1.5 border-b border-border/20 last:border-0">
+                            <span className="font-semibold text-foreground/80">{item.dateLabel}</span>
+                            <span className="font-semibold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap">
+                              {item.startTime} - {item.endTime}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Separator className="opacity-40" />
+                  </>
+                )}
+
+                {bookingDetailsForDisplay.interveningBreaks && bookingDetailsForDisplay.interveningBreaks.length > 0 && (
+                  <>
+                    <div className="py-2 px-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 rounded-xl space-y-1.5 text-xs text-muted-foreground my-2">
+                      <p className="font-bold text-[10px] text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Includes Gaps / Holidays
+                      </p>
+                      <div className="space-y-1 pl-1">
+                        {bookingDetailsForDisplay.interveningBreaks.map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2">
+                            <div className={`mt-1.5 h-1.5 w-1.5 rounded-full ${item.type === 'holiday' ? 'bg-red-500' : item.type === 'partial' ? 'bg-amber-500' : 'bg-blue-500'}`} />
+                            <div className="text-muted-foreground">
+                              <span className="font-semibold text-foreground/80">{item.dateLabel}</span>
+                              {item.timeLabel && <span className="ml-1">({item.timeLabel})</span>}
+                              <span className="ml-1.5 font-medium text-muted-foreground/80">— {item.reason}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Separator className="opacity-40" />
+                  </>
+                )}
+
                 <SummaryItem icon={MapPin} label="Address" value={`${bookingDetailsForDisplay.addressLine1}${bookingDetailsForDisplay.addressLine2 ? ', ' + bookingDetailsForDisplay.addressLine2 : ''}, ${bookingDetailsForDisplay.city}`} />
                 <Separator className="opacity-40" />
 
@@ -587,8 +639,12 @@ export default function ThankYouPage() {
                   </React.Fragment>
                 ))}
 
-                <SummaryItem icon={Activity} label="Total Tax" value={`+ ₹${bookingDetailsForDisplay.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
-                <Separator className="opacity-40" />
+                {bookingDetailsForDisplay.taxAmount > 0 && (
+                  <>
+                    <SummaryItem icon={Activity} label="Total Tax" value={`+ ₹${bookingDetailsForDisplay.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                    <Separator className="opacity-40" />
+                  </>
+                )}
 
                 <SummaryItem 
                     icon={CreditCard} 

@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { HomepageAd, AdActionType, AdPlacement, FirestoreCategory, FirestoreService } from '@/types/firestore';
-import { useEffect, useState, useRef } from "react";
-import { Loader2, Image as ImageIconLucide, Trash2, ExternalLink, ListChecks, ShoppingBag } from "lucide-react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { Loader2, Image as ImageIconLucide, Trash2, ExternalLink, ListChecks, ShoppingBag, Search, Tags, CheckCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import { storage } from '@/lib/firebase'; // Assuming firebase.ts exports storage
@@ -74,6 +76,31 @@ export default function AdForm({ onSubmit: onSubmitProp, initialData, onCancel, 
 
   const watchedActionType = form.watch("actionType");
 
+  const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
+  const [isActionTypePickerOpen, setIsActionTypePickerOpen] = useState(false);
+  const [isPlacementPickerOpen, setIsPlacementPickerOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [isServicePickerOpen, setIsServicePickerOpen] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState("");
+
+  const watchedTargetValue = form.watch("targetValue");
+
+  const selectedCategory = useMemo(() => {
+    return allCategories.find(c => c.slug === watchedTargetValue);
+  }, [allCategories, watchedTargetValue]);
+
+  const selectedService = useMemo(() => {
+    return allServices.find(s => s.slug === watchedTargetValue);
+  }, [allServices, watchedTargetValue]);
+
+  const searchableCategories = useMemo(() => {
+    return allCategories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase()));
+  }, [allCategories, categorySearch]);
+
+  const searchableServices = useMemo(() => {
+    return allServices.filter(s => s.name.toLowerCase().includes(serviceSearch.toLowerCase()));
+  }, [allServices, serviceSearch]);
+
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -93,6 +120,10 @@ export default function AdForm({ onSubmit: onSubmitProp, initialData, onCancel, 
       setCurrentImagePreview(null); setOriginalImageUrlFromInitialData(null);
     }
     setSelectedFile(null); setUploadProgress(null); setIsFormBusyForImage(false); setStatusMessage("");
+    setIsCategoryPickerOpen(false);
+    setCategorySearch("");
+    setIsServicePickerOpen(false);
+    setServiceSearch("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [initialData, form]);
 
@@ -184,7 +215,61 @@ export default function AdForm({ onSubmit: onSubmitProp, initialData, onCancel, 
         <FormField control={form.control} name="imageHint" render={({ field }) => (<FormItem><FormLabel>Image AI Hint</FormLabel><FormControl><Input placeholder="e.g., summer sale offer" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField control={form.control} name="actionType" render={({ field }) => (<FormItem><FormLabel>Action Type</FormLabel><Select onValueChange={(value) => { field.onChange(value as AdActionType); form.setValue('targetValue', ''); }} value={field.value} disabled={effectiveIsSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Select action" /></SelectTrigger></FormControl><SelectContent>{adActionTypes.map(type => (<SelectItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
+          <FormField control={form.control} name="actionType" render={({ field }) => (
+            <FormItem className="flex flex-col">
+              <FormLabel className="mb-2">Action Type</FormLabel>
+              <Dialog open={isActionTypePickerOpen} onOpenChange={setIsActionTypePickerOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between text-left font-normal h-10",
+                      !field.value && "text-muted-foreground"
+                    )}
+                    disabled={effectiveIsSubmitting}
+                    type="button"
+                  >
+                    {field.value ? field.value.charAt(0).toUpperCase() + field.value.slice(1) : "Select action"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Select Action Type</DialogTitle>
+                    <DialogDescription>
+                      Choose the action triggered when clicking the ad.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <ScrollArea className="h-[200px] rounded-md border p-2">
+                      <div className="space-y-1">
+                        {adActionTypes.map((type) => (
+                          <Button
+                            key={type}
+                            variant={field.value === type ? "secondary" : "ghost"}
+                            className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                            onClick={() => {
+                              field.onChange(type as AdActionType);
+                              form.setValue('targetValue', '');
+                              setIsActionTypePickerOpen(false);
+                            }}
+                            type="button"
+                          >
+                            <span className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+                            {field.value === type && (
+                              <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                            )}
+                          </Button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <FormMessage />
+            </FormItem>
+          )}/>
           <FormField control={form.control} name="targetValue" render={({ field }) => (
             <FormItem>
               <FormLabel>Target Value <span className="text-destructive">*</span>
@@ -193,15 +278,216 @@ export default function AdForm({ onSubmit: onSubmitProp, initialData, onCancel, 
                 {watchedActionType === 'url' && <ExternalLink className="inline ml-1 h-3 w-3 text-muted-foreground"/>}
               </FormLabel>
               {watchedActionType === 'url' && <FormControl><Input placeholder="https://example.com/target" {...field} disabled={effectiveIsSubmitting} /></FormControl>}
-              {watchedActionType === 'category' && <Select onValueChange={field.onChange} value={field.value} disabled={effectiveIsSubmitting || allCategories.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl><SelectContent>{allCategories.map(c => (<SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>))}</SelectContent></Select>}
-              {watchedActionType === 'service' && <Select onValueChange={field.onChange} value={field.value} disabled={effectiveIsSubmitting || allServices.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger></FormControl><SelectContent>{allServices.map(s => (<SelectItem key={s.id} value={s.slug}>{s.name}</SelectItem>))}</SelectContent></Select>}
+              {watchedActionType === 'category' && (
+                <Dialog open={isCategoryPickerOpen} onOpenChange={setIsCategoryPickerOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between text-left font-normal h-10",
+                        !field.value && "text-muted-foreground"
+                      )}
+                      disabled={effectiveIsSubmitting || allCategories.length === 0}
+                      type="button"
+                    >
+                      {selectedCategory ? (
+                        <div className="flex items-center gap-2">
+                          <ListChecks className="h-4 w-4 text-primary" />
+                          <span>{selectedCategory.name}</span>
+                        </div>
+                      ) : (
+                        "Search and select category..."
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Select Category</DialogTitle>
+                      <DialogDescription>
+                        Search and select a target category for this ad.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Type category name..."
+                          className="pl-8"
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                        />
+                      </div>
+                      <ScrollArea className="h-[300px] rounded-md border p-2">
+                        <div className="space-y-1">
+                          {searchableCategories.length === 0 ? (
+                            <p className="text-center py-4 text-sm text-muted-foreground">No categories found.</p>
+                          ) : (
+                            searchableCategories.map((cat) => (
+                              <Button
+                                key={cat.id}
+                                variant={field.value === cat.slug ? "secondary" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-3 px-3 relative group"
+                                onClick={() => {
+                                  field.onChange(cat.slug);
+                                  setIsCategoryPickerOpen(false);
+                                  setCategorySearch("");
+                                }}
+                                type="button"
+                              >
+                                <div className="flex items-center gap-2 pr-8">
+                                  <ListChecks className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-semibold text-sm">{cat.name}</span>
+                                </div>
+                                {field.value === cat.slug && (
+                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                )}
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+              {watchedActionType === 'service' && (
+                <Dialog open={isServicePickerOpen} onOpenChange={setIsServicePickerOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between text-left font-normal h-10",
+                        !field.value && "text-muted-foreground"
+                      )}
+                      disabled={effectiveIsSubmitting || allServices.length === 0}
+                      type="button"
+                    >
+                      {selectedService ? (
+                        <div className="flex items-center gap-2">
+                          <ShoppingBag className="h-4 w-4 text-primary" />
+                          <span>{selectedService.name}</span>
+                        </div>
+                      ) : (
+                        "Search and select service..."
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Select Service</DialogTitle>
+                      <DialogDescription>
+                        Search and select a target service for this ad.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Type service name..."
+                          className="pl-8"
+                          value={serviceSearch}
+                          onChange={(e) => setServiceSearch(e.target.value)}
+                        />
+                      </div>
+                      <ScrollArea className="h-[300px] rounded-md border p-2">
+                        <div className="space-y-1">
+                          {searchableServices.length === 0 ? (
+                            <p className="text-center py-4 text-sm text-muted-foreground">No services found.</p>
+                          ) : (
+                            searchableServices.map((serv) => (
+                              <Button
+                                key={serv.id}
+                                variant={field.value === serv.slug ? "secondary" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-3 px-3 relative group"
+                                onClick={() => {
+                                  field.onChange(serv.slug);
+                                  setIsServicePickerOpen(false);
+                                  setServiceSearch("");
+                                }}
+                                type="button"
+                              >
+                                <div className="flex items-center gap-2 pr-8">
+                                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-semibold text-sm">{serv.name}</span>
+                                </div>
+                                {field.value === serv.slug && (
+                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                )}
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
               <FormMessage />
             </FormItem>
           )}/>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField control={form.control} name="placement" render={({ field }) => (<FormItem><FormLabel>Placement</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={effectiveIsSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Select placement" /></SelectTrigger></FormControl><SelectContent>{adPlacements.map(place => (<SelectItem key={place} value={place}>{place.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
+            <FormField control={form.control} name="placement" render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel className="mb-2">Placement</FormLabel>
+                <Dialog open={isPlacementPickerOpen} onOpenChange={setIsPlacementPickerOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between text-left font-normal h-10",
+                        !field.value && "text-muted-foreground"
+                      )}
+                      disabled={effectiveIsSubmitting}
+                      type="button"
+                    >
+                      {field.value ? field.value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()) : "Select placement"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Select Placement</DialogTitle>
+                      <DialogDescription>
+                        Choose where the ad will be placed on the home page.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <ScrollArea className="h-[200px] rounded-md border p-2">
+                        <div className="space-y-1">
+                          {adPlacements.map((place) => (
+                            <Button
+                              key={place}
+                              variant={field.value === place ? "secondary" : "ghost"}
+                              className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                              onClick={() => {
+                                field.onChange(place as AdPlacement);
+                                setIsPlacementPickerOpen(false);
+                              }}
+                              type="button"
+                            >
+                              <span className="text-sm font-medium">
+                                {place.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
+                              </span>
+                              {field.value === place && (
+                                <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <FormMessage />
+              </FormItem>
+            )}/>
             <FormField control={form.control} name="order" render={({ field }) => (<FormItem><FormLabel>Order</FormLabel><FormControl><Input type="number" placeholder="0" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormDescription>Sort order within the same placement.</FormDescription><FormMessage /></FormItem>)}/>
         </div>
         <FormField control={form.control} name="isActive" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Ad Active</FormLabel><FormDescription>Enable this ad to be shown.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={effectiveIsSubmitting} /></FormControl></FormItem>)}/>

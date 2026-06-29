@@ -218,6 +218,8 @@ export interface FirestoreBooking {
   previousScheduledDate?: string; // NEW: Store previous date before reschedule
   previousScheduledTimeSlot?: string; // NEW: Store previous slot before reschedule
   estimatedEndTime?: string; // Work-only completion time (ISO string)
+  interveningBreaks?: { type: 'holiday' | 'partial' | 'gap'; dateLabel: string; timeLabel?: string; reason?: string }[];
+  dailyTimeline?: { dateLabel: string; startTime: string; endTime: string }[];
   createdAt: Timestamp;
   updatedAt?: Timestamp;
   isReviewedByCustomer?: boolean;
@@ -537,10 +539,27 @@ export interface PlatformFeeSetting {
 export type ProviderFeeType = 'fixed' | 'percentage';
 
 // Application Settings Type
-export interface DayAvailability {
-    isEnabled: boolean;
+export interface TimeInterval {
     startTime: string; // HH:MM
     endTime: string;   // HH:MM
+}
+
+export interface DayAvailability {
+    isEnabled: boolean;
+    startTime: string; // HH:MM (fallback)
+    endTime: string;   // HH:MM (fallback)
+    intervals?: TimeInterval[]; // Array of custom time intervals
+}
+
+export interface LeaveRequest {
+    id?: string;
+    startDate: string; // YYYY-MM-DD
+    endDate: string;   // YYYY-MM-DD
+    leaveType: 'full_day' | 'partial_day';
+    startTime?: string; // HH:MM (if partial_day)
+    endTime?: string;   // HH:MM (if partial_day)
+    reason: string;
+    createdAt: any;
 }
 
 export type LoginMethod = 'email' | 'otp' | 'google';

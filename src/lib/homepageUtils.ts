@@ -38,7 +38,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     adminDb.collection('webSettings').doc('featuresConfiguration').get(),
                     adminDb.collection('seoSettings').doc('global').get(),
                     adminDb.collection('webSettings').doc('global').get(),
-                    adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
+                    adminDb.collection('cities').where('isActive', '==', true).get(),
                     adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order', 'asc').get()
                 ]);
 
@@ -52,7 +52,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                         showCustomServiceButton: false,
                         homepageCategoryVisibility: {},
                         ads: [],
-                    } as FeaturesConfiguration;
+                     } as FeaturesConfiguration;
 
                 const seoSettings = seoSettingsDoc.exists
                     ? serializeFirestoreData<FirestoreSEOSettings>(seoSettingsDoc.data())
@@ -65,15 +65,33 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                 const allCategories = allCatsSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreCategory, 'id'>>(doc.data() as any), id: doc.id } as FirestoreCategory));
 
                 const citiesData = citiesSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreCity, 'id'>>(doc.data() as any), id: doc.id } as FirestoreCity));
+                citiesData.sort((a, b) => a.name.localeCompare(b.name));
                 
-                const citiesWithAreasPromise = Promise.all(citiesData.map(async (city) => {
-                    const areasSnapshot = await adminDb.collection('areas')
-                        .where('cityId', '==', city.id)
-                        .where('isActive', '==', true)
-                        .orderBy('name')
-                        .get();
-                    const areasData = areasSnapshot.docs.map(doc => ({ ...serializeFirestoreData<Omit<FirestoreArea, 'id'>>(doc.data() as any), id: doc.id } as FirestoreArea));
-                    return { ...city, areas: areasData };
+                // Fetch all active areas in a single query instead of looping (N+1 reads optimization)
+                const allAreasSnapshot = await adminDb.collection('areas')
+                    .where('isActive', '==', true)
+                    .get();
+                
+                const allAreas = allAreasSnapshot.docs.map(doc => ({
+                    ...serializeFirestoreData<Omit<FirestoreArea, 'id'>>(doc.data() as any),
+                    id: doc.id
+                } as FirestoreArea));
+                allAreas.sort((a, b) => a.name.localeCompare(b.name));
+
+                // Group areas by cityId
+                const areasByCityId = new Map<string, FirestoreArea[]>();
+                allAreas.forEach(area => {
+                    if (area.cityId) {
+                        if (!areasByCityId.has(area.cityId)) {
+                            areasByCityId.set(area.cityId, []);
+                        }
+                        areasByCityId.get(area.cityId)!.push(area);
+                    }
+                });
+
+                const citiesWithAreas = citiesData.map(city => ({
+                    ...city,
+                    areas: areasByCityId.get(city.id) || []
                 }));
 
                 const promises: Promise<FirestoreService[] | { category: FirestoreCategory; services: FirestoreService[] }[]>[] = [];
@@ -168,11 +186,10 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     promises.push(Promise.resolve([] as { category: FirestoreCategory; services: FirestoreService[] }[]));
                 }
 
-                const [popularServices, recentServices, categoryWiseServices, citiesWithAreas] = await Promise.all([
+                const [popularServices, recentServices, categoryWiseServices] = await Promise.all([
                     promises[0] as Promise<FirestoreService[]>,
                     promises[1] as Promise<FirestoreService[]>,
                     promises[2] as Promise<{ category: FirestoreCategory; services: FirestoreService[] }[]>,
-                    citiesWithAreasPromise
                 ]);
 
                 return {
