@@ -215,19 +215,17 @@ export default async function CityCategoryPage({ params }: PageProps) {
 
   const categoryCitySchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "LocalBusiness",
     "name": `${categoryData.name} in ${cityData.name}`,
     "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by FixBro.`,
     "image": schemaImage,
-    "provider": {
-      "@type": "LocalBusiness",
-      "name": "FixBro",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": cityData.name,
-        "addressRegion": "Karnataka",
-        "addressCountry": "IN"
-      }
+    "telephone": seoSettings.structuredDataTelephone,
+    "priceRange": "₹₹",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": cityData.name,
+      "addressRegion": "Karnataka",
+      "addressCountry": "IN"
     },
     "areaServed": {
       "@type": "City",

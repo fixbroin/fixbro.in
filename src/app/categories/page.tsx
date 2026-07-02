@@ -16,7 +16,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const appBaseUrl = getBaseUrl();
   return {
-    title: 'Top-Rated Home Service Categories in Bangalore | FixBro',
+    title: 'Top-Rated Home Service Categories in Bangalore',
     description: 'Explore all professional home service categories in Bangalore. Find expert carpenters, plumbers, electricians, painters, and appliance technicians near you.',
     robots: {
       index: true,
@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: `${appBaseUrl}/categories`,
     },
     openGraph: {
-      title: 'Top-Rated Home Service Categories in Bangalore | FixBro',
+      title: 'Top-Rated Home Service Categories in Bangalore',
       description: 'Explore all professional home service categories in Bangalore. Find expert carpenters, plumbers, electricians, painters, and appliance technicians near you.',
       url: '/categories',
       images: [{ url: `${appBaseUrl}/android-chrome-512x512.png`, width: 512, height: 512, alt: 'FixBro Categories' }],

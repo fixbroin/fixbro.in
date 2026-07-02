@@ -224,19 +224,17 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
 
   const areaCategorySchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "LocalBusiness",
     "name": `${searchTerm} in ${areaData.name}, ${cityData.name}`,
     "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${searchTerm} services in ${areaData.name}, ${cityData.name}. Trusted experts by FixBro.`,
     "image": schemaImage,
-    "provider": {
-      "@type": "LocalBusiness",
-      "name": "FixBro",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": areaData.name,
-        "addressRegion": cityData.name,
-        "addressCountry": "IN"
-      }
+    "telephone": seoSettings.structuredDataTelephone,
+    "priceRange": "₹₹",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": areaData.name,
+      "addressRegion": cityData.name,
+      "addressCountry": "IN"
     },
     "areaServed": {
       "@type": "AdministrativeArea",

@@ -171,13 +171,17 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
 
   const areaSchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
+    "@type": "LocalBusiness",
     "name": `Home Services in ${areaData.name}, ${areaData.parentCityData!.name}`,
     "description": areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
     "image": schemaImage,
-    "provider": {
-      "@type": "LocalBusiness",
-      "name": "FixBro"
+    "telephone": seoSettings.structuredDataTelephone,
+    "priceRange": "₹₹",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": areaData.name,
+      "addressRegion": areaData.parentCityData!.name,
+      "addressCountry": "IN"
     },
     "areaServed": {
       "@type": "AdministrativeArea",

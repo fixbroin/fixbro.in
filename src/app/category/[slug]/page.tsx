@@ -165,12 +165,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     
     const categorySchema = {
       "@context": "https://schema.org",
-      "@type": "Service",
+      "@type": "Product",
       "name": `${data.category.name} Services`,
       "description": data.category.seo_description || `Professional ${data.category.name} services near you.`,
       "image": schemaImage,
-      "provider": {
-        "@type": "LocalBusiness",
+      "brand": {
+        "@type": "Brand",
         "name": "FixBro"
       },
       "aggregateRating": {

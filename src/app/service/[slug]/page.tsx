@@ -248,24 +248,6 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const ratingValue = serviceData.rating || aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8";
   const reviewCount = serviceData.reviewCount || aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156";
 
-  (serviceSchema as any).aggregateRating = {
-    "@type": "AggregateRating",
-    "ratingValue": ratingValue,
-    "reviewCount": reviewCount,
-    "bestRating": "5",
-    "worstRating": "1"
-  };
-
-  // Add Pricing Info if available
-  if (serviceData.price) {
-    (serviceSchema as any).offers = {
-      "@type": "Offer",
-      "price": serviceData.discountedPrice || serviceData.price,
-      "priceCurrency": "INR",
-      "availability": "https://schema.org/InStock"
-    };
-  }
-
   // Create a separate Product schema specifically for Google organic Product Feeds
   const productSchema = {
     "@context": "https://schema.org",
