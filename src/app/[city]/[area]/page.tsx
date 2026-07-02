@@ -79,9 +79,9 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
 
-  const title = replacePlaceholders(areaData.metaTitle || seoSettings.areaPageTitlePattern, placeholderData) || `${areaData.name}, ${areaData.parentCityData?.name} | FixBro`;
-  const description = replacePlaceholders(areaData.metaDescription || seoSettings.areaPageDescriptionPattern, placeholderData) || `Trusted home services in ${areaData.name}, ${areaData.parentCityData?.name}.`;
-  const keywords = replacePlaceholders(areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
+  const title = replacePlaceholders(areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, placeholderData) || `${areaData.name}, ${areaData.parentCityData?.name} | FixBro`;
+  const description = replacePlaceholders(areaData.seo_description || areaData.metaDescription || seoSettings.areaPageDescriptionPattern, placeholderData) || `Trusted home services in ${areaData.name}, ${areaData.parentCityData?.name}.`;
+  const keywords = replacePlaceholders(areaData.seo_keywords || areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = areaData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -173,7 +173,7 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "name": `Home Services in ${areaData.name}, ${areaData.parentCityData!.name}`,
-    "description": areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
+    "description": areaData.seo_description || areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
     "priceRange": "₹₹",

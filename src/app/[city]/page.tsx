@@ -61,9 +61,9 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { cityName: cityData.name };
 
-  const title = replacePlaceholders(cityData.metaTitle || seoSettings.cityPageTitlePattern, placeholderData) || `${cityData.name} Home Services | FixBro`;
-  const description = replacePlaceholders(cityData.metaDescription || seoSettings.cityPageDescriptionPattern, placeholderData) || `Trusted home services in ${cityData.name}.`;
-  const keywords = replacePlaceholders(cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
+  const title = replacePlaceholders(cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, placeholderData) || `${cityData.name} Home Services | FixBro`;
+  const description = replacePlaceholders(cityData.seo_description || cityData.metaDescription || seoSettings.cityPageDescriptionPattern, placeholderData) || `Trusted home services in ${cityData.name}.`;
+  const keywords = replacePlaceholders(cityData.seo_keywords || cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = cityData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
@@ -139,7 +139,7 @@ export default async function CityHomePage({ params }: CityPageProps) {
     "@type": "LocalBusiness",
     "name": `FixBro ${cityData.name}`,
     "url": `${appBaseUrl}/${citySlug}`,
-    "description": cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by FixBro.`,
+    "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by FixBro.`,
     "telephone": seoSettings.structuredDataTelephone,
     "image": schemaImage,
     "address": {
