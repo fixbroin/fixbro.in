@@ -338,17 +338,17 @@ export default function AreaServiceSeoForm({
                               <Button
                                 key={city.id}
                                 variant={field.value === city.id ? "secondary" : "ghost"}
-                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative whitespace-normal"
                                 onClick={() => {
                                   field.onChange(city.id);
                                   setIsCityPickerOpen(false);
                                   setCitySearch("");
                                 }}
                               >
-                                <div className="flex flex-col gap-1 pr-6">
+                                <div className="flex flex-col gap-1 pr-6 text-left">
                                   <span className="font-semibold text-sm">{city.name}</span>
                                   {hasGenerated && (
-                                    <span className="text-[10px] text-muted-foreground line-clamp-1">
+                                    <span className="text-[10px] text-muted-foreground whitespace-normal break-words text-left">
                                       Has overrides: {generatedAreas.join(", ")}
                                     </span>
                                   )}
@@ -425,17 +425,17 @@ export default function AreaServiceSeoForm({
                               <Button
                                 key={area.id}
                                 variant={field.value === area.id ? "secondary" : "ghost"}
-                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative whitespace-normal"
                                 onClick={() => {
                                   field.onChange(area.id);
                                   setIsAreaPickerOpen(false);
                                   setAreaSearch("");
                                 }}
                               >
-                                <div className="flex flex-col gap-1 pr-6">
+                                <div className="flex flex-col gap-1 pr-6 text-left">
                                   <span className="font-semibold text-sm">{area.name}</span>
                                   {hasGenerated && (
-                                    <span className="text-[10px] text-muted-foreground line-clamp-1">
+                                    <span className="text-[10px] text-muted-foreground whitespace-normal break-words text-left">
                                       Has overrides: {generatedServices.join(", ")}
                                     </span>
                                   )}

@@ -264,7 +264,36 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
       "price": serviceData.discountedPrice || serviceData.price,
       "priceCurrency": "INR",
       "availability": "https://schema.org/InStock",
-      "url": `${appBaseUrl}/service/${slug}`
+      "url": `${appBaseUrl}/service/${slug}`,
+      "priceValidUntil": `${new Date().getFullYear() + 1}-01-01`,
+      "hasMerchantReturnPolicy": {
+        "@type": "MerchantReturnPolicy",
+        "applicableCountry": "IN",
+        "returnPolicyCategory": "https://schema.org/MerchantReturnNotPermitted"
+      },
+      "shippingDetails": {
+        "@type": "OfferShippingDetails",
+        "shippingRate": {
+          "@type": "MonetaryAmount",
+          "value": "0",
+          "currency": "INR"
+        },
+        "deliveryTime": {
+          "@type": "ShippingDeliveryTime",
+          "handlingTime": {
+            "@type": "QuantitativeValue",
+            "minValue": "0",
+            "maxValue": "0",
+            "unitCode": "DAY"
+          },
+          "transitTime": {
+            "@type": "QuantitativeValue",
+            "minValue": "0",
+            "maxValue": "0",
+            "unitCode": "DAY"
+          }
+        }
+      }
     } : undefined,
     "aggregateRating": {
       "@type": "AggregateRating",

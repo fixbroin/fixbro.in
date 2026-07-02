@@ -138,6 +138,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
 
   const { cityData, areaData, serviceData, seoOverride } = pageData;
   const appBaseUrl = getBaseUrl();
+  const pagePath = `/${cityData.slug}/${areaData.slug}/service/${serviceData.slug}`;
 
   const breadcrumbItems = [
     { name: "Home", url: appBaseUrl },
@@ -178,6 +179,42 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
       "@type": "Brand",
       "name": "FixBro"
     },
+    "offers": serviceData.price ? {
+      "@type": "Offer",
+      "price": serviceData.discountedPrice || serviceData.price,
+      "priceCurrency": "INR",
+      "availability": "https://schema.org/InStock",
+      "url": `${appBaseUrl}${pagePath}`,
+      "priceValidUntil": `${new Date().getFullYear() + 1}-01-01`,
+      "hasMerchantReturnPolicy": {
+        "@type": "MerchantReturnPolicy",
+        "applicableCountry": "IN",
+        "returnPolicyCategory": "https://schema.org/MerchantReturnNotPermitted"
+      },
+      "shippingDetails": {
+        "@type": "OfferShippingDetails",
+        "shippingRate": {
+          "@type": "MonetaryAmount",
+          "value": "0",
+          "currency": "INR"
+        },
+        "deliveryTime": {
+          "@type": "ShippingDeliveryTime",
+          "handlingTime": {
+            "@type": "QuantitativeValue",
+            "minValue": "0",
+            "maxValue": "0",
+            "unitCode": "DAY"
+          },
+          "transitTime": {
+            "@type": "QuantitativeValue",
+            "minValue": "0",
+            "maxValue": "0",
+            "unitCode": "DAY"
+          }
+        }
+      }
+    } : undefined,
     "aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": ratingValue,
