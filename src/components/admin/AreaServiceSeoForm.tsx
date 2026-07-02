@@ -511,7 +511,7 @@ export default function AreaServiceSeoForm({
                               <Button
                                 key={service.id}
                                 variant={field.value === service.id ? "secondary" : "ghost"}
-                                className="w-full justify-start text-left h-auto py-3 px-3 relative group"
+                                className="w-full justify-start text-left h-auto py-3 px-3 relative group whitespace-normal break-words"
                                 onClick={() => {
                                   field.onChange(service.id);
                                   setIsServicePickerOpen(false);
