@@ -276,7 +276,7 @@ export default function AreaServiceSeoForm({
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Select City</DialogTitle>
-                    <DialogDescription>Select the city for this localized service page.</DialogDescription>
+                    <DialogDescription>Search and select a city. ✅ indicates existing SEO settings.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="relative">
@@ -293,20 +293,37 @@ export default function AreaServiceSeoForm({
                         {searchableCities.length === 0 ? (
                           <p className="text-center py-4 text-sm text-muted-foreground">No cities found.</p>
                         ) : (
-                          searchableCities.map((city) => (
-                            <Button
-                              key={city.id}
-                              variant={field.value === city.id ? "secondary" : "ghost"}
-                              className="w-full justify-start text-left h-auto py-2.5 px-3"
-                              onClick={() => {
-                                field.onChange(city.id);
-                                setIsCityPickerOpen(false);
-                                setCitySearch("");
-                              }}
-                            >
-                              <span className="font-semibold text-sm">{city.name}</span>
-                            </Button>
-                          ))
+                          searchableCities.map((city) => {
+                            const generatedAreas = Array.from(new Set(existingSettings
+                              .filter(s => s.cityId === city.id)
+                              .map(s => s.areaName)));
+                            const hasGenerated = generatedAreas.length > 0;
+
+                            return (
+                              <Button
+                                key={city.id}
+                                variant={field.value === city.id ? "secondary" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative"
+                                onClick={() => {
+                                  field.onChange(city.id);
+                                  setIsCityPickerOpen(false);
+                                  setCitySearch("");
+                                }}
+                              >
+                                <div className="flex flex-col gap-1 pr-6">
+                                  <span className="font-semibold text-sm">{city.name}</span>
+                                  {hasGenerated && (
+                                    <span className="text-[10px] text-muted-foreground line-clamp-1">
+                                      Has overrides: {generatedAreas.join(", ")}
+                                    </span>
+                                  )}
+                                </div>
+                                {hasGenerated && (
+                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                )}
+                              </Button>
+                            );
+                          })
                         )}
                       </div>
                     </ScrollArea>
@@ -346,7 +363,7 @@ export default function AreaServiceSeoForm({
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Select Area</DialogTitle>
-                    <DialogDescription>Search areas inside the selected city.</DialogDescription>
+                    <DialogDescription>Search areas in the selected city. ✅ indicates existing SEO settings.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="relative">
@@ -433,7 +450,7 @@ export default function AreaServiceSeoForm({
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Select Service</DialogTitle>
-                    <DialogDescription>Choose the service for this local SEO landing page.</DialogDescription>
+                    <DialogDescription>Search services. ✅ indicates existing SEO for the chosen area.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="relative">
@@ -450,20 +467,36 @@ export default function AreaServiceSeoForm({
                         {searchableServices.length === 0 ? (
                           <p className="text-center py-4 text-sm text-muted-foreground">No services found.</p>
                         ) : (
-                          searchableServices.map((service) => (
-                            <Button
-                              key={service.id}
-                              variant={field.value === service.id ? "secondary" : "ghost"}
-                              className="w-full justify-start text-left h-auto py-2.5 px-3"
-                              onClick={() => {
-                                field.onChange(service.id);
-                                setIsServicePickerOpen(false);
-                                setServiceSearch("");
-                              }}
-                            >
-                              <span className="font-semibold text-sm">{service.name}</span>
-                            </Button>
-                          ))
+                          searchableServices.map((service) => {
+                            const isGenerated = watchedCityId && watchedAreaId && existingSettings.some(
+                              s => s.cityId === watchedCityId && s.areaId === watchedAreaId && s.serviceId === service.id
+                            );
+
+                            return (
+                              <Button
+                                key={service.id}
+                                variant={field.value === service.id ? "secondary" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-3 px-3 relative group"
+                                onClick={() => {
+                                  field.onChange(service.id);
+                                  setIsServicePickerOpen(false);
+                                  setServiceSearch("");
+                                }}
+                              >
+                                <div className="flex flex-col gap-1 pr-8">
+                                  <span className="font-semibold text-sm">{service.name}</span>
+                                  {isGenerated && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-green-50 text-green-700 border-green-200 w-fit">
+                                      Already Generated
+                                    </Badge>
+                                  )}
+                                </div>
+                                {isGenerated && (
+                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                )}
+                              </Button>
+                            );
+                          })
                         )}
                       </div>
                     </ScrollArea>
