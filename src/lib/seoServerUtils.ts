@@ -3,9 +3,10 @@
 
 import { adminDb } from './firebaseAdmin';
 import { defaultSeoValues } from './seoUtils';
-import type { FirestoreSEOSettings, CityCategorySeoSetting, AreaCategorySeoSetting } from '@/types/firestore';
+import type { FirestoreSEOSettings, CityCategorySeoSetting, AreaCategorySeoSetting, AreaServiceSeoSetting } from '@/types/firestore';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
+import { serializeFirestoreData } from './serializeUtils';
 
 /**
  * Fetches global SEO settings with server-side request memoization using Admin SDK.
@@ -48,7 +49,7 @@ export const getCityCategorySeoOverride = cache(async (cityId: string, categoryI
           .limit(1);
         const snapshot = await query.get();
         if (!snapshot.empty) {
-          return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as CityCategorySeoSetting;
+          return { id: snapshot.docs[0].id, ...serializeFirestoreData(snapshot.docs[0].data()) } as CityCategorySeoSetting;
         }
         return null;
       } catch (error) {
@@ -75,7 +76,7 @@ export const getAreaCategorySeoOverride = cache(async (areaId: string, categoryI
           .limit(1);
         const snapshot = await query.get();
         if (!snapshot.empty) {
-          return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as AreaCategorySeoSetting;
+          return { id: snapshot.docs[0].id, ...serializeFirestoreData(snapshot.docs[0].data()) } as AreaCategorySeoSetting;
         }
         return null;
       } catch (error) {
@@ -85,5 +86,32 @@ export const getAreaCategorySeoOverride = cache(async (areaId: string, categoryI
     },
     [`area-category-seo-${areaId}-${categoryId}`],
     { revalidate: false, tags: ['seo-settings', 'area-category-seo', 'global-cache'] }
+  )();
+});
+
+/**
+ * Fetches area-service specific SEO overrides.
+ */
+export const getAreaServiceSeoOverride = cache(async (areaId: string, serviceId: string): Promise<AreaServiceSeoSetting | null> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const query = adminDb.collection('areaServiceSeoSettings')
+          .where('areaId', '==', areaId)
+          .where('serviceId', '==', serviceId)
+          .where('isActive', '==', true)
+          .limit(1);
+        const snapshot = await query.get();
+        if (!snapshot.empty) {
+          return { id: snapshot.docs[0].id, ...serializeFirestoreData(snapshot.docs[0].data()) } as AreaServiceSeoSetting;
+        }
+        return null;
+      } catch (error) {
+        console.error('Error fetching area-service SEO override:', error);
+        return null;
+      }
+    },
+    [`area-service-seo-${areaId}-${serviceId}`],
+    { revalidate: false, tags: ['seo-settings', 'area-service-seo', 'global-cache'] }
   )();
 });

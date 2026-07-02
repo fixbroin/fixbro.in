@@ -303,6 +303,74 @@ areaCategoryFaqsTemplate: [
     answer: "FixBro connects customers with experienced professionals, transparent pricing, convenient booking, and reliable service support."
   }
 ],
+
+  areaServiceSeoContentTemplate: `
+<section class="space-y-5">
+
+  <h2>{{serviceName}} in {{areaName}}, {{cityName}}</h2>
+
+  <p>
+    FixBro offers reliable, top-rated {{serviceName}} in {{areaName}}, {{cityName}}. Whether you need urgent assistance, standard repairs, routine maintenance, or professional installation work, our verified local service experts are ready to handle it for you.
+  </p>
+
+  <p>
+    Every job is completed by background-verified professionals using modern tools, high-quality spare parts, and standardized processes. Book {{serviceName}} near you in {{areaName}} with flexible scheduling and get transparent upfront estimates.
+  </p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+
+    <div class="p-4 bg-muted/30 rounded-lg">
+      <strong>Local Availability</strong><br>
+      Serving homes, apartments, and offices in {{areaName}}.
+    </div>
+
+    <div class="p-4 bg-muted/30 rounded-lg">
+      <strong>Prompt Turnaround</strong><br>
+      Same-day scheduling option and on-time service delivery.
+    </div>
+
+    <div class="p-4 bg-muted/30 rounded-lg">
+      <strong>Verified Quality</strong><br>
+      Backed by verified technician reviews and FixBro assurance.
+    </div>
+
+  </div>
+
+  <h3>Why Book {{serviceName}} in {{areaName}} with FixBro?</h3>
+
+  <ul>
+    <li>Dedicated service experts available locally in {{areaName}}</li>
+    <li>Upfront pricing with no hidden charges</li>
+    <li>Flexible booking slots to suit your schedule</li>
+    <li>Equipped with professional equipment for precise execution</li>
+    <li>Customer-first platform support</li>
+  </ul>
+
+  <p>
+    Enjoy a stress-free booking experience. Reserve your {{serviceName}} slot in {{areaName}}, {{cityName}} today!
+  </p>
+
+</section>
+`,
+
+  areaServiceFaqsTemplate: [
+    {
+      question: "What is the cost of {{serviceName}} in {{areaName}}?",
+      answer: "The price for {{serviceName}} is displayed transparently above. Upfront pricing ensures you pay only for the exact service you select, with no hidden fees."
+    },
+    {
+      question: "How soon can I schedule {{serviceName}} in {{areaName}}?",
+      answer: "We offer flexible slots, including same-day availability depending on technician schedules in {{areaName}}."
+    },
+    {
+      question: "Are the technicians trained for {{serviceName}}?",
+      answer: "Yes, all service professionals are experienced, background-verified, and fully equipped with professional tools to execute {{serviceName}} safely."
+    },
+    {
+      question: "Is there any warranty on {{serviceName}}?",
+      answer: "FixBro stands behind the service quality. If any issues arise from the workmanship, our support team will address it promptly."
+    }
+  ],
 };
 
 /**

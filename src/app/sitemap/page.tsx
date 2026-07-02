@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebaseAdmin';
-import type { FirestoreCategory, FirestoreCity, FirestoreArea, FirestoreService, FirestoreSubCategory, FirestoreBlogPost, ContentPage } from '@/types/firestore';
+import type { FirestoreCategory, FirestoreCity, FirestoreArea, FirestoreService, FirestoreSubCategory, FirestoreBlogPost, ContentPage, AreaServiceSeoSetting } from '@/types/firestore';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { Metadata } from 'next';
@@ -31,6 +31,7 @@ interface SitemapData {
   globalCategories: FirestoreCategory[];
   servicesByCategory: Array<{ category: FirestoreCategory; subCategories: Array<{ subCategory: FirestoreSubCategory; services: FirestoreService[] }> }>;
   blogs: FirestoreBlogPost[];
+  serviceOverrides: AreaServiceSeoSetting[];
 }
 
 const getSitemapData = cache(async (): Promise<SitemapData> => {
@@ -63,13 +64,15 @@ const getSitemapData = cache(async (): Promise<SitemapData> => {
         categoriesSnap,
         subCategoriesSnap,
         servicesSnap,
-        blogsSnap
+        blogsSnap,
+        serviceSeoSnap
       ] = await Promise.all([
         adminDb.collection('cities').where('isActive', '==', true).orderBy('name').get(),
         adminDb.collection('adminCategories').where('isActive', '==', true).orderBy('order').get(),
         adminDb.collection('adminSubCategories').where('isActive', '==', true).orderBy('name').get(),
         adminDb.collection('adminServices').where('isActive', '==', true).orderBy('name').get(),
-        adminDb.collection('blogPosts').where('isPublished', '==', true).orderBy('createdAt', 'desc').get()
+        adminDb.collection('blogPosts').where('isPublished', '==', true).orderBy('createdAt', 'desc').get(),
+        adminDb.collection('areaServiceSeoSettings').where('isActive', '==', true).get()
       ]);
 
       const cities = citiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCity));
@@ -77,6 +80,8 @@ const getSitemapData = cache(async (): Promise<SitemapData> => {
       const subCategories = subCategoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreSubCategory));
       const services = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreService));
       const blogs = blogsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreBlogPost));
+      
+      const parsedServiceOverrides = serviceSeoSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AreaServiceSeoSetting));
       
       // Group City-wise Categories
       const cityCategories = cities.map(city => ({
@@ -112,6 +117,7 @@ const getSitemapData = cache(async (): Promise<SitemapData> => {
         globalCategories: categories,
         servicesByCategory,
         blogs,
+        serviceOverrides: parsedServiceOverrides
       };
     },
     ['visual-sitemap-data'],
@@ -294,6 +300,31 @@ export default async function SitemapPage() {
                     </ul>
                 </div>
             </section>
+
+            {/* Section 8: Localized Service SEO Pages */}
+            {data.serviceOverrides && data.serviceOverrides.length > 0 && (
+                <section>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary"><Briefcase className="h-6 w-6"/></div>
+                        <h2 className="text-2xl font-bold font-headline">Localized Service Pages</h2>
+                    </div>
+                    <div className="bg-card p-8 rounded-3xl shadow-sm border border-border/50">
+                        <ul className="space-y-3 columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-8">
+                        {data.serviceOverrides.map(setting => (
+                            <li key={setting.id} className="break-inside-avoid flex items-start gap-2 group">
+                                <ChevronRight className="h-3 w-3 text-primary mt-1 opacity-40 group-hover:opacity-100 transition-opacity shrink-0" />
+                                <Link 
+                                  href={`/${setting.citySlug}/${setting.areaSlug}/service/${setting.serviceSlug}`} 
+                                  className="text-muted-foreground hover:text-primary text-sm font-medium transition-colors leading-snug"
+                                >
+                                  {setting.serviceName} in {setting.areaName} ({setting.cityName})
+                                </Link>
+                            </li>
+                        ))}
+                        </ul>
+                    </div>
+                </section>
+            )}
         </div>
       </div>
     </div>

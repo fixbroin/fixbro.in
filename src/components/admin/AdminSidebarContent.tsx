@@ -17,7 +17,7 @@ import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { hasPathAccess } from '@/config/rbac';
 
@@ -51,6 +51,7 @@ const navItems = [
   { href: '/admin/service-zones', label: 'Service Zones', icon: Globe2 },
   { href: '/admin/seo-settings', label: 'Global SEO Patterns', icon: Target },
   { href: '/admin/seo-overrides', label: 'Advanced SEO', icon: Zap },
+  { href: '/admin/service-seo', label: 'Service-wise SEO', icon: Layers },
   { type: 'separator', label: 'Operations & Finance' },
   { href: '/admin/referral-settings', label: 'Referral System', icon: Handshake },
   { href: '/admin/quotation-invoice', label: 'Quotation & Invoice', icon: Receipt },
@@ -83,6 +84,35 @@ export default function AdminSidebarContent() {
   const { user, adminPermissions, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Restore scroll position from sessionStorage
+    const savedScroll = sessionStorage.getItem('admin-sidebar-scroll');
+    if (savedScroll) {
+      container.scrollTop = parseInt(savedScroll, 10);
+    }
+
+    // Save scroll position on scroll (debounced by 150ms)
+    let timeoutId: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (scrollContainerRef.current) {
+          sessionStorage.setItem('admin-sidebar-scroll', scrollContainerRef.current.scrollTop.toString());
+        }
+      }, 150);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Filter navItems based on granular permissions
   const filteredNavItems = navItems.filter(item => {
@@ -172,7 +202,7 @@ export default function AdminSidebarContent() {
           className="group-data-[collapsible=icon]:mr-0 group-data-[collapsible=icon]:justify-center"
         />
       </SidebarHeader>
-      <SidebarContent className="pb-8 overflow-x-hidden">
+      <SidebarContent ref={scrollContainerRef} className="pb-8 overflow-x-hidden">
         <SidebarMenu className="gap-1 px-2 pt-4 group-data-[collapsible=icon]:px-1">
           {cleanedNavItems.map((item, index) => {
             if (item.type === 'separator') {

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Target, Globe, FileText, Type, Pilcrow, BarChart, Save, Loader2, Settings2, Map, Layers, RefreshCw, Sparkles, MessageSquareQuote, Building, MapPin } from "lucide-react";
+import { Target, Globe, FileText, Type, Pilcrow, BarChart, Save, Loader2, Settings2, Map, Layers, RefreshCw, Sparkles, MessageSquareQuote, Building, MapPin, Briefcase } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { db } from '@/lib/firebase';
@@ -78,6 +78,11 @@ const seoSettingsSchema = z.object({
   })).optional(),
   areaCategorySeoContentTemplate: z.string().optional(),
   areaCategoryFaqsTemplate: z.array(z.object({
+    question: z.string(),
+    answer: z.string()
+  })).optional(),
+  areaServiceSeoContentTemplate: z.string().optional(),
+  areaServiceFaqsTemplate: z.array(z.object({
     question: z.string(),
     answer: z.string()
   })).optional(),
@@ -373,6 +378,15 @@ export default function SEOSettingsPage() {
                     </div>
                     {renderSEOField("areaCategorySeoContentTemplate", "Default Bio Template (HTML)", "e.g., <h3>Top-rated {{categoryName}} in {{areaName}}</h3>...", "Placeholder: {{areaName}}, {{cityName}}, {{categoryName}}", true)}
                     {renderFaqTemplateField("areaCategoryFaqsTemplate", "Default FAQ Template (JSON)", "JSON array with {{areaName}}, {{cityName}}, {{categoryName}} placeholders.")}
+                  </div>
+
+                  <div className="space-y-6 pt-6 border-t">
+                    <div className="flex items-center gap-2">
+                        <Briefcase className="h-5 w-5 text-primary" />
+                        <h4 className="text-lg font-bold">Area-Service Defaults</h4>
+                    </div>
+                    {renderSEOField("areaServiceSeoContentTemplate", "Default Bio Template (HTML)", "e.g., <h3>Top-rated {{serviceName}} in {{areaName}}</h3>...", "Placeholder: {{areaName}}, {{cityName}}, {{serviceName}}", true)}
+                    {renderFaqTemplateField("areaServiceFaqsTemplate", "Default FAQ Template (JSON)", "JSON array with {{areaName}}, {{cityName}}, {{serviceName}} placeholders.")}
                   </div>
                 </CardContent>
               </Card>

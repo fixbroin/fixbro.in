@@ -746,6 +746,8 @@ export interface FirestoreSEOSettings {
   cityCategoryFaqsTemplate?: FaqItem[];
   areaCategorySeoContentTemplate?: string;
   areaCategoryFaqsTemplate?: FaqItem[];
+  areaServiceSeoContentTemplate?: string;
+  areaServiceFaqsTemplate?: FaqItem[];
 
   updatedAt?: Timestamp;
 }
@@ -1101,6 +1103,29 @@ export interface AreaCategorySeoSetting {
   imageHint?: string;
   isActive: boolean;
   createdAt?: Timestamp; // Added createdAt
+  updatedAt?: Timestamp;
+}
+
+export interface AreaServiceSeoSetting {
+  id?: string; // Firestore document ID
+  cityId: string;
+  cityName: string; // Denormalized
+  citySlug: string; // Denormalized
+  areaId: string;
+  areaName: string; // Denormalized
+  areaSlug: string; // Denormalized
+  serviceId: string;
+  serviceName: string; // Denormalized
+  serviceSlug: string; // Denormalized
+  slug: string; // e.g., "bangalore/whitefield/service/bed-dismantle"
+  h1_title?: string;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
+  seo_content?: string; // Long-form SEO content
+  faqs?: FaqItem[];
+  isActive: boolean;
+  createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 

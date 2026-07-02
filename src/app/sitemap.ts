@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { adminDb } from '@/lib/firebaseAdmin'; 
 import { Timestamp } from 'firebase-admin/firestore'; 
-import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage } from '@/types/firestore';
+import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage, AreaServiceSeoSetting } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config'; 
 import { unstable_cache } from 'next/cache';
 
@@ -205,6 +205,28 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
     }
   } catch (e) {
     console.error("Sitemap: Error fetching cities/areas/categories:", e);
+  }
+
+  // Add localized service-wise SEO overrides sitemap entries
+  try {
+    const serviceSeoSnapshot = await adminDb
+      .collection('areaServiceSeoSettings')
+      .where('isActive', '==', true)
+      .get();
+    
+    serviceSeoSnapshot.forEach(docSnap => {
+      const setting = docSnap.data() as AreaServiceSeoSetting;
+      if (setting.citySlug && setting.areaSlug && setting.serviceSlug) {
+        entries.push({
+          url: `${appBaseUrl}/${setting.citySlug}/${setting.areaSlug}/service/${setting.serviceSlug}`,
+          lastModified: safeToISOString(setting.updatedAt || setting.createdAt, currentDate),
+          changeFrequency: 'daily',
+          priority: 0.8,
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Sitemap: Error fetching area-service SEO entries:", e);
   }
 
   const uniqueEntries = Array.from(new Map(entries.map(entry => [entry.url, entry])).values());

@@ -8,7 +8,7 @@ import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, THEME_PA
 import { defaultGlobalWebSettings } from '@/config/webDefaults';
 import { defaultAppSettings } from '@/config/appDefaults';
 import { defaultMarketingValues } from '@/hooks/useMarketingSettings';
-import type { ContentPage, FirestoreCategory, FirestoreSubCategory, FirestoreService, FirestoreTax, FirestoreCity, FirestoreArea, CityCategorySeoSetting, AreaCategorySeoSetting } from '@/types/firestore';
+import type { ContentPage, FirestoreCategory, FirestoreSubCategory, FirestoreService, FirestoreTax, FirestoreCity, FirestoreArea, CityCategorySeoSetting, AreaCategorySeoSetting, AreaServiceSeoSetting } from '@/types/firestore';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 
@@ -408,6 +408,36 @@ export const getAreaCategorySeoSettings = cache(async (): Promise<AreaCategorySe
       }
     },
     ['area-category-seo-list'],
+    { revalidate: false, tags: ['seo-settings', 'global-cache'] }
+  )();
+});
+
+/**
+ * Fetches all Area-Service SEO settings with caching.
+ */
+export const getAreaServiceSeoSettings = cache(async (): Promise<AreaServiceSeoSetting[]> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const snapshot = await adminDb.collection("areaServiceSeoSettings").get();
+        const settings = snapshot.docs.map(doc => ({ ...serializeFirestoreData(doc.data()), id: doc.id } as AreaServiceSeoSetting));
+        
+        // Sort in memory to avoid requiring a Firestore composite index
+        settings.sort((a, b) => {
+          const cityComp = (a.cityName || '').localeCompare(b.cityName || '');
+          if (cityComp !== 0) return cityComp;
+          const areaComp = (a.areaName || '').localeCompare(b.areaName || '');
+          if (areaComp !== 0) return areaComp;
+          return (a.serviceName || '').localeCompare(b.serviceName || '');
+        });
+        
+        return settings;
+      } catch (error) {
+        console.error("Error fetching area-service SEO settings:", error);
+        return [];
+      }
+    },
+    ['area-service-seo-list'],
     { revalidate: false, tags: ['seo-settings', 'global-cache'] }
   )();
 });
