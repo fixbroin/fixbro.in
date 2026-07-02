@@ -118,8 +118,12 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: false },
+  eslint: { ignoreDuringBuilds: false },
 };
 
-export default withPWA(nextConfig);
+const finalConfig = withPWA(nextConfig);
+finalConfig.typescript = { ignoreBuildErrors: false };
+finalConfig.eslint = { ignoreDuringBuilds: false };
+
+export default finalConfig;
