@@ -379,7 +379,7 @@ export async function POST(request: Request) {
     }
 
     // D. Trigger Actual Push Notifications
-    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string) => {
+    async function triggerPush(pUserId: string, pTitle: string, pBody: string, pHref: string) {
         try {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
@@ -389,7 +389,7 @@ export async function POST(request: Request) {
         } catch (e) {
             console.error(`Error triggering push for ${pUserId}:`, e);
         }
-    };
+    }
 
     if (userId) {
         tasks.push(triggerPush(

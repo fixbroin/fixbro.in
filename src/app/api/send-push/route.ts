@@ -70,7 +70,11 @@ export async function POST(request: Request) {
         // Handle dead or invalid tokens
         const isDeadToken = 
             err.code === 'messaging/registration-token-not-registered' || 
-            err.code === 'messaging/invalid-argument';
+            err.code === 'messaging/invalid-argument' ||
+            err.message?.includes('unregistered') ||
+            err.message?.includes('registration-token-not-registered') ||
+            err.message?.includes('invalid-argument') ||
+            err.errorInfo?.code === 'messaging/registration-token-not-registered';
 
         if (isDeadToken) {
             console.log(`Token ${token} is no longer valid. Deleting from Firestore for user ${userId}...`);
