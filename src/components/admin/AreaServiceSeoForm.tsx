@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
 import { Loader2, Edit2, Lock, CheckCircle, Search, MapPin, Building, Tags, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { replacePlaceholders, defaultSeoValues } from "@/lib/seoUtils";
 
 const generateSeoSlug = (parts: (string | undefined)[]): string => {
     return parts.filter(Boolean).map(part => part!.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).join('/');
@@ -65,9 +66,18 @@ export default function AreaServiceSeoForm({
 }: AreaServiceSeoFormProps) {
   const [filteredAreas, setFilteredAreas] = useState<FirestoreArea[]>([]);
   const [isSlugEditable, setIsSlugEditable] = useState(false);
+  const [globalSeo, setGlobalSeo] = useState<any>(null);
   
   const initialId = initialData?.id;
   const initialCityId = initialData?.cityId;
+
+  useEffect(() => {
+    getDoc(doc(db, "seoSettings", "global")).then(snap => {
+      if (snap.exists()) {
+        setGlobalSeo(snap.data());
+      }
+    });
+  }, []);
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
   const [citySearch, setCitySearch] = useState("");
@@ -183,7 +193,7 @@ export default function AreaServiceSeoForm({
     }
   }, [watchedCityId, areas, form, isEditing, initialCityId]);
 
-  // Auto-generate Slug & Title
+  // Auto-generate Slug, Title, SEO Content & FAQs
   useEffect(() => {
     if (!isEditing && selectedCity && selectedArea && selectedService && !isSlugEditable) {
       const generated = generateSeoSlug([selectedCity.slug, selectedArea.slug, "service", selectedService.slug]);
@@ -198,8 +208,33 @@ export default function AreaServiceSeoForm({
       form.setValue("meta_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name} | FixBro`);
       form.setValue("meta_description", `Professional ${cleanServiceName} services in ${selectedArea.name}, ${selectedCity.name}. Trusted, transparent pricing, verified experts by FixBro.`);
       form.setValue("meta_keywords", `${cleanServiceName} in ${selectedArea.name}, ${cleanServiceName} near me, best ${cleanServiceName} in ${selectedCity.name}`);
+
+      // Auto-populate SEO Content details from global/default template
+      const contentTemplate = globalSeo?.areaServiceSeoContentTemplate || defaultSeoValues.areaServiceSeoContentTemplate || "";
+      const parsedContent = replacePlaceholders(contentTemplate, {
+        cityName: selectedCity.name,
+        areaName: selectedArea.name,
+        serviceName: selectedService.name
+      });
+      form.setValue("seo_content", parsedContent);
+
+      // Auto-populate FAQ Q&As from global/default template
+      const faqsTemplate = globalSeo?.areaServiceFaqsTemplate || defaultSeoValues.areaServiceFaqsTemplate || [];
+      const parsedFaqs = faqsTemplate.map((f: any) => ({
+        question: replacePlaceholders(f.question, {
+          cityName: selectedCity.name,
+          areaName: selectedArea.name,
+          serviceName: selectedService.name
+        }),
+        answer: replacePlaceholders(f.answer, {
+          cityName: selectedCity.name,
+          areaName: selectedArea.name,
+          serviceName: selectedService.name
+        })
+      }));
+      form.setValue("faqs", parsedFaqs);
     }
-  }, [selectedCity, selectedArea, selectedService, isEditing, isSlugEditable, form, checkSlugUniqueness, initialId]);
+  }, [selectedCity, selectedArea, selectedService, isEditing, isSlugEditable, form, checkSlugUniqueness, initialId, globalSeo]);
 
   const handleSlugBlur = async () => {
     const rawVal = form.getValues("slug");

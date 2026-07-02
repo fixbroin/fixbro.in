@@ -5,6 +5,7 @@ import { unstable_cache } from 'next/cache';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { getGlobalSEOSettings, getAreaServiceSeoOverride } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
+import { serializeFirestoreData } from '@/lib/serializeUtils';
 import { getAggregateRating } from '@/lib/homepageUtils';
 import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
@@ -31,21 +32,21 @@ const getPageData = cache(async (citySlug: string, areaSlug: string, serviceSlug
         const cityQuery = citiesRef.where('slug', '==', citySlug).where('isActive', '==', true).limit(1);
         const citySnapshot = await cityQuery.get();
         if (citySnapshot.empty) return null;
-        const cityData = { id: citySnapshot.docs[0].id, ...citySnapshot.docs[0].data() } as FirestoreCity;
+        const cityData = { ...serializeFirestoreData<any>(citySnapshot.docs[0].data()), id: citySnapshot.docs[0].id } as FirestoreCity;
 
         // Get Area
         const areasRef = adminDb.collection('areas');
         const areaQuery = areasRef.where('cityId', '==', cityData.id).where('slug', '==', areaSlug).where('isActive', '==', true).limit(1);
         const areaSnapshot = await areaQuery.get();
         if (areaSnapshot.empty) return null;
-        const areaData = { id: areaSnapshot.docs[0].id, ...areaSnapshot.docs[0].data() } as FirestoreArea;
+        const areaData = { ...serializeFirestoreData<any>(areaSnapshot.docs[0].data()), id: areaSnapshot.docs[0].id } as FirestoreArea;
 
         // Get Service
         const servicesRef = adminDb.collection('adminServices');
         const serviceQuery = servicesRef.where('slug', '==', serviceSlug).limit(1);
         const serviceSnapshot = await serviceQuery.get();
         if (serviceSnapshot.empty) return null;
-        const serviceData = { id: serviceSnapshot.docs[0].id, ...serviceSnapshot.docs[0].data() } as FirestoreService;
+        const serviceData = { ...serializeFirestoreData<any>(serviceSnapshot.docs[0].data()), id: serviceSnapshot.docs[0].id } as FirestoreService;
 
         // Get Override Config
         const seoOverride = await getAreaServiceSeoOverride(areaData.id, serviceData.id);
