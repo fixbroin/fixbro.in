@@ -106,6 +106,7 @@ export default function ServiceSeoPage() {
     try {
       await deleteDoc(doc(serviceSeoRef, id));
       await triggerRefresh('seo-settings');
+      await triggerRefresh('sitemap');
       toast({ title: "Success", description: "SEO override deleted successfully." });
       await fetchData(true);
     } catch (error) {
@@ -124,6 +125,7 @@ export default function ServiceSeoPage() {
         updatedAt: Timestamp.now()
       });
       await triggerRefresh('seo-settings');
+      await triggerRefresh('sitemap');
       toast({ title: "Success", description: `SEO configuration ${updatedStatus ? 'activated' : 'deactivated'} successfully.` });
       await fetchData(true);
     } catch (error) {
@@ -181,6 +183,7 @@ export default function ServiceSeoPage() {
       }
       
       await triggerRefresh('seo-settings');
+      await triggerRefresh('sitemap');
       toast({ title: "Success", description: "Local Service SEO configurations saved successfully." });
       setIsFormOpen(false);
       await fetchData(true);
