@@ -13,11 +13,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getTimestampMillis } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { 
   Loader2, ArrowLeft, Search, User, MapPin, Phone, Mail, 
   CalendarDays, Clock, CheckCircle2, IndianRupee, Tag, 
-  AlertCircle, Plus, Trash2, Info, HandCoins, ChevronDown, CheckCircle, Check, ChevronsUpDown, X
+  AlertCircle, Plus, Trash2, Info, HandCoins, ChevronDown, CheckCircle, Check, ChevronsUpDown
 } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { 
@@ -29,7 +29,7 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import type { 
   FirestoreBooking, FirestoreUser, FirestoreCategory, 
-  FirestoreService, BookingStatus, BookingServiceItem, FirestorePromoCode
+  FirestoreService, BookingStatus, BookingServiceItem
 } from '@/types/firestore';
 import { 
   generateBookingId, getBasePriceForInvoice, 
@@ -41,15 +41,6 @@ import { Separator } from "@/components/ui/separator";
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-
-interface AppliedPromoCodeInfo {
-  id: string;
-  code: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  calculatedDiscount: number;
-  minBookingAmount?: number;
-}
 
 export default function AdminCreateBookingPage() {
   const router = useRouter();
@@ -64,10 +55,6 @@ export default function AdminCreateBookingPage() {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
   const [createdBookingId, setCreatedBookingId] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<AppliedPromoCodeInfo | null>(null);
-  const [promoCodeInput, setPromoCodeInput] = useState("");
-  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
-  const [availablePromos, setAvailablePromos] = useState<FirestorePromoCode[]>([]);
 
   const [customerSearch, setCustomerSearch] = useState("");
   const [searchResults, setSearchResults] = useState<FirestoreUser[]>([]);
@@ -148,30 +135,14 @@ export default function AdminCreateBookingPage() {
   useEffect(() => {
     const fetchPrerequisites = async () => {
       try {
-        const [catSnap, subCatSnap, servSnap, promoSnap] = await Promise.all([
+        const [catSnap, subCatSnap, servSnap] = await Promise.all([
           getDocs(query(collection(db, "adminCategories"), orderBy("order", "asc"))),
           getDocs(query(collection(db, "adminSubCategories"), orderBy("order", "asc"))),
-          getDocs(query(collection(db, "adminServices"), where("isActive", "==", true))),
-          getDocs(collection(db, "adminPromoCodes"))
+          getDocs(query(collection(db, "adminServices"), where("isActive", "==", true)))
         ]);
         setCategories(catSnap.docs.map(d => ({ ...d.data(), id: d.id } as FirestoreCategory)));
         setSubCategories(subCatSnap.docs.map(d => ({ ...d.data(), id: d.id })));
         setAllServices(servSnap.docs.map(d => ({ ...d.data(), id: d.id } as FirestoreService)));
-        
-        const promos = promoSnap.docs
-          .map(d => ({ ...d.data(), id: d.id } as FirestorePromoCode))
-          .filter(p => p.isActive);
-          
-        const currentDate = new Date();
-        const validPromos = promos.filter(p => {
-          const from = getTimestampMillis(p.validFrom);
-          const until = getTimestampMillis(p.validUntil);
-          if (from && currentDate < new Date(from)) return false;
-          if (until && currentDate > new Date(until)) return false;
-          return true;
-        });
-        validPromos.sort((a, b) => a.code.localeCompare(b.code));
-        setAvailablePromos(validPromos);
       } catch (error) { console.error(error); } finally { setIsLoadingPrerequisites(false); }
     };
     fetchPrerequisites();
@@ -229,32 +200,8 @@ export default function AdminCreateBookingPage() {
         }
       });
     }
-
-    // Calculate Promo Discount
-    let discountAmount = 0;
-    if (appliedPromo) {
-      if (appliedPromo.minBookingAmount && itemTotal < appliedPromo.minBookingAmount) {
-        // Ignored, doesn't meet minimum requirements
-      } else {
-        discountAmount = appliedPromo.discountType === 'percentage' 
-          ? (itemTotal * appliedPromo.discountValue) / 100 
-          : appliedPromo.discountValue;
-        discountAmount = Math.min(discountAmount, itemTotal);
-      }
-    }
-
-    const grandTotal = Math.max(0, itemTotal + taxTotal + visitingCharge + platformFeeTotal - discountAmount);
-
-    return { 
-      itemTotal, 
-      taxTotal, 
-      visitingCharge, 
-      platformFeeTotal, 
-      appliedPlatformFees, 
-      discountAmount,
-      grandTotal 
-    };
-  }, [selectedService, isCustomService, customServicePrice, selectedQuantity, appConfig, appliedPromo]);
+    return { itemTotal, taxTotal, visitingCharge, platformFeeTotal, appliedPlatformFees, grandTotal: itemTotal + taxTotal + visitingCharge + platformFeeTotal };
+  }, [selectedService, isCustomService, customServicePrice, selectedQuantity, appConfig]);
 
   const validateForm = () => {
     const errors: string[] = [];
@@ -267,99 +214,6 @@ export default function AdminCreateBookingPage() {
     if (!selectedSlot) errors.push("slot");
     setFormErrors(errors);
     return errors.length === 0;
-  };
-
-  const handleApplyPromo = async (codeOverride?: string) => {
-    const code = (codeOverride || promoCodeInput).toUpperCase().trim();
-    if (!code) return;
-    setIsApplyingPromo(true);
-    try {
-      const q = query(collection(db, "adminPromoCodes"), where("code", "==", code));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        toast({ title: "Invalid Code", description: "This promo code does not exist.", variant: "destructive" });
-        setIsApplyingPromo(false);
-        return;
-      }
-      const promoData = { id: snap.docs[0].id, ...snap.docs[0].data() } as FirestorePromoCode;
-      if (!promoData.isActive) { 
-        toast({ title: "Inactive Code", description: "This promo code is currently inactive.", variant: "destructive" }); 
-        setIsApplyingPromo(false); 
-        return; 
-      }
-      
-      const currentDate = new Date();
-      const validFrom = getTimestampMillis(promoData.validFrom);
-      if (validFrom && currentDate < new Date(validFrom)) { 
-        toast({ title: "Not Yet Valid", description: "This promo code is not active yet.", variant: "destructive" }); 
-        setIsApplyingPromo(false); 
-        return; 
-      }
-      const validUntil = getTimestampMillis(promoData.validUntil);
-      if (validUntil && currentDate > new Date(validUntil)) { 
-        toast({ title: "Expired Code", description: "This promo code has expired.", variant: "destructive" }); 
-        setIsApplyingPromo(false); 
-        return; 
-      }
-
-      const sumOfItemPrices = summary.itemTotal;
-      if (promoData.minBookingAmount && sumOfItemPrices < promoData.minBookingAmount) {
-        toast({ 
-          title: "Min Amount Not Met", 
-          description: `Minimum ₹${promoData.minBookingAmount} required for this code.`, 
-          variant: "destructive" 
-        });
-        setIsApplyingPromo(false);
-        return;
-      }
-      
-      if (promoData.maxUsesPerUser && promoData.maxUsesPerUser > 0 && selectedUser?.uid) {
-        const bookingsRef = collection(db, "bookings");
-        const userUsageQuery = query(
-          bookingsRef, 
-          where("userId", "==", selectedUser.uid), 
-          where("discountCode", "==", promoData.code.toUpperCase())
-        );
-        const userUsageSnapshot = await getDocs(userUsageQuery);
-        if (userUsageSnapshot.size >= promoData.maxUsesPerUser) {
-          toast({ 
-            title: "Limit Reached", 
-            description: "This customer has already used this code the maximum number of times.", 
-            variant: "destructive" 
-          });
-          setIsApplyingPromo(false);
-          return;
-        }
-      }
-
-      let disc = promoData.discountType === 'percentage' 
-        ? (sumOfItemPrices * promoData.discountValue) / 100 
-        : promoData.discountValue;
-      disc = Math.min(disc, sumOfItemPrices);
-
-      const applied = { 
-        id: promoData.id, 
-        code: promoData.code, 
-        discountType: promoData.discountType, 
-        discountValue: promoData.discountValue, 
-        calculatedDiscount: disc,
-        minBookingAmount: promoData.minBookingAmount ?? undefined
-      };
-      setAppliedPromo(applied);
-      setPromoCodeInput("");
-      toast({ title: "Promo Applied!", description: `Saved ₹${disc.toFixed(2)}.` });
-    } catch (e) {
-      console.error(e);
-      toast({ title: "Error", description: "Failed to apply promo code.", variant: "destructive" });
-    } finally {
-      setIsApplyingPromo(false);
-    }
-  };
-
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoCodeInput("");
-    toast({ title: "Promo Removed" });
   };
 
   const handleSubmit = async () => {
@@ -397,29 +251,7 @@ export default function AdminCreateBookingPage() {
       const bookingData: any = {
         bookingId: newBookingId, 
         bookingNumber: nextBookingNumber,
-        userId: selectedUser?.uid || null, 
-        customerName: customerDetails.name, 
-        customerEmail: customerDetails.email, 
-        customerPhone: customerDetails.phone, 
-        addressLine1: customerDetails.address, 
-        city: customerDetails.city, 
-        state: "N/A", 
-        pincode: customerDetails.pincode, 
-        scheduledDate: selectedDate!.toLocaleDateString('en-CA'), 
-        scheduledTimeSlot: selectedSlot, 
-        services: serviceItems, 
-        appliedPlatformFees: summary.appliedPlatformFees, 
-        subTotal: summary.itemTotal, 
-        taxAmount: summary.taxTotal, 
-        visitingCharge: summary.visitingCharge, 
-        discountCode: appliedPromo?.code || null,
-        discountAmount: summary.discountAmount || 0,
-        totalAmount: summary.grandTotal, 
-        paymentMethod: paymentMode, 
-        status: bookingStatus, 
-        createdAt: Timestamp.now(), 
-        updatedAt: Timestamp.now(), 
-        isReviewedByCustomer: false,
+        userId: selectedUser?.uid || null, customerName: customerDetails.name, customerEmail: customerDetails.email, customerPhone: customerDetails.phone, addressLine1: customerDetails.address, city: customerDetails.city, state: "N/A", pincode: customerDetails.pincode, scheduledDate: selectedDate!.toLocaleDateString('en-CA'), scheduledTimeSlot: selectedSlot, services: serviceItems, appliedPlatformFees: summary.appliedPlatformFees, subTotal: summary.itemTotal, taxAmount: summary.taxTotal, visitingCharge: summary.visitingCharge, totalAmount: summary.grandTotal, paymentMethod: paymentMode, status: bookingStatus, createdAt: Timestamp.now(), updatedAt: Timestamp.now(), isReviewedByCustomer: false,
         parentCategoryId: selectedCategoryId || null,
         subCategoryId: selectedSubCategoryId || null
       };
@@ -529,81 +361,7 @@ export default function AdminCreateBookingPage() {
                 <div className="flex justify-between"><span>Visiting:</span><span className="font-medium">₹{summary.visitingCharge.toFixed(2)}</span></div>
                 {summary.appliedPlatformFees.map((fee, idx) => (<div key={idx} className="flex justify-between"><span className="flex items-center gap-1 text-muted-foreground"><HandCoins className="h-3 w-3" /> {fee.name}:</span><span className="font-medium">₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span></div>))}
                 <div className="flex justify-between"><span>Tax:</span><span className="font-medium">₹{summary.taxTotal.toFixed(2)}</span></div>
-                {summary.discountAmount > 0 && (
-                  <div className="flex justify-between text-green-600 font-semibold">
-                    <span>Discount ({appliedPromo?.code}):</span>
-                    <span>-₹{summary.discountAmount.toFixed(2)}</span>
-                  </div>
-                )}
                 <Separator /><div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">₹{summary.grandTotal.toFixed(2)}</span></div>
-              </div>
-              <Separator />
-              
-              {/* Promo Code Section */}
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Promo Code</Label>
-                {appliedPromo ? (
-                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 p-2.5 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-xs font-bold text-green-700 dark:text-green-400">&quot;{appliedPromo.code}&quot; Applied</p>
-                        <p className="text-[10px] text-green-600">Saved ₹{appliedPromo.calculatedDiscount.toFixed(2)}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" 
-                      onClick={handleRemovePromo}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Enter promo code" 
-                        value={promoCodeInput} 
-                        onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-                        disabled={isApplyingPromo}
-                        className="h-9 text-xs font-bold uppercase"
-                      />
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleApplyPromo()} 
-                        disabled={!promoCodeInput.trim() || isApplyingPromo}
-                        className="h-9 px-3 text-xs"
-                      >
-                        {isApplyingPromo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply"}
-                      </Button>
-                    </div>
-                    {availablePromos.length > 0 && (
-                      <div className="pt-1.5 space-y-1">
-                        <span className="text-[10px] font-semibold text-muted-foreground block">Available Promos:</span>
-                        <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto pr-1">
-                          {availablePromos.map((promo) => (
-                            <button
-                              key={promo.id}
-                              type="button"
-                              onClick={() => handleApplyPromo(promo.code)}
-                              disabled={isApplyingPromo}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-muted hover:bg-primary/15 border border-muted hover:border-primary/20 text-[10px] font-bold text-muted-foreground hover:text-primary transition-all cursor-pointer"
-                            >
-                              <Tag className="h-2.5 w-2.5" />
-                              <span>{promo.code}</span>
-                              <span className="text-[9px] font-normal text-muted-foreground/85">
-                                ({promo.discountType === 'percentage' ? `${promo.discountValue}%` : `₹${promo.discountValue}`})
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
               <Separator />
               <div className="space-y-3">
@@ -691,12 +449,6 @@ export default function AdminCreateBookingPage() {
             <div className="flex justify-between"><span>Customer:</span><span className="font-bold">{customerDetails.name}</span></div>
             <div className="flex justify-between"><span>Service:</span><span className="font-bold truncate max-w-[200px]">{isCustomService ? customServiceName : selectedService?.name}</span></div>
             <div className="flex justify-between"><span>Date:</span><span className="font-bold">{selectedDate?.toLocaleDateString()}</span></div>
-            {summary.discountAmount > 0 && (
-              <div className="flex justify-between text-green-600 font-semibold">
-                <span>Discount ({appliedPromo?.code}):</span>
-                <span>-₹{summary.discountAmount.toFixed(2)}</span>
-              </div>
-            )}
             <div className="flex justify-between pt-2 border-t font-bold"><span>Amount:</span><span className="text-primary">₹{summary.grandTotal.toFixed(2)}</span></div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">

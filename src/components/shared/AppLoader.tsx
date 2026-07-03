@@ -18,7 +18,6 @@ export default function AppLoader({ text, initialLoaderType }: AppLoaderProps) {
 
   // Check if we can read the cached loaderType from localStorage to prevent flash
   let cachedLoaderType: string | null = null;
-  let cookieLoaderType: string | null = null;
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem("fixbro_cache_global-web-settings");
@@ -29,18 +28,12 @@ export default function AppLoader({ text, initialLoaderType }: AppLoaderProps) {
         }
       }
     } catch (e) {}
-    try {
-      const match = document.cookie.match(/(?:^|; )fixbro-loader-type=([^;]*)/);
-      if (match) {
-        cookieLoaderType = decodeURIComponent(match[1]);
-      }
-    } catch (e) {}
   }
 
   // Use active settings, cached settings, layout cookie, or default
   const loaderType = (!isLoading && globalSettings?.loaderType)
     ? globalSettings.loaderType
-    : (cachedLoaderType || cookieLoaderType || initialLoaderType || "logo-pulse");
+    : (cachedLoaderType || initialLoaderType || "logo-pulse");
 
   return (
     <div className="fixed inset-0 z-[250] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md transition-all duration-300">
