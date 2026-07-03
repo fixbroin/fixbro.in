@@ -29,7 +29,50 @@ interface AccountLinkProps {
   label: string;
   badgeCount?: number;
   isLogout?: boolean;
+  onClick: (e: React.MouseEvent) => void;
 }
+
+const AccountLink = ({ href, icon: Icon, label, badgeCount, isLogout = false, onClick }: AccountLinkProps) => {
+  const content = (
+    <div
+      className={cn(
+        "flex items-center w-full p-4 rounded-xl border border-border/50 bg-background shadow-sm transition-all duration-300 mb-3 group",
+        isLogout 
+          ? "hover:bg-destructive hover:text-white hover:border-destructive" 
+          : "hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-md"
+      )}
+    >
+      <div className={cn(
+        "p-2 rounded-lg mr-4 transition-colors duration-300",
+        isLogout 
+          ? "bg-destructive/10 text-destructive group-hover:bg-white/20 group-hover:text-white" 
+          : "bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-white"
+      )}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <span className="flex-grow text-base font-semibold">{label}</span>
+      {badgeCount !== undefined && badgeCount > 0 && (
+        <span className={cn(
+          "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold mr-2",
+          isLogout ? "bg-white text-destructive" : "bg-red-600 text-white shadow-sm"
+        )}>
+           {badgeCount > 9 ? '9+' : badgeCount}
+        </span>
+      )}
+      <ChevronRight className="h-5 w-5 opacity-50 group-hover:opacity-100 transition-opacity" />
+    </div>
+  );
+
+  if (isLogout) {
+    return <button onClick={onClick} className="w-full text-left">{content}</button>;
+  }
+
+  return (
+    <Link href={href} onClick={onClick} className="block">
+      {content}
+    </Link>
+  );
+};
 
 function AccountPageContent() {
   const { user, firestoreUser, logOut, isLoading: authIsLoading } = useAuth();
@@ -82,50 +125,6 @@ function AccountPageContent() {
     e.preventDefault();
     showLoading();
     logOut();
-  };
-
-  const AccountLink = ({ href, icon: Icon, label, badgeCount, isLogout = false }: AccountLinkProps) => {
-    const action = isLogout ? handleLogout : (e: React.MouseEvent) => handleNav(e, href);
-
-    const content = (
-      <div
-        className={cn(
-          "flex items-center w-full p-4 rounded-xl border border-border/50 bg-background shadow-sm transition-all duration-300 mb-3 group",
-          isLogout 
-            ? "hover:bg-destructive hover:text-white hover:border-destructive" 
-            : "hover:bg-primary hover:text-primary-foreground hover:border-primary hover:shadow-md"
-        )}
-      >
-        <div className={cn(
-          "p-2 rounded-lg mr-4 transition-colors duration-300",
-          isLogout 
-            ? "bg-destructive/10 text-destructive group-hover:bg-white/20 group-hover:text-white" 
-            : "bg-primary/10 text-primary group-hover:bg-white/20 group-hover:text-white"
-        )}>
-          <Icon className="h-5 w-5" />
-        </div>
-        <span className="flex-grow text-base font-semibold">{label}</span>
-        {badgeCount !== undefined && badgeCount > 0 && (
-          <span className={cn(
-            "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold mr-2",
-            isLogout ? "bg-white text-destructive" : "bg-red-600 text-white shadow-sm"
-          )}>
-             {badgeCount > 9 ? '9+' : badgeCount}
-          </span>
-        )}
-        <ChevronRight className="h-5 w-5 opacity-50 group-hover:opacity-100 transition-opacity" />
-      </div>
-    );
-  
-    if (isLogout) {
-      return <button onClick={action} className="w-full text-left">{content}</button>;
-    }
-  
-    return (
-      <Link href={href} onClick={action} className="block">
-        {content}
-      </Link>
-    );
   };
 
   const accountMenuItems = [
@@ -190,7 +189,7 @@ function AccountPageContent() {
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">My Account</h3>
           {accountMenuItems.filter(item => item.condition ? item.condition() : true).map(item => (
-            <AccountLink key={item.href} {...item} />
+            <AccountLink key={item.href} {...item} onClick={(e) => handleNav(e, item.href)} />
           ))}
         </div>
         
@@ -198,7 +197,7 @@ function AccountPageContent() {
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">More</h3>
           {extraPagesItems.filter(item => item.condition ? item.condition() : true).map(item => (
-            <AccountLink key={item.href} {...item} />
+            <AccountLink key={item.href} {...item} onClick={(e) => handleNav(e, item.href)} />
           ))}
         </div>
         
@@ -206,13 +205,13 @@ function AccountPageContent() {
         <div className="space-y-1">
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-4 mb-2">Legal</h3>
           {policyItems.map(item => (
-            <AccountLink key={item.href} {...item} />
+            <AccountLink key={item.href} {...item} onClick={(e) => handleNav(e, item.href)} />
           ))}
         </div>
         
         {/* Section 5: Logout */}
         <div className="pt-2">
-          <AccountLink href="#" label="Log Out" icon={LogOut} isLogout={true} />
+          <AccountLink href="#" label="Log Out" icon={LogOut} isLogout={true} onClick={handleLogout} />
         </div>
       </nav>
     </div>
