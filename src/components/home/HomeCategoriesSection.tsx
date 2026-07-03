@@ -71,7 +71,7 @@ const HomeCategoriesSection = () => {
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-y-10 gap-x-4 md:gap-x-6 lg:gap-x-8">
         {[...Array(itemsLimit + 1)].map((_, i) => (
           <div className="flex flex-col items-center gap-4" key={i}>
-            <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-44 lg:h-44 xl:w-48 xl:h-48 rounded-full bg-muted" />
+            <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 rounded-full bg-muted" />
             <Skeleton className="h-6 w-24 bg-muted" />
           </div>
         ))}

@@ -16,6 +16,7 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppImage from '@/components/ui/AppImage';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { Switch } from "@/components/ui/switch";
 
 export default function AdminSlideshowsPage() {
   const [slides, setSlides] = useState<FirestoreSlideshow[]>([]);
@@ -85,6 +86,20 @@ export default function AdminSlideshowsPage() {
     }
   };
 
+  const handleToggleActive = async (slide: FirestoreSlideshow) => {
+    setIsSubmitting(true);
+    try {
+      await updateDoc(doc(db, "adminSlideshows", slide.id!), { isActive: !slide.isActive, updatedAt: Timestamp.now() });
+      toast({ title: "Status Updated", description: `Slide "${slide.title || 'Promo'}" ${!slide.isActive ? "enabled" : "disabled"}.` });
+      await triggerRefresh('content');
+    } catch (error) {
+      console.error("Error toggling slide status: ", error);
+      toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleFormSubmit = async (data: Omit<FirestoreSlideshow, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
     setIsSubmitting(true);
     try {
@@ -144,6 +159,7 @@ export default function AdminSlideshowsPage() {
                     <TableHead className="w-24">Preview</TableHead>
                     <TableHead>Title/Description</TableHead>
                     <TableHead>Order</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                     <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -160,6 +176,16 @@ export default function AdminSlideshowsPage() {
                         <div className="text-xs text-muted-foreground line-clamp-1">{slide.description}</div>
                       </TableCell>
                       <TableCell>{slide.order}</TableCell>
+                      <TableCell className="text-center">
+                        <PermissionGuard moduleId="slideshows" action="write">
+                          <Switch 
+                            checked={slide.isActive} 
+                            onCheckedChange={() => handleToggleActive(slide)} 
+                            disabled={isSubmitting}
+                            aria-label={`Toggle active status for ${slide.title || "slide"}`}
+                          />
+                        </PermissionGuard>
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
                           <PermissionGuard moduleId="slideshows" action="write">

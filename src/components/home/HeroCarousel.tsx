@@ -221,6 +221,7 @@ export function HeroCarousel() {
                     size="icon" 
                     className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
                     onClick={() => api?.scrollPrev()}
+                    aria-label="Previous slide"
                 >
                     <ChevronLeft className="h-6 w-6" />
                 </Button>
@@ -231,6 +232,7 @@ export function HeroCarousel() {
                     size="icon" 
                     className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
                     onClick={() => api?.scrollNext()}
+                    aria-label="Next slide"
                 >
                     <ChevronRight className="h-6 w-6" />
                 </Button>

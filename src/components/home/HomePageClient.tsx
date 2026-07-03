@@ -696,7 +696,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       handleSimpleNavigation("/categories");
   }, [handleSimpleNavigation]);
 
-  const displayHeroCarousel = !isLoadingAppSettings && (appConfig.enableHeroCarousel ?? true);
+  const displayHeroCarousel = isLoadingAppSettings ? true : (appConfig.enableHeroCarousel ?? true);
   const finalH1 = pageH1 || initialH1Title || (citySlug || areaSlug 
     ? `Professional Home Services in ${areaSlug || citySlug}`.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
     : "Discover Our Services");
