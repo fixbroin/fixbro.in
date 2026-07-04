@@ -167,6 +167,35 @@ export async function POST(request: Request) {
         }
     }
 
+    // --- Sync Promo Code Usage Status on subsequent updates ---
+    if (booking.discountCode && booking.isStatsTracked) {
+        const usageId = `usage_${bookingDocId}`;
+        tasks.push((async () => {
+            try {
+                const usageRef = adminDb.collection('promoCodeUsage').doc(usageId);
+                const usageDoc = await usageRef.get();
+                if (usageDoc.exists) {
+                    await usageRef.update({
+                        status: currentStatus
+                    });
+                } else {
+                    await usageRef.set({
+                        bookingId: booking.bookingId || "N/A",
+                        customerName: booking.customerName || "Unknown",
+                        customerEmail: booking.customerEmail || "No Email",
+                        discountCode: String(booking.discountCode),
+                        discountAmount: Number(booking.discountAmount || 0),
+                        status: currentStatus,
+                        createdAt: booking.createdAt || Timestamp.now()
+                    });
+                }
+                await triggerRefresh('promo-usage');
+            } catch (e) {
+                console.error("Error syncing promo code usage status:", e);
+            }
+        })());
+    }
+
     // --- NEW: Notify Assigned Provider ---
     if (booking.providerId && (currentStatus === 'AssignedToProvider' || currentStatus === 'Confirmed') && !booking.isProviderNotified) {
         const notifyProviderTask = (async () => {

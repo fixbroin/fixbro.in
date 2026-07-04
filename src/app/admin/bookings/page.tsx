@@ -378,6 +378,25 @@ export default function AdminBookingsPage() {
     try {
       await deleteDoc(doc(db, "bookings", booking.id));
       
+      // Delete promo code usage record if it exists
+      if (booking.discountCode) {
+        try {
+          await deleteDoc(doc(db, "promoCodeUsage", `usage_${booking.id}`));
+          
+          // Decrement promo code usesCount if promo code exists
+          const promoQuery = await getDocs(query(collection(db, "adminPromoCodes"), where("code", "==", booking.discountCode)));
+          if (!promoQuery.empty) {
+            const promoDoc = promoQuery.docs[0];
+            await updateDoc(doc(db, "adminPromoCodes", promoDoc.id), {
+              usesCount: Math.max(0, (promoDoc.data().usesCount || 0) - 1)
+            });
+          }
+          await triggerRefresh('promo-usage');
+        } catch (e) {
+          console.error("Error updating promo code usage on booking delete:", e);
+        }
+      }
+
       // Manually update local state to remove the deleted booking immediately
       setBookings(prev => prev.filter(b => b.id !== booking.id));
       if (selectedBooking?.id === booking.id) {

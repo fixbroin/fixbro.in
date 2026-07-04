@@ -100,6 +100,40 @@ export default function AdminPromoCodesPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleDeleteUsageRecord = async (record: PromoCodeUsageRecord) => {
+    setIsSubmitting(true);
+    try {
+      await deleteDoc(doc(db, "promoCodeUsage", record.id));
+      
+      // Update local state
+      setUsageHistory(prev => prev.filter(r => r.id !== record.id));
+      
+      // Update cache
+      const updatedHistory = usageHistory.filter(r => r.id !== record.id);
+      setCache('promo-usage-history', updatedHistory, true);
+      
+      // Decrement the promo code's usesCount if the promo code still exists
+      if (record.discountCode) {
+        const promoQuery = await getDocs(query(promoCodesCollectionRef, where("code", "==", record.discountCode)));
+        if (!promoQuery.empty) {
+          const promoDoc = promoQuery.docs[0];
+          const currentUses = promoDoc.data().usesCount || 0;
+          await updateDoc(doc(db, "adminPromoCodes", promoDoc.id), {
+            usesCount: Math.max(0, currentUses - 1)
+          });
+          setPromoCodes(prev => prev.map(pc => pc.id === promoDoc.id ? { ...pc, usesCount: Math.max(0, currentUses - 1) } : pc));
+        }
+      }
+      
+      toast({ title: "Success", description: "Usage record deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting usage record: ", error);
+      toast({ title: "Error", description: "Could not delete usage record.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   
   const handleToggleActive = async (code: FirestorePromoCode) => {
     setIsSubmitting(true);
@@ -368,13 +402,14 @@ export default function AdminPromoCodesPage() {
                     <TableHead className="text-center">Discount</TableHead>
                     <TableHead className="text-center">Booking ID</TableHead>
                     <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-right">Date</TableHead>
+                    <TableHead className="text-center">Date</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredHistory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                         {historySearchTerm ? "No matching usage records found." : "No promo code usage recorded yet."}
                       </TableCell>
                     </TableRow>
@@ -406,8 +441,34 @@ export default function AdminPromoCodesPage() {
                             {record.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-xs">
+                        <TableCell className="text-center text-xs">
                           {record.createdAt ? new Date(record.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete this promo code usage record for booking &quot;{record.bookingId}&quot;.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteUsageRecord(record)}
+                                  disabled={isSubmitting}
+                                  className="bg-destructive hover:bg-destructive/90">
+                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     ))
