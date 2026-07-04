@@ -20,6 +20,7 @@ import { getCache, setCache } from '@/lib/client-cache';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAdminStats } from "@/hooks/useAdminStats";
+import { triggerRefresh } from '@/lib/revalidateUtils';
 
 export default function AdminPromoCodesPage() {
   const { stats } = useAdminStats();
@@ -112,6 +113,9 @@ export default function AdminPromoCodesPage() {
       // Update cache
       const updatedHistory = usageHistory.filter(r => r.id !== record.id);
       setCache('promo-usage-history', updatedHistory, true);
+      
+      // Invalidate server cache tag
+      await triggerRefresh('promo-usage');
       
       // Decrement the promo code's usesCount if the promo code still exists
       if (record.discountCode) {
