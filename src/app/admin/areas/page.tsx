@@ -14,6 +14,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -77,6 +78,9 @@ export default function AdminAreasPage() {
   const handleDeleteArea = async (areaId: string) => {
     setIsSubmitting(true);
     try {
+      // Call Google Indexing API before deleting from Firestore so we can resolve its slugs
+      await submitToGoogleIndexing('area', areaId, false);
+      
       await deleteDoc(doc(db, "areas", areaId));
       setAreas(areas.filter(area => area.id !== areaId));
       toast({ title: "Success", description: "Area deleted successfully." });
@@ -84,7 +88,6 @@ export default function AdminAreasPage() {
       // Refresh the cache
       await triggerRefresh('areas');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
     } catch (error) {
       console.error("Error deleting area: ", error);
       toast({ title: "Error", description: "Could not delete area.", variant: "destructive" });
@@ -115,19 +118,23 @@ export default function AdminAreasPage() {
     };
 
     try {
+      let activeId = data.id || "";
       if (editingArea && data.id) {
         const areaDoc = doc(db, "areas", data.id);
         await updateDoc(areaDoc, { ...payload, updatedAt: Timestamp.now() });
         toast({ title: "Success", description: "Area updated successfully." });
       } else {
-        await addDoc(areasCollectionRef, { ...payload, createdAt: Timestamp.now() });
+        const docRef = await addDoc(areasCollectionRef, { ...payload, createdAt: Timestamp.now() });
+        activeId = docRef.id;
         toast({ title: "Success", description: "Area added successfully." });
       }
       
       // Refresh the cache
       await triggerRefresh('areas');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (activeId) {
+        await submitToGoogleIndexing('area', activeId, payload.isActive);
+      }
 
       setIsFormOpen(false);
       setEditingArea(null);

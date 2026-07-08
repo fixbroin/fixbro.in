@@ -225,12 +225,12 @@ const PwaInstallButton = () => {
   // --- DESKTOP FLOATING TAB UI ---
   return (
     <div
-      className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden"
+      className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden animate-pulse hover:animate-none"
       onClick={handleInstallClick}
     >
       <div className="flex items-center w-full h-full p-2.5">
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
-            <Download className="h-5 w-5 text-white" />
+            <Download className="h-5 w-5 text-white animate-bounce group-hover:animate-none" />
         </div>
         
         <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">

@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, limit } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -70,6 +71,7 @@ export default function AdminCitiesPage() {
   const handleDeleteCity = async (cityId: string) => {
     setIsSubmitting(true);
     try {
+      const city = cities.find(c => c.id === cityId);
       await deleteDoc(doc(db, "cities", cityId));
       setCities(cities.filter(city => city.id !== cityId));
       toast({ title: "Success", description: "City deleted successfully." });
@@ -77,7 +79,9 @@ export default function AdminCitiesPage() {
       // Refresh the cache
       await triggerRefresh('cities');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (city?.slug) {
+        await submitToGoogleIndexing('city', city.slug, false);
+      }
     } catch (error) {
       console.error("Error deleting city: ", error);
       toast({ title: "Error", description: "Could not delete city. It might have areas associated with it.", variant: "destructive" });
@@ -112,7 +116,9 @@ export default function AdminCitiesPage() {
       // Refresh the cache
       await triggerRefresh('cities');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (payload.slug) {
+        await submitToGoogleIndexing('city', payload.slug, payload.isActive);
+      }
 
       setIsFormOpen(false);
       setEditingCity(null);

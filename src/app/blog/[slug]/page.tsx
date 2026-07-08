@@ -230,41 +230,60 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-blog-${post.id}`} />
       
       {/* Header with Background */}
-      <div className="relative bg-primary/5 py-16 md:py-24 overflow-hidden">
+      <div className="relative bg-primary/5 py-12 md:py-20 overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl" />
         
         <div className="container mx-auto px-4 relative z-10">
-          <Breadcrumbs items={breadcrumbItems} />
-          
-          <div className="max-w-4xl mx-auto text-center mt-8">
-            {post.categoryName && (
-              <span className="px-4 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest mb-6 inline-block">
-                {post.categoryName}
-              </span>
-            )}
-            <h1 className="text-4xl md:text-6xl font-headline font-bold text-foreground leading-tight mb-8">
-              {post.title}
-            </h1>
+          <div className="max-w-4xl mx-auto">
+            <Breadcrumbs items={breadcrumbItems} />
             
-            <div className="flex flex-wrap items-center justify-center gap-6 text-muted-foreground font-medium">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                  {post.authorName?.charAt(0) || <User className="h-5 w-5" />}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center mt-8">
+              {/* Cover Image on Desktop (Left Side) */}
+              <div className="hidden md:block md:col-span-4">
+                <div className="relative aspect-square w-full rounded-2xl overflow-hidden shadow-lg border border-border/50 bg-muted">
+                  <AppImage
+                    src={post.coverImageUrl}
+                    alt={post.title}
+                    fill
+                    objectPosition="top"
+                    className="object-cover"
+                    priority
+                  />
                 </div>
-                <span>{post.authorName || 'FixBro Expert'}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                <span>{getDisplayDate(post.createdAt)}</span>
-              </div>
-              {displayReadingTime && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <span>{displayReadingTime} read</span>
+
+              {/* Titles & Metadata (Right Side on Desktop, Centered on Mobile) */}
+              <div className="col-span-1 md:col-span-8 text-center md:text-left">
+                {post.categoryName && (
+                  <span className="px-4 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-full uppercase tracking-widest mb-4 md:mb-6 inline-block">
+                    {post.categoryName}
+                  </span>
+                )}
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-headline font-bold text-foreground leading-tight mb-6 md:mb-8">
+                  {post.title}
+                </h1>
+                
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 md:gap-6 text-muted-foreground font-medium text-sm md:text-base">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs md:text-sm">
+                      {post.authorName?.charAt(0) || <User className="h-4 w-4 md:h-5 md:w-5" />}
+                    </div>
+                    <span>{post.authorName || 'FixBro Expert'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                    <span>{getDisplayDate(post.createdAt)}</span>
+                  </div>
+                  {displayReadingTime && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                      <span>{displayReadingTime} read</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -274,7 +293,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         <div className="max-w-4xl mx-auto">
           {/* Main Content Card */}
           <div className="bg-card rounded-3xl shadow-2xl border border-border/50 overflow-hidden mb-16">
-            <div className="relative aspect-square w-full">
+            {/* Cover Image on Mobile (Hidden on Desktop) */}
+            <div className="relative aspect-square w-full md:hidden">
               <AppImage
                 src={post.coverImageUrl}
                 alt={post.title}

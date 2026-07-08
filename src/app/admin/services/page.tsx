@@ -20,6 +20,7 @@ import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { Switch } from '@/components/ui/switch';
 import { Input } from "@/components/ui/input";
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -170,7 +171,8 @@ export default function AdminServicesPage() {
         await triggerRefresh('services');
         await triggerRefresh('global-cache');
         await triggerRefresh('sitemap');
-        // Removed global-cache trigger to save reads
+        // Notify Google Indexing API
+        await submitToGoogleIndexing('service', service.slug, !service.isActive);
     } catch (_error) {
         toast({ title: "Error", description: "Could not update status.", variant: "destructive" });
     } finally {
@@ -214,7 +216,9 @@ export default function AdminServicesPage() {
       await deleteDoc(serviceDocRef);
       await triggerRefresh('services'); // SmartSync: Invalidate cache
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (serviceData?.slug) {
+        await submitToGoogleIndexing('service', serviceData.slug, false);
+      }
       setServices(prev => prev.filter(serv => serv.id !== serviceId));
       toast({ title: "Success", description: "Service deleted successfully." });
     } catch (error) {
@@ -285,7 +289,9 @@ export default function AdminServicesPage() {
         await triggerRefresh(`service-${data.slug}`); // Invalidate specific service page cache
       }
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (payloadForFirestore.slug) {
+        await submitToGoogleIndexing('service', payloadForFirestore.slug, payloadForFirestore.isActive);
+      }
       setIsFormOpen(false); setEditingService(null); await fetchData(true);
     } catch (_error) {
       console.error("Error saving service: ", _error);

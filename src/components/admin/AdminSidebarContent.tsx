@@ -52,6 +52,7 @@ const navItems = [
   { href: '/admin/seo-settings', label: 'Global SEO Patterns', icon: Target },
   { href: '/admin/seo-overrides', label: 'Advanced SEO', icon: Zap },
   { href: '/admin/service-seo', label: 'Service-wise SEO', icon: Layers },
+  { href: '/admin/google-indexing', label: 'Google Indexing', icon: Globe2 },
   { type: 'separator', label: 'Operations & Finance' },
   { href: '/admin/referral-settings', label: 'Referral System', icon: Handshake },
   { href: '/admin/quotation-invoice', label: 'Quotation & Invoice', icon: Receipt },

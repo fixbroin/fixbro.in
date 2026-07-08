@@ -49,6 +49,7 @@
     "formidable": "^3.5.1",
     "framer-motion": "^11.2.10",
     "genkit": "^1.8.0",
+    "googleapis": "^173.0.0",
     "input-otp": "^1.2.4",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",

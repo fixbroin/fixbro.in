@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -135,8 +136,27 @@ export default function SeoOverridesPage() {
     setIsSubmitting(true);
     const collectionRef = type === 'cityCategory' ? cityCatSeoRef : areaCatSeoRef;
     try {
+      const setting = type === 'cityCategory' 
+        ? cityCategorySettings.find(s => s.id === id)
+        : areaCategorySettings.find(s => s.id === id);
       await deleteDoc(doc(collectionRef, id));
       await triggerRefresh('seo-settings');
+      
+      if (setting) {
+        const city = cities.find(c => c.id === setting.cityId);
+        const category = categories.find(c => c.id === setting.categoryId);
+        if (type === 'cityCategory') {
+          if (city?.slug && category?.slug) {
+            await submitToGoogleIndexing('city-category', { citySlug: city.slug, categorySlug: category.slug }, false);
+          }
+        } else {
+          const area = areas.find(a => a.id === (setting as AreaCategorySeoSetting).areaId);
+          if (city?.slug && area?.slug && category?.slug) {
+            await submitToGoogleIndexing('area-category', { citySlug: city.slug, areaSlug: area.slug, categorySlug: category.slug }, false);
+          }
+        }
+      }
+      
       toast({ title: "Success", description: "SEO override deleted successfully." });
       await fetchData(true); // Force refresh
     } catch (error) {
@@ -152,6 +172,20 @@ export default function SeoOverridesPage() {
     try {
         await updateDoc(doc(collectionRef, setting.id!), { isActive: !setting.isActive, updatedAt: Timestamp.now() });
         await triggerRefresh('seo-settings');
+        
+        const city = cities.find(c => c.id === setting.cityId);
+        const category = categories.find(c => c.id === setting.categoryId);
+        if (type === 'cityCategory') {
+          if (city?.slug && category?.slug) {
+            await submitToGoogleIndexing('city-category', { citySlug: city.slug, categorySlug: category.slug }, !setting.isActive);
+          }
+        } else {
+          const area = areas.find(a => a.id === (setting as AreaCategorySeoSetting).areaId);
+          if (city?.slug && area?.slug && category?.slug) {
+            await submitToGoogleIndexing('area-category', { citySlug: city.slug, areaSlug: area.slug, categorySlug: category.slug }, !setting.isActive);
+          }
+        }
+        
         toast({ title: "Success", description: "Status updated."});
         await fetchData(true);
     } catch (error) {
@@ -201,6 +235,9 @@ export default function SeoOverridesPage() {
         await addDoc(cityCatSeoRef, { ...basePayload, createdAt: Timestamp.now() });
       }
       await triggerRefresh('seo-settings');
+      if (city.slug && category.slug) {
+        await submitToGoogleIndexing('city-category', { citySlug: city.slug, categorySlug: category.slug }, basePayload.isActive);
+      }
       toast({ title: "Success", description: "City-Category SEO setting saved." });
       setIsFormOpen(false); 
       await fetchData(true);
@@ -246,6 +283,9 @@ export default function SeoOverridesPage() {
         await addDoc(areaCatSeoRef, { ...basePayload, createdAt: Timestamp.now() });
       }
       await triggerRefresh('seo-settings');
+      if (city.slug && area.slug && category.slug) {
+        await submitToGoogleIndexing('area-category', { citySlug: city.slug, areaSlug: area.slug, categorySlug: category.slug }, basePayload.isActive);
+      }
       toast({ title: "Success", description: "Area-Category SEO setting saved." });
       setIsFormOpen(false); 
       await fetchData(true);

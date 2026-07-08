@@ -16,6 +16,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query,
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { getIconComponent } from '@/lib/iconMap';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch'; // Import Switch
@@ -161,7 +162,9 @@ export default function AdminCategoriesPage() {
       await triggerRefresh('categories');
       await triggerRefresh('services');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (categoryData?.slug) {
+        await submitToGoogleIndexing('category', categoryData.slug, false);
+      }
     } catch (error) {
       console.error("Error deleting category: ", error);
       toast({ title: "Error", description: "Could not delete category.", variant: "destructive" });
@@ -180,7 +183,8 @@ export default function AdminCategoriesPage() {
         // Refresh the cache
         await triggerRefresh('categories');
         await triggerRefresh('sitemap');
-        // Removed global-cache trigger to save reads
+        // Notify Google Indexing
+        await submitToGoogleIndexing('category', category.slug, !category.isActive);
     } catch (error) {
         toast({ title: "Error", description: "Could not update category status.", variant: "destructive" });
     } finally {
@@ -222,7 +226,9 @@ export default function AdminCategoriesPage() {
       await triggerRefresh('categories');
       await triggerRefresh('services');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (payloadForFirestore.slug) {
+        await submitToGoogleIndexing('category', payloadForFirestore.slug, payloadForFirestore.isActive);
+      }
 
       setIsFormOpen(false);
       setEditingCategory(null);

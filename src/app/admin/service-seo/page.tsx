@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -104,9 +105,13 @@ export default function ServiceSeoPage() {
   const handleDeleteSetting = async (id: string) => {
     setIsSubmitting(true);
     try {
+      const setting = settings.find(s => s.id === id);
       await deleteDoc(doc(serviceSeoRef, id));
       await triggerRefresh('seo-settings');
       await triggerRefresh('sitemap');
+      if (setting?.citySlug && setting?.areaSlug && setting?.serviceSlug) {
+        await submitToGoogleIndexing('area-service', { citySlug: setting.citySlug, areaSlug: setting.areaSlug, serviceSlug: setting.serviceSlug }, false);
+      }
       toast({ title: "Success", description: "SEO override deleted successfully." });
       await fetchData(true);
     } catch (error) {
@@ -126,6 +131,9 @@ export default function ServiceSeoPage() {
       });
       await triggerRefresh('seo-settings');
       await triggerRefresh('sitemap');
+      if (setting.citySlug && setting.areaSlug && setting.serviceSlug) {
+        await submitToGoogleIndexing('area-service', { citySlug: setting.citySlug, areaSlug: setting.areaSlug, serviceSlug: setting.serviceSlug }, updatedStatus);
+      }
       toast({ title: "Success", description: `SEO configuration ${updatedStatus ? 'activated' : 'deactivated'} successfully.` });
       await fetchData(true);
     } catch (error) {
@@ -184,6 +192,9 @@ export default function ServiceSeoPage() {
       
       await triggerRefresh('seo-settings');
       await triggerRefresh('sitemap');
+      if (payload.citySlug && payload.areaSlug && payload.serviceSlug) {
+        await submitToGoogleIndexing('area-service', { citySlug: payload.citySlug, areaSlug: payload.areaSlug, serviceSlug: payload.serviceSlug }, payload.isActive);
+      }
       toast({ title: "Success", description: "Local Service SEO configurations saved successfully." });
       setIsFormOpen(false);
       await fetchData(true);

@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
 export default function AdminBlogPage() {
@@ -85,7 +86,9 @@ export default function AdminBlogPage() {
       toast({ title: "Success", description: "Blog post deleted successfully." });
       await triggerRefresh('blog');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (post.slug) {
+        await submitToGoogleIndexing('blog', post.slug, false);
+      }
     } catch (error) {
       console.error("Error deleting post: ", error);
       toast({ title: "Error", description: (error as Error).message || "Could not delete post.", variant: "destructive" });
@@ -101,7 +104,9 @@ export default function AdminBlogPage() {
       toast({ title: "Status Updated", description: `Post "${post.title}" ${!post.isPublished ? "published" : "unpublished"}.`});
       await triggerRefresh('blog');
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (post.slug) {
+        await submitToGoogleIndexing('blog', post.slug, !post.isPublished);
+      }
     } catch (error) {
       toast({ title: "Error", description: "Could not update post status.", variant: "destructive" });
     } finally {
@@ -136,7 +141,9 @@ export default function AdminBlogPage() {
         await triggerRefresh(`blog-${payload.slug}`);
       }
       await triggerRefresh('sitemap');
-      // Removed global-cache trigger to save reads
+      if (payload.slug) {
+        await submitToGoogleIndexing('blog', payload.slug, payload.isPublished);
+      }
       setIsFormOpen(false);
       setEditingPost(null);
     } catch (error) {
