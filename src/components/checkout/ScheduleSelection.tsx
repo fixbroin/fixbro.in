@@ -229,38 +229,52 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
 
                 if (!isCurrent) return;
                 setIsSearchingForNextDay(true);
-                const nextDay = new Date(selectedDate);
+                const searchDaysCount = 7;
+                const fetchPromises = [];
 
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                for (let i = 1; i <= searchDaysCount; i++) {
+                    const targetDay = new Date(selectedDate);
+                    targetDay.setDate(targetDay.getDate() + i);
+                    
+                    fetchPromises.push((async () => {
+                        try {
+                            const res = await fetchAvailableSlots(targetDay);
+                            return { date: targetDay, res };
+                        } catch {
+                            return { date: targetDay, res: { slots: [], isLeave: false } };
+                        }
+                    })());
+                }
+
+                const results = await Promise.all(fetchPromises);
                 
                 if (!isCurrent) {
                   setIsSearchingForNextDay(false);
                   return;
                 }
 
-                for (let i = 0; i < 30; i++) {
-                    nextDay.setDate(nextDay.getDate() + 1);
-                    const nextDayRes = await fetchAvailableSlots(nextDay);
+                const sortedResults = results.sort((a, b) => a.date.getTime() - b.date.getTime());
+                const foundDay = sortedResults.find(item => item.res.slots.length > 0 && !item.res.isLeave);
+
+                if (foundDay) {
+                    const nextAvailableDate = new Date(foundDay.date);
+                    setSelectedDate(nextAvailableDate);
+                    setDisplayMonth(nextAvailableDate); 
+                    setAvailableTimeSlots(foundDay.res.slots);
                     
-                    if (!isCurrent) {
-                      setIsSearchingForNextDay(false);
-                      return;
-                    }
-                    
-                    if (nextDayRes.slots.length > 0 && !nextDayRes.isLeave) {
-                        const nextAvailableDate = new Date(nextDay);
-                        setSelectedDate(nextAvailableDate);
-                        setDisplayMonth(nextAvailableDate); 
-                        setAvailableTimeSlots(nextDayRes.slots);
-                        
-                        toast({
-                            variant: "success" as any,
-                            title: "Available Slots Found!",
-                            description: `We found slots for you on ${nextDay.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
-                        });
-                        break;
-                    }
+                    toast({
+                        variant: "success" as any,
+                        title: "Available Slots Found!",
+                        description: `We found slots for you on ${foundDay.date.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                    });
+                } else {
+                    toast({
+                        variant: "destructive",
+                        title: "No Upcoming Slots",
+                        description: `Could not find any available slots in the next ${searchDaysCount} days.`,
+                    });
                 }
+                
                 if (isCurrent) {
                   setIsSearchingForNextDay(false);
                 }
