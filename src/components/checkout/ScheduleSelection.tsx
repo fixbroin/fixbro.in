@@ -208,12 +208,16 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
   }, [appConfig?.timezone]);
 
   useEffect(() => {
-    if (!selectedDate || isSearchingForNextDay || isLoadingAppSettings) return;
+    if (!selectedDate || isLoadingAppSettings) return;
+    
+    let isCurrent = true;
     
     const runSlotCalculation = async () => {
         setIsLoadingSlots(true);
         try {
             const res = await fetchAvailableSlots(selectedDate);
+            if (!isCurrent) return;
+            
             setAvailableTimeSlots(res.slots);
 
             if (res.slots.length === 0 && !res.isLeave && !isSearchingForNextDay) {
@@ -223,15 +227,26 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
                     description: `Sorry, there are no slots available for ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
                 });
 
+                if (!isCurrent) return;
                 setIsSearchingForNextDay(true);
                 const nextDay = new Date(selectedDate);
-                let found = false;
 
                 await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                if (!isCurrent) {
+                  setIsSearchingForNextDay(false);
+                  return;
+                }
 
                 for (let i = 0; i < 30; i++) {
                     nextDay.setDate(nextDay.getDate() + 1);
                     const nextDayRes = await fetchAvailableSlots(nextDay);
+                    
+                    if (!isCurrent) {
+                      setIsSearchingForNextDay(false);
+                      return;
+                    }
+                    
                     if (nextDayRes.slots.length > 0 && !nextDayRes.isLeave) {
                         const nextAvailableDate = new Date(nextDay);
                         setSelectedDate(nextAvailableDate);
@@ -243,20 +258,30 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
                             title: "Available Slots Found!",
                             description: `We found slots for you on ${nextDay.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
                         });
-                        found = true;
                         break;
                     }
                 }
-                setIsSearchingForNextDay(false);
+                if (isCurrent) {
+                  setIsSearchingForNextDay(false);
+                }
             }
         } catch (error) {
-            setDataFetchError("Failed to load available slots. Please try again.");
+            if (isCurrent) {
+              setDataFetchError("Failed to load available slots. Please try again.");
+            }
         } finally {
-            setIsLoadingSlots(false);
+            if (isCurrent) {
+              setIsLoadingSlots(false);
+            }
         }
     };
     runSlotCalculation();
-  }, [selectedDate, fetchAvailableSlots, isSearchingForNextDay, toast, isLoadingAppSettings]);
+
+    return () => {
+      isCurrent = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, fetchAvailableSlots, toast, isLoadingAppSettings]);
 
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
