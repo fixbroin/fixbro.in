@@ -118,11 +118,11 @@ export default function GoogleIndexingDashboard() {
 
   return (
     <PermissionGuard moduleId="seo_overrides" action="read">
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">Google Indexing API Dashboard</h2>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={() => fetchStats()} disabled={isLoading || isSubmitting}>
+      <div className="flex-1 space-y-4 p-1 pt-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Google Indexing API Dashboard</h2>
+          <div className="flex items-center">
+            <Button variant="outline" size="sm" onClick={() => fetchStats()} disabled={isLoading || isSubmitting} className="w-full md:w-auto justify-center">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Refresh Data
             </Button>
@@ -268,42 +268,77 @@ export default function GoogleIndexingDashboard() {
                     No submissions recorded yet.
                   </div>
                 ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>URL</TableHead>
-                          <TableHead className="w-[100px]">Status</TableHead>
-                          <TableHead className="w-[200px]">Processed Date</TableHead>
-                          <TableHead>Details/Errors</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {recentSubmissions.map((record, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-mono text-xs break-all max-w-[400px]">
-                              {record.url}
-                            </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                record.success 
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                              }`}>
-                                {record.success ? "Success" : "Failed"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {record.submittedAt ? new Date(record.submittedAt).toLocaleString() : 'N/A'}
-                            </TableCell>
-                            <TableCell className="text-xs text-red-500 font-mono">
-                              {record.error || "-"}
-                            </TableCell>
+                  <>
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>URL</TableHead>
+                            <TableHead className="w-[100px]">Status</TableHead>
+                            <TableHead className="w-[200px]">Processed Date</TableHead>
+                            <TableHead>Details/Errors</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {recentSubmissions.map((record, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-mono text-xs break-all max-w-[400px]">
+                                {record.url}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                  record.success 
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                }`}>
+                                  {record.success ? "Success" : "Failed"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {record.submittedAt ? new Date(record.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}
+                              </TableCell>
+                              <TableCell className="text-xs text-red-500 font-mono">
+                                {record.error || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Mobile Card List View */}
+                    <div className="block md:hidden space-y-4">
+                      {recentSubmissions.map((record, index) => (
+                        <div key={index} className="rounded-lg border p-4 space-y-3 bg-card text-card-foreground shadow-sm">
+                          <div className="flex flex-col gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold w-fit ${
+                              record.success 
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
+                                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                            }`}>
+                              {record.success ? "Success" : "Failed"}
+                            </span>
+                            <div className="font-mono text-xs break-all text-slate-800 dark:text-slate-200 leading-relaxed font-semibold">
+                              {record.url}
+                            </div>
+                          </div>
+                          
+                          <div className="flex flex-col gap-1.5 text-xs border-t pt-2 mt-2 text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span className="font-medium">Processed Date:</span>
+                              <span>{record.submittedAt ? new Date(record.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</span>
+                            </div>
+                            {!record.success && record.error && (
+                              <div className="mt-2 p-2.5 rounded bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-950/30 text-red-600 dark:text-red-400 font-mono text-[11px] leading-relaxed break-all">
+                                {record.error}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
