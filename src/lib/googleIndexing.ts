@@ -374,7 +374,7 @@ export async function triggerBulkIndexingBatch() {
         url: res.url,
         success: res.success,
         submittedAt: Timestamp.now(),
-        ...(res.error ? { error: res.error } : {})
+        error: res.error || null
       }, { merge: true });
     });
 

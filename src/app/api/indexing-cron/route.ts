@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
         url: res.url,
         success: res.success,
         submittedAt: Timestamp.now(),
-        ...(res.error ? { error: res.error } : {})
+        error: res.error || null
       }, { merge: true });
     });
 
