@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,6 +17,8 @@ import { getHaversineDistance } from '@/lib/locationUtils';
 import dynamic from 'next/dynamic'; 
 import { useApplicationConfig } from '@/hooks/useApplicationConfig'; 
 import { useAuth } from '@/hooks/useAuth';
+import { logUserActivity } from '@/lib/activityLogger';
+import { getGuestId } from '@/lib/guestIdManager';
 
 const MapAddressSelector = dynamic(() => import('@/components/checkout/MapAddressSelector'), {
   loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin" /></div>,
@@ -48,6 +50,8 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
   
   const [isServiceable, setIsServiceable] = useState<boolean | null>(null);
   const [allServiceZones, setAllServiceZones] = useState<ServiceZone[]>([]);
+
+  const lastLoggedOutOfCoverageIdRef = useRef<string | null>(null);
   const [providerZones, setProviderZones] = useState<ServiceZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
@@ -151,6 +155,34 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
     else setIsServiceable(null); 
   }, [selectedAddressId, savedAddresses, checkServiceability]);
 
+  // Log user activity when the selected address is out of coverage
+  useEffect(() => {
+    if (isServiceable === false && selectedAddressId) {
+      if (lastLoggedOutOfCoverageIdRef.current !== selectedAddressId) {
+        lastLoggedOutOfCoverageIdRef.current = selectedAddressId;
+        const selectedAddress = savedAddresses.find(a => a.id === selectedAddressId);
+        if (selectedAddress) {
+          logUserActivity(
+            'checkoutStep',
+            {
+              checkoutStepName: 'out_of_coverage',
+              addressId: selectedAddress.id,
+              fullName: selectedAddress.fullName,
+              city: selectedAddress.city,
+              pincode: selectedAddress.pincode,
+              pageUrl: '/checkout'
+            },
+            user?.uid,
+            !user ? getGuestId() : null,
+            selectedAddress.fullName || firestoreUser?.displayName || user?.displayName || "Registered User"
+          );
+        }
+      }
+    } else if (isServiceable === true) {
+      lastLoggedOutOfCoverageIdRef.current = null;
+    }
+  }, [isServiceable, selectedAddressId, savedAddresses, user, firestoreUser]);
+
   const handleOpenMapClick = useCallback(async () => {
     setEditingAddress(null);
     setIsLocating(true);
@@ -195,6 +227,27 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
     setIsMapModalOpen(false);
     setIsFormOpen(true); 
   }, [checkServiceability, user, firestoreUser, editingAddress]);
+
+  const handleOutOfCoverage = useCallback((addressData: Partial<AddressFormData>) => {
+    logUserActivity(
+      'checkoutStep',
+      {
+        checkoutStepName: 'out_of_coverage',
+        addressLine1: addressData.addressLine1,
+        addressLine2: addressData.addressLine2,
+        city: addressData.city,
+        state: addressData.state,
+        pincode: addressData.pincode,
+        latitude: addressData.latitude,
+        longitude: addressData.longitude,
+        source: 'map_selection',
+        pageUrl: '/checkout'
+      },
+      user?.uid,
+      !user ? getGuestId() : null,
+      addressData.fullName || firestoreUser?.displayName || user?.displayName || "Registered User"
+    );
+  }, [user, firestoreUser]);
 
   const handleEditAddress = (e: React.MouseEvent, address: Address) => {
     e.stopPropagation();
@@ -354,6 +407,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
                 onClose={() => setIsMapModalOpen(false)} 
                 initialCenter={initialMapCenter} 
                 serviceZones={applicableServiceZones} 
+                onOutOfCoverage={handleOutOfCoverage}
               />
             )}
           </div>

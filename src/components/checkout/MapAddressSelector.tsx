@@ -25,6 +25,7 @@ interface MapAddressSelectorProps {
   initialCenter: { lat: number, lng: number } | null;
   serviceZones: ServiceZone[]; // New prop
   onManualSearchClick?: () => void; // Added for manual search
+  onOutOfCoverage?: (address: Partial<AddressFormData>) => void;
 }
 
 const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bangalore
@@ -35,7 +36,7 @@ const GOOGLE_MAPS_SCRIPT_ID = "fixbro-google-maps-places-script";
 const GOOGLE_MAPS_CALLBACK_NAME = `initFixBroMapAddressSelectorCallback_${Math.random().toString(36).substring(2, 15)}`;
 
 
-const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddressSelect, onClose, initialCenter, serviceZones, onManualSearchClick }) => {
+const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddressSelect, onClose, initialCenter, serviceZones, onManualSearchClick, onOutOfCoverage }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
   
@@ -247,6 +248,9 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
         description: "This address is outside our service area. Please select a different location.",
         variant: "destructive",
       });
+      if (selectedAddress && onOutOfCoverage) {
+        onOutOfCoverage(selectedAddress);
+      }
       return;
     }
     if (selectedAddress) {

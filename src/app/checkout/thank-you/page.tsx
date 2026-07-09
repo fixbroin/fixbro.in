@@ -364,6 +364,25 @@ export default function ThankYouPage() {
         const docRef = await addDoc(collection(db, "bookings"), newBookingData);
         // Track stats for new booking
         incrementSystemStats({ totalBookings: 1 }).catch(e => console.error("Stats increment error:", e));
+
+        const servicesSummary = resolvedServiceItems.map(s => `${s.name} (x${s.quantity})`).join(', ');
+
+        // Log the booking creation activity (User Activity)
+        logUserActivity(
+          'newBooking',
+          {
+            bookingId: newBookingId,
+            bookingDocId: docRef.id,
+            totalAmount: totalAmountForBooking,
+            paymentMethod: paymentMethod || "Unknown",
+            customerName,
+            customerPhone,
+            servicesSummary
+          },
+          currentUser?.uid,
+          !currentUser ? getGuestId() : null,
+          customerName
+        );
         
         // --- SEND BOOKING NOTIFICATIONS (Push + In-App) ---
         try {
@@ -394,7 +413,6 @@ export default function ThankYouPage() {
         // --- END BOOKING NOTIFICATIONS ---
 
         // --- IMMEDIATELY PREPARE UI DATA AND SHOW SUCCESS SCREEN ---
-        const servicesSummary = resolvedServiceItems.map(s => `${s.name} (x${s.quantity})`).join(', ');
         setBookingDetailsForDisplay({ 
             ...(newBookingData as FirestoreBooking), 
             id: docRef.id, 

@@ -20,6 +20,8 @@ import PromoCodeCard from '@/components/checkout/PromoCodeCard';
 import type { Address } from '@/types/firestore';
 import PaymentSummary from '@/components/checkout/payment/PaymentSummary';
 import PaymentMethods from '@/components/checkout/payment/PaymentMethods';
+import { logUserActivity } from '@/lib/activityLogger';
+import { getGuestId } from '@/lib/guestIdManager';
 
 interface AppliedPromoCodeInfo {
   id: string;
@@ -116,6 +118,20 @@ export default function CheckoutPage() {
     setIsScheduleModalOpen(false);
     toast({ title: "Schedule Updated", description: "Your service time has been updated." });
 
+    // Log time slot selection activity
+    logUserActivity(
+      'checkoutStep',
+      {
+        checkoutStepName: 'time_slot_selected',
+        scheduledDate: date.toLocaleDateString('en-CA'),
+        scheduledSlot: slot,
+        estimatedEndTime: endTime,
+        pageUrl: '/checkout'
+      },
+      user?.uid,
+      !user ? getGuestId() : null
+    );
+
     // Auto-flow logic
     if (!selectedAddress) {
       setTimeout(() => {
@@ -136,6 +152,22 @@ export default function CheckoutPage() {
     setIsAddressModalOpen(false);
     toast({ title: "Address Updated", description: "Your service address has been updated." });
 
+    // Log address selection activity
+    logUserActivity(
+      'checkoutStep',
+      {
+        checkoutStepName: 'address_selected',
+        addressId: address.id,
+        fullName: address.fullName,
+        phone: address.phone,
+        city: address.city,
+        pincode: address.pincode,
+        pageUrl: '/checkout'
+      },
+      user?.uid,
+      !user ? getGuestId() : null
+    );
+
     // Scroll to payment section
     setTimeout(() => {
       paymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -144,6 +176,19 @@ export default function CheckoutPage() {
 
   const handlePaymentMethodSelect = (method: string) => {
     setPaymentMethod(method);
+
+    // Log payment method selection activity
+    logUserActivity(
+      'checkoutStep',
+      {
+        checkoutStepName: 'payment_method_selected',
+        paymentMethod: method,
+        pageUrl: '/checkout'
+      },
+      user?.uid,
+      !user ? getGuestId() : null
+    );
+
     // Scroll to book button in order summary
     if (window.innerWidth < 1024) {
       setTimeout(() => {
