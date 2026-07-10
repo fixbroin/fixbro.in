@@ -358,6 +358,19 @@ export async function POST(request: Request) {
         }));
     }
 
+    // D. Trigger Actual Push Notifications
+    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string) => {
+        try {
+            await fetch(`${getBaseUrl()}/api/send-push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: pUserId, title: pTitle, body: pBody, href: pHref }),
+            });
+        } catch (e) {
+            console.error(`Error triggering push for ${pUserId}:`, e);
+        }
+    };
+
     // C. Admin Dashboard Notification (Notify all active admins)
     try {
         const adminsSnapshot = await adminDb.collection('admins').where('status', '==', 'active').get();
@@ -406,19 +419,6 @@ export async function POST(request: Request) {
     } catch (adminNotifyErr) {
         console.error("Error notifying admins:", adminNotifyErr);
     }
-
-    // D. Trigger Actual Push Notifications
-    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string) => {
-        try {
-            await fetch(`${getBaseUrl()}/api/send-push`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: pUserId, title: pTitle, body: pBody, href: pHref }),
-            });
-        } catch (e) {
-            console.error(`Error triggering push for ${pUserId}:`, e);
-        }
-    };
 
     if (userId) {
         tasks.push(triggerPush(
