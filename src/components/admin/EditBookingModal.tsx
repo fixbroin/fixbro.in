@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,13 +12,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Save, User, Mail, Phone, MapPin, Edit, Clock, Globe, CalendarDays, Check, ChevronsUpDown } from 'lucide-react';
-import type { FirestoreBooking, BookingStatus, FirestoreNotification } from '@/types/firestore';
+import { Separator } from "@/components/ui/separator";
+import AppImage from '@/components/ui/AppImage';
+import { Loader2, Save, User, Mail, Phone, MapPin, Edit, Clock, Globe, CalendarDays, Check, ChevronsUpDown, Trash2, PlusCircle, Search, Tag } from 'lucide-react';
+import type { FirestoreBooking, BookingStatus, FirestoreNotification, FirestoreService, FirestorePromoCode, BookingServiceItem } from '@/types/firestore';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import RescheduleBookingDialog from '@/components/shared/RescheduleBookingDialog';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { getBasePriceForInvoice } from '@/lib/bookingUtils';
 
 const statusOptions: [string, ...string[]] = [
   "Pending Payment",
@@ -78,6 +82,13 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
   const [isTimeSlotPickerOpen, setIsTimeSlotPickerOpen] = useState(false);
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
 
+  const { config: appConfig } = useApplicationConfig();
+  const [services, setServices] = useState<BookingServiceItem[]>([]);
+  const [allCatalogServices, setAllCatalogServices] = useState<FirestoreService[]>([]);
+  const [isAddServiceDialogOpen, setIsAddServiceDialogOpen] = useState(false);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState("");
+  const [availablePromos, setAvailablePromos] = useState<FirestorePromoCode[]>([]);
+
   const form = useForm<BookingEditFormData>({
     resolver: zodResolver(bookingEditSchema),
     defaultValues: {
@@ -110,6 +121,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
         if (docSnap.exists()) {
           const bookingData = docSnap.data() as FirestoreBooking;
           setBooking(bookingData);
+          setServices(bookingData.services || []);
           
           form.reset({
             customerName: bookingData.customerName || "",
@@ -154,6 +166,28 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
 
     fetchBooking();
   }, [bookingId, isOpen, form, toast, onOpenChange]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchServicesCatalog = async () => {
+      try {
+        const snap = await getDocs(query(collection(db, "adminServices"), where("isActive", "==", true)));
+        setAllCatalogServices(snap.docs.map(d => ({ ...d.data(), id: d.id } as FirestoreService)));
+      } catch (err) {
+        console.error("Error fetching catalog services:", err);
+      }
+    };
+    const fetchPromos = async () => {
+      try {
+        const snap = await getDocs(collection(db, "adminPromoCodes"));
+        setAvailablePromos(snap.docs.map(d => ({ ...d.data(), id: d.id } as FirestorePromoCode)));
+      } catch (err) {
+        console.error("Error fetching promos:", err);
+      }
+    };
+    fetchServicesCatalog();
+    fetchPromos();
+  }, [isOpen]);
   
   const handleCalendarSelect = (date: Date | undefined) => {
     setCalendarDate(date);
@@ -179,15 +213,150 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
     toast({ title: "Slot Updated", description: `Booking schedule updated to ${newDate} at ${newSlot}.` });
   };
 
+  const handleQuantityChange = (serviceId: string, delta: number) => {
+    setServices(prev => prev.map(s => {
+      if (s.serviceId === serviceId) {
+        const newQty = Math.max(1, s.quantity + delta);
+        const price = s.pricePerUnit * newQty;
+        const rate = s.taxPercentApplied || 0;
+        const base = getBasePriceForInvoice(price, !!s.isTaxInclusive, rate);
+        return {
+          ...s,
+          quantity: newQty,
+          taxAmountForItem: price - base
+        };
+      }
+      return s;
+    }));
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    setServices(prev => prev.filter(s => s.serviceId !== serviceId));
+  };
+
+  const handleAddServiceFromCatalog = (srv: FirestoreService) => {
+    if (services.some(s => s.serviceId === srv.id)) {
+      toast({ title: "Already Added", description: "This service is already added." });
+      return;
+    }
+
+    const price = srv.discountedPrice ?? srv.price;
+    const rate = srv.taxPercent || 0;
+    const base = getBasePriceForInvoice(price, !!srv.isTaxInclusive, rate);
+
+    const newItem: BookingServiceItem = {
+      serviceId: srv.id,
+      name: srv.name,
+      imageUrl: srv.imageUrl || undefined,
+      quantity: 1,
+      pricePerUnit: price,
+      discountedPricePerUnit: srv.discountedPrice || null,
+      isTaxInclusive: !!srv.isTaxInclusive,
+      taxPercentApplied: rate,
+      taxAmountForItem: price - base,
+      taskTimeValue: srv.taskTimeValue || null,
+      taskTimeUnit: srv.taskTimeUnit || null,
+      shortDescription: srv.shortDescription || null,
+    };
+
+    setServices(prev => [...prev, newItem]);
+    setIsAddServiceDialogOpen(false);
+    setServiceSearchQuery("");
+    toast({ title: "Added", description: `${srv.name} added.` });
+  };
+
+  const summary = useMemo(() => {
+    let itemTotal = 0; 
+    let taxTotal = 0; 
+    let visitingCharge = 0; 
+    let platformFeeTotal = 0;
+    const appliedPlatformFees: any[] = [];
+
+    services.forEach(item => {
+      const qty = item.quantity;
+      const price = item.pricePerUnit * qty;
+      itemTotal += price;
+
+      const rate = item.taxPercentApplied || 0;
+      const base = getBasePriceForInvoice(price, !!item.isTaxInclusive, rate);
+      taxTotal += (price - base);
+    });
+
+    if (appConfig?.enableMinimumBookingPolicy && itemTotal < (appConfig.minimumBookingAmount || 0)) {
+      visitingCharge = appConfig.visitingChargeAmount || 0;
+      if (appConfig.enableTaxOnVisitingCharge) {
+        const vcBase = getBasePriceForInvoice(visitingCharge, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent || 0);
+        taxTotal += vcBase * ((appConfig.visitingChargeTaxPercent || 0) / 100);
+      }
+    }
+
+    if (appConfig?.platformFees) {
+      appConfig.platformFees.forEach(fee => {
+        if (fee.isActive) {
+          const base = fee.type === 'percentage' ? (itemTotal * (fee.value / 100)) : fee.value;
+          const tax = base * ((fee.feeTaxRatePercent || 0) / 100);
+          appliedPlatformFees.push({ 
+            name: fee.name, 
+            type: fee.type, 
+            valueApplied: fee.value, 
+            calculatedFeeAmount: base, 
+            taxRatePercentOnFee: fee.feeTaxRatePercent || 0, 
+            taxAmountOnFee: tax 
+          });
+          platformFeeTotal += (base + tax);
+        }
+      });
+    }
+
+    let discountAmount = booking?.discountAmount || 0;
+    if (booking?.discountCode) {
+      const promo = availablePromos.find(p => p.code === booking.discountCode);
+      if (promo) {
+        if (promo.minBookingAmount && itemTotal < promo.minBookingAmount) {
+          discountAmount = 0;
+        } else {
+          discountAmount = promo.discountType === 'percentage' 
+            ? (itemTotal * promo.discountValue) / 100 
+            : promo.discountValue;
+          discountAmount = Math.min(discountAmount, itemTotal);
+        }
+      }
+    }
+
+    const grandTotal = Math.max(0, itemTotal + taxTotal + visitingCharge + platformFeeTotal - discountAmount);
+
+    return { 
+      itemTotal, 
+      taxTotal, 
+      visitingCharge, 
+      platformFeeTotal, 
+      appliedPlatformFees, 
+      discountAmount,
+      grandTotal 
+    };
+  }, [services, appConfig, booking, availablePromos]);
+
   const onSubmit = async (data: BookingEditFormData) => {
     if (!booking || !bookingId) return;
+    if (services.length === 0) {
+      toast({ title: "Validation Error", description: "You must have at least one service in the booking.", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
 
     try {
       const bookingDocRef = doc(db, "bookings", bookingId);
       
-      const updateData: Partial<FirestoreBooking> = {
+      const updateData = {
         ...data,
+        services: services,
+        subTotal: summary.itemTotal,
+        taxAmount: summary.taxTotal,
+        visitingCharge: summary.visitingCharge,
+        platformFeeTotal: summary.platformFeeTotal,
+        appliedPlatformFees: summary.appliedPlatformFees,
+        discountAmount: summary.discountAmount,
+        totalAmount: summary.grandTotal,
         status: data.status as BookingStatus,
         latitude: data.latitude === null ? undefined : data.latitude,
         longitude: data.longitude === null ? undefined : data.longitude,
@@ -385,6 +554,158 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                         </FormControl>
                       </FormItem>
                     </div>
+                  </section>
+
+                  {/* Service Items Section */}
+                  <section className="space-y-4 p-4 border rounded-xl bg-muted/5 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-black text-primary uppercase tracking-wider flex items-center gap-2">
+                        <Tag className="h-4 w-4 text-primary" /> Service Items
+                      </h3>
+                      <Dialog open={isAddServiceDialogOpen} onOpenChange={setIsAddServiceDialogOpen}>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          className="h-8 text-xs font-bold border-primary text-primary hover:bg-primary hover:text-white"
+                          onClick={() => setIsAddServiceDialogOpen(true)}
+                        >
+                          <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Service
+                        </Button>
+                        <DialogContent className="w-[90vw] sm:max-w-lg rounded-2xl max-h-[80vh] flex flex-col p-0">
+                          <DialogHeader className="p-6 pb-4 border-b">
+                            <DialogTitle>Add Service</DialogTitle>
+                            <DialogDescription>Search and select a service to add to this booking.</DialogDescription>
+                          </DialogHeader>
+                          <div className="p-4 border-b shrink-0">
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input 
+                                placeholder="Search services..." 
+                                className="pl-9 h-9"
+                                value={serviceSearchQuery}
+                                onChange={(e) => setServiceSearchQuery(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-grow overflow-y-auto p-4 max-h-[50vh] min-h-0">
+                            <div className="space-y-2">
+                              {allCatalogServices
+                                .filter(s => s.name.toLowerCase().includes(serviceSearchQuery.toLowerCase()))
+                                .map((srv) => (
+                                  <Button
+                                    key={srv.id}
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start text-left h-auto py-3 px-4 flex flex-col items-start gap-1 hover:bg-muted/50 border rounded-lg"
+                                    onClick={() => handleAddServiceFromCatalog(srv)}
+                                  >
+                                    <span className="font-bold text-sm text-foreground">{srv.name}</span>
+                                    <span className="text-xs text-muted-foreground">Price: ₹{srv.discountedPrice ?? srv.price}</span>
+                                  </Button>
+                                ))}
+                              {allCatalogServices.filter(s => s.name.toLowerCase().includes(serviceSearchQuery.toLowerCase())).length === 0 && (
+                                <div className="text-center py-8 text-sm text-muted-foreground">No services found matching search query.</div>
+                              )}
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    <div className="space-y-3">
+                      {services.map((item) => (
+                        <div key={item.serviceId} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg bg-background gap-4 shadow-sm">
+                          <div className="flex items-center gap-3">
+                            {item.imageUrl && (
+                              <AppImage src={item.imageUrl} alt={item.name} width={40} height={40} className="rounded-md object-cover h-10 w-10 shrink-0" />
+                            )}
+                            <div className="space-y-0.5">
+                              <div className="font-bold text-sm leading-tight">{item.name}</div>
+                              <div className="text-xs text-muted-foreground">₹{item.pricePerUnit} per unit</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 self-end sm:self-auto">
+                            <div className="flex items-center border rounded-lg p-0.5 h-8 bg-muted/20">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 rounded-md"
+                                onClick={() => handleQuantityChange(item.serviceId, -1)}
+                              >
+                                -
+                              </Button>
+                              <span className="w-8 text-center text-xs font-bold">{item.quantity}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 rounded-md"
+                                onClick={() => handleQuantityChange(item.serviceId, 1)}
+                              >
+                                +
+                              </Button>
+                            </div>
+                            <div className="text-sm font-bold min-w-[70px] text-right">
+                              ₹{(item.pricePerUnit * item.quantity).toLocaleString()}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => handleRemoveService(item.serviceId)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {services.length === 0 && (
+                        <div className="text-center py-6 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg font-medium">
+                          No services added. You must add at least one service.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Summary Display */}
+                    {services.length > 0 && (
+                      <div className="mt-4 border-t pt-4 space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Services Subtotal:</span>
+                          <span className="font-bold">₹{summary.itemTotal.toFixed(2)}</span>
+                        </div>
+                        {summary.visitingCharge > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Visiting Charge:</span>
+                            <span className="font-bold">₹{summary.visitingCharge.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {summary.appliedPlatformFees.map((fee: any, idx: number) => (
+                          <div key={idx} className="flex justify-between">
+                            <span className="text-muted-foreground">{fee.name}:</span>
+                            <span className="font-bold">₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Taxes Applied:</span>
+                          <span className="font-bold">₹{summary.taxTotal.toFixed(2)}</span>
+                        </div>
+                        {summary.discountAmount > 0 && (
+                          <div className="flex justify-between text-red-500 font-bold">
+                            <span>Promo Discount ({booking?.discountCode}):</span>
+                            <span>-₹{summary.discountAmount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator />
+                        <div className="flex justify-between text-sm font-bold text-primary pt-1">
+                          <span>Grand Total:</span>
+                          <span>₹{summary.grandTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
                   </section>
 
                   {/* Schedule & Status */}
