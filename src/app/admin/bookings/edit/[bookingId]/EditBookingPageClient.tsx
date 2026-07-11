@@ -65,12 +65,15 @@ const bookingEditSchema = z.object({
 
 type BookingEditFormData = z.infer<typeof bookingEditSchema>;
 
-// Removed params from props
-export default function EditBookingPageClient() {
+interface EditBookingPageClientProps {
+  bookingId?: string;
+}
+
+export default function EditBookingPageClient({ bookingId: propBookingId }: EditBookingPageClientProps = {}) {
   const router = useRouter();
   const paramsFromHook = useParams(); // Use the hook
   const { toast } = useToast();
-  const bookingId = paramsFromHook.bookingId as string; // Get bookingId from the hook
+  const bookingId = propBookingId || (paramsFromHook?.bookingId as string);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

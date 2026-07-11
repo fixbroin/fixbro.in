@@ -14,8 +14,6 @@ interface PageProps {
 
 // No data fetching here, client component handles it
 export default async function Page({ params }: PageProps) {
-  // We don't await params here because this is just a wrapper.
-  // The client component will use the `useParams` hook which is synchronous client-side.
-  // We pass the params directly to the client component.
-  return <EditBookingPageClient />;
+  const { bookingId } = await params;
+  return <EditBookingPageClient bookingId={bookingId} />;
 }
