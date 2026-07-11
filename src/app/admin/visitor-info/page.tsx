@@ -79,6 +79,7 @@ export default function AdminVisitorInfoPage() {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<'all' | 'unique'>('all');
   const { toast } = useToast();
 
   const fetchInitialLogs = async () => {
@@ -245,6 +246,73 @@ export default function AdminVisitorInfoPage() {
       );
   }, [visitorLogs, searchTerm]);
 
+  const uniqueVisitorLogs = useMemo(() => {
+    const map = new Map<string, {
+      ipAddress: string;
+      city: string;
+      countryName: string;
+      pathname: string;
+      ispOrganization: string;
+      userAgent: string;
+      timestamp: any;
+      visitCount: number;
+      paths: string[];
+    }>();
+
+    visitorLogs.forEach(log => {
+      if (!log.ipAddress) return;
+      const existing = map.get(log.ipAddress);
+      if (existing) {
+        existing.visitCount += 1;
+        const currentMillis = getTimestampMillis(log.timestamp) || 0;
+        const existingMillis = getTimestampMillis(existing.timestamp) || 0;
+        if (currentMillis > existingMillis) {
+          existing.timestamp = log.timestamp;
+          existing.pathname = log.pathname || '/';
+          existing.city = log.city || '';
+          existing.countryName = log.countryName || '';
+          existing.ispOrganization = log.ispOrganization || '';
+          existing.userAgent = log.userAgent || '';
+        }
+        if (log.pathname && !existing.paths.includes(log.pathname)) {
+          existing.paths.push(log.pathname);
+        }
+      } else {
+        map.set(log.ipAddress, {
+          ipAddress: log.ipAddress,
+          city: log.city || '',
+          countryName: log.countryName || '',
+          pathname: log.pathname || '/',
+          ispOrganization: log.ispOrganization || '',
+          userAgent: log.userAgent || '',
+          timestamp: log.timestamp,
+          visitCount: 1,
+          paths: [log.pathname || '/']
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const aMillis = getTimestampMillis(a.timestamp) || 0;
+      const bMillis = getTimestampMillis(b.timestamp) || 0;
+      return bMillis - aMillis;
+    });
+  }, [visitorLogs]);
+
+  const filteredUniqueLogs = useMemo(() => {
+    if (!searchTerm) return uniqueVisitorLogs;
+    const lowerSearch = searchTerm.toLowerCase();
+    return uniqueVisitorLogs.filter(log => 
+        log.ipAddress?.toLowerCase().includes(lowerSearch) ||
+        log.city?.toLowerCase().includes(lowerSearch) ||
+        log.countryName?.toLowerCase().includes(lowerSearch) ||
+        log.pathname?.toLowerCase().includes(lowerSearch) ||
+        log.ispOrganization?.toLowerCase().includes(lowerSearch)
+    );
+  }, [uniqueVisitorLogs, searchTerm]);
+
+  const currentDisplayLogs = viewMode === 'all' ? filteredLogs : filteredUniqueLogs;
+
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   const renderMobileCard = (log: FirestoreVisitorInfoLog) => (
@@ -274,6 +342,55 @@ export default function AdminVisitorInfoPage() {
                 <div className="font-mono text-xs break-all text-primary font-medium leading-relaxed">
                     {log.pathname}
                 </div>
+             </div>
+         </div>
+
+         <Separator className="my-1 opacity-50" />
+         
+         <div className="text-[10px] text-muted-foreground italic truncate">
+             ISP: {log.ispOrganization || 'N/A'}
+         </div>
+      </CardContent>
+    </Card>
+  );
+
+  const renderMobileUniqueCard = (log: typeof uniqueVisitorLogs[number]) => (
+    <Card key={log.ipAddress} className="mb-4 border-l-4 border-l-blue-500 shadow-sm overflow-hidden">
+      <CardContent className="p-4 space-y-3 text-sm">
+         <div className="flex justify-between items-start">
+             <div className="flex items-center gap-2">
+                 <Badge variant="outline" className="bg-primary/5 text-[10px] py-0">{log.ipAddress}</Badge>
+                 <span className="text-[10px] text-muted-foreground">{formatLogTimestamp(log.timestamp)}</span>
+             </div>
+             <div className="flex items-center gap-1">
+                 {getDeviceIcon(log.userAgent)}
+                 {getBrowserIcon(log.userAgent)}
+             </div>
+         </div>
+         
+         <div className="space-y-2">
+             <div className="flex justify-between items-center text-xs">
+                 <div className="flex items-center gap-1.5">
+                     <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                     <span className="truncate">{log.city || 'N/A'}, {log.countryName || 'N/A'}</span>
+                 </div>
+                 <Badge className="bg-blue-100 hover:bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-none font-bold text-[10px] px-2 py-0.5">
+                     {log.visitCount} visits
+                 </Badge>
+             </div>
+             <div className="bg-secondary/20 p-2 rounded-md border border-secondary/30">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-muted-foreground mb-1">
+                    <Layout className="h-3 w-3" />
+                    <span>Last Path Visited</span>
+                </div>
+                <div className="font-mono text-xs break-all text-primary font-medium leading-relaxed">
+                    {log.pathname}
+                </div>
+                {log.paths.length > 1 && (
+                  <div className="text-[9px] text-muted-foreground mt-1 truncate">
+                    Paths: {log.paths.join(', ')}
+                  </div>
+                )}
              </div>
          </div>
 
@@ -418,7 +535,30 @@ export default function AdminVisitorInfoPage() {
       <Card className="shadow-sm border-none">
         <CardHeader className="pb-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <CardTitle className="text-lg font-bold">Activity Logs</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <CardTitle className="text-lg font-bold">Activity Logs</CardTitle>
+              
+              {/* Tab Selector */}
+              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/60">
+                <Button
+                  variant={viewMode === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs font-semibold px-3"
+                  onClick={() => setViewMode('all')}
+                >
+                  All Visits
+                </Button>
+                <Button
+                  variant={viewMode === 'unique' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs font-semibold px-3"
+                  onClick={() => setViewMode('unique')}
+                >
+                  Unique Visitors ({uniqueVisitorLogs.length})
+                </Button>
+              </div>
+            </div>
+            
             <div className="relative w-full md:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
@@ -436,7 +576,7 @@ export default function AdminVisitorInfoPage() {
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <p className="animate-pulse text-sm">Synchronizing logs...</p>
             </div>
-          ) : filteredLogs.length === 0 ? (
+          ) : currentDisplayLogs.length === 0 ? (
             <div className="text-center py-16">
               <PackageSearch className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
               <p className="text-muted-foreground font-medium">No results found for "{searchTerm}"</p>
@@ -446,62 +586,132 @@ export default function AdminVisitorInfoPage() {
             <>
               {/* Desktop View */}
               <div className="hidden lg:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Visitor / Device</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Location</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Path</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider">Network (ISP)</TableHead>
-                      <TableHead className="text-[11px] font-bold uppercase tracking-wider text-right">Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLogs.map((log) => (
-                      <TableRow key={log.id} className="hover:bg-muted/10 transition-colors">
-                        <TableCell>
-                            <div className="flex flex-col">
-                                <span className="font-mono text-xs font-bold text-primary">{log.ipAddress}</span>
-                                <div className="flex items-center mt-1 text-[10px] text-muted-foreground">
-                                    {getDeviceIcon(log.userAgent)}
-                                    <span className="truncate max-w-[120px]" title={log.userAgent}>{log.userAgent.split(' ')[0]}...</span>
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-col">
-                                <span className="text-xs font-medium">{log.city || 'Unknown City'}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{log.countryName || 'Global'}</span>
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0 bg-secondary/30">
-                                {log.pathname}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate" title={log.ispOrganization}>
-                            {log.ispOrganization || 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                             <div className="flex flex-col items-end">
-                                <span className="text-xs font-medium">{formatLogTimestamp(log.timestamp)}</span>
-                                <span className="text-[10px] text-muted-foreground opacity-60 font-mono">
-                                    {(() => {
-                                        const millis = getTimestampMillis(log.timestamp);
-                                        return millis ? format(new Date(millis), 'HH:mm:ss') : '';
-                                    })()}
-                                </span>
-                            </div>
-                        </TableCell>
+                {viewMode === 'all' ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Visitor / Device</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Location</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Path</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Network (ISP)</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-right">Time</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredLogs.map((log) => (
+                        <TableRow key={log.id} className="hover:bg-muted/10 transition-colors">
+                          <TableCell>
+                              <div className="flex flex-col">
+                                  <span className="font-mono text-xs font-bold text-primary">{log.ipAddress}</span>
+                                  <div className="flex items-center mt-1 text-[10px] text-muted-foreground">
+                                      {getDeviceIcon(log.userAgent)}
+                                      <span className="truncate max-w-[120px]" title={log.userAgent}>{log.userAgent.split(' ')[0]}...</span>
+                                  </div>
+                              </div>
+                          </TableCell>
+                          <TableCell>
+                              <div className="flex flex-col">
+                                  <span className="text-xs font-medium">{log.city || 'Unknown City'}</span>
+                                  <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{log.countryName || 'Global'}</span>
+                              </div>
+                          </TableCell>
+                          <TableCell>
+                              <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0 bg-secondary/30">
+                                  {log.pathname}
+                              </Badge>
+                          </TableCell>
+                          <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate" title={log.ispOrganization}>
+                              {log.ispOrganization || 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                               <div className="flex flex-col items-end">
+                                  <span className="text-xs font-medium">{formatLogTimestamp(log.timestamp)}</span>
+                                  <span className="text-[10px] text-muted-foreground opacity-60 font-mono">
+                                      {(() => {
+                                          const millis = getTimestampMillis(log.timestamp);
+                                          return millis ? format(new Date(millis), 'HH:mm:ss') : '';
+                                      })()}
+                                  </span>
+                              </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Visitor / Device</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Location</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Visits Count</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Last Path Visited</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider">Network (ISP)</TableHead>
+                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-right">Last Active</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUniqueLogs.map((log) => (
+                        <TableRow key={log.ipAddress} className="hover:bg-muted/10 transition-colors">
+                          <TableCell>
+                              <div className="flex flex-col">
+                                  <span className="font-mono text-xs font-bold text-primary">{log.ipAddress}</span>
+                                  <div className="flex items-center mt-1 text-[10px] text-muted-foreground">
+                                      {getDeviceIcon(log.userAgent)}
+                                      <span className="truncate max-w-[120px]" title={log.userAgent}>{log.userAgent.split(' ')[0]}...</span>
+                                  </div>
+                              </div>
+                          </TableCell>
+                          <TableCell>
+                              <div className="flex flex-col">
+                                  <span className="text-xs font-medium">{log.city || 'Unknown City'}</span>
+                                  <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{log.countryName || 'Global'}</span>
+                              </div>
+                          </TableCell>
+                          <TableCell>
+                              <Badge className="bg-blue-100 hover:bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-none font-bold text-[10px] px-2 py-0.5">
+                                  {log.visitCount} visits
+                              </Badge>
+                          </TableCell>
+                          <TableCell>
+                              <div className="flex flex-col gap-1 items-start">
+                                <Badge variant="secondary" className="font-mono text-[10px] px-2 py-0 bg-secondary/30">
+                                    {log.pathname}
+                                </Badge>
+                                {log.paths.length > 1 && (
+                                  <span className="text-[9px] text-muted-foreground">
+                                    +{log.paths.length - 1} other paths
+                                  </span>
+                                )}
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate" title={log.ispOrganization}>
+                              {log.ispOrganization || 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                               <div className="flex flex-col items-end">
+                                  <span className="text-xs font-medium">{formatLogTimestamp(log.timestamp)}</span>
+                                  <span className="text-[10px] text-muted-foreground opacity-60 font-mono">
+                                      {(() => {
+                                          const millis = getTimestampMillis(log.timestamp);
+                                          return millis ? format(new Date(millis), 'HH:mm:ss') : '';
+                                      })()}
+                                  </span>
+                              </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
 
               {/* Mobile View */}
               <div className="lg:hidden">
-                {filteredLogs.map(renderMobileCard)}
+                {viewMode === 'all' 
+                  ? filteredLogs.map(renderMobileCard)
+                  : filteredUniqueLogs.map(renderMobileUniqueCard)
+                }
               </div>
             </>
           )}

@@ -1,6 +1,8 @@
 {
   "name": "FixBro Admin",
   "short_name": "FixBro Admin",
+  "id": "/admin",
+  "scope": "/admin",
   "description": "Admin Panel for FixBro Services",
   "start_url": "/admin",
   "display": "standalone",
