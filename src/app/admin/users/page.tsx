@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import AppImage from '@/components/ui/AppImage';
+import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -292,10 +293,8 @@ export default function AdminUsersPage() {
 
   const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber: string) => {
     e.stopPropagation();
-    const sanitizedPhone = mobileNumber.replace(/\D/g, '');
-    const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
-    const message = encodeURIComponent("Hi, I'm contacting you from FixBro.");
-    window.open(`https://wa.me/${internationalPhone}?text=${message}`, '_blank');
+    const message = "Hi, I'm contacting you from FixBro.";
+    openWhatsAppChooser(mobileNumber, message);
   };
 
   const formatAddress = (address?: Address): string => {
@@ -393,10 +392,9 @@ export default function AdminUsersPage() {
             <a href={`tel:${user.mobileNumber}`} className="text-primary hover:underline font-medium">{user.mobileNumber || 'No Phone'}</a>
           </div>
           {user.mobileNumber && (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-lg" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)}>
-              <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
-              <span className="text-[10px] font-black uppercase">WhatsApp</span>
-            </Button>
+            <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors" title="WhatsApp">
+              <img src="/whatsapp.png" alt="WA" className="h-7 w-7" />
+            </button>
           )}
         </div>
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -562,7 +560,7 @@ export default function AdminUsersPage() {
                               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                                 <Phone className="h-3 w-3 text-primary/60 shrink-0" /> 
                                 <a href={`tel:${user.mobileNumber}`} className="hover:underline">{user.mobileNumber || "No Contact"}</a>
-                                {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors"><AppImage src="/whatsapp.png" alt="WA" width={14} height={14} /></button>}
+                                {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors"><img src="/whatsapp.png" alt="WA" className="h-5 w-5" /></button>}
                               </div>
                             </div>
                           </TableCell>
@@ -630,7 +628,7 @@ export default function AdminUsersPage() {
 
       {selectedUserForModal && (
         <Dialog open={isUserDetailsModalOpen} onOpenChange={setIsUserDetailsModalOpen}>
-          <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+          <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
             <UserDetailsModal user={selectedUserForModal} onClose={() => setIsUserDetailsModalOpen(false)} onUpdateUser={handleUpdateUserFromModal} />
           </DialogContent>
         </Dialog>
@@ -638,7 +636,7 @@ export default function AdminUsersPage() {
 
       {/* Image Preview Dialog */}
       <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-        <DialogContent className="max-w-md p-0 border-none bg-transparent shadow-none flex items-center justify-center">
+        <DialogContent aria-describedby={undefined} className="max-w-md p-0 border-none bg-transparent shadow-none flex items-center justify-center">
           <DialogHeader className="sr-only">
             <DialogTitle>Profile Photo Preview</DialogTitle>
           </DialogHeader>

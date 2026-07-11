@@ -16,6 +16,7 @@ import { UserCircle, Mail, Phone, CalendarDays, CheckCircle, XCircle, Loader2, E
 import { ScrollArea } from '../ui/scroll-area';
 import AppImage from '@/components/ui/AppImage';
 import { getTimestampMillis } from '@/lib/utils';
+import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 
 interface UserDetailsModalProps {
   user: FirestoreUser;
@@ -77,17 +78,9 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
   
   const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber?: string | null) => {
     e.stopPropagation();
-  
-    if (!mobileNumber) return; // ✅ THIS LINE FIXES EVERYTHING
-  
-    const sanitizedPhone = mobileNumber.replace(/\D/g, '');
-    const internationalPhone = sanitizedPhone.startsWith('91')
-      ? sanitizedPhone
-      : `91${sanitizedPhone}`;
-  
-    const message = encodeURIComponent("Hi, I'm contacting you from FixBro.");
-  
-    window.open(`https://wa.me/${internationalPhone}?text=${message}`, '_blank');
+    if (!mobileNumber) return;
+    const message = "Hi, I'm contacting you from FixBro.";
+    openWhatsAppChooser(mobileNumber, message);
   };
 
   return (

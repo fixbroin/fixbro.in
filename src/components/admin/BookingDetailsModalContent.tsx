@@ -14,6 +14,7 @@ import { getTimestampMillis, formatScheduledDate } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 
 interface BookingDetailsModalContentProps {
   booking: FirestoreBooking;
@@ -67,10 +68,8 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
 
   const handleWhatsAppClick = () => {
     if (booking.customerPhone) {
-      const sanitizedPhone = booking.customerPhone.replace(/\D/g, '');
-      const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
-      const message = encodeURIComponent(`Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`);
-      window.open(`https://wa.me/${internationalPhone}?text=${message}`, '_blank');
+      const message = `Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`;
+      openWhatsAppChooser(booking.customerPhone, message);
     }
   };
 

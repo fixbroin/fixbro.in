@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import BookingDetailsModalContent from '@/components/admin/BookingDetailsModalContent';
 import EditBookingModal from '@/components/admin/EditBookingModal';
+import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -184,10 +185,8 @@ export default function AdminBookingsPage() {
 
   const handleWhatsAppClick = (booking: FirestoreBooking) => {
     if (booking.customerPhone) {
-      const sanitizedPhone = booking.customerPhone.replace(/\D/g, '');
-      const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
-      const message = encodeURIComponent(`Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`);
-      window.open(`https://wa.me/${internationalPhone}?text=${message}`, '_blank');
+      const message = `Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`;
+      openWhatsAppChooser(booking.customerPhone, message);
     }
   };
 
