@@ -17,6 +17,7 @@ import {
  query, orderBy, onSnapshot, doc, updateDoc, Timestamp, deleteDoc, where, getDocs, deleteField, addDoc, getDoc, runTransaction, limit, startAfter, type QueryDocumentSnapshot } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import BookingDetailsModalContent from '@/components/admin/BookingDetailsModalContent';
+import EditBookingModal from '@/components/admin/EditBookingModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -160,6 +161,9 @@ export default function AdminBookingsPage() {
   const [bookingToChangeStatus, setBookingToChangeStatus] = useState<FirestoreBooking | null>(null);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isFilterStatusPickerOpen, setIsFilterStatusPickerOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [bookingToEditId, setBookingToEditId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleInitialize = async () => {
     setIsInitializing(true);
@@ -262,7 +266,7 @@ export default function AdminBookingsPage() {
       };
       fetchInitialBookings();
     }
-  }, [searchTerm, toast]);
+  }, [searchTerm, toast, refreshTrigger]);
 
   const loadMoreBookings = async () => {
     if (isLoadingMore || !hasMore || searchTerm.trim().length > 0 || !lastDoc) return;
@@ -567,7 +571,7 @@ export default function AdminBookingsPage() {
       <CardFooter className="p-4 pt-0 gap-2 flex flex-wrap">
         <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setSelectedBooking(booking); setIsDetailsModalOpen(true); }}>Details</Button>
         <PermissionGuard moduleId="bookings" action="write">
-          <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => router.push(`/admin/bookings/edit/${booking.id}`)}>Edit</Button>
+          <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToEditId(booking.id || null); setIsEditModalOpen(true); }}>Edit</Button>
         </PermissionGuard>
         <PermissionGuard moduleId="bookings" action="write">
           <Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>Assign</Button>
@@ -760,7 +764,7 @@ export default function AdminBookingsPage() {
                               </PermissionGuard>
                               <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button>
                               <PermissionGuard moduleId="bookings" action="write">
-                                <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => router.push(`/admin/bookings/edit/${b.id}`)}>Edit</Button>
+                                <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setBookingToEditId(b.id || null); setIsEditModalOpen(true); }}>Edit</Button>
                               </PermissionGuard>
                               <PermissionGuard moduleId="bookings" action="delete">
                                 <AlertDialog>
@@ -848,6 +852,12 @@ export default function AdminBookingsPage() {
           </DialogContent>
         </Dialog>
       )}
+      <EditBookingModal
+        bookingId={bookingToEditId}
+        isOpen={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onSuccess={() => setRefreshTrigger(prev => prev + 1)}
+      />
     </div>
   );
 }
