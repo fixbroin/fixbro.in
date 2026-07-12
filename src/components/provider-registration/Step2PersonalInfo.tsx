@@ -18,6 +18,7 @@ import { Loader2, User, Mail, Phone, MapPin, BookOpen, Languages, Camera, Image 
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import { storage } from '@/lib/firebase';
+import { compressImage } from "@/lib/imageCompressor";
 import { ref as storageRefStandard, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Progress } from "@/components/ui/progress";
 import { useEffect, useRef, useState } from "react";
@@ -144,16 +145,24 @@ export default function Step2PersonalInfo({
     }
   }, [initialData, firestoreUser, user, form, isMounted]);
 
-
-  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
-      if (file.size > 15 * 1024 * 1024) {
-        toast({ title: "File Too Large", description: "Image must be < 15MB.", variant: "destructive" });
+      if (file.size > 50 * 1024 * 1024) {
+        toast({ title: "File Too Large", description: "Image must be < 50MB.", variant: "destructive" });
         if (fileInputRef.current) fileInputRef.current.value = "";
         setSelectedFile(null); setCurrentImagePreview(form.getValues('profilePhotoUrl') || initialData.profilePhotoUrl || null); return;
       }
-      setSelectedFile(file); setCurrentImagePreview(URL.createObjectURL(file));
+      
+      let fileToSet = file;
+      try {
+        fileToSet = await compressImage(file);
+      } catch (err) {
+        console.error("Compression failed, using original file", err);
+      }
+
+      setSelectedFile(fileToSet); 
+      setCurrentImagePreview(URL.createObjectURL(fileToSet));
       form.setValue('profilePhotoUrl', null, { shouldValidate: false });
       setShowPhotoError(false);
     } else {
@@ -440,7 +449,7 @@ export default function Step2PersonalInfo({
                 </FormControl>
 
                 <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
-                  <span>Max size: 15MB</span>
+                  <span>Max size: 50MB</span>
                   {(displayPreviewUrl || selectedFile) && (
                     <Button type="button" variant="ghost" size="sm" onClick={handleRemoveImage} disabled={effectiveIsSaving} className="text-[10px] h-6 px-1.5 text-destructive hover:bg-destructive/10">
                       <Trash2 className="h-3 w-3 mr-1" />Remove

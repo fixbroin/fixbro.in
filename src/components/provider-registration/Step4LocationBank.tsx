@@ -23,6 +23,7 @@ import { Timestamp, doc, getDoc } from "firebase/firestore";
 import { nanoid } from 'nanoid';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import dynamic from 'next/dynamic';
+import { compressImage } from "@/lib/imageCompressor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
@@ -413,9 +414,9 @@ export default function Step4LocationBank({
                         </div>
                       )}
                     </div>
-                    <FormControl><Input type="file" accept="image/png, image/jpeg, image/webp" onChange={(e) => { if (e.target.files?.[0]) { const file = e.target.files[0]; if (file.size > 15 * 1024 * 1024) { toast({ title: "File Too Large", description: "Image must be < 15MB.", variant: "destructive" }); e.target.value = ""; return; } setSelectedChequeFile(file); setCurrentChequePreview(URL.createObjectURL(file)); form.setValue('cancelledChequeUrl', null, { shouldValidate: false }); } }} ref={chequeFileInputRef} className="hidden" disabled={effectiveIsSaving}/></FormControl>
+                    <FormControl><Input type="file" accept="image/png, image/jpeg, image/webp" onChange={async (e) => { if (e.target.files?.[0]) { const file = e.target.files[0]; if (file.size > 50 * 1024 * 1024) { toast({ title: "File Too Large", description: "Image must be < 50MB.", variant: "destructive" }); e.target.value = ""; return; } let fileToSet = file; try { fileToSet = await compressImage(file); } catch (err) { console.error("Compression failed", err); } setSelectedChequeFile(fileToSet); setCurrentChequePreview(URL.createObjectURL(fileToSet)); form.setValue('cancelledChequeUrl', null, { shouldValidate: false }); } }} ref={chequeFileInputRef} className="hidden" disabled={effectiveIsSaving}/></FormControl>
                     <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
-                      <span>Max size: 15MB</span>
+                      <span>Max size: 50MB</span>
                       {(displayChequePreviewUrl || selectedChequeFile) && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => { setSelectedChequeFile(null); setCurrentChequePreview(null); form.setValue('cancelledChequeUrl', null); }} disabled={effectiveIsSaving} className="text-[10px] h-6 px-2 text-destructive hover:bg-destructive/10">
                           <Trash2 className="h-3 w-3 mr-1 text-destructive"/>Remove Image
@@ -491,13 +492,13 @@ export default function Step4LocationBank({
                             type="file" 
                             accept="image/png, image/jpeg, image/webp" 
                             className="hidden"
-                            onChange={(e) => { if (e.target.files?.[0]) { const file = e.target.files[0]; if (file.size > 15 * 1024 * 1024) { toast({ title: "File Too Large", description: "Image must be < 15MB.", variant: "destructive" }); return; } setSelectedSignatureFile(file); setCurrentSignaturePreview(URL.createObjectURL(file)); form.setValue('signatureUrl', null, { shouldValidate: false }); } }}
+                            onChange={async (e) => { if (e.target.files?.[0]) { const file = e.target.files[0]; if (file.size > 50 * 1024 * 1024) { toast({ title: "File Too Large", description: "Image must be < 50MB.", variant: "destructive" }); return; } let fileToSet = file; try { fileToSet = await compressImage(file); } catch (err) { console.error("Compression failed", err); } setSelectedSignatureFile(fileToSet); setCurrentSignaturePreview(URL.createObjectURL(fileToSet)); form.setValue('signatureUrl', null, { shouldValidate: false }); } }}
                             ref={signatureFileInputRef} 
                             disabled={effectiveIsSaving}
                           />
                         </FormControl>
                         <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
-                          <span>Max size: 15MB</span>
+                          <span>Max size: 50MB</span>
                           {currentSignaturePreview && (
                             <Button type="button" variant="ghost" size="sm" onClick={() => { setSelectedSignatureFile(null); setCurrentSignaturePreview(null); form.setValue('signatureUrl', null); }} disabled={effectiveIsSaving} className="text-[10px] h-6 px-2 text-destructive hover:bg-destructive/10">
                               <Trash2 className="h-3 w-3 mr-1"/>Remove Signature
