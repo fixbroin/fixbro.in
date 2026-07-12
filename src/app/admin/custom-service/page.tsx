@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
 import { Eye, Check, Trash2, Loader2, PackageSearch, Construction, Phone, CheckCircle2, MoreHorizontal } from "lucide-react";
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc, limit } from 'firebase/firestore';
+import { ref as storageRef, deleteObject } from "firebase/storage";
 import type { CustomServiceRequest, CustomRequestStatus, FirestoreNotification } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -172,9 +173,25 @@ export default function CustomServiceAdminPage() {
     if (!requestId) return;
     setIsUpdating(requestId);
     try {
+      const requestToDelete = requests.find((r) => r.id === requestId);
+      if (requestToDelete?.imageUrls && requestToDelete.imageUrls.length > 0) {
+        // Delete all uploaded images from Firebase Storage
+        await Promise.all(
+          requestToDelete.imageUrls.map(async (url) => {
+            try {
+              const imageRef = storageRef(storage, url);
+              await deleteObject(imageRef);
+            } catch (err) {
+              console.error("Failed to delete image from storage:", url, err);
+            }
+          })
+        );
+      }
+
       await deleteDoc(doc(db, "customServiceRequests", requestId));
       toast({ title: "Request Deleted", description: "The custom service request has been removed." });
     } catch (error) {
+      console.error("Error deleting custom request:", error);
       toast({ title: "Error", description: "Could not delete request.", variant: "destructive" });
     } finally {
       setIsUpdating(null);
