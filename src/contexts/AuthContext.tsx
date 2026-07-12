@@ -20,7 +20,7 @@ import { initializeFCM, onForegroundMessage } from '@/lib/fcmUtils';
 import { doc, setDoc, Timestamp, getDoc, onSnapshot, collection, query, where, getDocs, limit, runTransaction, or } from "firebase/firestore";
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { FirestoreUser, MarketingAutomationSettings, ReferralSettings, Referral, FirestoreNotification } from '@/types/firestore';
+import type { FirestoreUser, MarketingAutomationSettings, ReferralSettings, Referral, FirestoreNotification, ProviderApplicationStatus } from '@/types/firestore';
 import { logUserActivity } from '@/lib/activityLogger';
 import { assignNewUserNumber } from '@/lib/webServerUtils';
 import { getGuestId, clearGuestId } from '@/lib/guestIdManager';
@@ -53,6 +53,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isLoading: boolean;
   isInitialAuthCheckComplete: boolean;
+  providerStatus: ProviderApplicationStatus | null;
   isAdminLoading: boolean;
   authActionRedirectPath: string | null;
   triggerAuthRedirect: (intendedPath: string) => void;
@@ -102,6 +103,7 @@ const getSimpleDeviceId = (): string => {
 export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firestoreUser, setFirestoreUser] = useState<FirestoreUser | null>(null);
+  const [providerStatus, setProviderStatus] = useState<ProviderApplicationStatus | null>(null);
   const [adminPermissions, setAdminPermissions] = useState<AdminPermissions | null>(null);
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -148,6 +150,26 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         return () => unsubscribe();
     } else {
         setFirestoreUser(null);
+    }
+  }, [user]);
+
+  // NEW: Real-time Provider Application Status Sync
+  useEffect(() => {
+    if (user?.uid) {
+        const appDocRef = doc(db, 'providerApplications', user.uid);
+        const unsubscribe = onSnapshot(appDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setProviderStatus(docSnap.data()?.status as ProviderApplicationStatus || null);
+            } else {
+                setProviderStatus(null);
+            }
+        }, (error) => {
+            console.error("AuthContext: Error fetching Provider Application status:", error);
+            setProviderStatus(null);
+        });
+        return () => unsubscribe();
+    } else {
+        setProviderStatus(null);
     }
   }, [user]);
 
@@ -699,6 +721,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       isSuperAdmin,
       isLoading,
       isInitialAuthCheckComplete,
+      providerStatus,
       isAdminLoading,
       authActionRedirectPath,
       triggerAuthRedirect: internalTriggerAuthRedirect,
@@ -714,7 +737,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       cancelProfileCompletion,
       setUser,
     };
-  }, [user, firestoreUser, adminPermissions, adminRole, isSuperAdmin, isLoading, isInitialAuthCheckComplete, isAdminLoading, authActionRedirectPath, internalTriggerAuthRedirect, signUp, logIn, logOut, signInWithGoogle, handleSuccessfulAuth, isCompletingProfile, isCompletingProfileAsAdmin, userCredentialForProfileCompletion, completeProfileSetup, cancelProfileCompletion, setUser]);
+  }, [user, firestoreUser, adminPermissions, adminRole, isSuperAdmin, isLoading, isInitialAuthCheckComplete, providerStatus, isAdminLoading, authActionRedirectPath, internalTriggerAuthRedirect, signUp, logIn, logOut, signInWithGoogle, handleSuccessfulAuth, isCompletingProfile, isCompletingProfileAsAdmin, userCredentialForProfileCompletion, completeProfileSetup, cancelProfileCompletion, setUser]);
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };
