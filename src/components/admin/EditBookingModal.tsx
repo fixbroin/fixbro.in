@@ -409,7 +409,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
           <DialogTitle className="text-xl flex items-center gap-2">
             <Edit className="h-5 w-5 text-primary" /> Edit Booking: {booking?.bookingId || "Loading..."}
           </DialogTitle>
-          <DialogDescription>Modify the details of this booking. Service items cannot be changed here.</DialogDescription>
+          <DialogDescription>Modify the details and service items of this booking.</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
