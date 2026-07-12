@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import type { ProviderApplication, ProviderControlOptions, BankDetails } from '@/types/firestore';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, MapPin, Banknote, Camera, Image as ImageIcon, Trash2, Check, Lock, ChevronRight, AlertCircle, FileText } from "lucide-react";
@@ -268,6 +269,9 @@ export default function Step4LocationBank({
     }
     
     const errors: string[] = [];
+    if (appConfig.isCancelledChequeCompulsory && !selectedChequeFile && !data.cancelledChequeUrl && !initialData.bankDetails?.cancelledChequeUrl) {
+        errors.push("Cancelled Cheque Image");
+    }
     if (!selectedSignatureFile && !data.signatureUrl && !initialData.signatureUrl) {
         errors.push("Signature Image");
     }
@@ -371,18 +375,24 @@ export default function Step4LocationBank({
               <FormField control={form.control} name="ifscCode" render={({ field }) => (<FormItem><FormLabel>IFSC Code *</FormLabel><FormControl><Input placeholder="e.g., SBIN0001234" {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} disabled={effectiveIsSaving}/></FormControl><FormMessage /></FormItem>)}/>
               <FormItem className="space-y-2">
                 <FormLabel className="flex items-center text-sm font-semibold">
-                  <Camera className="mr-2 h-4 w-4 text-muted-foreground"/>Upload Cancelled Cheque (Optional)
+                  <Camera className="mr-2 h-4 w-4 text-muted-foreground"/>Upload Cancelled Cheque {appConfig.isCancelledChequeCompulsory ? "*" : "(Optional)"}
                 </FormLabel>
                 <FormDescription className="text-[11px] text-muted-foreground leading-normal mb-2">
                   Please upload a clear picture of your cancelled cheque. Make sure the account number, IFSC code, and your name are clearly visible. See the example on the right.
                 </FormDescription>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left: Upload Box */}
-                  <div className="flex flex-col space-y-1">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Your Document</div>
+                  <div className="flex flex-col space-y-1 max-w-[220px] mx-auto w-full">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center justify-between w-full">
+                      <span>Your Document</span>
+                      {validationErrors.includes("Cancelled Cheque Image") && <Badge variant="destructive" className="h-4 px-1.5 text-[10px] animate-pulse">REQUIRED</Badge>}
+                    </div>
                     <div 
                       onClick={() => !effectiveIsSaving && chequeFileInputRef.current?.click()}
-                      className="relative aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 bg-muted/30 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all shadow-sm h-36"
+                      className={cn(
+                        "relative aspect-square w-full max-w-[220px] mx-auto rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm",
+                        validationErrors.includes("Cancelled Cheque Image") ? "border-destructive bg-destructive/5 animate-pulse" : "border-muted-foreground/25 hover:border-primary/50 bg-muted/30"
+                      )}
                     >
                       {displayChequePreviewUrl ? (
                         <>
@@ -391,8 +401,9 @@ export default function Step4LocationBank({
                         </>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
-                          <Camera className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-[10px] font-bold text-muted-foreground">CLICK TO UPLOAD</span>
+                          <Camera className={cn("h-8 w-8", validationErrors.includes("Cancelled Cheque Image") ? "text-destructive" : "text-muted-foreground")} />
+                          {validationErrors.includes("Cancelled Cheque Image") && <AlertCircle className="h-5 w-5 text-destructive animate-bounce" />}
+                          <span className={cn("text-[10px] font-bold", validationErrors.includes("Cancelled Cheque Image") ? "text-destructive" : "text-muted-foreground")}>CLICK TO UPLOAD</span>
                         </div>
                       )}
                       {chequeUploadProgress !== null && selectedChequeFile && (
@@ -414,11 +425,11 @@ export default function Step4LocationBank({
                   </div>
 
                   {/* Right: Example Box */}
-                  <div className="flex flex-col space-y-1">
+                  <div className="flex flex-col space-y-1 max-w-[220px] mx-auto w-full">
                     <div className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Check className="h-3.5 w-3.5" /> Example / Demo
                     </div>
-                    <div className="relative aspect-video rounded-lg border border-border/70 bg-background flex flex-col items-center justify-center overflow-hidden transition-all shadow-sm h-36">
+                    <div className="relative aspect-square w-full max-w-[220px] mx-auto rounded-lg border border-border/70 bg-background flex flex-col items-center justify-center overflow-hidden transition-all shadow-sm">
                       <NextImage src="/sample-cheque.png" alt="Sample cancelled cheque" fill className="object-contain p-1" />
                     </div>
                     <span className="text-[10px] text-muted-foreground text-center">Reference Image</span>
@@ -444,15 +455,16 @@ export default function Step4LocationBank({
                     </FormDescription>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Left: Upload Box */}
-                      <div className="flex flex-col space-y-1">
-                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                          Your Document {validationErrors.includes("Signature Image") && <span className="text-[9px] bg-destructive text-white px-1.5 py-0.5 rounded animate-pulse ml-2">REQUIRED</span>}
+                      <div className="flex flex-col space-y-1 max-w-[220px] mx-auto w-full">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center justify-between w-full">
+                          <span>Your Document</span>
+                          {validationErrors.includes("Signature Image") && <Badge variant="destructive" className="h-4 px-1.5 text-[10px] animate-pulse">REQUIRED</Badge>}
                         </div>
                         <div 
                           onClick={() => !effectiveIsSaving && signatureFileInputRef.current?.click()}
                           className={cn(
-                            "relative aspect-video rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm h-36",
-                            validationErrors.includes("Signature Image") ? "border-destructive bg-destructive/5" : "border-muted-foreground/25 hover:border-primary/50 bg-muted/30"
+                            "relative aspect-square w-full max-w-[220px] mx-auto rounded-lg border-2 border-dashed transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden shadow-sm",
+                            validationErrors.includes("Signature Image") ? "border-destructive bg-destructive/5 animate-pulse" : "border-muted-foreground/25 hover:border-primary/50 bg-muted/30"
                           )}
                         >
                           {displaySignaturePreviewUrl ? (
@@ -463,6 +475,7 @@ export default function Step4LocationBank({
                           ) : (
                             <div className="flex flex-col items-center gap-2">
                               <Camera className={cn("h-8 w-8", validationErrors.includes("Signature Image") ? "text-destructive" : "text-muted-foreground")} />
+                              {validationErrors.includes("Signature Image") && <AlertCircle className="h-5 w-5 text-destructive animate-bounce" />}
                               <span className={cn("text-[10px] font-bold", validationErrors.includes("Signature Image") ? "text-destructive" : "text-muted-foreground")}>CLICK TO UPLOAD</span>
                             </div>
                           )}
@@ -494,11 +507,11 @@ export default function Step4LocationBank({
                       </div>
 
                       {/* Right: Example Box */}
-                      <div className="flex flex-col space-y-1">
+                      <div className="flex flex-col space-y-1 max-w-[220px] mx-auto w-full">
                         <div className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1 flex items-center gap-1">
                           <Check className="h-3.5 w-3.5" /> Example / Demo
                         </div>
-                        <div className="relative aspect-video rounded-lg border border-border/70 bg-background flex flex-col items-center justify-center overflow-hidden transition-all shadow-sm h-36">
+                        <div className="relative aspect-square w-full max-w-[220px] mx-auto rounded-lg border border-border/70 bg-background flex flex-col items-center justify-center overflow-hidden transition-all shadow-sm">
                           <NextImage src="/sample-signature.png" alt="Sample signature" fill className="object-contain p-1" />
                         </div>
                         <span className="text-[10px] text-muted-foreground text-center">Reference Image</span>
