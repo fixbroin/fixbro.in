@@ -73,17 +73,13 @@ export default function AdminServiceZonesPage() {
   useEffect(() => {
     setIsLoadingRequests(true);
     const q = query(
-      collection(db, "userActivities"),
+      collection(db, "outOfZoneRequests"),
       orderBy("timestamp", "desc"),
       limit(150)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as UserActivity))
-        .filter((act) => 
-          act.eventType === 'checkoutStep' && 
-          act.eventData?.checkoutStepName === 'out_of_coverage'
-        );
+        .map(doc => ({ id: doc.id, ...doc.data() } as UserActivity));
       setOutOfZoneRequests(items);
       setIsLoadingRequests(false);
     }, (error) => {
@@ -96,7 +92,7 @@ export default function AdminServiceZonesPage() {
   const handleDeleteRequest = async (id: string) => {
     setIsDeletingRequest(id);
     try {
-      await deleteDoc(doc(db, "userActivities", id));
+      await deleteDoc(doc(db, "outOfZoneRequests", id));
       toast({ title: "Success", description: "Request record deleted successfully." });
     } catch (error) {
       console.error("Error deleting request:", error);
