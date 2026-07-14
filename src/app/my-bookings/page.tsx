@@ -492,7 +492,7 @@ export default function MyBookingsPage() {
                   <div className="flex flex-col md:flex-row">
                     {/* Service Image Section / Services List */}
                     {hasMultipleServices ? (
-                      <div className="w-full md:w-96 p-6 bg-muted/10 border-b md:border-b-0 md:border-r border-border/40 flex flex-col justify-start gap-4 shrink-0">
+                      <div className="w-full md:w-96 p-3 bg-muted/10 border-b md:border-b-0 md:border-r border-border/40 flex flex-col justify-start gap-4 shrink-0">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Booked Services ({booking.services.length})</span>
                         </div>

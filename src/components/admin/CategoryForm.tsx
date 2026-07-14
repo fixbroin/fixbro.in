@@ -345,7 +345,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
 
   return (
     <Form {...form} key={initialData ? `edit-${initialData.id}` : 'new-post'}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-6 overflow-y-auto">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-3 overflow-y-auto">
         <FormField
           control={form.control}
           name="name"
@@ -575,7 +575,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
           />
         </div>
 
-        <div className="p-6 border-t sticky bottom-0 bg-background flex justify-end space-x-3">
+        <div className="p-3 border-t sticky bottom-0 bg-background flex justify-end space-x-3">
           <Button type="button" variant="outline" onClick={onCancel} disabled={effectiveIsSubmitting}>
             Cancel
           </Button>

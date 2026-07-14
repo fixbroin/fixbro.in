@@ -337,7 +337,7 @@ export default function AdminServiceZonesPage() {
               }
             }}
           >
-            <DialogHeader className="p-6 pb-4 border-b">
+            <DialogHeader className="p-3 pb-4 border-b">
               <DialogTitle>{editingZone ? 'Edit Service Zone' : 'Add New Service Zone'}</DialogTitle>
               <DialogDescription>Use the map to select the center and define the radius of the service area.</DialogDescription>
             </DialogHeader>
