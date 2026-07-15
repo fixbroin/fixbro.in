@@ -56,13 +56,13 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-4 sm:p-6 border-b flex-shrink-0">
+        <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0">
           <DialogTitle className="text-xl sm:text-2xl">{request.serviceTitle}</DialogTitle>
           <DialogDescription>Submitted by {request.userName || "Guest"} on {formatDate(request.submittedAt)}</DialogDescription>
         </DialogHeader>
         
         <div className="flex-grow overflow-y-auto min-h-0">
-          <div className="p-4 sm:p-6 space-y-4">
+          <div className="p-4 sm:p-3 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <DetailItem label="Customer Name" value={request.userName} />
                 <DetailItem label="Category" value={request.categoryName || request.customCategory} />
@@ -92,7 +92,7 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
           </div>
         </div>
 
-        <DialogFooter className="p-4 sm:p-6 border-t bg-muted/50 flex-shrink-0">
+        <DialogFooter className="p-4 sm:p-3 border-t bg-muted/50 flex-shrink-0">
           <DialogClose asChild>
             <Button variant="outline">Close</Button>
           </DialogClose>

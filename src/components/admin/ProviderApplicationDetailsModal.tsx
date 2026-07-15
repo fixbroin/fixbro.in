@@ -254,7 +254,7 @@ export default function ProviderApplicationDetailsModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl w-[calc(100vw-6px)] sm:w-[90vw] h-[calc(100vh-6px)] max-h-[calc(100vh-6px)] grid grid-rows-[auto_1fr_auto] p-0 overflow-x-hidden">
-        <DialogHeader className="p-4 sm:p-6 border-b flex-shrink-0 w-full max-w-full overflow-hidden">
+        <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0 w-full max-w-full overflow-hidden">
           <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
             <Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
               <AvatarImage src={application.profilePhotoUrl || undefined} alt={application.fullName || "Provider"} />
@@ -284,7 +284,7 @@ export default function ProviderApplicationDetailsModal({
             </div>
 
             {/* Scrollable Tab Content Wrapper */}
-            <div className="flex-grow overflow-y-auto min-h-0 p-4 sm:p-6 w-full">
+            <div className="flex-grow overflow-y-auto min-h-0 p-4 sm:p-3 w-full">
               <TabsContent value="work" className="space-y-1 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">
                 <DetailRow label="Category" value={application.workCategoryName || 'N/A'} />
                 <DetailRow label="Experience" value={application.experienceLevelLabel || 'N/A'} />
@@ -522,7 +522,7 @@ export default function ProviderApplicationDetailsModal({
           </Tabs>
         </div>
 
-        <DialogFooter className="p-3 sm:p-6 border-t bg-muted/50 flex flex-col gap-2 sm:gap-0 sm:flex-row sm:justify-between items-center flex-shrink-0 w-full">
+        <DialogFooter className="p-3 sm:p-3 border-t bg-muted/50 flex flex-col gap-2 sm:gap-0 sm:flex-row sm:justify-between items-center flex-shrink-0 w-full">
           {/* Mobile Layout (Visible only on mobile) */}
           <div className="flex flex-col gap-2 w-full sm:hidden">
             {/* Row 1: Status Actions */}

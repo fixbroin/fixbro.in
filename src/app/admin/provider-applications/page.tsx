@@ -258,22 +258,25 @@ export default function AdminProviderApplicationsPage() {
   const renderApplicationCard = (app: ProviderApplication) => (
     <Card key={app.id} className="mb-4 shadow-sm border overflow-hidden">
       <CardHeader className="p-4 bg-muted/20">
-        <div className="flex justify-between items-start gap-2">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border border-border">
-              <AvatarImage src={app.profilePhotoUrl || undefined} alt={app.fullName || "P"} />
-              <AvatarFallback>{app.fullName ? app.fullName[0].toUpperCase() : <UserCircle />}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <CardTitle className="text-base font-bold truncate">{app.fullName || "N/A"}</CardTitle>
-              <CardDescription className="text-xs truncate">{app.email || "No Email"}</CardDescription>
+        <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10 border border-border shrink-0">
+            <AvatarImage src={app.profilePhotoUrl || undefined} alt={app.fullName || "P"} />
+            <AvatarFallback>{app.fullName ? app.fullName[0].toUpperCase() : <UserCircle />}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div>
+              <CardTitle className="text-base font-bold text-foreground break-words leading-tight">{app.fullName || "N/A"}</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground break-all">{app.email || "No Email"}</CardDescription>
+            </div>
+            <div>
+              <Badge variant={getStatusBadgeVariant(app.status)} className={`text-xs capitalize whitespace-nowrap inline-block ${app.status === 'approved' ? 'bg-green-500 text-white' : ''}`}>
+                {app.status.replace(/_/g, ' ')}
+              </Badge>
             </div>
           </div>
-          <Badge variant={getStatusBadgeVariant(app.status)} className={`text-xs capitalize whitespace-nowrap ${app.status === 'approved' ? 'bg-green-500 text-white' : ''}`}>
-            {app.status.replace(/_/g, ' ')}
-          </Badge>
         </div>
       </CardHeader>
+
       <CardContent className="p-4 text-sm space-y-2">
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground font-medium">Category:</span>
