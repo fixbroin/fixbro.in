@@ -189,25 +189,16 @@ export default async function Page() {
       "query-input": "required name=search_term_string"
     }
   };
+  const homeRatingValNum = parseFloat(String(aggregateRating?.ratingValue || "4.8")) || 4.8;
+  const homeReviewCountNum = parseInt(String(aggregateRating?.reviewCount || "15600"), 10) || 15600;
 
-  if (aggregateRating) {
-    (localBusinessSchema as any).aggregateRating = {
-      "@type": "AggregateRating",
-      "ratingValue": aggregateRating.ratingValue || "4.8",
-      "reviewCount": aggregateRating.reviewCount || "120",
-      "bestRating": "5",
-      "worstRating": "1"
-    };
-  } else {
-    (localBusinessSchema as any).aggregateRating = {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "reviewCount": "156",
-      "bestRating": "5",
-      "worstRating": "1"
-    };
-  }
-
+  (localBusinessSchema as any).aggregateRating = {
+    "@type": "AggregateRating",
+    "ratingValue": homeRatingValNum,
+    "reviewCount": homeReviewCountNum,
+    "bestRating": 5,
+    "worstRating": 1
+  };
   return (
     <>
       <JsonLdScript data={localBusinessSchema} idSuffix="homepage-local-biz" />

@@ -1,6 +1,4 @@
 
-"use client";
-
 import { useId } from 'react';
 
 interface JsonLdScriptProps {
