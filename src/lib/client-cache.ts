@@ -1,5 +1,8 @@
 // src/lib/client-cache.ts
 
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 interface CacheEntry {
   data: any;
   timestamp: number;
@@ -29,13 +32,14 @@ export const getRemoteCacheVersions = async (): Promise<any> => {
   lastVersionFetchTime = now;
   remoteVersionsPromise = (async () => {
     try {
-      const res = await fetch('/api/cache-versions');
-      if (res.ok) {
-        return await res.json();
+      const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
+      const versionSnap = await getDoc(versionDocRef);
+      if (versionSnap.exists()) {
+        return versionSnap.data() || {};
       }
       return {};
     } catch (e) {
-      console.warn("Failed to fetch remote cache versions via server API:", e);
+      console.warn("Failed to fetch remote cache versions:", e);
       // Reset the promise on failure so that subsequent calls can retry
       remoteVersionsPromise = null;
       lastVersionFetchTime = 0;

@@ -61,7 +61,7 @@ export default function ProviderRegistrationToggleTab() {
           <CardTitle className="flex items-center"><Power className="mr-2 h-5 w-5"/>Provider Registration Settings</CardTitle>
           <CardDescription>Control options and requirements for provider registration.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 p-3"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></CardContent>
+        <CardContent className="space-y-4 p-6"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /></CardContent>
       </Card>
     );
   }
@@ -72,7 +72,7 @@ export default function ProviderRegistrationToggleTab() {
         <CardTitle className="flex items-center"><Power className="mr-2 h-5 w-5"/>Provider Registration Settings</CardTitle>
         <CardDescription>Configure provider registration form requirements and access.</CardDescription>
       </CardHeader>
-      <CardContent className="p-3">
+      <CardContent className="p-6">
         <div className="space-y-4">
           <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
             <div className="space-y-0.5">

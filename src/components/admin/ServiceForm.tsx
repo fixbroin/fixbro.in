@@ -574,7 +574,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
 
   return (
     <Form {...form} key={initialData ? `service-form-${initialData.id}` : 'new-service-form'}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-3 overflow-y-auto">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-grow space-y-6 p-6 overflow-y-auto">
         
         {/* Basic Information Section */}
         <div className="border border-muted/80 rounded-xl p-5 bg-card/40 backdrop-blur-sm shadow-sm space-y-4 hover:border-primary/20 transition-all duration-200">
@@ -1275,7 +1275,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
           <FormField control={form.control} name="seo_keywords" render={({ field }) => (<FormItem><FormLabel>Meta Keywords (comma-separated)</FormLabel><FormControl><Input placeholder="e.g., ac service, ac repair" {...field} value={field.value ?? ""} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
         </div>
 
-        <div className="p-3 border-t sticky bottom-0 bg-background flex justify-end space-x-3">
+        <div className="p-6 border-t sticky bottom-0 bg-background flex justify-end space-x-3">
           <Button type="button" variant="outline" onClick={onCancel} disabled={effectiveIsSubmitting}>Cancel</Button>
           <Button type="submit" disabled={effectiveIsSubmitting || (parentCategories.length === 0 && !initialData) || (filteredSubCategories.length === 0 && !form.getValues('subCategoryId') && !initialData) }>
             {effectiveIsSubmitting && !statusMessage.includes("Uploading") && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

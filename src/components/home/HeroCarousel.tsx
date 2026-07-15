@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import { Button } from "@/components/ui/button";
+import { db } from "@/lib/firebase";
+import { collection, query, where, orderBy, getDocs, onSnapshot } from "firebase/firestore";
 import type { FirestoreSlide, SlideButtonLinkType } from "@/types/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlaySquare, ChevronRight, ChevronLeft } from "lucide-react";
@@ -21,7 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { useLoading } from '@/contexts/LoadingContext';
-import { getCache, setCache, getRemoteCacheVersions } from '@/lib/client-cache';
+import { getCache, setCache } from '@/lib/client-cache';
 import { cn } from "@/lib/utils";
 
 export function HeroCarousel() {
@@ -49,50 +51,36 @@ export function HeroCarousel() {
     return [];
   }, [autoplayEnabled, autoplayDelay, slides.length]);
 
-  // Load slides with smart caching and version check
+  // Real-time listener for slides
   useEffect(() => {
     // Initial Hydration from Cache
     const cached = getCache<FirestoreSlide[]>('hero-slides', true);
     if (cached) setSlides(cached);
 
-    const fetchSlides = async () => {
-      try {
-        // Smart Cache check
-        const remoteVersions = await getRemoteCacheVersions();
-        const remoteVersion = remoteVersions.content || 0;
-        
-        const localVersion = parseInt(localStorage.getItem('hero-slides-version') || "0");
-        
-        if (cached && remoteVersion <= localVersion) {
-          setIsLoadingSlides(false);
-          return;
-        }
-
-        const res = await fetch('/api/hero-slides');
-        if (res.ok) {
-          const fetchedSlides = await res.json() as FirestoreSlide[];
-          setSlides(fetchedSlides);
-          setCache('hero-slides', fetchedSlides, true);
-          localStorage.setItem('hero-slides-version', remoteVersion.toString());
-          
-          // --- PRE-LOAD IMAGES FOR CACHING ---
-          if (typeof window !== 'undefined') {
-              fetchedSlides.forEach(slide => {
-                  if (slide.imageUrl) {
-                      const img = new Image();
-                      img.src = slide.imageUrl;
-                  }
-              });
-          }
-        }
+    const slidesCollectionRef = collection(db, "adminSlideshows");
+    const q = query(slidesCollectionRef, where("isActive", "==", true), orderBy("order", "asc"));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedSlides = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreSlide));
+        setSlides(fetchedSlides);
+        setCache('hero-slides', fetchedSlides, true);
         setIsLoadingSlides(false);
-      } catch (err) {
-        console.error("Error fetching slides:", err);
-        setIsLoadingSlides(false);
-      }
-    };
 
-    fetchSlides();
+        // --- PRE-LOAD IMAGES FOR CACHING ---
+        if (typeof window !== 'undefined') {
+            fetchedSlides.forEach(slide => {
+                if (slide.imageUrl) {
+                    const img = new Image();
+                    img.src = slide.imageUrl;
+                }
+            });
+        }
+    }, (err) => {
+        console.error("Error listening to slides:", err);
+        setIsLoadingSlides(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
