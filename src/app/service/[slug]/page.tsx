@@ -247,13 +247,6 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     "areaServed": {
       "@type": "City",
       "name": cityName
-    },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": ratingValNum,
-      "reviewCount": reviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
     }
   };
 
