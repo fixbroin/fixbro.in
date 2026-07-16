@@ -219,10 +219,6 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     { name: serviceData.name, url: `${appBaseUrl}/service/${slug}` }
   ];
   const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItems);
-  const ratingValue = serviceData.rating || aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8";
-  const reviewCount = serviceData.reviewCount || aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156";
-  const ratingValNum = parseFloat(String(ratingValue)) || 4.8;
-  const reviewCountNum = parseInt(String(reviewCount), 10) || 156;
 
   const serviceSchema = {
     "@context": "https://schema.org",
@@ -234,8 +230,6 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
       "@type": "LocalBusiness",
       "name": "FixBro",
       "telephone": seoSettings.structuredDataTelephone,
-      "priceRange": "₹₹",
-      "image": schemaImage,
       "address": {
         "@type": "PostalAddress",
         "streetAddress": seoSettings.structuredDataStreetAddress,
@@ -247,16 +241,14 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     "areaServed": {
       "@type": "City",
       "name": cityName
-    },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": ratingValNum,
-      "reviewCount": reviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
     }
   };
 
+  // Add Aggregate Rating if available
+  const ratingValue = serviceData.rating || aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8";
+  const reviewCount = serviceData.reviewCount || aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156";
+
+  // Create a separate Product schema specifically for Google organic Product Feeds
   const productSchema = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -267,11 +259,9 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
       "@type": "Brand",
       "name": "FixBro"
     },
-    "sku": serviceData.id,
-    "mpn": serviceData.id,
     "offers": serviceData.price ? {
       "@type": "Offer",
-      "price": parseFloat(String(serviceData.discountedPrice || serviceData.price)) || 0,
+      "price": serviceData.discountedPrice || serviceData.price,
       "priceCurrency": "INR",
       "availability": "https://schema.org/InStock",
       "url": `${appBaseUrl}/service/${slug}`,
@@ -285,21 +275,21 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
         "@type": "OfferShippingDetails",
         "shippingRate": {
           "@type": "MonetaryAmount",
-          "value": 0,
+          "value": "0",
           "currency": "INR"
         },
         "deliveryTime": {
           "@type": "ShippingDeliveryTime",
           "handlingTime": {
             "@type": "QuantitativeValue",
-            "minValue": 0,
-            "maxValue": 0,
+            "minValue": "0",
+            "maxValue": "0",
             "unitCode": "DAY"
           },
           "transitTime": {
             "@type": "QuantitativeValue",
-            "minValue": 0,
-            "maxValue": 0,
+            "minValue": "0",
+            "maxValue": "0",
             "unitCode": "DAY"
           }
         }
@@ -307,12 +297,13 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     } : undefined,
     "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": ratingValNum,
-      "reviewCount": reviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
+      "ratingValue": ratingValue,
+      "reviewCount": reviewCount,
+      "bestRating": "5",
+      "worstRating": "1"
     }
   };
+
   // Add FAQ Schema if available
   let faqSchema = null;
   if (serviceData.serviceFaqs && serviceData.serviceFaqs.length > 0) {

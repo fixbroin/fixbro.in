@@ -616,7 +616,6 @@ export interface AppSettings {
   chatNotificationSoundUrl?: string; // New: default sound for chat notifications
   isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
-  isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
   maxProviderRadiusKm?: number; // New for provider work area
   autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
   

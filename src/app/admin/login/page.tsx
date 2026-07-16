@@ -14,7 +14,6 @@ import Logo from '@/components/shared/Logo';
 import { Mail, KeyRound, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import type { LogInData } from '@/contexts/AuthContext';
-import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
@@ -49,31 +48,12 @@ export default function AdminLoginPage() {
   }, [user, adminPermissions, isAdminLoading, router, toast]);
 
   const onSubmit = async (data: LoginFormValues) => {
-    form.clearErrors('email');
-    form.clearErrors('password');
-    
-    if (data.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-      form.setError("email", { 
-        type: "manual", 
-        message: "This login is for admin use only." 
-      });
-      toast({ 
-        title: "Access Denied", 
-        description: "This login is for admin use only.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
     try {
       await logIn(data as LogInData);
       // Redirection is handled within logIn or useEffect
-    } catch (error: any) {
+    } catch (error) {
       console.error("Admin login page error:", error);
-      form.setError("password", {
-        type: "manual",
-        message: error?.message || "Wrong password you entered"
-      });
+      // Error is handled by toast in AuthContext
     }
   };
 

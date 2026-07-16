@@ -18,7 +18,6 @@ import { useToast } from "@/hooks/use-toast";
 import { storage } from '@/lib/firebase';
 import { ref as storageRefStandard, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Progress } from "@/components/ui/progress";
-import { compressImage } from "@/lib/imageCompressor";
 import { nanoid } from 'nanoid';
 import { cn } from "@/lib/utils";
 
@@ -125,8 +124,8 @@ export default function Step3KycDocuments({
   ) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 50 * 1024 * 1024) {
-        toast({ title: "File Too Large", description: "Image must be < 50MB.", variant: "destructive" });
+      if (file.size > 15 * 1024 * 1024) {
+        toast({ title: "File Too Large", description: "Image must be < 15MB.", variant: "destructive" });
         e.target.value = ""; return;
       }
       setter(prev => ({ ...prev, file: file, previewUrl: URL.createObjectURL(file), uploadProgress: null, originalFileName: file.name }));
@@ -134,8 +133,8 @@ export default function Step3KycDocuments({
   };
 
   const handleAdditionalDocFileChange = (typeId: string, side: 'front' | 'back', file: File) => {
-    if (file.size > 50 * 1024 * 1024) {
-      toast({ title: "File Too Large", description: "Image must be < 50MB.", variant: "destructive" });
+    if (file.size > 15 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Image must be < 15MB.", variant: "destructive" });
       return;
     }
     setAdditionalDocumentsData(prev => {
@@ -355,18 +354,7 @@ export default function Step3KycDocuments({
           type="file" 
           accept="image/*" 
           className="hidden" 
-          onChange={async (e) => {
-            if (e.target.files?.[0]) {
-              const file = e.target.files[0];
-              let fileToSet = file;
-              try {
-                fileToSet = await compressImage(file);
-              } catch (err) {
-                console.error("Compression failed", err);
-              }
-              onFileSelect(fileToSet);
-            }
-          }}
+          onChange={e => e.target.files?.[0] && onFileSelect(e.target.files[0])}
           disabled={isFormBusy || isSaving}
         />
 

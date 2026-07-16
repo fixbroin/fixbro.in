@@ -221,8 +221,6 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
 
   const rawSchemaImage = categoryData.imageUrl || `/android-chrome-512x512.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
-  const areaCatRatingValNum = parseFloat(String(aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8")) || 4.8;
-  const areaCatReviewCountNum = parseInt(String(aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156"), 10) || 156;
 
   const areaCategorySchema = {
     "@context": "https://schema.org",
@@ -244,10 +242,10 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
     },
     "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": areaCatRatingValNum,
-      "reviewCount": areaCatReviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
+      "ratingValue": aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8",
+      "reviewCount": aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156",
+      "bestRating": "5",
+      "worstRating": "1"
     }
   };
 

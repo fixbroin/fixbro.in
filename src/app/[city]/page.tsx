@@ -134,9 +134,6 @@ export default async function CityHomePage({ params }: CityPageProps) {
   const rawSchemaImage = cityData.imageUrl || seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
   const schemaImage = rawSchemaImage.startsWith('http') ? rawSchemaImage : `${appBaseUrl}${rawSchemaImage.startsWith('/') ? '' : '/'}${rawSchemaImage}`;
 
-  const cityRatingValNum = parseFloat(String(aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8")) || 4.8;
-  const cityReviewCountNum = parseInt(String(aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "15666"), 10) || 15666;
-
   const citySchema = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
@@ -145,7 +142,6 @@ export default async function CityHomePage({ params }: CityPageProps) {
     "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by FixBro.`,
     "telephone": seoSettings.structuredDataTelephone,
     "image": schemaImage,
-    "priceRange": "₹₹",
     "address": {
       "@type": "PostalAddress",
       "addressLocality": cityData.name,
@@ -158,10 +154,10 @@ export default async function CityHomePage({ params }: CityPageProps) {
     },
     "aggregateRating": {
       "@type": "AggregateRating",
-      "ratingValue": cityRatingValNum,
-      "reviewCount": cityReviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
+      "ratingValue": aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8",
+      "reviewCount": aggregateRating?.reviewCount || seoSettings.fallbackReviewCount || "156",
+      "bestRating": "5",
+      "worstRating": "1"
     }
   };
 

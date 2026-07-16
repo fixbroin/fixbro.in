@@ -40,7 +40,6 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
       platformFees: firestoreData.platformFees || defaultAppSettings.platformFees || [],
       enableCancellationPolicy: typeof firestoreData.enableCancellationPolicy === 'boolean' ? firestoreData.enableCancellationPolicy : defaultAppSettings.enableCancellationPolicy,
       isProviderRegistrationEnabled: typeof firestoreData.isProviderRegistrationEnabled === 'boolean' ? firestoreData.isProviderRegistrationEnabled : defaultAppSettings.isProviderRegistrationEnabled,
-      isCancelledChequeCompulsory: typeof firestoreData.isCancelledChequeCompulsory === 'boolean' ? firestoreData.isCancelledChequeCompulsory : defaultAppSettings.isCancelledChequeCompulsory,
       enableEmailPasswordLogin: typeof firestoreData.enableEmailPasswordLogin === 'boolean' ? firestoreData.enableEmailPasswordLogin : defaultAppSettings.enableEmailPasswordLogin,
       enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,
       enableGoogleLogin: typeof firestoreData.enableGoogleLogin === 'boolean' ? firestoreData.enableGoogleLogin : defaultAppSettings.enableGoogleLogin,
@@ -67,10 +66,10 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
             return;
         }
 
-        const res = await fetch('/api/application-config');
-        if (res.ok) {
-          const data = await res.json();
-          const processed = processData(data);
+        // Fetch fresh if version changed (1 read)
+        const docSnap = await getDoc(configDocRef);
+        if (docSnap.exists()) {
+          const processed = processData(docSnap.data());
           setConfig(processed);
           setCache(CACHE_KEY, processed, true);
           localStorage.setItem(`${CACHE_KEY}-version`, remoteVersion.toString());
