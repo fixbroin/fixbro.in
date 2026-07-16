@@ -56,7 +56,7 @@ export default function AdminFAQPage() {
     setIsSubmitting(true);
     try {
       await deleteDoc(doc(db, "adminFAQs", id));
-      await triggerRefresh('content');
+      await triggerRefresh('faqs');
       toast({ title: "Success", description: "FAQ deleted successfully." });
     } catch (error) {
       console.error("Error deleting FAQ: ", error);
@@ -77,7 +77,7 @@ export default function AdminFAQPage() {
         await addDoc(collection(db, "adminFAQs"), { ...faqData, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
         toast({ title: "Success", description: "New FAQ added." });
       }
-      await triggerRefresh('content');
+      await triggerRefresh('faqs');
       setIsFormOpen(false);
       setEditingFAQ(null);
     } catch (error) {
