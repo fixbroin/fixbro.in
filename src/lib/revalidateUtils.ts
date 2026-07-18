@@ -12,10 +12,18 @@ import { FieldValue } from 'firebase-admin/firestore';
  */
 export async function triggerRefresh(tag: 'services' | 'categories' | 'cities' | 'bookings' | 'users' | 'content' | 'blog' | 'global' | 'withdrawal-referral-config' | 'withdrawal-provider-config' | 'promo-usage' | string) {
   try {
-    revalidateTag(tag);
+    revalidateTag(tag, 'max');
     
-    // Purge static HTML pages cache globally so updates apply immediately on the frontend
-    revalidatePath('/', 'layout');
+    // Purge static HTML pages cache globally only for changes affecting public layout/content
+    const isPublicContentChange = [
+      'services', 'categories', 'cities', 'locations', 'content', 'blog', 'faqs',
+      'global', 'app-settings', 'web-settings', 'seo-settings', 'marketing-settings', 'global-cache'
+    ].includes(tag) || tag.startsWith('blog-') || tag.startsWith('service-');
+
+    if (isPublicContentChange) {
+      revalidatePath('/', 'layout');
+    }
+    
     // Bump the global cache version (1 write)
     // Only bump "global" if the change is truly global (settings/SEO)
     // This prevents every user login/booking from forcing all visitors to re-read settings.

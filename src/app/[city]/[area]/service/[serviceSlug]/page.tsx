@@ -222,7 +222,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
       "priceCurrency": "INR",
       "availability": "https://schema.org/InStock",
       "url": `${appBaseUrl}${pagePath}`,
-      "priceValidUntil": `${new Date().getFullYear() + 1}-01-01`,
+      "priceValidUntil": `${new Date().getFullYear() + 5}-12-31`,
       "hasMerchantReturnPolicy": {
         "@type": "MerchantReturnPolicy",
         "applicableCountry": "IN",
@@ -234,6 +234,10 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
           "@type": "MonetaryAmount",
           "value": 0,
           "currency": "INR"
+        },
+        "shippingDestination": {
+          "@type": "DefinedRegion",
+          "addressCountry": "IN"
         },
         "deliveryTime": {
           "@type": "ShippingDeliveryTime",
