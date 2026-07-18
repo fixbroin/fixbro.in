@@ -223,6 +223,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
       "availability": "https://schema.org/InStock",
       "url": `${appBaseUrl}${pagePath}`,
       "priceValidUntil": `${new Date().getFullYear() + 5}-12-31`,
+      "validFrom": `${new Date().getFullYear()}-01-01`,
       "hasMerchantReturnPolicy": {
         "@type": "MerchantReturnPolicy",
         "applicableCountry": "IN",
