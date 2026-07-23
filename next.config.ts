@@ -1,6 +1,7 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
+import path from 'path';
 
 // Safely handles responses
 const cacheUpdatePlugin = {
@@ -50,10 +51,11 @@ const withPWA = withPWAInit({
   reloadOnOnline: true,
   swcMinify: true,
   fallbacks: {
-    document: '/offline',
+    document: '/404',
   },
 
   workboxOptions: {
+    maximumFileSizeToCacheInBytes: 3000000,
     exclude: [
       /googletagmanager\.com/,
       /admin/,
@@ -61,8 +63,13 @@ const withPWA = withPWAInit({
       /chunk-[A-Za-z0-9]+\.js/,
       /\.map$/,
     ],
-    runtimeCaching: userRuntimeCaching,
-    // The top-level 'plugins' key was incorrect and is removed.
+    runtimeCaching: [
+      {
+        urlPattern: /\/_next\/data\/.*/i,
+        handler: 'NetworkOnly' as const,
+      },
+      ...userRuntimeCaching
+    ],
   },
 
   pwas: {
@@ -102,6 +109,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, './'),
   images: {
     unoptimized: false,
     formats: ["image/avif", "image/webp"],
@@ -119,6 +127,10 @@ const nextConfig: NextConfig = {
   },
 
   typescript: { ignoreBuildErrors: true },
+  experimental: {
+    workerThreads: false,
+    cpus: 2
+  }
 };
 
 export default withPWA(nextConfig);
