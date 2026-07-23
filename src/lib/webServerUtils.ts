@@ -382,13 +382,18 @@ export const getCityCategorySeoSettings = cache(async (): Promise<CityCategorySe
     async () => {
       try {
         const snapshot = await adminDb.collection("cityCategorySeoSettings").orderBy("cityName").orderBy("categoryName").get();
-        return snapshot.docs.map(doc => ({ ...serializeFirestoreData(doc.data()), id: doc.id } as CityCategorySeoSetting));
+        return snapshot.docs.map(doc => {
+          const data = serializeFirestoreData(doc.data()) as any;
+          delete data.seo_content;
+          delete data.faqs;
+          return { ...data, id: doc.id } as CityCategorySeoSetting;
+        });
       } catch (error) {
         console.error("Error fetching city-category SEO settings:", error);
         return [];
       }
     },
-    ['city-category-seo-list'],
+    ['city-category-seo-list-v2'],
     { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
   )();
 });
@@ -401,13 +406,18 @@ export const getAreaCategorySeoSettings = cache(async (): Promise<AreaCategorySe
     async () => {
       try {
         const snapshot = await adminDb.collection("areaCategorySeoSettings").orderBy("cityName").orderBy("areaName").orderBy("categoryName").get();
-        return snapshot.docs.map(doc => ({ ...serializeFirestoreData(doc.data()), id: doc.id } as AreaCategorySeoSetting));
+        return snapshot.docs.map(doc => {
+          const data = serializeFirestoreData(doc.data()) as any;
+          delete data.seo_content;
+          delete data.faqs;
+          return { ...data, id: doc.id } as AreaCategorySeoSetting;
+        });
       } catch (error) {
         console.error("Error fetching area-category SEO settings:", error);
         return [];
       }
     },
-    ['area-category-seo-list'],
+    ['area-category-seo-list-v2'],
     { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
   )();
 });
@@ -420,7 +430,12 @@ export const getAreaServiceSeoSettings = cache(async (): Promise<AreaServiceSeoS
     async () => {
       try {
         const snapshot = await adminDb.collection("areaServiceSeoSettings").get();
-        const settings = snapshot.docs.map(doc => ({ ...serializeFirestoreData(doc.data()), id: doc.id } as AreaServiceSeoSetting));
+        const settings = snapshot.docs.map(doc => {
+          const data = serializeFirestoreData(doc.data()) as any;
+          delete data.seo_content;
+          delete data.faqs;
+          return { ...data, id: doc.id } as AreaServiceSeoSetting;
+        });
         
         // Sort in memory to avoid requiring a Firestore composite index
         settings.sort((a, b) => {
@@ -437,7 +452,7 @@ export const getAreaServiceSeoSettings = cache(async (): Promise<AreaServiceSeoS
         return [];
       }
     },
-    ['area-service-seo-list'],
+    ['area-service-seo-list-v2'],
     { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
   )();
 });

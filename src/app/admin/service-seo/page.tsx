@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
-import { executeDbClearTable } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkServiceSeoGenerate } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getAdminServices, getCities, getAreas, getAreaServiceSeoSettings, getAdminCategories, getAdminSubCategories } from '@/lib/webServerUtils';
@@ -35,6 +35,7 @@ export default function ServiceSeoPage() {
   const [areas, setAreas] = useState<FirestoreArea[]>([]);
   const [services, setServices] = useState<FirestoreService[]>([]);
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
+  const [displayLimit, setDisplayLimit] = useState(500);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<AreaServiceSeoSetting | null>(null);
@@ -108,121 +109,25 @@ export default function ServiceSeoPage() {
   const handleStartBatch = async () => {
     setBatchRunning(true);
     setBatchProgress(0);
-    setBatchStatus("Initializing batch...");
+    setBatchStatus("Initializing server-side bulk generation...");
 
     try {
-      const targetCities = batchCityId === "all" ? cities : cities.filter(c => String(c.id) === String(batchCityId));
-      
-      let targetServices = services.filter(s => s.isActive !== false);
-      if (batchCategoryId !== "all") {
-        targetServices = targetServices.filter(s => String(s.parentCategoryId) === String(batchCategoryId));
-      }
-      if (batchServiceId !== "all") {
-        targetServices = targetServices.filter(s => String(s.id) === String(batchServiceId));
-      }
+      setBatchProgress(20);
+      setBatchStatus("Running bulk SEO generation on database server (this takes about 2-5 seconds)...");
 
-      let processedCount = 0;
-      let createdCount = 0;
-      let updatedCount = 0;
+      const result = await executeBulkServiceSeoGenerate({
+        batchCityId,
+        batchAreaId,
+        batchCategoryId,
+        batchServiceId,
+        batchOverwrite
+      });
 
-      // Use local areas state instead of fetching from DB
-      const allActiveAreas = areas.filter(a => a.isActive !== false);
-
-      const cityIds = targetCities.map(c => String(c.id));
-      let targetAreas = allActiveAreas.filter(a => cityIds.includes(String(a.cityId)));
-      if (batchAreaId !== "all") {
-        targetAreas = targetAreas.filter(a => String(a.id) === String(batchAreaId));
-      }
-
-      // Fetch fresh existing settings directly from MySQL to prevent stale cache duplicates
-      const freshSettingsSnap = await getDocs(collection(db, "areaServiceSeoSettings"));
-      const freshSettings = freshSettingsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as AreaServiceSeoSetting[];
-
-      const totalIterations = targetAreas.length * targetServices.length;
-      if (totalIterations === 0) {
-        toast({ 
-          title: "No targets", 
-          description: `No active areas or services found. (Areas: ${targetAreas.length}, Services: ${targetServices.length})`, 
-          variant: "destructive" 
-        });
-        setBatchRunning(false);
-        return;
-      }
-
-      for (const area of targetAreas) {
-        const areaId = area.id;
-        const areaName = area.name;
-        const cityId = area.cityId;
-        const city = cities.find(c => String(c.id) === String(cityId));
-        if (!city) continue;
-        const cityName = city.name;
-
-        // Compute closest areas for this area using our Haversine helper
-        const fallbackNearby = getNearbyAreasSorted(area, allActiveAreas.filter(a => String(a.cityId) === String(cityId)), 10);
-
-        for (const service of targetServices) {
-          const serviceId = service.id;
-          const serviceName = service.name;
-
-          processedCount++;
-          setBatchProgress(Math.round((processedCount / totalIterations) * 100));
-          setBatchStatus(`Processing: ${cityName} / ${areaName} - ${serviceName} (${processedCount}/${totalIterations})`);
-
-          // Check if override already exists in the absolute fresh settings
-          const existing = freshSettings.find(s => String(s.areaId) === String(areaId) && String(s.serviceId) === String(serviceId));
-          if (existing && !batchOverwrite) {
-            continue;
-          }
-
-          // Fetch category name from local categories state
-          let categoryName = "Home Services";
-          if (service.parentCategoryId) {
-            const catObj = categories.find(c => String(c.id) === String(service.parentCategoryId));
-            if (catObj) {
-              categoryName = catObj.name;
-            }
-          }
-
-          // Generate content
-          const result = generateFreeAreaServiceSeoData(cityName, areaName, categoryName, serviceName, fallbackNearby);
-          const finalSlug = await resolveUniqueSlug(serviceSeoRef, generateSeoSlug([city.slug, area.slug, 'service', service.slug]), existing?.id);
-
-          const payload: Omit<AreaServiceSeoSetting, 'id' | 'createdAt' | 'updatedAt'> = {
-            cityId,
-            cityName,
-            citySlug: city.slug || "",
-            areaId,
-            areaName,
-            areaSlug: area.slug || "",
-            serviceId,
-            serviceName,
-            serviceSlug: service.slug || "",
-            slug: finalSlug,
-            h1_title: result.h1_title,
-            meta_title: result.seo_title,
-            meta_description: result.seo_description,
-            meta_keywords: result.seo_keywords,
-            seo_content: result.seo_content,
-            faqs: result.faqs,
-            isActive: true
-          };
-
-          if (existing) {
-            await updateDoc(doc(serviceSeoRef, existing.id), { ...payload, updatedAt: Timestamp.now() });
-            updatedCount++;
-          } else {
-            await addDoc(serviceSeoRef, { ...payload, createdAt: Timestamp.now() });
-            createdCount++;
-          }
-        }
-      }
+      setBatchProgress(100);
 
       toast({
         title: "Batch Generation Completed!",
-        description: `Successfully processed all service pages. Created: ${createdCount}, Updated: ${updatedCount}.`,
+        description: `Successfully processed all service pages. Created: ${result.createdCount}, Updated: ${result.updatedCount}, Skipped: ${result.skippedCount}.`,
         className: "bg-green-100 border-green-300 text-green-700"
       });
 
@@ -282,56 +187,51 @@ export default function ServiceSeoPage() {
   const fetchData = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      if (!forceRefresh) {
-        const cachedCities = getCache<FirestoreCity[]>('admin-cities-for-service-seo', true);
-        const cachedAreas = getCache<FirestoreArea[]>('admin-areas-for-service-seo', true);
-        const cachedServices = getCache<FirestoreService[]>('admin-services-for-service-seo', true);
-        const cachedSettings = getCache<AreaServiceSeoSetting[]>('admin-service-seo-settings', true);
-        const cachedCategories = getCache<FirestoreCategory[]>('admin-categories-for-service-seo', true);
+      let cachedCities = getCache<FirestoreCity[]>('admin-cities-for-service-seo', true);
+      let cachedAreas = getCache<FirestoreArea[]>('admin-areas-for-service-seo', true);
+      let cachedServices = getCache<FirestoreService[]>('admin-services-for-service-seo', true);
+      let cachedCategories = getCache<FirestoreCategory[]>('admin-categories-for-service-seo', true);
 
-        if (cachedCities && cachedAreas && cachedServices && cachedSettings && cachedCategories && cachedServices.some(s => s.parentCategoryId !== undefined)) {
-          setCities(cachedCities);
-          setAreas(cachedAreas);
-          setServices(cachedServices);
-          setSettings(cachedSettings);
-          setCategories(cachedCategories);
-          setIsLoading(false);
-          return;
-        }
+      if (forceRefresh || !cachedCities || !cachedAreas || !cachedServices || !cachedCategories || !cachedServices.some(s => s.parentCategoryId !== undefined)) {
+        // Fetch fresh static data from Server Actions
+        const [fetchedCities, fetchedAreas, fetchedServices, fetchedCategories, fetchedSubCategories] = await Promise.all([
+          getCities(),
+          getAreas(),
+          getAdminServices(),
+          getAdminCategories(),
+          getAdminSubCategories()
+        ]);
+
+        const resolvedServices = fetchedServices.map(srv => {
+          if (srv.parentCategoryId) return srv;
+          const subCat = fetchedSubCategories.find(sub => String(sub.id) === String(srv.subCategoryId));
+          return {
+            ...srv,
+            parentCategoryId: subCat?.parentId || undefined
+          };
+        });
+
+        cachedCities = fetchedCities;
+        cachedAreas = fetchedAreas;
+        cachedServices = resolvedServices;
+        cachedCategories = fetchedCategories;
+
+        // Save static lists to client memory cache
+        setCache('admin-cities-for-service-seo', fetchedCities, true);
+        setCache('admin-areas-for-service-seo', fetchedAreas, true);
+        setCache('admin-services-for-service-seo', resolvedServices, true);
+        setCache('admin-categories-for-service-seo', fetchedCategories, true);
       }
 
-      // Fetch fresh data from Server Actions (statically compiled / cached on server)
-      const [fetchedCities, fetchedAreas, fetchedServices, fetchedSettings, fetchedCategories, fetchedSubCategories] = await Promise.all([
-        getCities(),
-        getAreas(),
-        getAdminServices(),
-        getAreaServiceSeoSettings(),
-        getAdminCategories(),
-        getAdminSubCategories()
-      ]);
+      setCities(cachedCities);
+      setAreas(cachedAreas);
+      setServices(cachedServices);
+      setCategories(cachedCategories);
 
-      // Resolve parentCategoryId for each service using subCategoryId -> parentId lookup
-      const resolvedServices = fetchedServices.map(srv => {
-        if (srv.parentCategoryId) return srv;
-        const subCat = fetchedSubCategories.find(sub => String(sub.id) === String(srv.subCategoryId));
-        return {
-          ...srv,
-          parentCategoryId: subCat?.parentId || undefined
-        };
-      });
-
-      setCities(fetchedCities);
-      setAreas(fetchedAreas);
-      setServices(resolvedServices);
+      // ALWAYS load settings fresh from server on page reload/navigation to avoid stale caches
+      const fetchedSettings = await getAreaServiceSeoSettings();
       setSettings(fetchedSettings);
-      setCategories(fetchedCategories);
-
-      // Save to client memory cache
-      setCache('admin-cities-for-service-seo', fetchedCities, true);
-      setCache('admin-areas-for-service-seo', fetchedAreas, true);
-      setCache('admin-services-for-service-seo', resolvedServices, true);
-      setCache('admin-service-seo-settings', fetchedSettings, true);
-      setCache('admin-categories-for-service-seo', fetchedCategories, true);
+      setDisplayLimit(500);
 
     } catch (error) {
       console.error("Error loading Service-wise SEO data:", error);
@@ -352,9 +252,23 @@ export default function ServiceSeoPage() {
     setIsFormOpen(true);
   };
 
-  const handleEditSetting = (setting: AreaServiceSeoSetting) => {
-    setEditingSetting(setting);
-    setIsFormOpen(true);
+  const handleEditSetting = async (setting: AreaServiceSeoSetting) => {
+    setIsSubmitting(true);
+    try {
+      const docRef = doc(serviceSeoRef, setting.id!);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setEditingSetting({ id: docSnap.id, ...docSnap.data() } as AreaServiceSeoSetting);
+        setIsFormOpen(true);
+      } else {
+        toast({ title: "Error", description: "SEO Override not found.", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Error loading override details:", err);
+      toast({ title: "Error", description: "Failed to load override details.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteSetting = async (id: string) => {
@@ -525,7 +439,7 @@ export default function ServiceSeoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {settings.map((setting) => (
+                {settings.slice(0, displayLimit).map((setting) => (
                   <TableRow key={setting.id}>
                     <TableCell className="font-semibold">{setting.cityName}</TableCell>
                     <TableCell>{setting.areaName}</TableCell>
@@ -577,6 +491,22 @@ export default function ServiceSeoPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {settings.length > displayLimit && (
+            <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+              <div>
+                Showing first {Math.min(displayLimit, settings.length)} of {settings.length} overrides.
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
+                  Load More (+500)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(settings.length)}>
+                  Load All ({settings.length})
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

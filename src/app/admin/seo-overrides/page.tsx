@@ -20,7 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
-import { executeDbClearTable } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkOverridesSeoGenerate } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getCache, setCache } from '@/lib/client-cache';
@@ -40,6 +40,8 @@ export default function SeoOverridesPage() {
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
   const [cities, setCities] = useState<FirestoreCity[]>([]);
   const [areas, setAreas] = useState<FirestoreArea[]>([]);
+  const [cityDisplayLimit, setCityDisplayLimit] = useState(500);
+  const [areaDisplayLimit, setAreaDisplayLimit] = useState(500);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<CityCategorySeoSetting | AreaCategorySeoSetting | null>(null);
@@ -100,172 +102,24 @@ export default function SeoOverridesPage() {
   const handleStartBatch = async () => {
     setBatchRunning(true);
     setBatchProgress(0);
-    setBatchStatus("Initializing batch...");
+    setBatchStatus("Initializing server-side bulk generation...");
 
     try {
-      const targetCities = batchCityId === "all" ? cities : cities.filter(c => c.id === batchCityId);
-      const targetCategories = batchCategoryId === "all" ? categories : categories.filter(c => c.id === batchCategoryId);
+      setBatchProgress(20);
+      setBatchStatus("Running bulk SEO generation on database server (this takes about 2-5 seconds)...");
 
-      let processedCount = 0;
-      let createdCount = 0;
-      let updatedCount = 0;
+      const result = await executeBulkOverridesSeoGenerate({
+        activeTab: activeTab as "city-category" | "area-category",
+        batchCityId,
+        batchCategoryId,
+        batchOverwrite
+      });
 
-      const areasRef = collection(db, "areas");
-      const areasSnap = await getDocs(query(areasRef, where("isActive", "==", true)));
-      const allActiveAreas = areasSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as FirestoreArea[];
-
-      if (activeTab === "city-category") {
-        // Fetch fresh existing settings directly from MySQL to bypass stale Next.js cache
-        const freshCityCatSnap = await getDocs(cityCatSeoRef);
-        const freshCityCatSettings = freshCityCatSnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as CityCategorySeoSetting[];
-
-        const totalIterations = targetCities.length * targetCategories.length;
-        if (totalIterations === 0) {
-          toast({ title: "No targets", description: "No active cities or categories found.", variant: "destructive" });
-          setBatchRunning(false);
-          return;
-        }
-
-        const servicesRef = collection(db, "services");
-
-        for (const city of targetCities) {
-          const cityId = city.id;
-          const cityName = city.name;
-          const cityAreas = allActiveAreas.filter(a => a.cityId === cityId);
-
-          for (const category of targetCategories) {
-            const categoryId = category.id;
-            const categoryName = category.name;
-
-            processedCount++;
-            setBatchProgress(Math.round((processedCount / totalIterations) * 100));
-            setBatchStatus(`Processing: ${cityName} - ${categoryName} (${processedCount}/${totalIterations})`);
-
-            // Use the absolute fresh settings to verify existence
-            const existing = freshCityCatSettings.find(s => String(s.cityId) === String(cityId) && String(s.categoryId) === String(categoryId));
-            if (existing && !batchOverwrite) {
-              continue;
-            }
-
-            const servicesSnap = await getDocs(query(servicesRef, where("categoryId", "==", categoryId), where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
-            const serviceNames = servicesSnap.docs.map(d => d.data().name);
-
-            const result = generateFreeCityCategorySeoData(cityName, categoryName, serviceNames, cityAreas);
-            const finalSlug = await resolveUniqueSlug(cityCatSeoRef, generateSeoSlug([city.slug, category.slug]), existing?.id);
-
-            const payload: Omit<CityCategorySeoSetting, 'id' | 'createdAt' | 'updatedAt'> = {
-              cityId,
-              cityName,
-              categoryId,
-              categoryName,
-              slug: finalSlug,
-              h1_title: result.h1_title,
-              meta_title: result.seo_title,
-              meta_description: result.seo_description,
-              meta_keywords: result.seo_keywords,
-              seo_content: result.seo_content,
-              faqs: result.faqs,
-              imageHint: result.imageHint,
-              isActive: true
-            };
-
-            if (existing) {
-              await updateDoc(doc(cityCatSeoRef, existing.id), { ...payload, updatedAt: Timestamp.now() });
-              updatedCount++;
-            } else {
-              await addDoc(cityCatSeoRef, { ...payload, createdAt: Timestamp.now() });
-              createdCount++;
-            }
-          }
-        }
-      } else {
-        const cityIds = targetCities.map(c => c.id);
-        const targetAreas = allActiveAreas.filter(a => cityIds.includes(a.cityId));
-
-        // Fetch fresh existing settings directly from MySQL to bypass stale Next.js cache
-        const freshAreaCatSnap = await getDocs(areaCatSeoRef);
-        const freshAreaCatSettings = freshAreaCatSnap.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as AreaCategorySeoSetting[];
-
-        const totalIterations = targetAreas.length * targetCategories.length;
-        if (totalIterations === 0) {
-          toast({ title: "No targets", description: "No active areas or categories found.", variant: "destructive" });
-          setBatchRunning(false);
-          return;
-        }
-
-        const servicesRef = collection(db, "services");
-
-        for (const area of targetAreas) {
-          const areaId = area.id;
-          const areaName = area.name;
-          const cityId = area.cityId;
-          const city = cities.find(c => c.id === cityId);
-          if (!city) continue;
-          const cityName = city.name;
-
-          const fallbackNearby = getNearbyAreasSorted(area, allActiveAreas.filter(a => a.cityId === cityId), 10);
-
-          for (const category of targetCategories) {
-            const categoryId = category.id;
-            const categoryName = category.name;
-
-            processedCount++;
-            setBatchProgress(Math.round((processedCount / totalIterations) * 100));
-            setBatchStatus(`Processing: ${cityName} / ${areaName} - ${categoryName} (${processedCount}/${totalIterations})`);
-
-            // Use the absolute fresh settings to verify existence
-            const existing = freshAreaCatSettings.find(s => String(s.areaId) === String(areaId) && String(s.categoryId) === String(categoryId));
-            if (existing && !batchOverwrite) {
-              continue;
-            }
-
-            const servicesSnap = await getDocs(query(servicesRef, where("categoryId", "==", categoryId), where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
-            const serviceNames = servicesSnap.docs.map(d => d.data().name);
-
-            const result = generateFreeAreaCategorySeoData(cityName, areaName, categoryName, serviceNames, fallbackNearby);
-            const finalSlug = await resolveUniqueSlug(areaCatSeoRef, generateSeoSlug([city.slug, area.slug, category.slug]), existing?.id);
-
-            const payload: Omit<AreaCategorySeoSetting, 'id' | 'createdAt' | 'updatedAt'> = {
-              cityId,
-              cityName,
-              areaId,
-              areaName,
-              categoryId,
-              categoryName,
-              slug: finalSlug,
-              h1_title: result.h1_title,
-              meta_title: result.seo_title,
-              meta_description: result.seo_description,
-              meta_keywords: result.seo_keywords,
-              seo_content: result.seo_content,
-              faqs: result.faqs,
-              imageHint: result.imageHint,
-              isActive: true
-            };
-
-            if (existing) {
-              await updateDoc(doc(areaCatSeoRef, existing.id), { ...payload, updatedAt: Timestamp.now() });
-              updatedCount++;
-            } else {
-              await addDoc(areaCatSeoRef, { ...payload, createdAt: Timestamp.now() });
-              createdCount++;
-            }
-          }
-        }
-      }
+      setBatchProgress(100);
 
       toast({
         title: "Batch Generation Completed!",
-        description: `Successfully processed all combinations. Created: ${createdCount}, Updated: ${updatedCount}.`,
+        description: `Successfully processed all combinations. Created: ${result.createdCount}, Updated: ${result.updatedCount}, Skipped: ${result.skippedCount}.`,
         className: "bg-green-100 border-green-300 text-green-700"
       });
 
@@ -324,60 +178,40 @@ export default function SeoOverridesPage() {
   const fetchData = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      // --- SmartSync: Version Checking ---
-      let remoteVersion = 0;
-      if (!forceRefresh) {
-        try {
-          const versionDocRef = doc(db, "appConfiguration", "cacheVersions");
-          const versionSnap = await getDoc(versionDocRef);
-          if (versionSnap.exists()) {
-            remoteVersion = versionSnap.data().seoSettings || 0;
-          }
-        } catch (e) { console.warn("Failed to fetch cache versions:", e); }
+      let cachedCats = getCache<FirestoreCategory[]>('admin-cats-for-seo', true);
+      let cachedCities = getCache<FirestoreCity[]>('admin-cities-for-seo', true);
+      let cachedAreas = getCache<FirestoreArea[]>('admin-areas-for-seo', true);
 
-        const localVersionKey = 'admin-seo-overrides-full-version';
-        const localVersion = parseInt(localStorage.getItem(localVersionKey) || "0");
-        const cachedCats = getCache<FirestoreCategory[]>('admin-cats-for-seo', true);
-        const cachedCities = getCache<FirestoreCity[]>('admin-cities-for-seo', true);
-        const cachedAreas = getCache<FirestoreArea[]>('admin-areas-for-seo', true);
-        const cachedCitySeo = getCache<CityCategorySeoSetting[]>('admin-city-category-seo', true);
-        const cachedAreaSeo = getCache<AreaCategorySeoSetting[]>('admin-area-category-seo', true);
+      if (forceRefresh || !cachedCats || !cachedCities || !cachedAreas) {
+        const [fetchedCats, fetchedCities, fetchedAreas] = await Promise.all([
+          getAdminCategories(),
+          getCities(),
+          getAreas()
+        ]);
 
-        if (cachedCats && cachedCities && cachedAreas && cachedCitySeo && cachedAreaSeo && remoteVersion <= localVersion) {
-          setCategories(cachedCats);
-          setCities(cachedCities);
-          setAreas(cachedAreas);
-          setCityCategorySettings(cachedCitySeo);
-          setAreaCategorySettings(cachedAreaSeo);
-          setIsLoading(false);
-          return;
-        }
+        cachedCats = fetchedCats;
+        cachedCities = fetchedCities;
+        cachedAreas = fetchedAreas;
+
+        setCache('admin-cats-for-seo', fetchedCats, true);
+        setCache('admin-cities-for-seo', fetchedCities, true);
+        setCache('admin-areas-for-seo', fetchedAreas, true);
       }
 
-      // Use Server-Side Cache + Client-Side Cache
-      const [fetchedCats, fetchedCities, fetchedAreas, fetchedCitySeo, fetchedAreaSeo] = await Promise.all([
-        getAdminCategories(),
-        getCities(),
-        getAreas(),
+      setCategories(cachedCats);
+      setCities(cachedCities);
+      setAreas(cachedAreas);
+
+      // ALWAYS load settings fresh from server on page reload/navigation to avoid stale caches
+      const [fetchedCitySeo, fetchedAreaSeo] = await Promise.all([
         getCityCategorySeoSettings(),
         getAreaCategorySeoSettings()
       ]);
 
-      setCategories(fetchedCats);
-      setCities(fetchedCities);
-      setAreas(fetchedAreas);
       setCityCategorySettings(fetchedCitySeo);
       setAreaCategorySettings(fetchedAreaSeo);
-
-      // Update local cache
-      if (!forceRefresh) {
-        setCache('admin-cats-for-seo', fetchedCats, true);
-        setCache('admin-cities-for-seo', fetchedCities, true);
-        setCache('admin-areas-for-seo', fetchedAreas, true);
-        setCache('admin-city-category-seo', fetchedCitySeo, true);
-        setCache('admin-area-category-seo', fetchedAreaSeo, true);
-        localStorage.setItem('admin-seo-overrides-full-version', remoteVersion.toString());
-      }
+      setCityDisplayLimit(500);
+      setAreaDisplayLimit(500);
     } catch (error) {
       console.error("Error fetching SEO override data:", error);
       toast({ title: "Error", description: "Could not load SEO override data.", variant: "destructive" });
@@ -398,10 +232,25 @@ export default function SeoOverridesPage() {
     setIsFormOpen(true);
   };
 
-  const handleEditSetting = (setting: CityCategorySeoSetting | AreaCategorySeoSetting, type: 'cityCategory' | 'areaCategory') => {
-    setEditingSetting(setting);
-    setFormType(type);
-    setIsFormOpen(true);
+  const handleEditSetting = async (setting: CityCategorySeoSetting | AreaCategorySeoSetting, type: 'cityCategory' | 'areaCategory') => {
+    setIsSubmitting(true);
+    const collectionRef = type === 'cityCategory' ? cityCatSeoRef : areaCatSeoRef;
+    try {
+      const docRef = doc(collectionRef, setting.id!);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setEditingSetting({ id: docSnap.id, ...docSnap.data() } as any);
+        setFormType(type);
+        setIsFormOpen(true);
+      } else {
+        toast({ title: "Error", description: "SEO Override not found.", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Error loading override details:", err);
+      toast({ title: "Error", description: "Failed to load override details.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteSetting = async (id: string, type: 'cityCategory' | 'areaCategory') => {
@@ -613,7 +462,7 @@ export default function SeoOverridesPage() {
                 <Table>
                   <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {cityCategorySettings.map(setting => (
+                    {cityCategorySettings.slice(0, cityDisplayLimit).map(setting => (
                       <TableRow key={setting.id}>
                         <TableCell>{setting.cityName}</TableCell><TableCell>{setting.categoryName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
@@ -640,6 +489,22 @@ export default function SeoOverridesPage() {
                   </TableBody>
                 </Table>
               )}
+
+              {cityCategorySettings.length > cityDisplayLimit && (
+                <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+                  <div>
+                    Showing first {Math.min(cityDisplayLimit, cityCategorySettings.length)} of {cityCategorySettings.length} overrides.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(prev => prev + 500)}>
+                      Load More (+500)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(cityCategorySettings.length)}>
+                      Load All ({cityCategorySettings.length})
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -664,7 +529,7 @@ export default function SeoOverridesPage() {
                 <Table>
                     <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Area</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
-                    {areaCategorySettings.map(setting => (
+                    {areaCategorySettings.slice(0, areaDisplayLimit).map(setting => (
                         <TableRow key={setting.id}>
                         <TableCell>{setting.cityName}</TableCell><TableCell>{setting.areaName}</TableCell><TableCell>{setting.categoryName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
@@ -690,6 +555,22 @@ export default function SeoOverridesPage() {
                     ))}
                     </TableBody>
                 </Table>
+            )}
+
+            {areaCategorySettings.length > areaDisplayLimit && (
+              <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+                <div>
+                  Showing first {Math.min(areaDisplayLimit, areaCategorySettings.length)} of {areaCategorySettings.length} overrides.
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 500)}>
+                    Load More (+500)
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(areaCategorySettings.length)}>
+                    Load All ({areaCategorySettings.length})
+                  </Button>
+                </div>
+              </div>
             )}
             </CardContent>
           </Card>

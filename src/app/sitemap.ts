@@ -250,7 +250,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ];
       }
     },
-    ['sitemap-data'],
+    ['sitemap-data-v2'],
     { 
       revalidate: false, 
       tags: ['sitemap', 'global-cache'] 

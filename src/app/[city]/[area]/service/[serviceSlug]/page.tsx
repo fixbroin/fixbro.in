@@ -222,13 +222,6 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
     "areaServed": {
       "@type": "City",
       "name": cityData.name
-    },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": ratingValNum,
-      "reviewCount": reviewCountNum,
-      "bestRating": 5,
-      "worstRating": 1
     }
   };
 
@@ -242,8 +235,8 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
       "@type": "Brand",
       "name": "FixBro"
     },
-    "sku": `${cityData.id}-${areaData.id}-${serviceData.id}`,
-    "mpn": `${cityData.id}-${areaData.id}-${serviceData.id}`,
+    "sku": serviceData.id,
+    "mpn": serviceData.id,
     "offers": serviceData.price ? {
       "@type": "Offer",
       "price": parseFloat(String(serviceData.discountedPrice || serviceData.price)) || 0,
