@@ -186,3 +186,21 @@ export async function executeDbBatch(operations: any[]) {
     }
   });
 }
+
+export async function executeDbClearTable(tableName: string) {
+  return withRetry(async () => {
+    try {
+      const allowedTables = ['areaServiceSeoSettings', 'cityCategorySeoSettings', 'areaCategorySeoSettings'];
+      if (!allowedTables.includes(tableName)) {
+        throw new Error("Unauthorized table clear operation");
+      }
+      clearDocCache(tableName);
+      const pool = await getPool();
+      await pool.query(`DELETE FROM \`${tableName}\``);
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error in executeDbClearTable on ${tableName}:`, error);
+      throw new Error(error.message || 'Database error');
+    }
+  });
+}

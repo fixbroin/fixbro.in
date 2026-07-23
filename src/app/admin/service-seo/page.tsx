@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
+import { executeDbClearTable } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getAdminServices, getCities, getAreas, getAreaServiceSeoSettings, getAdminCategories, getAdminSubCategories } from '@/lib/webServerUtils';
@@ -133,6 +134,13 @@ export default function ServiceSeoPage() {
         targetAreas = targetAreas.filter(a => String(a.id) === String(batchAreaId));
       }
 
+      // Fetch fresh existing settings directly from MySQL to prevent stale cache duplicates
+      const freshSettingsSnap = await getDocs(collection(db, "areaServiceSeoSettings"));
+      const freshSettings = freshSettingsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as AreaServiceSeoSetting[];
+
       const totalIterations = targetAreas.length * targetServices.length;
       if (totalIterations === 0) {
         toast({ 
@@ -163,8 +171,8 @@ export default function ServiceSeoPage() {
           setBatchProgress(Math.round((processedCount / totalIterations) * 100));
           setBatchStatus(`Processing: ${cityName} / ${areaName} - ${serviceName} (${processedCount}/${totalIterations})`);
 
-          // Check if override already exists
-          const existing = settings.find(s => String(s.areaId) === String(areaId) && String(s.serviceId) === String(serviceId));
+          // Check if override already exists in the absolute fresh settings
+          const existing = freshSettings.find(s => String(s.areaId) === String(areaId) && String(s.serviceId) === String(serviceId));
           if (existing && !batchOverwrite) {
             continue;
           }
@@ -243,13 +251,12 @@ export default function ServiceSeoPage() {
         return;
       }
 
-      for (let i = 0; i < total; i++) {
-        const setting = settings[i];
-        setDeleteStatus(`Deleting override ${i + 1}/${total}: ${setting.areaName} - ${setting.serviceName}`);
-        setDeleteProgress(Math.round(((i + 1) / total) * 100));
-
-        await deleteDoc(doc(serviceSeoRef, setting.id!));
-      }
+      setDeleteStatus("Clearing all service-wise overrides from database...");
+      setDeleteProgress(50);
+      
+      await executeDbClearTable('areaServiceSeoSettings');
+      
+      setDeleteProgress(100);
 
       toast({
         title: "All Overrides Deleted",

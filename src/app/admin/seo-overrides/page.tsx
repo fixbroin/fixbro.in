@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
+import { executeDbClearTable } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getCache, setCache } from '@/lib/client-cache';
@@ -117,6 +118,13 @@ export default function SeoOverridesPage() {
       })) as FirestoreArea[];
 
       if (activeTab === "city-category") {
+        // Fetch fresh existing settings directly from MySQL to bypass stale Next.js cache
+        const freshCityCatSnap = await getDocs(cityCatSeoRef);
+        const freshCityCatSettings = freshCityCatSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as CityCategorySeoSetting[];
+
         const totalIterations = targetCities.length * targetCategories.length;
         if (totalIterations === 0) {
           toast({ title: "No targets", description: "No active cities or categories found.", variant: "destructive" });
@@ -139,7 +147,8 @@ export default function SeoOverridesPage() {
             setBatchProgress(Math.round((processedCount / totalIterations) * 100));
             setBatchStatus(`Processing: ${cityName} - ${categoryName} (${processedCount}/${totalIterations})`);
 
-            const existing = cityCategorySettings.find(s => s.cityId === cityId && s.categoryId === categoryId);
+            // Use the absolute fresh settings to verify existence
+            const existing = freshCityCatSettings.find(s => String(s.cityId) === String(cityId) && String(s.categoryId) === String(categoryId));
             if (existing && !batchOverwrite) {
               continue;
             }
@@ -179,6 +188,13 @@ export default function SeoOverridesPage() {
         const cityIds = targetCities.map(c => c.id);
         const targetAreas = allActiveAreas.filter(a => cityIds.includes(a.cityId));
 
+        // Fetch fresh existing settings directly from MySQL to bypass stale Next.js cache
+        const freshAreaCatSnap = await getDocs(areaCatSeoRef);
+        const freshAreaCatSettings = freshAreaCatSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as AreaCategorySeoSetting[];
+
         const totalIterations = targetAreas.length * targetCategories.length;
         if (totalIterations === 0) {
           toast({ title: "No targets", description: "No active areas or categories found.", variant: "destructive" });
@@ -206,7 +222,8 @@ export default function SeoOverridesPage() {
             setBatchProgress(Math.round((processedCount / totalIterations) * 100));
             setBatchStatus(`Processing: ${cityName} / ${areaName} - ${categoryName} (${processedCount}/${totalIterations})`);
 
-            const existing = areaCategorySettings.find(s => s.areaId === areaId && s.categoryId === categoryId);
+            // Use the absolute fresh settings to verify existence
+            const existing = freshAreaCatSettings.find(s => String(s.areaId) === String(areaId) && String(s.categoryId) === String(categoryId));
             if (existing && !batchOverwrite) {
               continue;
             }
@@ -279,13 +296,13 @@ export default function SeoOverridesPage() {
         return;
       }
 
-      for (let i = 0; i < total; i++) {
-        const setting = targetSettings[i];
-        setDeleteStatus(`Deleting override ${i + 1}/${total}: ${setting.cityName} ${setting.categoryName}`);
-        setDeleteProgress(Math.round(((i + 1) / total) * 100));
+      setDeleteStatus(`Clearing all overrides from the ${activeTab === 'city-category' ? 'cityCategorySeoSettings' : 'areaCategorySeoSettings'} table...`);
+      setDeleteProgress(50);
 
-        await deleteDoc(doc(collectionRef, setting.id!));
-      }
+      const targetTable = activeTab === "city-category" ? "cityCategorySeoSettings" : "areaCategorySeoSettings";
+      await executeDbClearTable(targetTable);
+
+      setDeleteProgress(100);
 
       toast({
         title: "All Overrides Deleted",
