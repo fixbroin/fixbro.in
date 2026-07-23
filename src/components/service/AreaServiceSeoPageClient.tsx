@@ -19,6 +19,7 @@ interface AreaServiceSeoPageClientProps {
   seoContent?: string;
   faqs?: FaqItem[];
   breadcrumbItems: { name: string; url?: string }[];
+  cityAreas?: FirestoreArea[];
 }
 
 export default function AreaServiceSeoPageClient({
@@ -28,7 +29,8 @@ export default function AreaServiceSeoPageClient({
   seoOverride,
   seoContent = "",
   faqs = [],
-  breadcrumbItems
+  breadcrumbItems,
+  cityAreas = []
 }: AreaServiceSeoPageClientProps) {
   const router = useRouter();
 
@@ -240,6 +242,29 @@ export default function AreaServiceSeoPageClient({
                   </AccordionItem>
                 ))}
               </Accordion>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dynamic Nearby Locations Directory */}
+        {cityAreas && cityAreas.length > 0 && (
+          <Card className="border-none shadow-md shadow-slate-100 bg-white rounded-xl mt-8">
+            <CardContent className="p-6">
+              <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Other Areas Served for {serviceData.name} in {cityData.name}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {cityAreas.filter(a => a.id !== areaData.id && a.isActive).slice(0, 20).map((area) => (
+                  <Link
+                    key={area.id}
+                    href={`/${cityData.slug}/${area.slug}/service/${serviceData.slug}`}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-all font-semibold"
+                  >
+                    {serviceData.name} in {area.name}
+                  </Link>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}

@@ -12,11 +12,12 @@ import { Switch } from "@/components/ui/switch";
 import type { FirestoreCity, FirestoreCategory, CityCategorySeoSetting } from '@/types/firestore';
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { Loader2, Wand2, Edit2, Lock, CheckCircle, Search, Building, Tags } from "lucide-react";
+import { Loader2, Wand2, Edit2, Lock, CheckCircle, Search, Building, Tags, Sparkles } from "lucide-react";
 import { generateCityCategorySeo } from '@/ai/flows/generateCityCategorySeoFlow';
+import { generateFreeCityCategorySeoData } from "@/lib/seoGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { collection, query, where, getDocs, limit, orderBy } from '@/lib/mysqlDb';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -176,6 +177,57 @@ export default function CityCategorySeoForm({
         return () => clearTimeout(delayDebounceFn);
     }
   }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
+
+  const handleGenerateFreeSeo = async () => {
+    const cityId = form.getValues("cityId");
+    const categoryId = form.getValues("categoryId");
+
+    const selectedCityObj = cities.find(c => c.id === cityId);
+    const selectedCategoryObj = categories.find(c => c.id === categoryId);
+
+    if (!selectedCityObj || !selectedCategoryObj) {
+      toast({
+        title: "City & Category Required",
+        description: "Please select a city and a category first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Query top active services under this category to build unique content strings
+      const servicesRef = collection(db, "services");
+      const snap = await getDocs(query(servicesRef, where("categoryId", "==", categoryId), where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
+      const serviceNames = snap.docs.map(d => d.data().name);
+
+      const areasRef = collection(db, "areas");
+      const areasSnap = await getDocs(query(areasRef, where("cityId", "==", cityId), where("isActive", "==", true)));
+      const fallbackNearby = areasSnap.docs.map(d => ({
+        id: d.id,
+        name: d.data().name,
+        slug: d.data().slug
+      }));
+
+      const result = generateFreeCityCategorySeoData(selectedCityObj.name, selectedCategoryObj.name, serviceNames, fallbackNearby);
+
+      form.setValue("h1_title", result.h1_title, { shouldValidate: true, shouldDirty: true });
+      form.setValue("meta_title", result.seo_title, { shouldValidate: true, shouldDirty: true });
+      form.setValue("meta_description", result.seo_description, { shouldValidate: true, shouldDirty: true });
+      form.setValue("meta_keywords", result.seo_keywords, { shouldValidate: true, shouldDirty: true });
+      form.setValue("seo_content", result.seo_content, { shouldValidate: true, shouldDirty: true });
+      form.setValue("faqs", result.faqs, { shouldValidate: true, shouldDirty: true });
+      form.setValue("imageHint", result.imageHint, { shouldValidate: true, shouldDirty: true });
+
+      toast({ 
+        title: "Content Generated (Free)!", 
+        description: "SEO fields and FAQs have been auto-populated using dynamic templates.",
+        className: "bg-green-100 border-green-300 text-green-700" 
+      });
+    } catch (error) {
+      console.error("Error generating free SEO:", error);
+      toast({ title: "Error", description: "Failed to generate free SEO content.", variant: "destructive" });
+    }
+  };
 
   const handleGenerateSeo = async () => {
     const cityId = form.getValues("cityId");
@@ -442,10 +494,16 @@ export default function CityCategorySeoForm({
         <div className="space-y-4 pt-4 border-t">
           <div className="flex justify-between items-center">
               <h3 className="text-md font-semibold text-muted-foreground">SEO Content</h3>
-              <Button type="button" variant="outline" size="sm" onClick={handleGenerateSeo} disabled={effectiveIsSubmitting || !watchedCityId || !watchedCategoryId}>
-                  {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                  Generate AI SEO
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={handleGenerateFreeSeo} disabled={effectiveIsSubmitting || !watchedCityId || !watchedCategoryId}>
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    Auto-Fill (Free)
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleGenerateSeo} disabled={effectiveIsSubmitting || !watchedCityId || !watchedCategoryId}>
+                    {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Generate AI SEO
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings.</p>
         </div>

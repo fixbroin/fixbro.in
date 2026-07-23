@@ -47,7 +47,7 @@ const getCategories = unstable_cache(
     }
   },
   ['admin-categories-list'],
-  { revalidate: 1, tags: ['categories', 'global-cache'] }
+  { revalidate: 86400, tags: ['categories', 'global-cache'] }
 );
 
 

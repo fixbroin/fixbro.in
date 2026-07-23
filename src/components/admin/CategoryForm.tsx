@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { FirestoreCategory } from '@/types/firestore';
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock } from "lucide-react";
+import { Loader2, Image as ImageIcon, Trash2, Wand2, Edit2, Lock, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import NextImage from 'next/image';
 import { storage, db } from '@/lib/firebase';
@@ -19,6 +19,7 @@ import { collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { generateCategorySeo } from '@/ai/flows/generateCategorySeoFlow';
+import { getSpinnedLocalContent } from "@/lib/seoGenerator";
 import { compressImage } from "@/lib/imageCompressor";
 
 const generateSlug = (name: string) => {
@@ -230,6 +231,55 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
     setCurrentImagePreview(null);
     form.setValue('imageUrl', '', { shouldValidate: true });
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleGenerateFreeSeo = async () => {
+    const categoryName = form.getValues("name");
+    if (!categoryName.trim()) {
+        toast({ title: "Category Name Required", description: "Please enter a category name first.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const spinnedContent = getSpinnedLocalContent({
+            cityName: "your city",
+            categoryName: categoryName
+        });
+
+        const h1Title = `Professional ${categoryName} Services`;
+        const seoTitle = `Best ${categoryName} Services near me | FixBro`;
+        const seoDescription = `Book certified and background-verified ${categoryName.toLowerCase()} experts with FixBro. Quality service, upfront pricing, and trusted professionals.`;
+        const seoKeywords = `${categoryName.toLowerCase()} services, best ${categoryName.toLowerCase()} near me, local ${categoryName.toLowerCase()}`;
+        const imageHint = `${categoryName.toLowerCase()} services`;
+
+        const faqsList = [
+          {
+            question: `How do I book ${categoryName.toLowerCase()} services on FixBro?`,
+            answer: `You can easily book online. Select the required ${categoryName.toLowerCase()} service, choose a convenient date and time slot, and confirm your booking instantly.`
+          },
+          {
+            question: `Are your ${categoryName.toLowerCase()} professionals certified?`,
+            answer: `Yes, all ${categoryName.toLowerCase()} technicians on our platform are background-checked, vetted, and highly experienced.`
+          }
+        ];
+
+        form.setValue("h1_title", h1Title, { shouldValidate: true, shouldDirty: true });
+        form.setValue("seo_title", seoTitle, { shouldValidate: true, shouldDirty: true });
+        form.setValue("seo_description", seoDescription, { shouldValidate: true, shouldDirty: true });
+        form.setValue("seo_keywords", seoKeywords, { shouldValidate: true, shouldDirty: true });
+        form.setValue("seo_content", spinnedContent, { shouldValidate: true, shouldDirty: true });
+        form.setValue("faqs", faqsList, { shouldValidate: true, shouldDirty: true });
+        form.setValue("imageHint", imageHint, { shouldValidate: true, shouldDirty: true });
+
+        toast({ 
+            title: "Content Generated (Free)!", 
+            description: "SEO fields and FAQs have been auto-populated using dynamic templates.",
+            className: "bg-green-100 border-green-300 text-green-700" 
+        });
+    } catch (error) {
+        console.error("Error generating free category SEO:", error);
+        toast({ title: "Error", description: "Failed to generate free SEO content.", variant: "destructive" });
+    }
   };
 
   const handleGenerateSeo = async () => {
@@ -510,16 +560,28 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         <div className="space-y-4 pt-4 border-t">
           <div className="flex justify-between items-center">
               <h3 className="text-md font-semibold text-muted-foreground">SEO Settings (Optional)</h3>
-              <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateSeo}
-                  disabled={effectiveIsSubmitting || !watchedName}
-              >
-                  {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                  Generate AI SEO
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateFreeSeo}
+                    disabled={effectiveIsSubmitting || !watchedName}
+                >
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    Auto-Fill (Free)
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateSeo}
+                    disabled={effectiveIsSubmitting || !watchedName}
+                >
+                    {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Generate AI SEO
+                </Button>
+              </div>
             </div>
           <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings. Use <code>{"{{categoryName}}"}</code> in global patterns.</p>
           <FormField control={form.control} name="h1_title" render={({ field }) => (

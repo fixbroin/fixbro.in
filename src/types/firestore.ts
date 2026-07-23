@@ -769,6 +769,9 @@ export interface FirestoreCity {
   metaDescription?: string;
   metaKeywords?: string;
   h1_title?: string;
+  latitude?: number;
+  longitude?: number;
+  nearbyCities?: Array<{ id: string, name: string, slug: string }>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -790,6 +793,9 @@ export interface FirestoreArea {
   metaDescription?: string;
   metaKeywords?: string;
   h1_title?: string;
+  latitude?: number;
+  longitude?: number;
+  nearbyAreas?: Array<{ id: string, name: string, slug: string }>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

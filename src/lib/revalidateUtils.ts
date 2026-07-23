@@ -13,7 +13,7 @@ import { FieldValue } from './mysqlDbAdmin';
 export async function triggerRefresh(tag: 'services' | 'categories' | 'cities' | 'bookings' | 'users' | 'content' | 'blog' | 'global' | 'withdrawal-referral-config' | 'withdrawal-provider-config' | 'promo-usage' | string) {
   try {
     try {
-      (revalidateTag as any)(tag);
+      (revalidateTag as any)(tag, 'max');
     } catch (e) {
       // Ignore Next.js internal revalidateTag profile mismatch
     }

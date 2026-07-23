@@ -17,6 +17,11 @@ import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { calculateNearbyCities } from '@/lib/locationUtils';
+import { generateFreeCitySeoData } from "@/lib/seoGenerator";
+import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Zap } from "lucide-react";
 
 const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -32,6 +37,86 @@ export default function AdminCitiesPage() {
   const { toast } = useToast();
 
   const citiesCollectionRef = collection(db, "cities");
+
+  // Batch SEO States
+  const [isBatchSeoOpen, setIsBatchSeoOpen] = useState(false);
+  const [batchSeoOverwrite, setBatchSeoOverwrite] = useState(false);
+  const [batchSeoRunning, setBatchSeoRunning] = useState(false);
+  const [batchSeoProgress, setBatchSeoProgress] = useState(0);
+  const [batchSeoStatus, setBatchSeoStatus] = useState("");
+
+  const handleStartBatchSeo = async () => {
+    setBatchSeoRunning(true);
+    setBatchSeoProgress(0);
+    setBatchSeoStatus("Initializing City SEO batch...");
+
+    try {
+      const targetCities = cities.filter(c => c.isActive !== false);
+
+      const totalIterations = targetCities.length;
+      if (totalIterations === 0) {
+        toast({ title: "No targets", description: "No active cities found.", variant: "destructive" });
+        setBatchSeoRunning(false);
+        return;
+      }
+
+      const catSnap = await getDocs(query(collection(db, "adminCategories"), where("isActive", "==", true)));
+      const categoryNames = catSnap.docs.map(doc => doc.data().name as string);
+
+      const areasSnap = await getDocs(query(collection(db, "areas"), where("isActive", "==", true)));
+      const allActiveAreas = areasSnap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+        slug: doc.data().slug,
+        cityId: doc.data().cityId
+      }));
+
+      let processedCount = 0;
+      let updatedCount = 0;
+
+      for (const city of targetCities) {
+        processedCount++;
+        setBatchSeoProgress(Math.round((processedCount / totalIterations) * 100));
+        setBatchSeoStatus(`Processing City SEO: ${city.name} (${processedCount}/${totalIterations})`);
+
+        const hasExisting = city.h1_title || city.seo_title || city.seo_description || city.seo_keywords;
+        if (hasExisting && !batchSeoOverwrite) {
+          continue;
+        }
+
+        const cityAreas = allActiveAreas.filter(a => a.cityId === city.id);
+
+        const result = generateFreeCitySeoData(city.name, categoryNames, cityAreas);
+
+        const cityDoc = doc(db, "cities", city.id!);
+        await updateDoc(cityDoc, {
+          h1_title: result.h1_title,
+          seo_title: result.seo_title,
+          seo_description: result.seo_description,
+          seo_keywords: result.seo_keywords,
+          updatedAt: Timestamp.now()
+        });
+
+        updatedCount++;
+      }
+
+      toast({
+        title: "City SEO Batch Completed!",
+        description: `Successfully updated SEO tags for ${updatedCount} cities.`,
+        className: "bg-green-100 border-green-300 text-green-700"
+      });
+
+      setIsBatchSeoOpen(false);
+      await triggerRefresh('locations');
+      await triggerRefresh('sitemap');
+      await fetchCities();
+    } catch (err) {
+      console.error("Error batch generating city SEO:", err);
+      toast({ title: "Batch Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+    } finally {
+      setBatchSeoRunning(false);
+    }
+  };
 
   const fetchCities = async () => {
     setIsLoading(true);
@@ -101,15 +186,26 @@ export default function AdminCitiesPage() {
       seo_description: data.seo_description,
       seo_keywords: data.seo_keywords,
       h1_title: data.h1_title,
+      latitude: data.latitude ? Number(data.latitude) : undefined,
+      longitude: data.longitude ? Number(data.longitude) : undefined,
     };
 
     try {
+      let activeId = data.id || "";
       if (editingCity && data.id) { 
         const cityDoc = doc(db, "cities", data.id);
-        await updateDoc(cityDoc, { ...payload, updatedAt: Timestamp.now() });
+        const nearby = (payload.latitude && payload.longitude)
+          ? await calculateNearbyCities(data.id, Number(payload.latitude), Number(payload.longitude))
+          : [];
+        await updateDoc(cityDoc, { ...payload, nearbyCities: nearby, updatedAt: Timestamp.now() });
         toast({ title: "Success", description: "City updated successfully." });
       } else { 
-        await addDoc(citiesCollectionRef, { ...payload, createdAt: Timestamp.now() });
+        const docRef = await addDoc(citiesCollectionRef, { ...payload, createdAt: Timestamp.now() });
+        activeId = docRef.id;
+        if (payload.latitude && payload.longitude) {
+          const nearby = await calculateNearbyCities(activeId, Number(payload.latitude), Number(payload.longitude));
+          await updateDoc(doc(db, "cities", activeId), { nearbyCities: nearby });
+        }
         toast({ title: "Success", description: "City added successfully." });
       }
       
@@ -149,11 +245,16 @@ export default function AdminCitiesPage() {
             <CardTitle className="text-2xl flex items-center"><MapPin className="mr-2 h-6 w-6 text-primary" />Manage Cities</CardTitle>
             <CardDescription>Add, edit, or delete cities. These will create pages like /city-slug.</CardDescription>
           </div>
-          <PermissionGuard moduleId="cities" action="create">
-            <Button onClick={handleAddCity} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New City
-            </Button>
-          </PermissionGuard>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <PermissionGuard moduleId="cities" action="create">
+              <Button variant="outline" onClick={() => setIsBatchSeoOpen(true)} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+                <Zap className="mr-2 h-4 w-4 text-amber-500" /> Batch Generate SEO (Free)
+              </Button>
+              <Button onClick={handleAddCity} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New City
+              </Button>
+            </PermissionGuard>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -240,6 +341,52 @@ export default function AdminCitiesPage() {
               onCancel={() => { setIsFormOpen(false); setEditingCity(null); }}
               isSubmitting={isSubmitting}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBatchSeoOpen} onOpenChange={(open) => { if (!batchSeoRunning) setIsBatchSeoOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle>Batch Generate City SEO tags</DialogTitle>
+            <DialogDescription>
+              Automatically generate H1, Meta Title, Description, and Keywords for all active cities.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-500 leading-relaxed">
+              This will calculate coordinates, category mappings, and locations to produce unique SEO copy for all active cities in your system.
+            </p>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="overwrite_seo" 
+                checked={batchSeoOverwrite} 
+                onCheckedChange={(checked) => setBatchSeoOverwrite(!!checked)}
+                disabled={batchSeoRunning}
+              />
+              <label htmlFor="overwrite_seo" className="text-sm font-medium leading-none cursor-pointer">
+                Overwrite existing custom SEO tags
+              </label>
+            </div>
+
+            {batchSeoRunning && (
+              <div className="space-y-2 pt-4">
+                <Progress value={batchSeoProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground animate-pulse">{batchSeoStatus}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsBatchSeoOpen(false)} disabled={batchSeoRunning}>
+              Cancel
+            </Button>
+            <Button onClick={handleStartBatchSeo} disabled={batchSeoRunning}>
+              {batchSeoRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {batchSeoRunning ? "Generating..." : "Start Batch Generation"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -10,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import type { FirestoreArea, FirestoreCity } from '@/types/firestore';
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { Loader2, Wand2, Edit2, Lock, Search, Building } from "lucide-react";
+import { Loader2, Wand2, Edit2, Lock, Search, Building, Sparkles } from "lucide-react";
 import { generateAreaSeo } from '@/ai/flows/generateAreaSeoFlow';
+import { generateFreeAreaSeoData } from "@/lib/seoGenerator";
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { collection, query, where, getDocs, limit, orderBy } from '@/lib/mysqlDb';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,8 @@ const areaFormSchema = z.object({
   slug: z.string().min(2, "Slug must be at least 2 characters.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid slug format (e.g., my-area-name).").optional().or(z.literal('')),
   cityId: z.string({ required_error: "Please select a parent city." }),
   isActive: z.boolean().default(true),
+  latitude: z.string().or(z.number()).optional().nullable(),
+  longitude: z.string().or(z.number()).optional().nullable(),
   // SEO Fields
   h1_title: z.string().optional().or(z.literal('')),
   seo_title: z.string().optional().or(z.literal('')),
@@ -48,6 +51,7 @@ interface AreaFormProps {
 
 export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel, cities, isSubmitting = false }: AreaFormProps) {
   const [isGeneratingSeo, setIsGeneratingSeo] = useState(false);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [isSlugEditable, setIsSlugEditable] = useState(false);
   
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
@@ -62,6 +66,8 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
       slug: "",
       cityId: undefined,
       isActive: true,
+      latitude: "",
+      longitude: "",
       h1_title: "",
       seo_title: "",
       seo_description: "",
@@ -107,6 +113,54 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
     return uniqueSlug;
   }, []);
 
+  const handleFetchCoordinates = async () => {
+    const areaName = form.getValues("name");
+    if (!areaName) {
+      toast({
+        title: "Area name required",
+        description: "Please enter an area name first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!selectedCity) {
+      toast({
+        title: "City required",
+        description: "Please select a parent city first to ensure geocoding accuracy.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsGeocoding(true);
+    try {
+      const q = `${areaName}, ${selectedCity.name}, India`;
+      const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.lat && data.lon) {
+        form.setValue("latitude", data.lat, { shouldValidate: true, shouldDirty: true });
+        form.setValue("longitude", data.lon, { shouldValidate: true, shouldDirty: true });
+        toast({
+          title: "Location details captured!",
+          description: `Coordinates resolved: ${data.lat}, ${data.lon}`
+        });
+      } else {
+        toast({
+          title: "Not found",
+          description: "Could not find coordinates for this area.",
+          variant: "destructive"
+        });
+      }
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e.message || "Failed to fetch coordinates.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   useEffect(() => {
     if (initialData) {
       form.reset({
@@ -114,6 +168,8 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
         slug: initialData.slug,
         cityId: initialData.cityId,
         isActive: initialData.isActive === undefined ? true : initialData.isActive,
+        latitude: initialData.latitude || "",
+        longitude: initialData.longitude || "",
         h1_title: initialData.h1_title || "",
         seo_title: initialData.seo_title || "",
         seo_description: initialData.seo_description || "",
@@ -121,7 +177,7 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
       });
     } else {
       form.reset({
-        name: "", slug: "", cityId: undefined, isActive: true,
+        name: "", slug: "", cityId: undefined, isActive: true, latitude: "", longitude: "",
         h1_title: "", seo_title: "", seo_description: "", seo_keywords: "",
       });
     }
@@ -155,6 +211,51 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
         return () => clearTimeout(delayDebounceFn);
     }
   }, [watchedSlug, isSlugEditable, initialData, form, checkSlugUniqueness]);
+
+  const handleGenerateFreeSeo = async () => {
+    const areaName = form.getValues("name");
+    const cityId = form.getValues("cityId");
+    const parentCity = cities.find(c => c.id === cityId);
+
+    if (!areaName || !parentCity) {
+      toast({
+        title: "Area & City Required",
+        description: "Please enter an area name and select a parent city first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Fetch top categories dynamically to use in area page meta text
+      const catsRef = collection(db, "adminCategories");
+      const snap = await getDocs(query(catsRef, where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
+      const categoryNames = snap.docs.map(d => d.data().name);
+
+      const areasRef = collection(db, "areas");
+      const currentAreaId = initialData?.id || "";
+      const areasSnap = cityId ? await getDocs(query(areasRef, where("cityId", "==", cityId), where("isActive", "==", true))) : { docs: [] };
+      const otherAreas = areasSnap.docs
+        .filter(d => d.id !== currentAreaId)
+        .map(d => ({ id: d.id, name: d.data().name, slug: d.data().slug }));
+
+      const result = generateFreeAreaSeoData(parentCity.name, areaName, categoryNames, otherAreas);
+
+      form.setValue("h1_title", result.h1_title, { shouldValidate: true, shouldDirty: true });
+      form.setValue("seo_title", result.seo_title, { shouldValidate: true, shouldDirty: true });
+      form.setValue("seo_description", result.seo_description, { shouldValidate: true, shouldDirty: true });
+      form.setValue("seo_keywords", result.seo_keywords, { shouldValidate: true, shouldDirty: true });
+
+      toast({ 
+        title: "Content Generated (Free)!", 
+        description: "SEO fields have been auto-populated using dynamic templates.",
+        className: "bg-green-100 border-green-300 text-green-700" 
+      });
+    } catch (error) {
+      console.error("Error generating free area SEO:", error);
+      toast({ title: "Error", description: "Failed to generate free SEO content.", variant: "destructive" });
+    }
+  };
 
   const handleGenerateSeo = async () => {
     const areaName = form.getValues("name");
@@ -193,6 +294,8 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
       ...formData,
       slug: formData.slug || "",
       id: initialData?.id,
+      latitude: formData.latitude ? Number(formData.latitude) : undefined,
+      longitude: formData.longitude ? Number(formData.longitude) : undefined,
     });
   };
   
@@ -201,19 +304,58 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Area Name</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Whitefield" {...field} disabled={effectiveIsSubmitting} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="flex gap-2 items-end">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem className="flex-grow">
+                <FormLabel>Area Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., Whitefield" {...field} disabled={effectiveIsSubmitting || isGeocoding} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleFetchCoordinates}
+            disabled={effectiveIsSubmitting || isGeocoding || !watchedName || !watchedCityId}
+          >
+            {isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "📍 Auto-Fetch Coordinates"}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="latitude"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Latitude</FormLabel>
+                <FormControl>
+                  <Input type="number" step="any" placeholder="e.g., 12.9698" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : "")} disabled={effectiveIsSubmitting || isGeocoding} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="longitude"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Longitude</FormLabel>
+                <FormControl>
+                  <Input type="number" step="any" placeholder="e.g., 77.7500" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : "")} disabled={effectiveIsSubmitting || isGeocoding} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <FormField
           control={form.control}
           name="slug"
@@ -348,16 +490,28 @@ export default function AreaForm({ onSubmit: onSubmitProp, initialData, onCancel
         <div className="space-y-4 pt-4 border-t">
             <div className="flex justify-between items-center">
               <h3 className="text-md font-semibold text-muted-foreground">SEO Settings (Optional)</h3>
-              <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateSeo}
-                  disabled={isGeneratingSeo || isSubmitting || !watchedName || !watchedCityId}
-              >
-                  {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                  Generate AI SEO
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateFreeSeo}
+                    disabled={isGeneratingSeo || isSubmitting || !watchedName || !watchedCityId}
+                >
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    Auto-Fill (Free)
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateSeo}
+                    disabled={isGeneratingSeo || isSubmitting || !watchedName || !watchedCityId}
+                >
+                    {isGeneratingSeo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                    Generate AI SEO
+                </Button>
+              </div>
             </div>
             <p className="text-xs text-muted-foreground">Leave blank to use global SEO patterns defined in SEO Settings.</p>
             <FormField control={form.control} name="h1_title" render={({ field }) => (

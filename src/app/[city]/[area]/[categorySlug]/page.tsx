@@ -12,6 +12,7 @@ import { getCategoryFullData, getAggregateRating } from '@/lib/homepageUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { getCategorySearchTerm, generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { getSpinnedLocalContent } from '@/lib/seoGenerator';
 
 export const revalidate = false;
 
@@ -43,6 +44,14 @@ const getPageData = cache(async (citySlug: string, areaSlug: string, categorySlu
         if (areaSnapshot.empty) return null;
         const areaData = { id: areaSnapshot.docs[0].id, ...areaSnapshot.docs[0].data() } as FirestoreArea;
 
+        // Get all active areas in the same city to dynamically interlink nearby areas
+        const cityAreasQuery = areasRef.where('cityId', '==', cityData.id).where('isActive', '==', true);
+        const cityAreasSnapshot = await cityAreasQuery.get();
+        const cityAreas = cityAreasSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as FirestoreArea[];
+
         const categoriesRef = adminDb.collection('adminCategories');
         const categoryQuery = categoriesRef.where('slug', '==', categorySlug).limit(1);
         const categorySnapshot = await categoryQuery.get();
@@ -54,7 +63,7 @@ const getPageData = cache(async (citySlug: string, areaSlug: string, categorySlu
           seoOverride = await getAreaCategorySeoOverride(areaData.id, categoryData.id);
         }
 
-        return { cityData, areaData, categoryData, seoOverride };
+        return { cityData, areaData, categoryData, seoOverride, cityAreas };
       } catch (error) {
         console.error(`[AreaCategoryPage] Error fetching page data:`, error);
         return null;

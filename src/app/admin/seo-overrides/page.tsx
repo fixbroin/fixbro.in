@@ -8,11 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Switch } from "@/components/ui/switch";
 import { PlusCircle, Edit, Trash2, Loader2, PackageSearch, Zap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { CityCategorySeoSetting, AreaCategorySeoSetting, FirestoreCategory, FirestoreCity, FirestoreArea } from '@/types/firestore';
 import CityCategorySeoForm, { type CityCategorySeoFormData } from '@/components/admin/CityCategorySeoForm';
 import AreaCategorySeoForm, { type AreaCategorySeoFormData } from '@/components/admin/AreaCategorySeoForm';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, getDoc } from '@/lib/mysqlDb';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, getDoc, limit } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +24,9 @@ import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getCache, setCache } from '@/lib/client-cache';
 import { getAdminCategories, getCities, getAreas, getCityCategorySeoSettings, getAreaCategorySeoSettings } from '@/lib/webServerUtils';
+import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { generateFreeCityCategorySeoData, generateFreeAreaCategorySeoData, getNearbyAreasSorted } from "@/lib/seoGenerator";
 
 const generateSeoSlug = (parts: (string | undefined)[]): string => {
     return parts.filter(Boolean).map(part => part!.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')).join('/');
@@ -48,6 +52,257 @@ export default function SeoOverridesPage() {
 
   const cityCatSeoRef = collection(db, "cityCategorySeoSettings");
   const areaCatSeoRef = collection(db, "areaCategorySeoSettings");
+
+  // Batch Generation State
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchCityId, setBatchCityId] = useState<string>("all");
+  const [batchCategoryId, setBatchCategoryId] = useState<string>("all");
+  const [batchOverwrite, setBatchOverwrite] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [batchStatus, setBatchStatus] = useState("");
+
+  // Delete All State
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  const [deleteRunning, setDeleteRunning] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [deleteStatus, setDeleteStatus] = useState("");
+
+  const resolveUniqueSlug = async (collectionRef: any, baseSlug: string, currentId?: string): Promise<string> => {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    let isUnique = false;
+
+    while (!isUnique) {
+      const q = query(
+        collectionRef,
+        where("slug", "==", uniqueSlug),
+        limit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        isUnique = true;
+      } else {
+        const docSnap = querySnapshot.docs[0];
+        if (currentId && docSnap.id === currentId) {
+          isUnique = true;
+        } else {
+          uniqueSlug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+    }
+    return uniqueSlug;
+  };
+
+  const handleStartBatch = async () => {
+    setBatchRunning(true);
+    setBatchProgress(0);
+    setBatchStatus("Initializing batch...");
+
+    try {
+      const targetCities = batchCityId === "all" ? cities : cities.filter(c => c.id === batchCityId);
+      const targetCategories = batchCategoryId === "all" ? categories : categories.filter(c => c.id === batchCategoryId);
+
+      let processedCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      const areasRef = collection(db, "areas");
+      const areasSnap = await getDocs(query(areasRef, where("isActive", "==", true)));
+      const allActiveAreas = areasSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as FirestoreArea[];
+
+      if (activeTab === "city-category") {
+        const totalIterations = targetCities.length * targetCategories.length;
+        if (totalIterations === 0) {
+          toast({ title: "No targets", description: "No active cities or categories found.", variant: "destructive" });
+          setBatchRunning(false);
+          return;
+        }
+
+        const servicesRef = collection(db, "services");
+
+        for (const city of targetCities) {
+          const cityId = city.id;
+          const cityName = city.name;
+          const cityAreas = allActiveAreas.filter(a => a.cityId === cityId);
+
+          for (const category of targetCategories) {
+            const categoryId = category.id;
+            const categoryName = category.name;
+
+            processedCount++;
+            setBatchProgress(Math.round((processedCount / totalIterations) * 100));
+            setBatchStatus(`Processing: ${cityName} - ${categoryName} (${processedCount}/${totalIterations})`);
+
+            const existing = cityCategorySettings.find(s => s.cityId === cityId && s.categoryId === categoryId);
+            if (existing && !batchOverwrite) {
+              continue;
+            }
+
+            const servicesSnap = await getDocs(query(servicesRef, where("categoryId", "==", categoryId), where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
+            const serviceNames = servicesSnap.docs.map(d => d.data().name);
+
+            const result = generateFreeCityCategorySeoData(cityName, categoryName, serviceNames, cityAreas);
+            const finalSlug = await resolveUniqueSlug(cityCatSeoRef, generateSeoSlug([city.slug, category.slug]), existing?.id);
+
+            const payload: Omit<CityCategorySeoSetting, 'id' | 'createdAt' | 'updatedAt'> = {
+              cityId,
+              cityName,
+              categoryId,
+              categoryName,
+              slug: finalSlug,
+              h1_title: result.h1_title,
+              meta_title: result.seo_title,
+              meta_description: result.seo_description,
+              meta_keywords: result.seo_keywords,
+              seo_content: result.seo_content,
+              faqs: result.faqs,
+              imageHint: result.imageHint,
+              isActive: true
+            };
+
+            if (existing) {
+              await updateDoc(doc(cityCatSeoRef, existing.id), { ...payload, updatedAt: Timestamp.now() });
+              updatedCount++;
+            } else {
+              await addDoc(cityCatSeoRef, { ...payload, createdAt: Timestamp.now() });
+              createdCount++;
+            }
+          }
+        }
+      } else {
+        const cityIds = targetCities.map(c => c.id);
+        const targetAreas = allActiveAreas.filter(a => cityIds.includes(a.cityId));
+
+        const totalIterations = targetAreas.length * targetCategories.length;
+        if (totalIterations === 0) {
+          toast({ title: "No targets", description: "No active areas or categories found.", variant: "destructive" });
+          setBatchRunning(false);
+          return;
+        }
+
+        const servicesRef = collection(db, "services");
+
+        for (const area of targetAreas) {
+          const areaId = area.id;
+          const areaName = area.name;
+          const cityId = area.cityId;
+          const city = cities.find(c => c.id === cityId);
+          if (!city) continue;
+          const cityName = city.name;
+
+          const fallbackNearby = getNearbyAreasSorted(area, allActiveAreas.filter(a => a.cityId === cityId), 10);
+
+          for (const category of targetCategories) {
+            const categoryId = category.id;
+            const categoryName = category.name;
+
+            processedCount++;
+            setBatchProgress(Math.round((processedCount / totalIterations) * 100));
+            setBatchStatus(`Processing: ${cityName} / ${areaName} - ${categoryName} (${processedCount}/${totalIterations})`);
+
+            const existing = areaCategorySettings.find(s => s.areaId === areaId && s.categoryId === categoryId);
+            if (existing && !batchOverwrite) {
+              continue;
+            }
+
+            const servicesSnap = await getDocs(query(servicesRef, where("categoryId", "==", categoryId), where("isActive", "==", true), orderBy("order", "asc"), limit(10)));
+            const serviceNames = servicesSnap.docs.map(d => d.data().name);
+
+            const result = generateFreeAreaCategorySeoData(cityName, areaName, categoryName, serviceNames, fallbackNearby);
+            const finalSlug = await resolveUniqueSlug(areaCatSeoRef, generateSeoSlug([city.slug, area.slug, category.slug]), existing?.id);
+
+            const payload: Omit<AreaCategorySeoSetting, 'id' | 'createdAt' | 'updatedAt'> = {
+              cityId,
+              cityName,
+              areaId,
+              areaName,
+              categoryId,
+              categoryName,
+              slug: finalSlug,
+              h1_title: result.h1_title,
+              meta_title: result.seo_title,
+              meta_description: result.seo_description,
+              meta_keywords: result.seo_keywords,
+              seo_content: result.seo_content,
+              faqs: result.faqs,
+              imageHint: result.imageHint,
+              isActive: true
+            };
+
+            if (existing) {
+              await updateDoc(doc(areaCatSeoRef, existing.id), { ...payload, updatedAt: Timestamp.now() });
+              updatedCount++;
+            } else {
+              await addDoc(areaCatSeoRef, { ...payload, createdAt: Timestamp.now() });
+              createdCount++;
+            }
+          }
+        }
+      }
+
+      toast({
+        title: "Batch Generation Completed!",
+        description: `Successfully processed all combinations. Created: ${createdCount}, Updated: ${updatedCount}.`,
+        className: "bg-green-100 border-green-300 text-green-700"
+      });
+
+      setIsBatchOpen(false);
+      await triggerRefresh('seo-settings');
+      await fetchData(true);
+    } catch (err) {
+      console.error("Error in batch generation:", err);
+      toast({ title: "Batch Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+    } finally {
+      setBatchRunning(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setDeleteRunning(true);
+    setDeleteProgress(0);
+    setDeleteStatus("Initializing deletion...");
+
+    try {
+      const targetSettings = activeTab === "city-category" ? cityCategorySettings : areaCategorySettings;
+      const collectionRef = activeTab === "city-category" ? cityCatSeoRef : areaCatSeoRef;
+      const total = targetSettings.length;
+
+      if (total === 0) {
+        toast({ title: "No overrides", description: "There are no overrides to delete in this tab.", variant: "destructive" });
+        setDeleteRunning(false);
+        return;
+      }
+
+      for (let i = 0; i < total; i++) {
+        const setting = targetSettings[i];
+        setDeleteStatus(`Deleting override ${i + 1}/${total}: ${setting.cityName} ${setting.categoryName}`);
+        setDeleteProgress(Math.round(((i + 1) / total) * 100));
+
+        await deleteDoc(doc(collectionRef, setting.id!));
+      }
+
+      toast({
+        title: "All Overrides Deleted",
+        description: `Successfully deleted all ${total} overrides in the ${activeTab === 'city-category' ? 'City-Category' : 'Area-Category'} section.`,
+        className: "bg-green-100 border-green-300 text-green-700"
+      });
+
+      setIsDeleteAllOpen(false);
+      await triggerRefresh('seo-settings');
+      await fetchData(true);
+    } catch (err) {
+      console.error("Error deleting all overrides:", err);
+      toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+    } finally {
+      setDeleteRunning(false);
+    }
+  };
 
   const fetchData = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -324,9 +579,15 @@ export default function SeoOverridesPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>City-Category Specific Settings</CardTitle><CardDescription>Overrides for /[city]/category/[categorySlug] pages.</CardDescription></div>
-              <PermissionGuard moduleId="seo_overrides" action="create">
-                <Button onClick={() => handleAddSetting('cityCategory')} disabled={isSubmitting || cities.length === 0 || categories.length === 0}><PlusCircle className="mr-2 h-4 w-4"/>Add New</Button>
-              </PermissionGuard>
+              <div className="flex gap-2">
+                <PermissionGuard moduleId="seo_overrides" action="create">
+                  <Button variant="outline" onClick={() => { setFormType('cityCategory'); setIsBatchOpen(true); }} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
+                  {cityCategorySettings.length > 0 && (
+                    <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting}><Trash2 className="mr-2 h-4 w-4"/>Delete All</Button>
+                  )}
+                  <Button onClick={() => handleAddSetting('cityCategory')} disabled={isSubmitting || cities.length === 0 || categories.length === 0}><PlusCircle className="mr-2 h-4 w-4"/>Add New</Button>
+                </PermissionGuard>
+              </div>
             </CardHeader>
             <CardContent>
               {cityCategorySettings.length === 0 ? (
@@ -369,9 +630,15 @@ export default function SeoOverridesPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Area-Category Specific Settings</CardTitle><CardDescription>Overrides for /[city]/[area]/[categorySlug] pages.</CardDescription></div>
-              <PermissionGuard moduleId="seo_overrides" action="create">
-                <Button onClick={() => handleAddSetting('areaCategory')} disabled={isSubmitting || cities.length === 0 || areas.length === 0 || categories.length === 0}><PlusCircle className="mr-2 h-4 w-4"/>Add New</Button>
-              </PermissionGuard>
+              <div className="flex gap-2">
+                <PermissionGuard moduleId="seo_overrides" action="create">
+                  <Button variant="outline" onClick={() => { setFormType('areaCategory'); setIsBatchOpen(true); }} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
+                  {areaCategorySettings.length > 0 && (
+                    <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting}><Trash2 className="mr-2 h-4 w-4"/>Delete All</Button>
+                  )}
+                  <Button onClick={() => handleAddSetting('areaCategory')} disabled={isSubmitting || cities.length === 0 || areas.length === 0 || categories.length === 0}><PlusCircle className="mr-2 h-4 w-4"/>Add New</Button>
+                </PermissionGuard>
+              </div>
             </CardHeader>
             <CardContent>
             {areaCategorySettings.length === 0 ? (
@@ -443,6 +710,110 @@ export default function SeoOverridesPage() {
                 isSubmitting={isSubmitting}
               />
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBatchOpen} onOpenChange={(open) => { if (!batchRunning) setIsBatchOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle>Batch Generate Free SEO Overrides</DialogTitle>
+            <DialogDescription>
+              Automatically generate and save spinned local SEO copy for all selected combinations. This operates entirely client-side for free.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Target City</label>
+              <Select value={batchCityId} onValueChange={setBatchCityId} disabled={batchRunning}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select City" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cities</SelectItem>
+                  {cities.map(c => (
+                    <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Target Category</label>
+              <Select value={batchCategoryId} onValueChange={setBatchCategoryId} disabled={batchRunning}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="overwrite" 
+                checked={batchOverwrite} 
+                onCheckedChange={(checked) => setBatchOverwrite(!!checked)}
+                disabled={batchRunning}
+              />
+              <label htmlFor="overwrite" className="text-sm font-medium leading-none cursor-pointer">
+                Overwrite existing custom overrides
+              </label>
+            </div>
+
+            {batchRunning && (
+              <div className="space-y-2 pt-4">
+                <Progress value={batchProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground animate-pulse">{batchStatus}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsBatchOpen(false)} disabled={batchRunning}>
+              Cancel
+            </Button>
+            <Button onClick={handleStartBatch} disabled={batchRunning}>
+              {batchRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {batchRunning ? "Generating..." : "Start Batch Generation"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteAllOpen} onOpenChange={(open) => { if (!deleteRunning) setIsDeleteAllOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-6 w-6" /> Danger: Delete All Overrides?
+            </DialogTitle>
+            <DialogDescription>
+              Are you absolutely sure you want to delete **ALL** SEO overrides in the current **{activeTab === 'city-category' ? 'City-Category' : 'Area-Category'}** tab? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {deleteRunning && (
+              <div className="space-y-2 pt-2">
+                <Progress value={deleteProgress} className="w-full" />
+                <p className="text-xs text-muted-foreground animate-pulse">{deleteStatus}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsDeleteAllOpen(false)} disabled={deleteRunning}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAll} disabled={deleteRunning}>
+              {deleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteRunning ? "Deleting..." : "Yes, Delete All"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

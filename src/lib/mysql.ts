@@ -156,10 +156,10 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'areas':
-        await insert('edapally', 'kochi', { name: 'Edapally', slug: 'edapally', parentId: 'kochi', isActive: true });
-        await insert('kakkanad', 'kochi', { name: 'Kakkanad', slug: 'kakkanad', parentId: 'kochi', isActive: true });
-        await insert('electronic-city', 'bangalore', { name: 'Electronic City', slug: 'electronic-city', parentId: 'bangalore', isActive: true });
-        await insert('hsr-layout', 'bangalore', { name: 'HSR Layout', slug: 'hsr-layout', parentId: 'bangalore', isActive: true });
+        await insert('edapally', 'kochi', { name: 'Edapally', slug: 'edapally', parentId: 'kochi', cityId: 'kochi', isActive: true });
+        await insert('kakkanad', 'kochi', { name: 'Kakkanad', slug: 'kakkanad', parentId: 'kochi', cityId: 'kochi', isActive: true });
+        await insert('electronic-city', 'bangalore', { name: 'Electronic City', slug: 'electronic-city', parentId: 'bangalore', cityId: 'bangalore', isActive: true });
+        await insert('hsr-layout', 'bangalore', { name: 'HSR Layout', slug: 'hsr-layout', parentId: 'bangalore', cityId: 'bangalore', isActive: true });
         break;
 
       case 'adminCategories':
@@ -523,8 +523,11 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       // Translate filter to JSON path
       if (op === '==') {
         if (typeof value === 'boolean') {
-          whereClauses.push(`${jsonExtractText(field)} = ?`);
+          whereClauses.push(`(${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ? OR CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) = ?)`);
           params.push(value ? 'true' : 'false');
+          params.push(value ? '1' : '0');
+          params.push(value ? '1.0' : '0.0');
+          params.push(value ? 1 : 0);
         } else if (value === null) {
           whereClauses.push(`${jsonExtractText(field)} IS NULL`);
         } else {
