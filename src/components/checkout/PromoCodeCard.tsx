@@ -145,11 +145,11 @@ export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }
                 <CardTitle className="text-lg">Offers & Promo Code</CardTitle>
               </div>
               {appliedPromo ? (
-                <Button variant="ghost" size="sm" onClick={handleRemovePromo} className="text-destructive font-bold h-7 px-2 hover:bg-destructive/10">
+                <Button variant="outline" size="sm" onClick={handleRemovePromo} className="text-destructive border-destructive/20 hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive font-bold h-8 px-3 rounded-md">
                   Remove
                 </Button>
               ) : (
-                <Button variant="ghost" size="sm" className="text-primary font-bold h-7 px-2 hover:bg-primary/10">
+                <Button variant="outline" size="sm" className="text-primary border-primary/20 hover:border-primary/40 hover:bg-primary/5 hover:text-primary font-bold h-8 px-3 rounded-md">
                   Apply
                 </Button>
               )}

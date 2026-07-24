@@ -310,7 +310,7 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
   className={cn(
     "flex-grow",
     shouldShowBottomNav && "pb-16",
-    shouldShowHeader && "pt-[var(--header-height,50px)]"
+    shouldShowHeader && "pt-[var(--header-height,64px)]"
   )}
 >
 

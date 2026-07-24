@@ -215,7 +215,7 @@ export default function CheckoutPage() {
       <Breadcrumbs items={breadcrumbItems} className="mb-6" />
       <CheckoutStepper currentStepId="checkout" /> {/* We show checkout as the active step */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-6">
           {/* Schedule Section */}
           <div ref={scheduleSectionRef}>
@@ -225,7 +225,7 @@ export default function CheckoutPage() {
                   <CalendarDays className="h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">Schedule</CardTitle>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setIsScheduleModalOpen(true)} className="text-primary font-bold">
+                <Button variant="outline" size="sm" onClick={() => setIsScheduleModalOpen(true)} className="text-primary border-primary/20 hover:border-primary/40 hover:bg-primary/5 hover:text-primary font-bold h-8 px-3 rounded-md">
                   {scheduledDate ? "Change" : "Select"}
                 </Button>
               </CardHeader>
@@ -259,7 +259,7 @@ export default function CheckoutPage() {
                   <MapPin className="h-5 w-5 text-primary" />
                   <CardTitle className="text-lg">Address</CardTitle>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setIsAddressModalOpen(true)} className="text-primary font-bold">
+                <Button variant="outline" size="sm" onClick={() => setIsAddressModalOpen(true)} className="text-primary border-primary/20 hover:border-primary/40 hover:bg-primary/5 hover:text-primary font-bold h-8 px-3 rounded-md">
                   {selectedAddress ? "Change" : "Select"}
                 </Button>
               </CardHeader>
@@ -314,7 +314,7 @@ export default function CheckoutPage() {
         </div>
 
         {/* Order Summary Column */}
-        <div className="lg:col-span-2" ref={orderSummaryRef}>
+        <div className="lg:col-span-4" ref={orderSummaryRef}>
           <div className="sticky top-6 space-y-6">
             {/* Promo Code Section (Desktop Only) */}
             <div className="hidden lg:block">
