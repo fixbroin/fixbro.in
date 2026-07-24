@@ -358,6 +358,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
         discountAmount: summary.discountAmount,
         totalAmount: summary.grandTotal,
         status: data.status as BookingStatus,
+        isReviewedByCustomer: (data.status === 'Completed' && booking.status !== 'Completed') ? false : booking.isReviewedByCustomer,
         latitude: data.latitude === null ? undefined : data.latitude,
         longitude: data.longitude === null ? undefined : data.longitude,
         updatedAt: Timestamp.now(),

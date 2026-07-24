@@ -262,6 +262,10 @@ export async function addDoc(collectionRef: CollectionReference, data: any) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'addDoc', path: collectionRef.path, data: cleanData })
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`addDoc failed: ${errText || res.statusText}`);
+  }
   const result = await res.json();
   return {
     id: result.id,
@@ -274,11 +278,15 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await fetch(getApiUrl('/api/db/mutate'), {
+  const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'setDoc', path: collectionPath, id: docId, data: cleanData, options })
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`setDoc failed: ${errText || res.statusText}`);
+  }
   return { success: true };
 }
 
@@ -287,20 +295,28 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await fetch(getApiUrl('/api/db/mutate'), {
+  const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'updateDoc', path: collectionPath, id: docId, data: cleanData })
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`updateDoc failed: ${errText || res.statusText}`);
+  }
   return { success: true };
 }
 
 export async function deleteDoc(docRef: DocumentReference) {
-  await fetch(getApiUrl('/api/db/mutate'), {
+  const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'deleteDoc', path: docRef.path })
   });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`deleteDoc failed: ${errText || res.statusText}`);
+  }
   return { success: true };
 }
 
@@ -328,11 +344,15 @@ export function writeBatch(dbInstance: any) {
       operations.push({ action: 'deleteDoc', collection: collectionPath, id: docId });
     },
     commit: async () => {
-      await fetch(getApiUrl('/api/db/batch'), {
+      const res = await fetch(getApiUrl('/api/db/batch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operations })
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Batch commit failed: ${errText || res.statusText}`);
+      }
     }
   };
 }

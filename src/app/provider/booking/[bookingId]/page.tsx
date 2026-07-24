@@ -110,15 +110,19 @@ export default function ProviderBookingDetailsPage() {
       const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
       
       let updatedTotal = booking.totalAmount;
-      if (newStatus === "Completed" && additionalCharges && additionalCharges.length > 0) {
-        updateData.additionalCharges = additionalCharges;
-        const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
-        updatedTotal = (booking.totalAmount || 0) + extraTotal;
-        updateData.totalAmount = updatedTotal;
-      }
-
-      if (newStatus === "Completed" && finalizedPaymentMethod) {
-        updateData.paymentMethod = finalizedPaymentMethod;
+      if (newStatus === "Completed") {
+        if (booking.status !== "Completed") {
+          updateData.isReviewedByCustomer = false;
+        }
+        if (additionalCharges && additionalCharges.length > 0) {
+          updateData.additionalCharges = additionalCharges;
+          const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
+          updatedTotal = (booking.totalAmount || 0) + extraTotal;
+          updateData.totalAmount = updatedTotal;
+        }
+        if (finalizedPaymentMethod) {
+          updateData.paymentMethod = finalizedPaymentMethod;
+        }
       }
 
       await updateDoc(bookingDocRef, updateData);

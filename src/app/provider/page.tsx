@@ -244,10 +244,13 @@ export default function ProviderDashboardPage() {
       const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
       
       if (newStatus === "Completed") {
+        const job = bookings.find(b => b.id === bookingId);
+        if (job && job.status !== "Completed") {
+          updateData.isReviewedByCustomer = false;
+        }
         if (additionalCharges && additionalCharges.length > 0) {
             updateData.additionalCharges = additionalCharges;
-            const job = bookings.find(b => b.id === bookingId);
-            updateData.totalAmount = (job?.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + c.amount, 0);
+            updateData.totalAmount = ((job?.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + c.amount, 0));
         }
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }

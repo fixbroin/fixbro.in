@@ -397,6 +397,9 @@ export default function AdminBookingsPage() {
         updateData.isProviderNotified = false; // Force re-notification
       }
       if (newStatus === "Completed") {
+        if (booking.status !== "Completed") {
+          updateData.isReviewedByCustomer = false;
+        }
         if (additionalCharges && additionalCharges.length > 0) {
             updateData.additionalCharges = additionalCharges;
             const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);

@@ -562,11 +562,10 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       // Translate filter to JSON path
       if (op === '==') {
         if (typeof value === 'boolean') {
-          whereClauses.push(`(${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ? OR CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) = ?)`);
+          whereClauses.push(`(${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ? OR ${jsonExtractText(field)} = ?)`);
           params.push(value ? 'true' : 'false');
           params.push(value ? '1' : '0');
           params.push(value ? '1.0' : '0.0');
-          params.push(value ? 1 : 0);
         } else if (value === null) {
           whereClauses.push(`${jsonExtractText(field)} IS NULL`);
         } else {
