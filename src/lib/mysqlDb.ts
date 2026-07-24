@@ -240,12 +240,29 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
     console.error("getDocs API fetch error:", e);
   }
   
-  const docs: QueryDocumentSnapshot[] = rawDocs.map((docItem: any) => ({
-    id: docItem.id,
-    data: () => deserializeClientData(docItem.data),
-    exists: () => true,
-    ref: { path: `${queryRef.path}/${docItem.id}`, id: docItem.id }
-  }));
+  const docs: QueryDocumentSnapshot[] = rawDocs.map((docItem: any) => {
+    const dataObj = docItem.data || {};
+    const updatedAt = dataObj.updatedAt;
+    let millis = 0;
+    if (updatedAt) {
+      const sec = typeof updatedAt._seconds === 'number' ? updatedAt._seconds : (typeof updatedAt.seconds === 'number' ? updatedAt.seconds : 0);
+      if (sec) {
+        millis = sec * 1000;
+      } else {
+        const d = new Date(updatedAt);
+        if (!isNaN(d.getTime())) millis = d.getTime();
+      }
+    }
+    return {
+      id: docItem.id,
+      data: () => deserializeClientData(docItem.data),
+      exists: () => true,
+      ref: { path: `${queryRef.path}/${docItem.id}`, id: docItem.id },
+      updateTime: {
+        toMillis: () => millis
+      }
+    };
+  });
 
   return {
     docs,

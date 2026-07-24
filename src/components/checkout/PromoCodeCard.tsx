@@ -139,30 +139,43 @@ export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogTrigger asChild>
           <Card className="overflow-hidden border-none shadow-md cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-lg">
-                  <TicketPercent className="h-5 w-5 text-primary" />
+            <CardHeader className="bg-muted/30 py-4 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TicketPercent className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">Offers & Promo Code</CardTitle>
+              </div>
+              {appliedPromo ? (
+                <Button variant="ghost" size="sm" onClick={handleRemovePromo} className="text-destructive font-bold h-7 px-2 hover:bg-destructive/10">
+                  Remove
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" className="text-primary font-bold h-7 px-2 hover:bg-primary/10">
+                  Apply
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-primary/10 p-3 rounded-full">
+                  <TicketPercent className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <p className="font-bold text-sm">Offers & Promo Code</p>
                   {appliedPromo ? (
-                    <p className="text-xs text-green-600 font-bold">Code "{appliedPromo.code}" Applied</p>
+                    <>
+                      <p className="font-bold text-green-600">Code "{appliedPromo.code}" Applied</p>
+                      <p className="text-sm text-muted-foreground">
+                        Saved {appliedPromo.discountType === 'percentage' ? `${appliedPromo.discountValue}%` : `₹${appliedPromo.discountValue}`}
+                      </p>
+                    </>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Apply coupon to save more</p>
+                    <>
+                      <p className="font-bold">Apply coupon to save more</p>
+                      <p className="text-sm text-muted-foreground">Select from available offers</p>
+                    </>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {appliedPromo ? (
-                   <Button variant="ghost" size="sm" onClick={handleRemovePromo} className="text-destructive text-xs font-bold h-7 px-2">
-                     REMOVE
-                   </Button>
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                )}
-              </div>
-            </div>
+            </CardContent>
           </Card>
         </DialogTrigger>
         

@@ -153,12 +153,29 @@ class MySQLAdminQueryBuilder {
     const pool = await getPool();
     const rawDocs = await getDocsInternal(pool, this.path, this.constraints);
     
-    const docs: MySQLAdminDocSnapshot[] = rawDocs.map((docItem: any) => ({
-      id: docItem.id,
-      data: () => deserializeAdminData(docItem.data),
-      exists: true,
-      ref: new MySQLAdminDocReference(`${this.path}/${docItem.id}`, docItem.id)
-    }));
+    const docs: MySQLAdminDocSnapshot[] = rawDocs.map((docItem: any) => {
+      const dataObj = docItem.data || {};
+      const updatedAt = dataObj.updatedAt;
+      let millis = 0;
+      if (updatedAt) {
+        const sec = typeof updatedAt._seconds === 'number' ? updatedAt._seconds : (typeof updatedAt.seconds === 'number' ? updatedAt.seconds : 0);
+        if (sec) {
+          millis = sec * 1000;
+        } else {
+          const d = new Date(updatedAt);
+          if (!isNaN(d.getTime())) millis = d.getTime();
+        }
+      }
+      return {
+        id: docItem.id,
+        data: () => deserializeAdminData(docItem.data),
+        exists: true,
+        ref: new MySQLAdminDocReference(`${this.path}/${docItem.id}`, docItem.id),
+        updateTime: {
+          toMillis: () => millis
+        }
+      };
+    });
 
     return {
       docs,

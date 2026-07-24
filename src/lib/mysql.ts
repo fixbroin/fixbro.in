@@ -51,7 +51,8 @@ const TABLES = [
   'areas',
   'searchAnalytics',
   'leaves',
-  'seoSettings'
+  'seoSettings',
+  'outofZoneRequests'
 ];
 
 /**
@@ -787,6 +788,7 @@ function extractDate(val: any): Date | null {
 
 export async function addDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, data: any) {
   const resolved = resolvePath(path);
+  await ensureTableExists(conn, resolved.table);
   // Generate random id if not in data, or use existing
   const docId = data.id || data.uid || require('nanoid').nanoid(20);
   const resolvedData = resolveFieldValues(null, data);
@@ -817,6 +819,7 @@ export async function addDocInternal(conn: mysql.PoolConnection | mysql.Pool, pa
 
 export async function setDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput: string, data: any, options: any = {}) {
   const resolved = resolvePath(`${path}/${docIdInput}`);
+  await ensureTableExists(conn, resolved.table);
   const resolvedData = resolveFieldValues(null, data);
   const cleanData = serializeDbData(resolvedData);
 

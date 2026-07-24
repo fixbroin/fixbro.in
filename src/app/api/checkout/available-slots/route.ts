@@ -436,7 +436,9 @@ export async function POST(req: NextRequest) {
                 .get()
         ]);
 
-        const existingBookings = bookingsSnap.docs.map(doc => doc.data() as FirestoreBooking);
+        const existingBookings = bookingsSnap.docs
+            .map(doc => doc.data() as FirestoreBooking)
+            .filter(b => b.status !== "Cancelled" && b.status !== "Completed");
         const leavesData = leavesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
 
         // Collect all unique service IDs from cart AND active bookings in target range

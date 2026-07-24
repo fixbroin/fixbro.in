@@ -16,7 +16,7 @@ export default function CheckoutLayout({ children }: CheckoutLayoutProps) {
           </div>
         </div>
       </header>
-      <main className="flex-grow container mx-auto px-2 py-8">
+      <main className="flex-grow container mx-auto px-2 py-4">
         {children}
       </main>
       <footer className="py-4 text-center text-sm text-muted-foreground">
