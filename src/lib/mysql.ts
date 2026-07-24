@@ -764,7 +764,7 @@ export async function addDocInternal(conn: mysql.PoolConnection | mysql.Pool, pa
     );
   } else if (createdAtDate) {
     await conn.query(
-      `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`) VALUES (?, ?, ?, ?)`,
       [docId, resolved.parentId, JSON.stringify(cleanData), createdAtDate]
     );
   } else {
