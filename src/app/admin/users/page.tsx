@@ -75,6 +75,7 @@ export default function AdminUsersPage() {
   const { stats } = useAdminStats();
   const { adminPermissions } = useAuth();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
+  const [displayLimit, setDisplayLimit] = useState(50);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -122,6 +123,7 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
+    setDisplayLimit(50);
     if (searchTerm.trim().length > 0) {
       const delayDebounceFn = setTimeout(async () => {
         setIsLoading(true);
@@ -541,7 +543,7 @@ export default function AdminUsersPage() {
                   </TableHeader>
                   <TableBody>
                     <AnimatePresence initial={false}>
-                      {filteredUsers.map((user, idx) => (
+                      {filteredUsers.slice(0, displayLimit).map((user, idx) => (
                         <motion.tr key={user.id} initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: idx < 15 ? idx * 0.03 : 0 }} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
                           <TableCell className="pl-8">
                             <div className="bg-primary/5 text-primary font-black text-xs h-9 w-9 rounded-xl flex items-center justify-center border border-primary/10 shadow-sm">
@@ -612,22 +614,23 @@ export default function AdminUsersPage() {
               </div>
               <div className="md:hidden">
                 <AnimatePresence initial={false}>
-                  {filteredUsers.map((user, idx) => renderUserCard(user, idx))}
+                  {filteredUsers.slice(0, displayLimit).map((user, idx) => renderUserCard(user, idx))}
                 </AnimatePresence>
               </div>
 
-              {hasMore && !searchTerm && (
-                <div className="p-8 text-center border-t border-muted/40">
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    onClick={loadMoreUsers} 
-                    disabled={isLoadingMore} 
-                    className="min-w-[200px] rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm font-black uppercase text-xs tracking-widest h-12"
-                  >
-                    {isLoadingMore ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ChevronDown className="h-5 w-5 mr-2" />}
-                    Load More Users
-                  </Button>
+              {filteredUsers.length > displayLimit && (
+                <div className="p-8 text-center border-t border-muted/40 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+                  <div>
+                    Showing first {Math.min(displayLimit, filteredUsers.length)} of {filteredUsers.length} users.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 50)}>
+                      Load More (+50)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredUsers.length)}>
+                      Load All ({filteredUsers.length})
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

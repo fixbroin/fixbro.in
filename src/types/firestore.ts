@@ -1165,6 +1165,7 @@ export interface FirestoreQuotation {
   taxAmount?: number; // Calculated: subtotal * (taxPercent / 100)
   totalAmount: number; // Calculated: subtotal + taxAmount
   status: QuotationStatus;
+  pdfUrl?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -1205,6 +1206,7 @@ export interface FirestoreInvoice {
   paymentMode?: InvoicePaymentMode | null; // Allow null
   paymentNotes?: string; // e.g., transaction ID if paid
   additionalNotes?: string; // General notes for the invoice
+  pdfUrl?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }

@@ -265,9 +265,9 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
       const storagePath = `quotations_pdf/${currentInitialData.id}_${savedQuotation.quotationNumber}.pdf`;
       const downloadUrl = await uploadPdfToStorage(pdfBlob, storagePath);
       
-      await updateDoc(doc(db, "quotations", currentInitialData.id), { status: 'Sent', updatedAt: Timestamp.now() });
+      await updateDoc(doc(db, "quotations", currentInitialData.id), { status: 'Sent', pdfUrl: downloadUrl, updatedAt: Timestamp.now() });
       form.setValue('status', 'Sent'); 
-      if (onSaveSuccess) onSaveSuccess({ ...savedQuotation, status: 'Sent', updatedAt: Timestamp.now() });
+      if (onSaveSuccess) onSaveSuccess({ ...savedQuotation, status: 'Sent', pdfUrl: downloadUrl, updatedAt: Timestamp.now() });
 
       toast({
         duration: 10000,

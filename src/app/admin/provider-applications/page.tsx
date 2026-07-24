@@ -80,10 +80,14 @@ export default function AdminProviderApplicationsPage() {
 
 
   const filteredApplications = useMemo(() => {
-    if (filterStatus === "all") {
-      return applications;
-    }
-    return applications.filter(app => app.status === filterStatus);
+    const base = filterStatus === "all" ? applications : applications.filter(app => app.status === filterStatus);
+    
+    // Sort by createdAt descending (using parsed JSON timestamp)
+    return [...base].sort((a, b) => {
+      const aTime = getTimestampMillis(a.createdAt);
+      const bTime = getTimestampMillis(b.createdAt);
+      return bTime - aTime;
+    });
   }, [applications, filterStatus]);
 
   const handleUpdateStatus = async (applicationId: string, newStatus: ProviderApplicationStatus, notes?: string) => {

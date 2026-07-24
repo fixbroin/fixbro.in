@@ -289,6 +289,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
 
       const storagePath = `invoices_pdf/${currentInitialData.id}_${savedInvoice.invoiceNumber}.pdf`;
       const downloadUrl = await uploadPdfToStorage(pdfBlob, storagePath);
+      await updateDoc(doc(db, "invoices", currentInitialData.id), { pdfUrl: downloadUrl, updatedAt: Timestamp.now() });
       
       toast({
         duration: 10000,

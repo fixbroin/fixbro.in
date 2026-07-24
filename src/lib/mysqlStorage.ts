@@ -24,12 +24,16 @@ export function ref(storageInstance: any, path: string) {
  * e.g., "public/uploads/categories/filename.png" -> "categories"
  */
 function getUploadPath(refPath: string): string {
+  if (refPath.includes('pdf') || refPath.endsWith('.pdf')) {
+    return 'pdf';
+  }
   const match = refPath.match(/uploads\/([^/]+)/);
   return match ? match[1] : 'general';
 }
 
 export function uploadBytesResumable(refInstance: MySQLStorageRef, file: File | Blob) {
   const uploadPath = getUploadPath(refInstance.path);
+  const filename = refInstance.path.split('/').pop() || 'file';
   
   // Custom mock UploadTask object
   let progressCallback: any = null;
@@ -56,7 +60,7 @@ export function uploadBytesResumable(refInstance: MySQLStorageRef, file: File | 
           if (progressCallback) progressCallback({ bytesTransferred: 20, totalBytes: 100 });
 
           const formData = new FormData();
-          formData.append('file', file);
+          formData.append('file', file, filename);
           formData.append('uploadPath', uploadPath);
 
           const res = await fetch('/api/upload', {
@@ -86,8 +90,9 @@ export function uploadBytesResumable(refInstance: MySQLStorageRef, file: File | 
 
 export async function uploadBytes(refInstance: MySQLStorageRef, file: File | Blob, metadata: any = {}) {
   const uploadPath = getUploadPath(refInstance.path);
+  const filename = refInstance.path.split('/').pop() || 'file';
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, filename);
   formData.append('uploadPath', uploadPath);
 
   const res = await fetch('/api/upload', {

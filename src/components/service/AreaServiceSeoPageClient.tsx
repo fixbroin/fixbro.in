@@ -62,7 +62,7 @@ export default function AreaServiceSeoPageClient({
           <CardContent className="p-0">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
               {/* Left Column: Details */}
-              <div className="p-3 md:p-10 lg:col-span-7 flex flex-col justify-between">
+              <div className="p-3 md:p-10 lg:col-span-7 flex flex-col justify-between order-2 lg:order-1">
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary mb-4">
                     <Sparkles className="h-3.5 w-3.5" />
@@ -143,7 +143,7 @@ export default function AreaServiceSeoPageClient({
               </div>
 
               {/* Right Column: Image Banner */}
-              <div className="relative min-h-[300px] lg:col-span-5 bg-slate-900 overflow-hidden">
+              <div className="relative min-h-[300px] lg:col-span-5 bg-slate-900 overflow-hidden order-1 lg:order-2">
                 <AppImage
                   src={serviceData.imageUrl || "/default-image.png"}
                   alt={h1Title}

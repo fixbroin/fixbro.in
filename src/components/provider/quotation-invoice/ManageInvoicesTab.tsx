@@ -21,6 +21,7 @@ import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdf
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { getTimestampMillis } from '@/lib/utils';
+import { deleteObject } from '@/lib/mysqlStorage';
 
 interface ManageInvoicesTabProps {
   onEditInvoice: (invoice: FirestoreInvoice) => void;
@@ -39,6 +40,20 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
   const { toast } = useToast();
   const { user: providerUser } = useAuth();
   const { settings: companySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
+  const [allowDelete, setAllowDelete] = useState(true);
+
+  useEffect(() => {
+    const settingsRef = doc(db, "webSettings", "quotationInvoiceSettings");
+    const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAllowDelete(data.allowProviderDelete !== false);
+      } else {
+        setAllowDelete(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!providerUser) {
@@ -71,6 +86,15 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
     if (!invoiceId) return;
     setIsUpdating(invoiceId);
     try {
+      const invoice = invoices.find(i => i.id === invoiceId);
+      if (invoice) {
+        try {
+          const deletePath = invoice.pdfUrl || `/uploads/pdf/${invoice.id}_${invoice.invoiceNumber}.pdf`;
+          await deleteObject(deletePath);
+        } catch (storageErr) {
+          console.warn("Storage deletion warning for invoice PDF:", storageErr);
+        }
+      }
       await deleteDoc(doc(db, "invoices", invoiceId));
       toast({ title: "Success", description: "Invoice deleted successfully." });
     } catch (error) {
@@ -113,6 +137,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
 
       const storagePath = `invoices_pdf/${invoice.id}_${invoice.invoiceNumber}.pdf`;
       const downloadUrl = await uploadPdfToStorage(pdfBlob, storagePath);
+      await updateDoc(doc(db, "invoices", invoice.id), { pdfUrl: downloadUrl, updatedAt: Timestamp.now() });
       
       toast({
         duration: 10000,
@@ -216,6 +241,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
                 <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => handleDownloadPdf(invoice)} disabled={isUpdating === invoice.id || isSending === invoice.id || isDownloading === invoice.id}>
                   {isDownloading === invoice.id ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/> : <Download className="mr-1 h-3.5 w-3.5"/>} PDF
                 </Button>
+                {allowDelete && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="text-xs h-8" disabled={isUpdating === invoice.id || isSending === invoice.id || isDownloading === invoice.id}>
@@ -233,6 +259,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                )}
             </div>
         </CardContent>
     </Card>
@@ -286,23 +313,25 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
                         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleDownloadPdf(invoice)} disabled={isUpdating === invoice.id || isSending === invoice.id || isDownloading === invoice.id} title="Download PDF">
                           {isDownloading === invoice.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
                         </Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" className="h-8 w-8" disabled={isUpdating === invoice.id || isSending === invoice.id || isDownloading === invoice.id} title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                                <AlertDialogDescription>Delete invoice {invoice.invoiceNumber} for {invoice.customerName}?</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id!)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        {allowDelete && (
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" className="h-8 w-8" disabled={isUpdating === invoice.id || isSending === invoice.id || isDownloading === invoice.id} title="Delete">
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                              <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+                                  <AlertDialogDescription>Delete invoice {invoice.invoiceNumber} for {invoice.customerName}?</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id!)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                 </TableRow>

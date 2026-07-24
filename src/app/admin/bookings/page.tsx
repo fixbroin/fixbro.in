@@ -144,6 +144,7 @@ export default function AdminBookingsPage() {
   const { stats } = useAdminStats();
   const { adminPermissions } = useAuth();
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
+  const [displayLimit, setDisplayLimit] = useState(50);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -231,6 +232,7 @@ export default function AdminBookingsPage() {
   };
 
   useEffect(() => {
+    setDisplayLimit(50);
     if (searchTerm.trim().length > 0) {
       const delayDebounceFn = setTimeout(async () => {
         setIsLoading(true);
@@ -739,7 +741,7 @@ export default function AdminBookingsPage() {
             <><div className="hidden md:block">
                 <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {filteredBookings.map((b, index) => {
+                  {filteredBookings.slice(0, displayLimit).map((b, index) => {
                     return (
                       <React.Fragment key={b.id}>
                         <TableRow className="hover:bg-transparent border-b-0">
@@ -783,7 +785,7 @@ export default function AdminBookingsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                        <TableRow className="bg-muted/5 border-b-2">
+                        <TableRow className="hover:bg-transparent border-t-0">
                           <TableCell colSpan={7} className="py-3 px-4">
                             <div className="flex flex-wrap items-center gap-3">
                               <PermissionGuard moduleId="bookings" action="write" fallback={
@@ -839,20 +841,21 @@ export default function AdminBookingsPage() {
                 </TableBody></Table>
                 </div>
                 <div className="md:hidden p-4 space-y-4">
-                {filteredBookings.map((b) => renderBookingCard(b))}
+                {filteredBookings.slice(0, displayLimit).map((b) => renderBookingCard(b))}
               </div>
-              {hasMore && !searchTerm && (
-                <div className="p-8 text-center border-t border-muted/40">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={loadMoreBookings}
-                    disabled={isLoadingMore}
-                    className="min-w-[200px] rounded-2xl border-2 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm font-black uppercase text-xs tracking-widest h-12"
-                  >
-                    {isLoadingMore ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ChevronDown className="h-5 w-5 mr-2" />}
-                    Load More Bookings
-                  </Button>
+              {filteredBookings.length > displayLimit && (
+                <div className="p-8 text-center border-t border-muted/40 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+                  <div>
+                    Showing first {Math.min(displayLimit, filteredBookings.length)} of {filteredBookings.length} bookings.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit((prev: number) => prev + 50)}>
+                      Load More (+50)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredBookings.length)}>
+                      Load All ({filteredBookings.length})
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

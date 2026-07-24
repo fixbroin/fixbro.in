@@ -20,6 +20,7 @@ import { generateInvoicePdf } from '@/lib/sriinvoiceGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { getTimestampMillis } from '@/lib/utils';
+import { deleteObject } from '@/lib/mysqlStorage';
 
 interface ManageInvoicesTabProps {
   onEditInvoice: (invoice: FirestoreInvoice) => void;
@@ -63,6 +64,15 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
     if (!invoiceId) return;
     setIsUpdating(invoiceId);
     try {
+      const invoice = invoices.find(i => i.id === invoiceId);
+      if (invoice) {
+        try {
+          const deletePath = invoice.pdfUrl || `/uploads/pdf/${invoice.id}_${invoice.invoiceNumber}.pdf`;
+          await deleteObject(deletePath);
+        } catch (storageErr) {
+          console.warn("Storage deletion warning for invoice PDF:", storageErr);
+        }
+      }
       await deleteDoc(doc(db, "invoices", invoiceId));
       toast({ title: "Success", description: "Invoice deleted successfully." });
     } catch (error) {
@@ -105,6 +115,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
 
       const storagePath = `invoices_pdf/${invoice.id}_${invoice.invoiceNumber}.pdf`;
       const downloadUrl = await uploadPdfToStorage(pdfBlob, storagePath);
+      await updateDoc(doc(db, "invoices", invoice.id), { pdfUrl: downloadUrl, updatedAt: Timestamp.now() });
       
       toast({
         duration: 10000,

@@ -582,6 +582,17 @@ export const getFaqsServer = cache(async (): Promise<any[]> => {
   )();
 });
 
+const getTimestampString = (timestamp: any): string => {
+  if (!timestamp) return new Date().toISOString();
+  if (typeof timestamp === 'string') return timestamp;
+  if (typeof timestamp === 'number') return new Date(timestamp).toISOString();
+  if (timestamp._seconds !== undefined) return new Date(timestamp._seconds * 1000).toISOString();
+  if (timestamp.seconds !== undefined) return new Date(timestamp.seconds * 1000).toISOString();
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') return timestamp.toDate().toISOString();
+  const date = new Date(timestamp);
+  return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+};
+
 /**
  * Fetches published blog posts from Firestore with caching.
  */
@@ -596,8 +607,8 @@ export const getPublishedPostsServer = cache(async (): Promise<any[]> => {
             return {
               ...data,
               id: doc.id,
-              createdAt: data.createdAt ? (typeof data.createdAt === 'string' ? data.createdAt : new Date().toISOString()) : new Date().toISOString(),
-              updatedAt: data.updatedAt ? (typeof data.updatedAt === 'string' ? data.updatedAt : undefined) : undefined,
+              createdAt: getTimestampString(data.createdAt),
+              updatedAt: data.updatedAt ? getTimestampString(data.updatedAt) : undefined,
             };
           })
           .filter(post => post.isPublished === true)

@@ -25,7 +25,7 @@ const Testimonials = () => {
   }));
 
   useEffect(() => {
-    const cachedReviews = getCache<FirestoreReview[]>('home_testimonials', true);
+    const cachedReviews = getCache<FirestoreReview[]>('home_testimonials', false);
     if (cachedReviews && cachedReviews.length > 0) {
       setTestimonials(cachedReviews);
       setIsLoading(false);
@@ -60,7 +60,7 @@ const Testimonials = () => {
         }
 
         setTestimonials(uniqueReviews);
-        setCache('home_testimonials', uniqueReviews, true);
+        setCache('home_testimonials', uniqueReviews, false);
 
       } catch (error) {
         console.error("Error fetching testimonials:", error);
