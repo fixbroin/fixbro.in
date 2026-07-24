@@ -42,7 +42,10 @@ export async function sendNewProviderApplicationAdminEmail(input: NewProviderApp
 }
 
 const createHtmlTemplate = (title: string, bodyContent: string, siteName: string, logoUrl?: string) => {
-    const finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
+    let finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
+    if (finalLogoUrl.startsWith('/')) {
+        finalLogoUrl = getBaseUrl() + finalLogoUrl;
+    }
     return `
 <!DOCTYPE html>
 <html lang="en">

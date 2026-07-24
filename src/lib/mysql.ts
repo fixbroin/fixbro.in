@@ -519,7 +519,46 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
         }
         return;
       }
-
+      // Handle date filters (createdAt/updatedAt) on actual table columns
+      if (field === 'createdAt' || field === 'updatedAt') {
+        const sqlField = `\`${field}\``;
+        const dateValue = extractDate(c.value);
+        
+        if (op === '==') {
+          if (dateValue === null) {
+            whereClauses.push(`${sqlField} IS NULL`);
+          } else {
+            whereClauses.push(`${sqlField} = ?`);
+            params.push(dateValue);
+          }
+        } else if (op === '!=') {
+          if (dateValue === null) {
+            whereClauses.push(`${sqlField} IS NOT NULL`);
+          } else {
+            whereClauses.push(`${sqlField} != ?`);
+            params.push(dateValue);
+          }
+        } else if (op === '<') {
+          whereClauses.push(`${sqlField} < ?`);
+          params.push(dateValue);
+        } else if (op === '<=') {
+          whereClauses.push(`${sqlField} <= ?`);
+          params.push(dateValue);
+        } else if (op === '>') {
+          whereClauses.push(`${sqlField} > ?`);
+          params.push(dateValue);
+        } else if (op === '>=') {
+          whereClauses.push(`${sqlField} >= ?`);
+          params.push(dateValue);
+        } else if (op === 'in') {
+          const list = (Array.isArray(value) ? value : [value]).map(v => extractDate(v)).filter(Boolean);
+          if (list.length > 0) {
+            whereClauses.push(`${sqlField} IN (${list.map(() => '?').join(', ')})`);
+            params.push(...list);
+          }
+        }
+        return;
+      }
       // Translate filter to JSON path
       if (op === '==') {
         if (typeof value === 'boolean') {

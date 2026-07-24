@@ -80,7 +80,10 @@ export async function sendBookingConfirmationEmail(input: BookingConfirmationEma
 }
 
 const createHtmlTemplate = (title: string, bodyContent: string, siteName: string, logoUrl?: string) => {
-    const finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
+    let finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
+    if (finalLogoUrl.startsWith('/')) {
+        finalLogoUrl = getBaseUrl() + finalLogoUrl;
+    }
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -202,10 +205,14 @@ const bookingEmailFlow = ai.defineFlow(
           ${bookingDetails.services.map(s => {
             const itemTotal = (typeof s.total === 'number') ? s.total : (s.pricePerUnit * s.quantity);
             const avgPrice = s.quantity > 0 ? itemTotal / s.quantity : 0;
+            let absoluteImgUrl = s.imageUrl || '/default-image.png';
+            if (absoluteImgUrl.startsWith('/')) {
+              absoluteImgUrl = getBaseUrl() + absoluteImgUrl;
+            }
             return `
             <tr class="service-row">
               <td class="service-img-cell">
-                <img src="${s.imageUrl || (getBaseUrl() + '/default-image.png')}" alt="${s.name}">
+                <img src="${absoluteImgUrl}" alt="${s.name}">
               </td>
               <td class="service-info-cell">
                 <div class="service-name">${s.name} (x${s.quantity})</div>
