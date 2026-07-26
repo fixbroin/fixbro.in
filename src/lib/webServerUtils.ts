@@ -378,83 +378,65 @@ export const getAreas = cache(async (): Promise<FirestoreArea[]> => {
  * Fetches all City-Category SEO settings with caching.
  */
 export const getCityCategorySeoSettings = cache(async (): Promise<CityCategorySeoSetting[]> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const snapshot = await adminDb.collection("cityCategorySeoSettings").orderBy("cityName").orderBy("categoryName").get();
-        return snapshot.docs.map(doc => {
-          const data = serializeFirestoreData(doc.data()) as any;
-          delete data.seo_content;
-          delete data.faqs;
-          return { ...data, id: doc.id } as CityCategorySeoSetting;
-        });
-      } catch (error) {
-        console.error("Error fetching city-category SEO settings:", error);
-        return [];
-      }
-    },
-    ['city-category-seo-list-v2'],
-    { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
-  )();
+  try {
+    const snapshot = await adminDb.collection("cityCategorySeoSettings").orderBy("cityName").orderBy("categoryName").get();
+    return snapshot.docs.map(doc => {
+      const data = serializeFirestoreData(doc.data()) as any;
+      delete data.seo_content;
+      delete data.faqs;
+      return { ...data, id: doc.id } as CityCategorySeoSetting;
+    });
+  } catch (error) {
+    console.error("Error fetching city-category SEO settings:", error);
+    return [];
+  }
 });
 
 /**
  * Fetches all Area-Category SEO settings with caching.
  */
 export const getAreaCategorySeoSettings = cache(async (): Promise<AreaCategorySeoSetting[]> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const snapshot = await adminDb.collection("areaCategorySeoSettings").orderBy("cityName").orderBy("areaName").orderBy("categoryName").get();
-        return snapshot.docs.map(doc => {
-          const data = serializeFirestoreData(doc.data()) as any;
-          delete data.seo_content;
-          delete data.faqs;
-          return { ...data, id: doc.id } as AreaCategorySeoSetting;
-        });
-      } catch (error) {
-        console.error("Error fetching area-category SEO settings:", error);
-        return [];
-      }
-    },
-    ['area-category-seo-list-v2'],
-    { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
-  )();
+  try {
+    const snapshot = await adminDb.collection("areaCategorySeoSettings").orderBy("cityName").orderBy("areaName").orderBy("categoryName").get();
+    return snapshot.docs.map(doc => {
+      const data = serializeFirestoreData(doc.data()) as any;
+      delete data.seo_content;
+      delete data.faqs;
+      return { ...data, id: doc.id } as AreaCategorySeoSetting;
+    });
+  } catch (error) {
+    console.error("Error fetching area-category SEO settings:", error);
+    return [];
+  }
 });
 
 /**
  * Fetches all Area-Service SEO settings with caching.
  */
 export const getAreaServiceSeoSettings = cache(async (): Promise<AreaServiceSeoSetting[]> => {
-  return unstable_cache(
-    async () => {
-      try {
-        const snapshot = await adminDb.collection("areaServiceSeoSettings").get();
-        const settings = snapshot.docs.map(doc => {
-          const data = serializeFirestoreData(doc.data()) as any;
-          delete data.seo_content;
-          delete data.faqs;
-          return { ...data, id: doc.id } as AreaServiceSeoSetting;
-        });
-        
-        // Sort in memory to avoid requiring a Firestore composite index
-        settings.sort((a, b) => {
-          const cityComp = (a.cityName || '').localeCompare(b.cityName || '');
-          if (cityComp !== 0) return cityComp;
-          const areaComp = (a.areaName || '').localeCompare(b.areaName || '');
-          if (areaComp !== 0) return areaComp;
-          return (a.serviceName || '').localeCompare(b.serviceName || '');
-        });
-        
-        return settings;
-      } catch (error) {
-        console.error("Error fetching area-service SEO settings:", error);
-        return [];
-      }
-    },
-    ['area-service-seo-list-v2'],
-    { revalidate: 86400, tags: ['seo-settings', 'global-cache'] }
-  )();
+  try {
+    const snapshot = await adminDb.collection("areaServiceSeoSettings").get();
+    const settings = snapshot.docs.map(doc => {
+      const data = serializeFirestoreData(doc.data()) as any;
+      delete data.seo_content;
+      delete data.faqs;
+      return { ...data, id: doc.id } as AreaServiceSeoSetting;
+    });
+    
+    // Sort in memory to avoid requiring a Firestore composite index
+    settings.sort((a, b) => {
+      const cityComp = (a.cityName || '').localeCompare(b.cityName || '');
+      if (cityComp !== 0) return cityComp;
+      const areaComp = (a.areaName || '').localeCompare(b.areaName || '');
+      if (areaComp !== 0) return areaComp;
+      return (a.serviceName || '').localeCompare(b.serviceName || '');
+    });
+    
+    return settings;
+  } catch (error) {
+    console.error("Error fetching area-service SEO settings:", error);
+    return [];
+  }
 });
 
 /**

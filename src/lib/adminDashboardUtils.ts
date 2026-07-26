@@ -193,7 +193,7 @@ export const getDashboardData = cache(
   }
 );
 
-export const getArchivedBookings = unstable_cache(
+export const getArchivedBookings = cache(
   async (): Promise<FirestoreBooking[]> => {
     try {
       const q = adminDb.collection('bookings').orderBy('createdAt', 'desc');
@@ -209,12 +209,10 @@ export const getArchivedBookings = unstable_cache(
       console.error("Error in getArchivedBookings:", error);
       return [];
     }
-  },
-  ['archived-bookings', 'bookings'],
-  { revalidate: false, tags: ['bookings', 'global-cache'] } // Changed to false
+  }
 );
 
-export const getArchivedUsers = unstable_cache(
+export const getArchivedUsers = cache(
   async (): Promise<FirestoreUser[]> => {
     try {
       const q = adminDb.collection('users').orderBy('createdAt', 'desc');
@@ -230,12 +228,10 @@ export const getArchivedUsers = unstable_cache(
       console.error("Error in getArchivedUsers:", error);
       return [];
     }
-  },
-  ['archived-users', 'users'],
-  { revalidate: false, tags: ['users', 'global-cache'] }
+  }
 );
 
-export const getArchivedActivities = unstable_cache(
+export const getArchivedActivities = cache(
   async (): Promise<UserActivity[]> => {
     try {
       const snapshot = await adminDb.collection('userActivities')
@@ -251,9 +247,7 @@ export const getArchivedActivities = unstable_cache(
       console.error("Error in getArchivedActivities:", error);
       return [];
     }
-  },
-  ['archived-activities'],
-  { revalidate: false, tags: ['activities', 'global-cache'] }
+  }
 );
 
 export interface PromoCodeUsageRecord {
@@ -267,7 +261,7 @@ export interface PromoCodeUsageRecord {
   createdAt: string;
 }
 
-export const getPromoCodeUsageHistory = unstable_cache(
+export const getPromoCodeUsageHistory = cache(
   async (): Promise<PromoCodeUsageRecord[]> => {
     try {
       // METHOD B: Read from specialized promoCodeUsage collection
@@ -288,9 +282,7 @@ export const getPromoCodeUsageHistory = unstable_cache(
       console.error("Error in getPromoCodeUsageHistory:", error);
       return [];
     }
-  },
-  ['promo-code-usage-history'],
-  { revalidate: false, tags: ['promo-usage', 'global-cache'] }
+  }
 );
 
 /**

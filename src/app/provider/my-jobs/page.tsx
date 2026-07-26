@@ -100,10 +100,10 @@ export default function ProviderMyJobsPage() {
     }
   };
 
-  const newJobRequests = useMemo(() => bookings.filter(b => b.status === 'AssignedToProvider'), [bookings]);
+  const newJobRequests = useMemo(() => bookings.filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled'), [bookings]);
   const ongoingJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider'), [bookings]);
   const completedJobs = useMemo(() => bookings.filter(b => b.status === 'Completed'), [bookings]);
-  const otherJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderRejected' || b.status === 'Cancelled' || b.status === 'Rescheduled' || b.status === 'Pending Payment' || b.status === 'Processing'), [bookings]);
+  const otherJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderRejected' || b.status === 'Cancelled' || b.status === 'Pending Payment' || b.status === 'Processing'), [bookings]);
 
 
   if (authIsLoading || isLoadingBookings) {
