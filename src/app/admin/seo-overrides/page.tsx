@@ -443,9 +443,9 @@ export default function SeoOverridesPage() {
         </TabsList>
         <TabsContent value="city-category">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div><CardTitle>City-Category Specific Settings</CardTitle><CardDescription>Overrides for /[city]/category/[categorySlug] pages.</CardDescription></div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap md:flex-nowrap gap-2 shrink-0">
                 <PermissionGuard moduleId="seo_overrides" action="create">
                   <Button variant="outline" onClick={() => { setFormType('cityCategory'); setIsBatchOpen(true); }} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
                   {cityCategorySettings.length > 0 && (
@@ -510,9 +510,9 @@ export default function SeoOverridesPage() {
         </TabsContent>
         <TabsContent value="area-category">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div><CardTitle>Area-Category Specific Settings</CardTitle><CardDescription>Overrides for /[city]/[area]/[categorySlug] pages.</CardDescription></div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap md:flex-nowrap gap-2 shrink-0">
                 <PermissionGuard moduleId="seo_overrides" action="create">
                   <Button variant="outline" onClick={() => { setFormType('areaCategory'); setIsBatchOpen(true); }} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
                   {areaCategorySettings.length > 0 && (

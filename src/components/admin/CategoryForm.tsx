@@ -50,6 +50,9 @@ const categoryFormSchema = z.object({
     question: z.string(),
     answer: z.string()
   })).optional(),
+  visitingChargeAmount: z.preprocess(val => val === '' ? undefined : Number(val), z.number().min(0).optional()),
+  minimumBookingAmount: z.preprocess(val => val === '' ? undefined : Number(val), z.number().min(0).optional()),
+  minimumBookingPolicyDescription: z.string().optional().or(z.literal('')),
 });
 
 type CategoryFormData = z.infer<typeof categoryFormSchema>;
@@ -99,6 +102,9 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
     defaultValues: {
       name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
       h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
+      visitingChargeAmount: "" as any,
+      minimumBookingAmount: "" as any,
+      minimumBookingPolicyDescription: "We charge a ₹{VISITING_CHARGE} visiting fee if your order value is below ₹{MINIMUM_BOOKING_AMOUNT}.",
     },
   });
 
@@ -149,6 +155,9 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_keywords: initialData.seo_keywords || "",
         seo_content: initialData.seo_content || "",
         faqs: initialData.faqs || [],
+        visitingChargeAmount: initialData.visitingChargeAmount !== undefined ? initialData.visitingChargeAmount : "" as any,
+        minimumBookingAmount: initialData.minimumBookingAmount !== undefined ? initialData.minimumBookingAmount : "" as any,
+        minimumBookingPolicyDescription: initialData.minimumBookingPolicyDescription || "We charge a ₹{VISITING_CHARGE} visiting fee if your order value is below ₹{MINIMUM_BOOKING_AMOUNT}.",
       });
       setCurrentImagePreview(initialData.imageUrl || null);
       setOriginalImageUrlFromInitialData(initialData.imageUrl || null);
@@ -156,6 +165,9 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
       form.reset({
         name: "", slug: "", order: nextOrder, isActive: true, imageUrl: "", imageHint: "",
         h1_title: "", seo_title: "", seo_description: "", seo_keywords: "", seo_content: "", faqs: [],
+        visitingChargeAmount: "" as any,
+        minimumBookingAmount: "" as any,
+        minimumBookingPolicyDescription: "We charge a ₹{VISITING_CHARGE} visiting fee if your order value is below ₹{MINIMUM_BOOKING_AMOUNT}.",
       });
       setCurrentImagePreview(null);
       setOriginalImageUrlFromInitialData(null);
@@ -377,6 +389,9 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         seo_keywords: formData.seo_keywords,
         seo_content: formData.seo_content,
         faqs: formData.faqs,
+        visitingChargeAmount: typeof formData.visitingChargeAmount === 'number' ? formData.visitingChargeAmount : undefined,
+        minimumBookingAmount: typeof formData.minimumBookingAmount === 'number' ? formData.minimumBookingAmount : undefined,
+        minimumBookingPolicyDescription: formData.minimumBookingPolicyDescription || undefined,
         id: initialData?.id,
       });
 
@@ -556,6 +571,46 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
             </FormItem>
           )}
         />
+
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-md font-semibold text-muted-foreground">Visiting Fee Settings (Optional)</h3>
+          <p className="text-xs text-muted-foreground">Override the global visiting charge settings for this category. Leave blank to use defaults.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField control={form.control} name="visitingChargeAmount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Visiting Charge (₹)</FormLabel>
+                <FormControl>
+                  <Input type="number" step="any" placeholder="e.g., 150" {...field} disabled={effectiveIsSubmitting} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}/>
+            <FormField control={form.control} name="minimumBookingAmount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Min Booking Amount for Free Delivery (₹)</FormLabel>
+                <FormControl>
+                  <Input type="number" step="any" placeholder="e.g., 399" {...field} disabled={effectiveIsSubmitting} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}/>
+          </div>
+          <FormField control={form.control} name="minimumBookingPolicyDescription" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Min Booking Policy Description Override</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="e.g., We charge a ₹{VISITING_CHARGE} visiting fee if your order value is below ₹{MINIMUM_BOOKING_AMOUNT}." 
+                  {...field} 
+                  rows={2} 
+                  disabled={effectiveIsSubmitting} 
+                />
+              </FormControl>
+              <FormDescription>Use placeholders: <code>{"{MINIMUM_BOOKING_AMOUNT}"}</code> and <code>{"{VISITING_CHARGE}"}</code> to substitute values dynamically.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}/>
+        </div>
 
         <div className="space-y-4 pt-4 border-t">
           <div className="flex justify-between items-center">

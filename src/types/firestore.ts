@@ -37,6 +37,9 @@ export interface FirestoreCategory {
   metaDescription?: string; // Legacy/Alternative SEO meta description
   metaKeywords?: string; // Legacy/Alternative SEO meta keywords
   createdAt?: Timestamp;
+  visitingChargeAmount?: number;
+  minimumBookingAmount?: number;
+  minimumBookingPolicyDescription?: string;
 }
 
 export interface FirestoreSubCategory {
@@ -534,6 +537,7 @@ export interface PlatformFeeSetting {
   value: number; // The percentage (e.g., 10 for 10%) or fixed amount (e.g., 50 for ₹50)
   feeTaxRatePercent: number; // Tax rate APPLIED TO THIS FEE's value (e.g., 18 for 18% tax on the fee amount). 0 if no tax.
   isActive: boolean;
+  description?: string;
 }
 
 export type ProviderFeeType = 'fixed' | 'percentage';

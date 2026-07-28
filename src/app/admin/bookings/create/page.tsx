@@ -251,14 +251,19 @@ export default function AdminCreateBookingPage() {
       taxTotal += item.taxAmountForItem || 0;
     });
 
-    if (appConfig?.enableMinimumBookingPolicy && itemTotal < (appConfig.minimumBookingAmount || 0)) {
-      visitingCharge = appConfig.visitingChargeAmount || 0;
-      if (appConfig.enableTaxOnVisitingCharge) {
-        const vcBase = getBasePriceForInvoice(visitingCharge, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent || 0);
-        taxTotal += vcBase * ((appConfig.visitingChargeTaxPercent || 0) / 100);
+    const vcAmount = (selectedCategory && typeof selectedCategory.visitingChargeAmount === 'number') ? selectedCategory.visitingChargeAmount : appConfig?.visitingChargeAmount;
+    const minBooking = (selectedCategory && typeof selectedCategory.minimumBookingAmount === 'number') ? selectedCategory.minimumBookingAmount : appConfig?.minimumBookingAmount;
+
+    if (appConfig?.enableMinimumBookingPolicy && typeof minBooking === 'number' && typeof vcAmount === 'number') {
+      if (itemTotal < minBooking) {
+        visitingCharge = vcAmount;
+        if (appConfig.enableTaxOnVisitingCharge) {
+          const vcBase = getBasePriceForInvoice(visitingCharge, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent || 0);
+          taxTotal += vcBase * ((appConfig.visitingChargeTaxPercent || 0) / 100);
+        }
       }
     }
-    if (appConfig?.platformFees) {
+    if (visitingCharge === 0 && appConfig?.platformFees) {
       appConfig.platformFees.forEach(fee => {
         if (fee.isActive) {
           const base = fee.type === 'percentage' ? (itemTotal * (fee.value / 100)) : fee.value;

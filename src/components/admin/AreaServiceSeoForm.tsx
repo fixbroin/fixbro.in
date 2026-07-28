@@ -300,6 +300,26 @@ export default function AreaServiceSeoForm({
     form.setValue("slug", unique);
   };
 
+  const handleCopyLink = () => {
+    const slug = form.getValues("slug");
+    if (!slug) {
+      toast({ title: "Cannot copy", description: "Slug must be set first.", variant: "warning" });
+      return;
+    }
+    const fullUrl = `${window.location.origin}/${slug}`;
+    navigator.clipboard.writeText(fullUrl);
+    toast({ title: "Copied!", description: "Link copied to clipboard." });
+  };
+
+  const handleVisitPage = () => {
+    const slug = form.getValues("slug");
+    if (!slug) {
+      toast({ title: "Cannot visit", description: "Slug must be set first.", variant: "warning" });
+      return;
+    }
+    window.open(`/${slug}`, '_blank');
+  };
+
   const onSubmit = async (formData: AreaServiceSeoFormData) => {
     try {
       const uniqueSlug = watchedSlug ? watchedSlug : generateSeoSlug([selectedCity?.slug, selectedArea?.slug, "service", selectedService?.slug]);
@@ -602,17 +622,41 @@ export default function AreaServiceSeoForm({
         {/* Slug Input */}
         <FormField control={form.control} name="slug" render={({ field }) => (
           <FormItem>
-            <FormLabel className="flex items-center justify-between">
+            <FormLabel className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>SEO Slug URL Path</span>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-6 text-[10px] py-0 px-2"
-                onClick={() => setIsSlugEditable(!isSlugEditable)}
-              >
-                {isSlugEditable ? <Lock className="mr-1 h-3 w-3" /> : <Edit2 className="mr-1 h-3 w-3" />}
-                {isSlugEditable ? "Lock Auto-slug" : "Customize Slug"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-1">
+                {watchedSlug && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyLink}
+                      className="h-6 text-[10px] py-0 px-2 text-primary hover:text-primary/80 hover:bg-muted"
+                    >
+                      Copy Link
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleVisitPage}
+                      className="h-6 text-[10px] py-0 px-2 text-primary hover:text-primary/80 hover:bg-muted"
+                    >
+                      Open Page
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-6 text-[10px] py-0 px-2"
+                  onClick={() => setIsSlugEditable(!isSlugEditable)}
+                >
+                  {isSlugEditable ? <Lock className="mr-1 h-3 w-3" /> : <Edit2 className="mr-1 h-3 w-3" />}
+                  {isSlugEditable ? "Lock Auto-slug" : "Customize Slug"}
+                </Button>
+              </div>
             </FormLabel>
             <FormControl>
               <div className="relative flex items-center">
@@ -632,7 +676,7 @@ export default function AreaServiceSeoForm({
         )}/>
 
         <div className="space-y-4 pt-4 border-t">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <h3 className="text-md font-semibold text-muted-foreground">SEO Content</h3>
             <Button type="button" variant="outline" size="sm" onClick={handleGenerateFreeSeo} disabled={effectiveIsSubmitting || !watchedCityId || !watchedAreaId || !watchedServiceId}>
               <Sparkles className="mr-2 h-4 w-4 text-primary" />

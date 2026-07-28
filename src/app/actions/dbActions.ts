@@ -190,7 +190,7 @@ export async function executeDbBatch(operations: any[]) {
 export async function executeDbClearTable(tableName: string) {
   return withRetry(async () => {
     try {
-      const allowedTables = ['areaServiceSeoSettings', 'cityCategorySeoSettings', 'areaCategorySeoSettings'];
+      const allowedTables = ['areaServiceSeoSettings', 'cityCategorySeoSettings', 'areaCategorySeoSettings', 'cities', 'areas'];
       if (!allowedTables.includes(tableName)) {
         throw new Error("Unauthorized table clear operation");
       }

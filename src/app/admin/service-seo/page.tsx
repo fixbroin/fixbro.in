@@ -393,7 +393,7 @@ export default function ServiceSeoPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <CardTitle className="text-2xl flex items-center">
               <Layers className="mr-2 h-6 w-6 text-primary" /> Service-wise Local SEO Overrides
@@ -402,7 +402,7 @@ export default function ServiceSeoPage() {
               Create dedicated local SEO landing pages linking to specific services in targeted areas (e.g. Bed dismantling in Whitefield).
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap md:flex-nowrap gap-2 shrink-0">
             <PermissionGuard moduleId="seo_overrides" action="create">
               <Button variant="outline" onClick={() => setIsBatchOpen(true)} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
               {settings.length > 0 && (

@@ -72,10 +72,16 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
                     .where('isActive', '==', true)
                     .get();
                 
-                const allAreas = allAreasSnapshot.docs.map(doc => ({
-                    ...serializeFirestoreData<Omit<FirestoreArea, 'id'>>(doc.data() as any),
-                    id: doc.id
-                } as FirestoreArea));
+                const allAreas = allAreasSnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        name: data.name,
+                        slug: data.slug,
+                        cityId: data.cityId,
+                        isActive: data.isActive
+                    } as FirestoreArea;
+                });
                 allAreas.sort((a, b) => a.name.localeCompare(b.name));
 
                 // Group areas by cityId

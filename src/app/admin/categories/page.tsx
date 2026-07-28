@@ -181,6 +181,9 @@ export default function AdminCategoriesPage() {
       seo_keywords: data.seo_keywords || undefined,
       seo_content: data.seo_content || undefined,
       faqs: data.faqs || [],
+      visitingChargeAmount: data.visitingChargeAmount !== undefined ? data.visitingChargeAmount : undefined,
+      minimumBookingAmount: data.minimumBookingAmount !== undefined ? data.minimumBookingAmount : undefined,
+      minimumBookingPolicyDescription: data.minimumBookingPolicyDescription || undefined,
     };
 
     try {

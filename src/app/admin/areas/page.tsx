@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
+import { executeDbClearTable } from '@/app/actions/dbActions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -73,6 +74,14 @@ export default function AdminAreasPage() {
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const circleRef = useRef<any>(null);
+
+  // Delete All States
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  const [deleteRunning, setDeleteRunning] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [deleteStatus, setDeleteStatus] = useState("");
+  const [displayLimit, setDisplayLimit] = useState(500);
+  const [onlyMajorAreas, setOnlyMajorAreas] = useState(true);
 
   // Load Leaflet dynamically on mount
   useEffect(() => {
@@ -210,17 +219,22 @@ export default function AdminAreasPage() {
     try {
       const radiusInMeters = mapRadius * 1000;
       const { lat, lon } = mapCenter;
+      const placeTypes = onlyMajorAreas ? "suburb|quarter|village" : "suburb|neighbourhood|quarter|village";
 
       const overpassQuery = `
         [out:json][timeout:25];
         (
-          node["place"~"suburb|neighbourhood|quarter|village"](around:${radiusInMeters},${lat},${lon});
-          way["place"~"suburb|neighbourhood|quarter|village"](around:${radiusInMeters},${lat},${lon});
+          node["place"~"${placeTypes}"](around:${radiusInMeters},${lat},${lon});
+          way["place"~"${placeTypes}"](around:${radiusInMeters},${lat},${lon});
         );
         out center;
       `;
 
-      const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
+      const response = await fetch('/api/admin/overpass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: overpassQuery })
+      });
       const data = await response.json();
 
       if (data && data.elements) {
@@ -522,6 +536,44 @@ export default function AdminAreasPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleDeleteAll = async () => {
+    if (areas.length === 0) {
+      toast({ title: "No Areas", description: "There are no areas to delete.", variant: "destructive" });
+      setIsDeleteAllOpen(false);
+      return;
+    }
+
+    setDeleteRunning(true);
+    setDeleteProgress(0);
+    setDeleteStatus("Initializing deletion...");
+
+    try {
+      const total = areas.length;
+      setDeleteStatus("Clearing all areas from database...");
+      setDeleteProgress(50);
+
+      await executeDbClearTable('areas');
+
+      setDeleteProgress(100);
+
+      toast({
+        title: "All Areas Deleted",
+        description: `Successfully deleted all ${total} areas.`,
+        className: "bg-green-100 border-green-300 text-green-700"
+      });
+
+      setIsDeleteAllOpen(false);
+      await triggerRefresh('locations');
+      await triggerRefresh('sitemap');
+      await fetchCitiesAndAreas();
+    } catch (err) {
+      console.error("Error deleting all areas:", err);
+      toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+    } finally {
+      setDeleteRunning(false);
+    }
+  };
+
   const handleAddArea = () => {
     setEditingArea(null);
     setIsFormOpen(true);
@@ -632,6 +684,11 @@ export default function AdminAreasPage() {
             <CardDescription>Add, edit, or delete service areas under cities.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <PermissionGuard moduleId="areas" action="delete">
+              <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting || isLoading || areas.length === 0} className="w-full sm:w-auto">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete All
+              </Button>
+            </PermissionGuard>
             <Button onClick={() => setIsMapGenerateOpen(true)} variant="outline" disabled={isSubmitting || isLoading || cities.length === 0} className="w-full sm:w-auto">
               <Map className="mr-2 h-4 w-4 text-emerald-500" /> Generate via Map (Free)
             </Button>
@@ -674,7 +731,7 @@ export default function AdminAreasPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {areas.map((area) => (
+                {areas.slice(0, displayLimit).map((area) => (
                   <TableRow key={area.id}>
                     <TableCell className="font-medium">{area.name}</TableCell>
                     <TableCell>{area.cityName}</TableCell>
@@ -722,6 +779,22 @@ export default function AdminAreasPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {areas.length > displayLimit && (
+            <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+              <div>
+                Showing first {Math.min(displayLimit, areas.length)} of {areas.length} areas.
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
+                  Load More (+500)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(areas.length)}>
+                  Load All ({areas.length})
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -912,6 +985,18 @@ export default function AdminAreasPage() {
               </div>
             </div>
 
+            <div className="flex items-center space-x-2 pt-1 pb-2">
+              <Checkbox 
+                id="only_major_areas" 
+                checked={onlyMajorAreas} 
+                onCheckedChange={(checked) => setOnlyMajorAreas(!!checked)}
+                disabled={isFetchingPlaces || isImporting}
+              />
+              <label htmlFor="only_major_areas" className="text-xs font-semibold leading-none cursor-pointer">
+                Only major areas (Excludes minor layouts, building names, and apartments)
+              </label>
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Search Location</label>
               <div className="flex gap-2">
@@ -1031,6 +1116,36 @@ export default function AdminAreasPage() {
                 Import {Object.values(selectedPlaces).filter(Boolean).length} Areas
               </Button>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteAllOpen} onOpenChange={(open) => { if (!deleteRunning) setIsDeleteAllOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-destructive">
+              <Trash2 className="h-6 w-6 mr-2" /> Danger: Delete All Areas?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete all areas/neighborhoods in the database. This action is irreversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteRunning && (
+            <div className="space-y-2 py-4">
+              <Progress value={deleteProgress} className="w-full" />
+              <p className="text-xs text-muted-foreground animate-pulse text-center">{deleteStatus}</p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsDeleteAllOpen(false)} disabled={deleteRunning}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteAll} disabled={deleteRunning}>
+              {deleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteRunning ? "Deleting..." : "Yes, Delete All"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

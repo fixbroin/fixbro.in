@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, Timestamp, doc, getDoc, runTransaction, query, where, getDocs, limit, updateDoc, deleteDoc, setDoc } from '@/lib/mysqlDb';
-import type { FirestoreBooking, BookingServiceItem, FirestoreService, FirestorePromoCode, AppSettings, AppliedPlatformFeeItem, FirestoreNotification, BookingStatus, MarketingAutomationSettings, MarketingSettings, ProviderApplication } from '@/types/firestore';
+import type { FirestoreBooking, BookingServiceItem, FirestoreService, FirestorePromoCode, AppSettings, AppliedPlatformFeeItem, FirestoreNotification, BookingStatus, MarketingAutomationSettings, MarketingSettings, ProviderApplication, FirestoreCategory } from '@/types/firestore';
 import { getActiveCheckoutEntries, removeCheckedOutItemsFromCart } from '@/lib/cartManager';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -310,9 +310,38 @@ export default function ThankYouPage() {
 
         const baseSubTotalForBooking = resolvedServiceItems.reduce((sum, item) => sum + (item._basePriceForBooking * item.quantity), 0);
         
+        let customCategoryData: {
+          visitingChargeAmount?: number;
+          minimumBookingAmount?: number;
+          minimumBookingPolicyDescription?: string;
+        } | null = null;
+
+        if (currentCategoryId) {
+          try {
+            const catSnap = await getDoc(doc(db, "adminCategories", currentCategoryId));
+            if (catSnap.exists()) {
+              const cd = catSnap.data();
+              customCategoryData = {
+                visitingChargeAmount: cd.visitingChargeAmount,
+                minimumBookingAmount: cd.minimumBookingAmount,
+                minimumBookingPolicyDescription: cd.minimumBookingPolicyDescription
+              };
+            }
+          } catch (e) {
+            console.error("Error loading category overrides in thank-you page:", e);
+          }
+        }
+
+        const vcAmount = (customCategoryData && typeof customCategoryData.visitingChargeAmount === 'number') ? customCategoryData.visitingChargeAmount : appConfig.visitingChargeAmount;
+        const minBooking = (customCategoryData && typeof customCategoryData.minimumBookingAmount === 'number') ? customCategoryData.minimumBookingAmount : appConfig.minimumBookingAmount;
+
         let baseVisitingChargeForBooking = 0; 
         const subtotalForVcPolicyCheck = sumOfDisplayedItemPrices - (bookingDiscountAmount || 0);
-        if (appConfig.enableMinimumBookingPolicy && typeof appConfig.minimumBookingAmount === 'number' && typeof appConfig.visitingChargeAmount === 'number') { if (subtotalForVcPolicyCheck > 0 && subtotalForVcPolicyCheck < appConfig.minimumBookingAmount) { baseVisitingChargeForBooking = getBasePriceForInvoice(appConfig.visitingChargeAmount, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent); } }
+        if (appConfig.enableMinimumBookingPolicy && typeof minBooking === 'number' && typeof vcAmount === 'number') { 
+          if (subtotalForVcPolicyCheck > 0 && subtotalForVcPolicyCheck < minBooking) { 
+            baseVisitingChargeForBooking = getBasePriceForInvoice(vcAmount, !!appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent); 
+          } 
+        }
         
         const totalItemTax = resolvedServiceItems.reduce((sum, item) => sum + (item.taxAmountForItem || 0), 0);
         let visitingChargeTax = 0; if (appConfig.enableTaxOnVisitingCharge && baseVisitingChargeForBooking > 0 && (appConfig.visitingChargeTaxPercent || 0) > 0) { visitingChargeTax = baseVisitingChargeForBooking * ((appConfig.visitingChargeTaxPercent || 0) / 100); }
