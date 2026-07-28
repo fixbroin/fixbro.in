@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, RefreshCw } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, RefreshCw, Map } from "lucide-react";
 import type { FirestoreArea, FirestoreCity } from '@/types/firestore';
 import AreaForm from '@/components/admin/AreaForm';
 import { db } from '@/lib/firebase';
@@ -55,6 +55,304 @@ export default function AdminAreasPage() {
   const [batchSeoRunning, setBatchSeoRunning] = useState(false);
   const [batchSeoProgress, setBatchSeoProgress] = useState(0);
   const [batchSeoStatus, setBatchSeoStatus] = useState("");
+
+  // Map Generation States
+  const [isMapGenerateOpen, setIsMapGenerateOpen] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lon: number }>({ lat: 12.9716, lon: 77.5946 }); // Default Bangalore
+  const [mapRadius, setMapRadius] = useState<number>(5); // Default 5 km
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [fetchedPlaces, setFetchedPlaces] = useState<any[]>([]);
+  const [selectedPlaces, setSelectedPlaces] = useState<Record<string, boolean>>({});
+  const [isFetchingPlaces, setIsFetchingPlaces] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [mapCityId, setMapCityId] = useState("");
+
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const circleRef = useRef<any>(null);
+
+  // Load Leaflet dynamically on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).L) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => {
+        setLeafletLoaded(true);
+      };
+      document.body.appendChild(script);
+    } else if ((window as any).L) {
+      setLeafletLoaded(true);
+    }
+  }, []);
+
+  // Initialize and handle Leaflet map instance
+  useEffect(() => {
+    if (!isMapGenerateOpen || !leafletLoaded) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+        circleRef.current = null;
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const mapContainer = document.getElementById('osm-map-container');
+      if (!mapContainer || mapRef.current) return;
+
+      const L = (window as any).L;
+      if (!L) return;
+
+      const mapInstance = L.map('osm-map-container').setView([mapCenter.lat, mapCenter.lon], 12);
+      mapRef.current = mapInstance;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mapInstance);
+
+      const markerInstance = L.marker([mapCenter.lat, mapCenter.lon], { draggable: true }).addTo(mapInstance);
+      markerRef.current = markerInstance;
+
+      const circleInstance = L.circle([mapCenter.lat, mapCenter.lon], {
+        color: '#10b981',
+        fillColor: '#10b981',
+        fillOpacity: 0.15,
+        radius: mapRadius * 1000
+      }).addTo(mapInstance);
+      circleRef.current = circleInstance;
+
+      markerInstance.on('dragend', () => {
+        const position = markerInstance.getLatLng();
+        setMapCenter({ lat: position.lat, lon: position.lng });
+        circleInstance.setLatLng(position);
+      });
+
+      mapInstance.on('click', (e: any) => {
+        const position = e.latlng;
+        markerInstance.setLatLng(position);
+        circleInstance.setLatLng(position);
+        setMapCenter({ lat: position.lat, lon: position.lng });
+      });
+
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [isMapGenerateOpen, leafletLoaded]);
+
+  // Update circle radius when radius changes
+  useEffect(() => {
+    if (circleRef.current) {
+      circleRef.current.setRadius(mapRadius * 1000);
+      if (mapRef.current && markerRef.current) {
+        const L = (window as any).L;
+        if (L) {
+          mapRef.current.fitBounds(circleRef.current.getBounds());
+        }
+      }
+    }
+  }, [mapRadius]);
+
+  const handleMapSearch = async () => {
+    if (!searchQuery) return;
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`, {
+        headers: {
+          'User-Agent': 'FixBro-Admin-App/1.0'
+        }
+      });
+      const data = await response.json();
+      if (data && data.length > 0) {
+        const first = data[0];
+        const lat = parseFloat(first.lat);
+        const lon = parseFloat(first.lon);
+        
+        setMapCenter({ lat, lon });
+
+        if (mapRef.current && markerRef.current && circleRef.current) {
+          const L = (window as any).L;
+          mapRef.current.setView([lat, lon], 13);
+          markerRef.current.setLatLng([lat, lon]);
+          circleRef.current.setLatLng([lat, lon]);
+          circleRef.current.setRadius(mapRadius * 1000);
+          mapRef.current.fitBounds(circleRef.current.getBounds());
+        }
+      } else {
+        toast({ title: "No Results", description: "Could not find that location.", variant: "warning" });
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      toast({ title: "Error", description: "Search failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleFetchNearby = async () => {
+    if (!mapCityId) {
+      toast({ title: "Select City", description: "Please select a target city first.", variant: "warning" });
+      return;
+    }
+    setIsFetchingPlaces(true);
+    setFetchedPlaces([]);
+    setSelectedPlaces({});
+
+    try {
+      const radiusInMeters = mapRadius * 1000;
+      const { lat, lon } = mapCenter;
+
+      const overpassQuery = `
+        [out:json][timeout:25];
+        (
+          node["place"~"suburb|neighbourhood|quarter|village"](around:${radiusInMeters},${lat},${lon});
+          way["place"~"suburb|neighbourhood|quarter|village"](around:${radiusInMeters},${lat},${lon});
+        );
+        out center;
+      `;
+
+      const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
+      const data = await response.json();
+
+      if (data && data.elements) {
+        const places: any[] = [];
+        const seenNames = new Set<string>();
+
+        data.elements.forEach((el: any) => {
+          const name = el.tags?.name;
+          if (!name) return;
+
+          const placeLat = el.lat || el.center?.lat;
+          const placeLon = el.lon || el.center?.lon;
+          if (!placeLat || !placeLon) return;
+
+          const key = name.toLowerCase().trim();
+          if (seenNames.has(key)) return;
+          seenNames.add(key);
+
+          const alreadyExists = areas.some(a => a.name.toLowerCase().trim() === key && a.cityId === mapCityId);
+
+          places.push({
+            name,
+            latitude: placeLat,
+            longitude: placeLon,
+            alreadyExists
+          });
+        });
+
+        places.sort((a, b) => a.name.localeCompare(b.name));
+        setFetchedPlaces(places);
+        
+        const initialSelected: Record<string, boolean> = {};
+        places.forEach(p => {
+          if (!p.alreadyExists) {
+            initialSelected[p.name] = true;
+          }
+        });
+        setSelectedPlaces(initialSelected);
+
+        if (places.length === 0) {
+          toast({ title: "No Places Found", description: "No suburbs or neighborhoods found in this radius.", variant: "info" });
+        } else {
+          toast({ title: "Success", description: `Found ${places.length} areas in range.` });
+        }
+      } else {
+        toast({ title: "No Places Found", description: "No results returned from query.", variant: "info" });
+      }
+    } catch (error) {
+      console.error("Overpass error:", error);
+      toast({ title: "Error", description: "Failed to fetch nearby areas.", variant: "destructive" });
+    } finally {
+      setIsFetchingPlaces(false);
+    }
+  };
+
+  const handleImportPlaces = async () => {
+    const toImport = fetchedPlaces.filter(p => selectedPlaces[p.name]);
+    if (toImport.length === 0) {
+      toast({ title: "No Selection", description: "Please select at least one area to import.", variant: "warning" });
+      return;
+    }
+
+    const parentCity = cities.find(c => c.id === mapCityId);
+    if (!parentCity) {
+      toast({ title: "Error", description: "Parent city not found.", variant: "destructive" });
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+
+    let successCount = 0;
+
+    try {
+      const catSnap = await getDocs(query(collection(db, "adminCategories"), where("isActive", "==", true)));
+      const categoryNames = catSnap.docs.map(doc => doc.data().name as string);
+
+      for (let i = 0; i < toImport.length; i++) {
+        const place = toImport[i];
+        setImportProgress(Math.round(((i + 1) / toImport.length) * 100));
+
+        try {
+          const areaSlug = generateSlug(place.name);
+          const fallbackNearby: { id: string; name: string; slug: string }[] = [];
+          const seoResult = generateFreeAreaSeoData(parentCity.name, place.name, categoryNames, fallbackNearby);
+
+          const payload = {
+            name: place.name,
+            slug: areaSlug,
+            cityId: mapCityId,
+            cityName: parentCity.name,
+            isActive: true,
+            latitude: Number(place.latitude),
+            longitude: Number(place.longitude),
+            h1_title: seoResult.h1_title,
+            seo_title: seoResult.seo_title,
+            seo_description: seoResult.seo_description,
+            seo_keywords: seoResult.seo_keywords,
+            createdAt: Timestamp.now()
+          };
+
+          const docRef = await addDoc(areasCollectionRef, payload);
+          const activeId = docRef.id;
+
+          const nearby = await calculateNearbyAreas(activeId, mapCityId, Number(place.latitude), Number(place.longitude));
+          await updateDoc(doc(db, "areas", activeId), { nearbyAreas: nearby });
+
+          successCount++;
+        } catch (placeErr) {
+          console.error(`Failed to import place ${place.name}:`, placeErr);
+        }
+      }
+
+      await recalculateAllNearbyAreasInCity(mapCityId);
+
+      toast({
+        title: "Import Complete!",
+        description: `Successfully imported ${successCount} areas into ${parentCity.name}.`
+      });
+
+      setIsMapGenerateOpen(false);
+      await triggerRefresh('locations');
+      await triggerRefresh('sitemap');
+      await fetchCitiesAndAreas();
+    } catch (error) {
+      console.error("Import error:", error);
+      toast({ title: "Import Failed", description: "An error occurred during import.", variant: "destructive" });
+    } finally {
+      setIsImporting(false);
+      setImportProgress(0);
+    }
+  };
 
   const handleStartBatchSeo = async () => {
     setBatchSeoRunning(true);
@@ -334,6 +632,9 @@ export default function AdminAreasPage() {
             <CardDescription>Add, edit, or delete service areas under cities.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button onClick={() => setIsMapGenerateOpen(true)} variant="outline" disabled={isSubmitting || isLoading || cities.length === 0} className="w-full sm:w-auto">
+              <Map className="mr-2 h-4 w-4 text-emerald-500" /> Generate via Map (Free)
+            </Button>
             <Button onClick={() => setIsBatchSeoOpen(true)} variant="outline" disabled={isSubmitting || isLoading || cities.length === 0} className="w-full sm:w-auto">
               <Zap className="mr-2 h-4 w-4 text-amber-500" /> Batch Generate SEO (Free)
             </Button>
@@ -565,6 +866,171 @@ export default function AdminAreasPage() {
               {batchSeoRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {batchSeoRunning ? "Generating..." : "Start Batch Generation"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMapGenerateOpen} onOpenChange={(open) => { if (!isImporting && !isFetchingPlaces) { setIsMapGenerateOpen(open); } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="p-4 pb-2 border-b">
+            <DialogTitle className="flex items-center"><Map className="mr-2 h-5 w-5 text-emerald-500" /> Generate Areas via Map</DialogTitle>
+            <DialogDescription>
+              Search a central point, adjust the radius, and fetch nearby suburbs/neighborhoods from OpenStreetMap to import.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Target City (Parent)</label>
+                <select
+                  value={mapCityId}
+                  onChange={(e) => setMapCityId(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">-- Choose Target City --</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>{city.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Radius (km)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="1"
+                    max="15"
+                    step="1"
+                    value={mapRadius}
+                    onChange={(e) => setMapRadius(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <span className="text-sm font-semibold whitespace-nowrap min-w-[40px] text-right">{mapRadius} km</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Search Location</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. HSR Layout, Bangalore"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMapSearch(); } }}
+                  className="flex h-10 flex-grow rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button onClick={handleMapSearch} disabled={isSearching || !searchQuery}>
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-muted-foreground">Map (Drag marker or click to change center)</span>
+              <div id="osm-map-container" className="h-[300px] w-full rounded-md border z-0" style={{ minHeight: '300px' }} />
+            </div>
+
+            <div className="flex justify-center pt-2">
+              <Button onClick={handleFetchNearby} disabled={isFetchingPlaces || !mapCityId} className="w-full sm:w-auto px-8">
+                {isFetchingPlaces ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Fetch Nearby Areas
+              </Button>
+            </div>
+
+            {fetchedPlaces.length > 0 && (
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Found {fetchedPlaces.length} Areas:</span>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs"
+                      onClick={() => {
+                        const newSelected: Record<string, boolean> = {};
+                        fetchedPlaces.forEach(p => {
+                          if (!p.alreadyExists) newSelected[p.name] = true;
+                        });
+                        setSelectedPlaces(newSelected);
+                      }}
+                    >
+                      Reset selection
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs"
+                      onClick={() => {
+                        const allSelected = fetchedPlaces.every(p => selectedPlaces[p.name]);
+                        const newSelected: Record<string, boolean> = {};
+                        if (!allSelected) {
+                          fetchedPlaces.forEach(p => {
+                            newSelected[p.name] = true;
+                          });
+                        }
+                        setSelectedPlaces(newSelected);
+                      }}
+                    >
+                      {fetchedPlaces.every(p => selectedPlaces[p.name]) ? "Deselect All" : "Select All"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border rounded-md max-h-48 overflow-y-auto p-2 bg-muted/20 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {fetchedPlaces.map((place) => (
+                    <div 
+                      key={place.name} 
+                      className={`flex items-center space-x-2 p-2 rounded-md border bg-background text-sm ${place.alreadyExists ? 'opacity-60' : ''}`}
+                    >
+                      <Checkbox
+                        id={`place-${place.name}`}
+                        checked={!!selectedPlaces[place.name]}
+                        onCheckedChange={(checked) => {
+                          setSelectedPlaces(prev => ({
+                            ...prev,
+                            [place.name]: !!checked
+                          }));
+                        }}
+                      />
+                      <label 
+                        htmlFor={`place-${place.name}`} 
+                        className="flex-grow cursor-pointer font-medium leading-none select-none truncate"
+                      >
+                        {place.name}
+                        {place.alreadyExists && (
+                          <span className="ml-1 text-[10px] bg-muted text-muted-foreground px-1 py-0.5 rounded">
+                            Exists
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                {isImporting && (
+                  <div className="space-y-2 pt-2">
+                    <Progress value={importProgress} className="w-full" />
+                    <p className="text-xs text-muted-foreground animate-pulse text-center">Importing areas... {importProgress}%</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 p-4 border-t sticky bottom-0 bg-background z-10">
+            <Button variant="outline" onClick={() => setIsMapGenerateOpen(false)} disabled={isImporting || isFetchingPlaces}>
+              Close
+            </Button>
+            {fetchedPlaces.length > 0 && (
+              <Button onClick={handleImportPlaces} disabled={isImporting || isFetchingPlaces || Object.values(selectedPlaces).filter(Boolean).length === 0}>
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Import {Object.values(selectedPlaces).filter(Boolean).length} Areas
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
