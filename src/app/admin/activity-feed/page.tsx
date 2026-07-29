@@ -349,7 +349,26 @@ export default function AdminActivityFeedPage() {
       case 'userLogout':
         return <span className="text-xs text-muted-foreground italic">Logout ({data.logoutMethod})</span>;
       case 'checkoutStep':
-        return <span className="text-xs font-bold text-purple-600 uppercase tracking-tighter">{data.checkoutStepName}</span>;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-bold text-purple-600 uppercase tracking-tighter">{data.checkoutStepName || 'Checkout'}</span>
+            {data.checkoutStepName === 'time_slot_selected' && (data.scheduledDate || data.scheduledSlot) && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Date: <strong className="text-foreground">{data.scheduledDate}</strong> | Slot: <strong className="text-foreground">{data.scheduledSlot}</strong>
+              </span>
+            )}
+            {data.checkoutStepName === 'address_selected' && data.fullName && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Name: <strong className="text-foreground">{data.fullName}</strong> ({data.city || 'N/A'})
+              </span>
+            )}
+            {data.checkoutStepName === 'payment_method_selected' && data.paymentMethod && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Method: <strong className="text-foreground">{data.paymentMethod}</strong>
+              </span>
+            )}
+          </div>
+        );
       default:
         return <code className="text-[10px] bg-muted/50 p-1 px-2 rounded font-mono text-muted-foreground break-all">{JSON.stringify(data)}</code>;
     }
