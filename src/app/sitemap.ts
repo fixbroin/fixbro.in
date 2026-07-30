@@ -232,8 +232,6 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   return uniqueEntries;
 }
 
-const SITEMAP_SIZE = 45000;
-
 const getCachedSitemapEntries = unstable_cache(
   async () => {
     return await getSitemapEntries();
@@ -245,33 +243,25 @@ const getCachedSitemapEntries = unstable_cache(
   }
 );
 
-export async function generateSitemaps() {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
-    const entries = await getCachedSitemapEntries();
-    const numSitemaps = Math.ceil(entries.length / SITEMAP_SIZE);
-    return Array.from({ length: Math.max(1, numSitemaps) }, (_, i) => ({ id: i }));
+    return await getCachedSitemapEntries();
   } catch (error) {
-    console.error("Error in generateSitemaps:", error);
-    return [{ id: 0 }];
+    console.warn("SITEMAP_CACHE_ERROR: Failed to get cached sitemap entries (expected in dev/build environments):", error);
+    try {
+      return await getSitemapEntries();
+    } catch (dbError) {
+      console.error("CRITICAL_SITEMAP_ERROR: Failed to generate sitemap entries from database:", dbError);
+      const appBaseUrl = getBaseUrl(); 
+      return [
+        {
+          url: appBaseUrl,
+          lastModified: new Date().toISOString(),
+          changeFrequency: 'yearly' as const,
+          priority: 0.1,
+        },
+      ];
+    }
   }
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  try {
-    const allEntries = await getCachedSitemapEntries();
-    const start = id * SITEMAP_SIZE;
-    const end = start + SITEMAP_SIZE;
-    return allEntries.slice(start, end);
-  } catch (error) {
-    console.error("SITEMAP_GENERATION_ERROR: Failed to generate sitemap entries:", error);
-    const appBaseUrl = getBaseUrl(); 
-    return [
-      {
-        url: appBaseUrl,
-        lastModified: new Date().toISOString(),
-        changeFrequency: 'yearly' as const,
-        priority: 0.1,
-      },
-    ];
-  }
-}
