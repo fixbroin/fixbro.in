@@ -1,11 +1,8 @@
-import { MetadataRoute } from 'next';
+// src/app/sitemap-helper.ts
 import { adminDb } from '@/lib/firebaseAdmin'; 
 import { Timestamp } from '@/lib/mysqlDbAdmin'; 
 import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage, AreaServiceSeoSetting } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config'; 
-import { unstable_cache } from 'next/cache';
-
-export const dynamic = 'force-dynamic';
 
 const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallbackDate: string): string => {
   try {
@@ -27,9 +24,9 @@ const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallb
   }
 };
 
-async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
+export async function getSitemapEntries() {
   const appBaseUrl = getBaseUrl(); 
-  const entries: MetadataRoute.Sitemap = [];
+  const entries: { url: string; lastModified: string; changeFrequency: string; priority: number }[] = [];
   const currentDate = new Date().toISOString();
 
   const staticPages = [
@@ -138,15 +135,12 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // Fetch cities and areas in single parallel calls
     const [citiesSnapshot, areasSnapshot] = await Promise.all([
       adminDb.collection('cities').where('isActive', '==', true).get(),
       adminDb.collection('areas').where('isActive', '==', true).get(),
     ]);
 
     const areas = areasSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreArea));
-    
-    // Group areas by cityId in memory
     const areasByCityId = new Map<string, FirestoreArea[]>();
     areas.forEach(area => {
       if (area.cityId) {
@@ -206,7 +200,6 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
     console.error("Sitemap: Error fetching cities/areas/categories:", e);
   }
 
-  // Add localized service-wise SEO overrides sitemap entries
   try {
     const serviceSeoSnapshot = await adminDb
       .collection('areaServiceSeoSettings')
@@ -232,36 +225,37 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   return uniqueEntries;
 }
 
-const getCachedSitemapEntries = unstable_cache(
-  async () => {
-    return await getSitemapEntries();
-  },
-  ['sitemap-data-v2'],
-  { 
-    revalidate: false, 
-    tags: ['sitemap', 'global-cache'] 
-  }
-);
+let sitemapCache: {
+  entries: any[];
+  timestamp: number;
+} | null = null;
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
+
+export async function getCachedSitemapEntries() {
+  const now = Date.now();
+  if (sitemapCache && (now - sitemapCache.timestamp < CACHE_TTL)) {
+    return sitemapCache.entries;
+  }
+  
   try {
-    return await getCachedSitemapEntries();
-  } catch (error) {
-    console.warn("SITEMAP_CACHE_ERROR: Failed to get cached sitemap entries (expected in dev/build environments):", error);
-    try {
-      return await getSitemapEntries();
-    } catch (dbError) {
-      console.error("CRITICAL_SITEMAP_ERROR: Failed to generate sitemap entries from database:", dbError);
-      const appBaseUrl = getBaseUrl(); 
-      return [
-        {
-          url: appBaseUrl,
-          lastModified: new Date().toISOString(),
-          changeFrequency: 'yearly' as const,
-          priority: 0.1,
-        },
-      ];
+    const entries = await getSitemapEntries();
+    sitemapCache = {
+      entries,
+      timestamp: now
+    };
+    return entries;
+  } catch (err) {
+    console.error("Sitemap compilation failed:", err);
+    if (sitemapCache) {
+      console.warn("Using expired sitemap cache as fallback");
+      return sitemapCache.entries;
     }
+    throw err;
   }
 }
 
+export function clearSitemapCache() {
+  sitemapCache = null;
+  console.log("[SitemapCache] In-memory sitemap cache cleared.");
+}
