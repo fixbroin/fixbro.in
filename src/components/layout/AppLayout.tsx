@@ -21,7 +21,12 @@ import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
 import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileDialog';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 
-const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
+interface AppLayoutProps {
+  children: React.ReactNode;
+  initialWebSettings?: any;
+}
+
+const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings }) => {
   const pathname = usePathname();
   const [isClientMounted, setIsClientMounted] = useState(false);
   
@@ -286,7 +291,7 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
     fetchPendingReview(); 
   }, [fetchPendingReview]);
 
-  const shouldShowHeader = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/');
+  const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/');
   const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
   const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
   const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/');
@@ -303,7 +308,7 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
             "fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out",
             isHeaderVisible ? "translate-y-0" : "-translate-y-full"
         )}>
-            <Header />
+            <Header initialWebSettings={initialWebSettings} />
         </div>
       )}
      <main

@@ -130,9 +130,8 @@ export default async function RootLayout({
           href="fixbro-dynamic-theme-styles"
           dangerouslySetInnerHTML={{ __html: serverThemeStyles }} 
         />
-        <Script
+        <script
           id="fixbro-initial-theme"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -169,7 +168,7 @@ export default async function RootLayout({
             <Suspense fallback={null}>
               <PageViewTracker />
             </Suspense>
-            <AppLayout>
+            <AppLayout initialWebSettings={webSettings}>
               {children}
             </AppLayout>
             <GlobalActionLoader />
