@@ -83,7 +83,7 @@ const calculateIncrementalTotalPriceForItem = (service: FirestoreService, quanti
 
 
 export default function PaymentPage() {
-  const [paymentMethod, setPaymentMethod] = useState("upi");
+  const [paymentMethod, setPaymentMethod] = useState("online");
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -387,8 +387,8 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (!isLoadingCartDetails && !isLoadingAppSettings) {
-      if (isCancellationFeeMode) { setPaymentMethod("upi"); return; } 
-      if (onlinePaymentEnabled) setPaymentMethod("upi"); 
+      if (isCancellationFeeMode) { setPaymentMethod("online"); return; } 
+      if (onlinePaymentEnabled) setPaymentMethod("online"); 
       else if (payAfterServiceEnabled) setPaymentMethod("later"); 
       else setPaymentMethod("");
     }
@@ -495,10 +495,16 @@ export default function PaymentPage() {
     if (!scriptLoaded) { toast({ title: "Error", description: "Could not load Razorpay checkout. Please try again.", variant: "destructive" }); setIsProcessingPayment(false); hideLoading(); return; }
 
     try {
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const currencyDecimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+
       const orderCreationResponse = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: Math.round(totalAmountDue * 100) }),
+          body: JSON.stringify({ 
+              amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
+              currency: currencyCode
+          }),
       });
 
       if (!orderCreationResponse.ok) {
@@ -515,7 +521,7 @@ export default function PaymentPage() {
       const paymentDescription = isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment";
 
       const options = {
-        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: "INR", name: globalSettings?.websiteName || "FixBro Services",
+        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: currencyCode, name: globalSettings?.websiteName || "Fixbro Services",
         description: paymentDescription, order_id: orderDetails.id,
         handler: (response: any) => {
           localStorage.setItem('razorpayPaymentId', response.razorpay_payment_id);
@@ -544,7 +550,7 @@ export default function PaymentPage() {
           router.push('/checkout/thank-you');
         },
         prefill: { name: customerName, email: customerEmail, contact: customerContact },
-        notes: { address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "FixBro"} Service Booking`, ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) },
+        notes: { address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Fixbro"} Service Booking`, ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) },
         theme: { color: "#45A0A2" },
         modal: { ondismiss: () => { setIsProcessingPayment(false); hideLoading(); }}
       };
@@ -579,10 +585,7 @@ export default function PaymentPage() {
   }
 
   const basePaymentOptions = [
-    { value: 'upi', label: 'UPI', icon: IndianRupee, online: true, available: onlinePaymentEnabled },
-    { value: 'card', label: 'Credit/Debit Card', icon: CreditCard, online: true, available: onlinePaymentEnabled },
-    { value: 'netbanking', label: 'Net Banking', icon: Landmark, online: true, available: onlinePaymentEnabled },
-    { value: 'wallet', label: 'Wallets', icon: Wallet, online: true, available: onlinePaymentEnabled },
+    { value: 'online', label: 'Pay Online (UPI, Cards, Net Banking, Wallets)', icon: CreditCard, online: true, available: onlinePaymentEnabled },
     { value: 'later', label: 'Pay After Service', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
   ];
   const currentAvailablePaymentOptions = basePaymentOptions.filter(option => option.available);
@@ -633,7 +636,7 @@ export default function PaymentPage() {
               {currentAvailablePaymentOptions.length > 0 ? (
                 <div className="mt-4"><h3 className="text-lg font-semibold mb-3">Select Payment Method</h3>
                     <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
-                    {currentAvailablePaymentOptions.map(method => { const Icon = method.icon; return (<Label key={method.value} htmlFor={`payment-${method.value}`} className={`flex items-center space-x-3 border rounded-md p-4 hover:bg-accent/50 cursor-pointer transition-colors ${paymentMethod === method.value ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary' : 'border-input bg-background'} ${isProcessingPayment ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => !isProcessingPayment && setPaymentMethod(method.value)}><RadioGroupItem value={method.value} id={`payment-${method.value}`} className="border-muted-foreground data-[state=checked]:border-primary-foreground" disabled={isProcessingPayment}/><Icon className="h-5 w-5" /><span>{method.label}</span></Label>);})}
+                    {currentAvailablePaymentOptions.map(method => { const Icon = method.icon; return (<Label key={method.value} htmlFor={`payment-${method.value}`} className={`flex items-center space-x-3 border rounded-xl p-4 hover:bg-accent/50 cursor-pointer transition-all ${paymentMethod === method.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-input bg-background'} ${isProcessingPayment ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => !isProcessingPayment && setPaymentMethod(method.value)}><RadioGroupItem value={method.value} id={`payment-${method.value}`} disabled={isProcessingPayment}/><Icon className="h-5 w-5 text-primary" /><span className="font-medium text-foreground">{method.label}</span></Label>);})}
                     </RadioGroup>
                 </div>
               ) : (<Alert variant="destructive" className="mt-4"><AlertTitle>No Payment Methods Available</AlertTitle><AlertDescription>Contact support or try later. Admin may need to enable a payment option.</AlertDescription></Alert>)}
