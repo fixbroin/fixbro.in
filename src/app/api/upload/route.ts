@@ -69,14 +69,56 @@ export async function POST(req: NextRequest) {
 
     // Clean destination subfolder under public/uploads/
     const cleanSubfolder = uploadPath.replace(/^[/\\]+|[/\\]+$/g, '').replace(/[/\\]+/g, '/');
-    const targetDir = path.join(process.cwd(), 'public', 'uploads', cleanSubfolder);
+    
+    // Resolve base directory, handling standalone mode to write to persistent root directory
+    let baseDir = process.cwd();
+    if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+      baseDir = path.join(baseDir, '..', '..');
+    }
+    const targetDir = path.join(baseDir, 'public', 'uploads', cleanSubfolder);
 
     await fs.mkdir(targetDir, { recursive: true });
 
-    // Generate unique filename preserving original extension
+    // Generate readable sequential filename preserving original extension
     const ext = path.extname(file.name) || '.jpg';
-    const filename = `${Date.now()}-${nanoid(8)}${ext}`;
-    const fullPath = path.join(targetDir, filename);
+    
+    // Map folder name to singular label (e.g. services -> service)
+    const segment = cleanSubfolder.split('/').pop()?.toLowerCase() || 'media';
+    const folderLabelMap: Record<string, string> = {
+      'services': 'service',
+      'slideshows': 'slideshow',
+      'categories': 'category',
+      'banners': 'banner',
+      'popups': 'popup',
+      'blogs': 'blog',
+      'general': 'general'
+    };
+    const label = folderLabelMap[segment] || segment;
+    
+    const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const prefix = `${dateStr}-${label}-fixbro-`;
+    
+    let counter = 1;
+    try {
+      const files = await fs.readdir(targetDir);
+      const matchingFiles = files.filter(f => f.startsWith(prefix));
+      counter = matchingFiles.length + 1;
+    } catch {}
+
+    let filename = `${prefix}${counter}${ext}`;
+    let fullPath = path.join(targetDir, filename);
+
+    // Ensure no collisions by checking file access
+    try {
+      while (true) {
+        await fs.access(fullPath);
+        counter++;
+        filename = `${prefix}${counter}${ext}`;
+        fullPath = path.join(targetDir, filename);
+      }
+    } catch {
+      // File does not exist, safe to write!
+    }
 
     await fs.writeFile(fullPath, buffer);
 
@@ -106,7 +148,11 @@ export async function DELETE(req: NextRequest) {
     // 1. Local VPS Disk Deletion
     if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('uploads/')) {
       const cleanPath = fileUrl.replace(/^\/?uploads\//, '');
-      const filePath = path.join(process.cwd(), 'public', 'uploads', cleanPath);
+      let baseDir = process.cwd();
+      if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+        baseDir = path.join(baseDir, '..', '..');
+      }
+      const filePath = path.join(baseDir, 'public', 'uploads', cleanPath);
       try {
         await fs.unlink(filePath);
       } catch (err) {
