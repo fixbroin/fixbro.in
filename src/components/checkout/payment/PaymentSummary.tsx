@@ -354,18 +354,29 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     }
 
     try {
+      const getCurrencySubunitDecimals = (currencyCode: string): number => {
+        const c = currencyCode.toUpperCase();
+        if (['JPY', 'KRW', 'CLP', 'VND', 'UGX'].includes(c)) return 0;
+        if (['BHD', 'JOD', 'KWD', 'OMR', 'TND'].includes(c)) return 3;
+        return 2;
+      };
+      const currencyDecimals = getCurrencySubunitDecimals(code);
+
       const res = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: Math.round(totalAmountDue * 100) }),
+          body: JSON.stringify({ 
+              amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
+              currency: code
+          }),
       });
       const orderDetails = await res.json();
 
       const options = {
         key: appConfig.razorpayKeyId,
         amount: orderDetails.amount,
-        currency: "INR",
-        name: globalSettings?.websiteName || "FixBro",
+        currency: code,
+        name: globalSettings?.websiteName || "Fixbro",
         description: "Service Booking",
         order_id: orderDetails.id,
         handler: (response: any) => {
