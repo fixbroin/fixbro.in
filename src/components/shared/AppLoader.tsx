@@ -14,7 +14,7 @@ export default function AppLoader({ text, initialLoaderType }: AppLoaderProps) {
   const appName =
     globalSettings?.websiteName ||
     process.env.NEXT_PUBLIC_WEBSITE_NAME ||
-    "FixBro";
+    "Fixbro";
   // Check if we can read the cached loaderType from cookies or localStorage to prevent flash
   let cookieLoaderType: string | null = null;
   let cachedLoaderType: string | null = null;

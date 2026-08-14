@@ -133,7 +133,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
       let failedSends = 0;
 
       const appDetails = {
-        websiteName: globalSettings.websiteName || 'FixBro',
+        websiteName: globalSettings.websiteName || 'Fixbro',
         websiteUrl: getBaseUrl(),
         supportEmail: globalSettings.contactEmail || 'support@fixbro.in',
         companyAddress: globalSettings.address || '',

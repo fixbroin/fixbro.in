@@ -23,7 +23,7 @@ export async function POST(request: Request) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'FixBroApp/1.0 (sup@fixbro.in)'
+            'User-Agent': 'FixbroApp/1.0 (sup@fixbro.in)'
           },
           body: `data=${encodeURIComponent(query)}`,
           next: { revalidate: 0 } // disable next.js caching

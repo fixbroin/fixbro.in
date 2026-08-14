@@ -198,7 +198,7 @@ export default async function CityCategoryPage({ params }: PageProps) {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "name": `${categoryData.name} in ${cityData.name}`,
-    "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by FixBro.`,
+    "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by Fixbro.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
     "priceRange": `${symbol}${symbol}`,

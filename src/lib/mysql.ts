@@ -201,7 +201,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
 
       case 'webSettings':
         await insert('global', null, {
-          websiteName: "FixBro",
+          websiteName: "Fixbro",
           contactEmail: "support@fixbro.in",
           contactMobile: "+917353113455",
           address: "#44 Electronic City Phase 2, Bangalore - 560100",
@@ -293,7 +293,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         });
         await insert('chatSettings', null, {
           isAiBotEnabled: false,
-          botGreetingMessage: "Hello! Welcome to FixBro. How can we help you today?",
+          botGreetingMessage: "Hello! Welcome to Fixbro. How can we help you today?",
           supportWorkingHours: "9:00 AM - 6:00 PM"
         });
         await insert('whatsappSettings', null, {
@@ -304,7 +304,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
           isActive: false
         });
         await insert('seo', null, {
-          title: "FixBro | Premium Home Services on Demand",
+          title: "Fixbro | Premium Home Services on Demand",
           description: "Book certified professionals for cleaning, plumbing, electrical, and other premium home services.",
           keywords: "home services, cleaning service, plumber, electrician, fixbro",
           ogImage: "/android-chrome-512x512.png"
@@ -327,7 +327,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'contentPages':
-        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About FixBro</h1><p>FixBro is India\'s premium on-demand home services platform...</p>', isActive: true });
+        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About Fixbro</h1><p>Fixbro is India\'s premium on-demand home services platform...</p>', isActive: true });
         await insert('terms-and-conditions', null, { slug: 'terms-and-conditions', title: 'Terms & Conditions', content: '<h1>Terms & Conditions</h1><p>Please read these terms carefully before booking...</p>', isActive: true });
         await insert('privacy-policy', null, { slug: 'privacy-policy', title: 'Privacy Policy', content: '<h1>Privacy Policy</h1><p>We respect your privacy and protect your data...</p>', isActive: true });
         break;

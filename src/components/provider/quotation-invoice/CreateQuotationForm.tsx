@@ -305,7 +305,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
       if (!quotationSnap.exists()) throw new Error("Quotation not found.");
       const savedQuotation = { id: quotationSnap.id, ...quotationSnap.data() } as FirestoreQuotation;
       const companyInfo: CompanyDetailsForPdf = {
-        name: companySettings?.websiteName || "FixBro", address: companySettings?.address || "",
+        name: companySettings?.websiteName || "Fixbro", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",

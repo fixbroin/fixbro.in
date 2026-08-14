@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: 'Carpenter, Plumber & Electrician Near Me in Bangalore',
-    description: 'Book trusted carpenter, plumber, electrician, TV installation, painting, and furniture assembly services near you in Bangalore with same-day service by FixBro experts.',
+    description: 'Book trusted carpenter, plumber, electrician, TV installation, painting, and furniture assembly services near you in Bangalore with same-day service by Fixbro experts.',
     alternates: {
       canonical: `${appBaseUrl}/near-me`,
     },
@@ -206,7 +206,7 @@ export default async function NearMeHubPage() {
           {/* SEO Content */}
           <div className="mt-20 max-w-4xl mx-auto prose prose-sm md:prose-base text-muted-foreground text-center">
             <h2 className="text-foreground">
-              Why Choose FixBro for Local
+              Why Choose Fixbro for Local
               Services in Bangalore?
             </h2>
 
@@ -215,7 +215,7 @@ export default async function NearMeHubPage() {
               plumber, electrician, TV
               installation, painting, or furniture
               assembly services near you?
-              FixBro connects Bangalore residents
+              Fixbro connects Bangalore residents
               with verified local experts for fast,
               reliable, and affordable home
               services across Whitefield, HSR

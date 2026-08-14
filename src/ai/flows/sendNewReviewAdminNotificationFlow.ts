@@ -112,7 +112,7 @@ const newReviewAdminNotificationEmailFlow = ai.defineFlow(
   },
   async (details) => {
     try {
-      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "FixBro", logoUrl, ...reviewDetails } = details;
+      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Fixbro", logoUrl, ...reviewDetails } = details;
 
       const adminEmail = "fixbro.in@gmail.com"; 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;

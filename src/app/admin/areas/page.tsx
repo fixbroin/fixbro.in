@@ -177,7 +177,7 @@ export default function AdminAreasPage() {
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`, {
         headers: {
-          'User-Agent': 'FixBro-Admin-App/1.0'
+          'User-Agent': 'Fixbro-Admin-App/1.0'
         }
       });
       const data = await response.json();

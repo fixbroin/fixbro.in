@@ -116,7 +116,7 @@ const newProviderApplicationAdminEmailFlow = ai.defineFlow(
       const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         applicationId, providerName, providerEmail, providerCategory, applicationUrl,
-        siteName = "FixBro", logoUrl
+        siteName = "Fixbro", logoUrl
       } = details;
 
       const adminEmail = "fixbro.in@gmail.com";

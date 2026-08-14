@@ -19,7 +19,7 @@ const InquiryReplyEmailInputSchema = z.object({
   userEmail: z.string().email().describe("The email address of the user."),
   originalMessage: z.string().describe("The original message or a summary of the inquiry submitted by the user."),
   replyMessage: z.string().describe("The admin's reply message."),
-  adminName: z.string().optional().default("FixBro Support").describe("The name of the admin or support team sending the reply."),
+  adminName: z.string().optional().default("Fixbro Support").describe("The name of the admin or support team sending the reply."),
   // SMTP Settings
   smtpHost: z.string().optional().describe("SMTP host for sending emails."),
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
@@ -125,7 +125,7 @@ const inquiryReplyEmailFlow = ai.defineFlow(
       const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         userName, userEmail, originalMessage, replyMessage, adminName, inquiryId,
-        siteName = "FixBro", logoUrl,
+        siteName = "Fixbro", logoUrl,
       } = details;
 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;

@@ -128,7 +128,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
     setIsSending(invoice.id);
     try {
       const companyInfo: CompanyDetailsForPdf = {
-        name: companySettings?.websiteName || "FixBro",
+        name: companySettings?.websiteName || "Fixbro",
         address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",
@@ -166,7 +166,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
     setIsDownloading(invoice.id);
     try {
       const companyInfo: CompanyDetailsForPdf = {
-        name: companySettings?.websiteName || "FixBro",
+        name: companySettings?.websiteName || "Fixbro",
         address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",

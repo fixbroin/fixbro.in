@@ -381,7 +381,7 @@ export default function ThemeSettingsPage() {
                     <XCircle className="h-6 w-6 text-destructive" />
                   </div>
                   <AlertDialogTitle className="text-2xl font-black tracking-tight uppercase">System Overwrite</AlertDialogTitle>
-                  <AlertDialogDescription className="text-base font-medium">This will wipe all custom branding and restore the original FixBro defaults.</AlertDialogDescription>
+                  <AlertDialogDescription className="text-base font-medium">This will wipe all custom branding and restore the original Fixbro defaults.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8">
                   <AlertDialogCancel className="rounded-xl border-none bg-muted">Cancel</AlertDialogCancel>

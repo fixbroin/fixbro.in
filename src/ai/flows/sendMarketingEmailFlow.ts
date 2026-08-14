@@ -112,7 +112,7 @@ const marketingEmailFlow = ai.defineFlow(
       const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         toEmail, subject, htmlBody,
-        siteName = "FixBro", logoUrl,
+        siteName = "Fixbro", logoUrl,
       } = details;
       
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;

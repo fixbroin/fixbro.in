@@ -108,7 +108,7 @@ const humanSupportRequestEmailFlow = ai.defineFlow(
   },
   async (details) => {
     try {
-      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "FixBro", logoUrl, ...requestDetails } = details;
+      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Fixbro", logoUrl, ...requestDetails } = details;
 
       // Primary Admin Email
       const adminEmail = "fixbro.in@gmail.com"; 
@@ -144,7 +144,7 @@ const humanSupportRequestEmailFlow = ai.defineFlow(
       });
       
       await transporter.sendMail({
-        from: `FixBro Support <${senderEmail}>`,
+        from: `Fixbro Support <${senderEmail}>`,
         to: adminEmail,
         subject: emailSubject,
         html: htmlBody,

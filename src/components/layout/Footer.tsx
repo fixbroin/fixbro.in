@@ -66,7 +66,7 @@ const Footer = () => {
   const [isSubscribing, setIsSubscribing] = useState(false);
   const { toast } = useToast();
 
-  const websiteName = settings?.websiteName || "FixBro";
+  const websiteName = settings?.websiteName || "Fixbro";
   const contactEmail = settings?.contactEmail || "support@fixbro.in"; 
   const socialLinks = settings?.socialMediaLinks;
 

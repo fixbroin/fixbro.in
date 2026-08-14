@@ -205,7 +205,7 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     "name": `${searchTerm} in ${areaData.name}, ${cityData.name}`,
-    "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${searchTerm} services in ${areaData.name}, ${cityData.name}. Trusted experts by FixBro.`,
+    "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${searchTerm} services in ${areaData.name}, ${cityData.name}. Trusted experts by Fixbro.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
     "priceRange": `${symbol}${symbol}`,

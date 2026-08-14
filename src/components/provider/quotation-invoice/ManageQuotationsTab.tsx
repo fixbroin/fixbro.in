@@ -110,7 +110,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
     if (actionType === 'send') setIsSending(quotation.id); else setIsDownloading(quotation.id);
     try {
       const companyInfo: CompanyDetailsForPdf = {
-        name: companySettings?.websiteName || "FixBro", address: companySettings?.address || "",
+        name: companySettings?.websiteName || "Fixbro", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",

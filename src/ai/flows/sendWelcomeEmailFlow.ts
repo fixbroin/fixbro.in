@@ -106,7 +106,7 @@ const welcomeEmailFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean(), message: z.string() }),
   },
   async (details) => {
-    const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, userName, userEmail, siteName = "FixBro", logoUrl } = details;
+    const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, userName, userEmail, siteName = "Fixbro", logoUrl } = details;
     
     const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 

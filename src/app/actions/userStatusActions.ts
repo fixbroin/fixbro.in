@@ -39,7 +39,7 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
     // 3. Load global settings configuration
     const appConfig = await getGlobalAppSettings();
 
-    const siteName = appConfig?.websiteName || process.env.NEXT_PUBLIC_WEBSITE_NAME || "FixBro";
+    const siteName = appConfig?.websiteName || process.env.NEXT_PUBLIC_WEBSITE_NAME || "Fixbro";
     const logoUrl = appConfig?.logoUrl;
     const contactEmail = appConfig?.contactEmail || appConfig?.senderEmail;
 

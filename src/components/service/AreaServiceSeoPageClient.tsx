@@ -50,7 +50,7 @@ export default function AreaServiceSeoPageClient({
 
   const ratingValue = serviceData.rating || "4.8";
   const reviewCount = serviceData.reviewCount || "156";
-  const cleanDescription = serviceData.description || `Professional ${serviceData.name} services in ${areaData.name}, ${cityData.name}. Trusted experts by FixBro.`;
+  const cleanDescription = serviceData.description || `Professional ${serviceData.name} services in ${areaData.name}, ${cityData.name}. Trusted experts by Fixbro.`;
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-16">
@@ -157,7 +157,7 @@ export default function AreaServiceSeoPageClient({
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent lg:bg-gradient-to-l" />
                 <div className="absolute bottom-6 left-6 right-6 text-white lg:hidden">
-                  <span className="text-xs font-semibold text-primary-foreground/90 uppercase tracking-wider block mb-1">FixBro Local Service</span>
+                  <span className="text-xs font-semibold text-primary-foreground/90 uppercase tracking-wider block mb-1">Fixbro Local Service</span>
                   <h3 className="text-xl font-extrabold tracking-tight">{serviceData.name}</h3>
                 </div>
               </div>

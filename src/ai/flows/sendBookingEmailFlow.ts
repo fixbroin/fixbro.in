@@ -172,7 +172,7 @@ const bookingEmailFlow = ai.defineFlow(
         invoicePdfBase64,
         previousScheduledDate,
         previousScheduledTimeSlot,
-        siteName = "FixBro",
+        siteName = "Fixbro",
         cancellationReason,
         logoUrl,
         currencySymbol = "Rs.",

@@ -1,6 +1,6 @@
-# FixBro VPS Cron Job & Google Indexing Configuration Guide
+# Fixbro VPS Cron Job & Google Indexing Configuration Guide
 
-This document lists all active automated cron jobs for the FixBro server, how to authorize Google Search Console, and troubleshooting guidelines. Keep this guide for future reference.
+This document lists all active automated cron jobs for the Fixbro server, how to authorize Google Search Console, and troubleshooting guidelines. Keep this guide for future reference.
 
 ---
 

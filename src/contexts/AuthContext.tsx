@@ -531,7 +531,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
                       body: JSON.stringify({
                           to: user.phoneNumber || details.mobileNumber,
                           templateName: marketingConfig.whatsAppOnSignup.templateName,
-                          parameters: [details.fullName, "FixBro"],
+                          parameters: [details.fullName, "Fixbro"],
                       }),
                   });
               } catch (waError) {
@@ -550,7 +550,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         // 1. Notify User
         const userNotification: Omit<FirestoreNotification, 'id'> = {
           userId: user.uid,
-          title: "Welcome to FixBro!",
+          title: "Welcome to Fixbro!",
           message: `Hi ${details.fullName}, thank you for joining us! We're excited to help you with your home services.`,
           type: 'success',
           href: '/profile',
@@ -573,7 +573,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           const adminNotification: Omit<FirestoreNotification, 'id'> = {
             userId: adminId,
             title: "New User Registered!",
-            message: `${details.fullName} has just signed up on FixBro.`,
+            message: `${details.fullName} has just signed up on Fixbro.`,
             type: 'info',
             href: `/admin/users`, // Assuming there's a users management page
             read: false,
@@ -592,7 +592,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       }
       // --- END SIGNUP NOTIFICATIONS ---
   
-      toast({ title: "Account Created!", description: "Welcome to FixBro!" });
+      toast({ title: "Account Created!", description: "Welcome to Fixbro!" });
   
       const redirectPathFromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('redirect') : null;
       let finalRedirectPath = '/';

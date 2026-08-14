@@ -30,9 +30,9 @@ const roboto = Roboto({
 export async function generateMetadata(): Promise<Metadata> {
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const siteName = seoSettings.siteName || 'FixBro';
+  const siteName = seoSettings.siteName || 'Fixbro';
   const defaultSuffix = seoSettings.defaultMetaTitleSuffix || ` - ${siteName}`;
-  const defaultDescription = seoSettings.defaultMetaDescription || 'Book home services easily with FixBro.';
+  const defaultDescription = seoSettings.defaultMetaDescription || 'Book home services easily with Fixbro.';
   const defaultKeywords = (seoSettings.defaultMetaKeywords || '').split(',').map(k => k.trim()).filter(k => k);
   const defaultOgImage = `/default-image.png`;
   const ogImage = seoSettings.structuredDataImage || defaultOgImage;

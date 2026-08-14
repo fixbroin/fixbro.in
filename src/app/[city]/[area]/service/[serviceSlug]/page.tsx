@@ -93,12 +93,12 @@ export async function generateMetadata(
 
   // Build customized metadata with manual config values or localized fallbacks
   const title = replacePlaceholders(
-    seoOverride?.meta_title || `${serviceData.name} in ${areaData.name}, ${cityData.name} | FixBro`,
+    seoOverride?.meta_title || `${serviceData.name} in ${areaData.name}, ${cityData.name} | Fixbro`,
     placeholderData
   );
 
   const description = replacePlaceholders(
-    seoOverride?.meta_description || `Professional ${serviceData.name} services in ${areaData.name}, ${cityData.name}. Quality home solutions, transparent pricing, verified experts by FixBro.`,
+    seoOverride?.meta_description || `Professional ${serviceData.name} services in ${areaData.name}, ${cityData.name}. Quality home solutions, transparent pricing, verified experts by Fixbro.`,
     placeholderData
   );
 
@@ -210,7 +210,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
     "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
-      "name": "FixBro",
+      "name": "Fixbro",
       "telephone": seoSettings.structuredDataTelephone,
       "priceRange": `${symbol}${symbol}`,
       "image": schemaImage,
@@ -236,7 +236,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
     "image": schemaImage,
     "brand": {
       "@type": "Brand",
-      "name": "FixBro"
+      "name": "Fixbro"
     },
     "sku": serviceData.id,
     "mpn": serviceData.id,

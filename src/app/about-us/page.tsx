@@ -23,10 +23,10 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
-  if (!pageData) return { title: `About Us | FixBro` };
+  if (!pageData) return { title: `About Us | Fixbro` };
 
-  const title = pageData.metaTitle || `About Us | ${seoSettings.siteName || 'FixBro'}`;
-  const description = pageData.metaDescription || pageData.excerpt || "Learn more about FixBro - Bangalore's most trusted home services provider.";
+  const title = pageData.metaTitle || `About Us | ${seoSettings.siteName || 'Fixbro'}`;
+  const description = pageData.metaDescription || pageData.excerpt || "Learn more about Fixbro - Bangalore's most trusted home services provider.";
 
   return {
     title: title,
@@ -74,10 +74,10 @@ export default async function AboutUsPage() {
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "FixBro",
+    "name": "Fixbro",
     "url": appBaseUrl,
     "logo": `${appBaseUrl}/android-chrome-512x512.png`,
-    "description": pageData.metaDescription || "FixBro is Bangalore's leading home services provider, offering professional carpentry, electrical, plumbing, and more.",
+    "description": pageData.metaDescription || "Fixbro is Bangalore's leading home services provider, offering professional carpentry, electrical, plumbing, and more.",
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+91-7353113455",

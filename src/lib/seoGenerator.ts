@@ -109,10 +109,10 @@ export function getSpinnedLocalContent(data: SeoPlaceholderData & { templateIdx?
 
   // 2. Main Paragraphs (Part 1)
   const paragraph1List = [
-    `Need professional ${targetLabel} services in ${locationLabel}? FixBro connects customers with trusted local experts who provide reliable service solutions for homes, apartments, offices, retail shops, and commercial properties throughout ${locationLabel} and neighbouring areas like ${formattedAreas}.`,
-    `Looking for certified ${targetLabel} specialists near you in ${locationLabel}? FixBro brings you background-verified trade experts equipped with advanced tools to handle home maintenance, retail support, and corporate installations around ${locationLabel} and neighbouring localities like ${formattedAreas}.`,
-    `If you are searching for high-quality ${targetLabel} in ${locationLabel}, our digital booking platform offers instant scheduling. FixBro connects you with skilled pros serving residential complexes, offices, and retail properties in ${locationLabel} as well as adjacent sectors including ${formattedAreas}.`,
-    `Get verified doorstep assistance for ${targetLabel} in ${locationLabel}. FixBro bridges the gap between home-owners and certified service professionals, delivering premium quality solutions across the entire ${locationLabel} region and surrounding areas like ${formattedAreas}.`
+    `Need professional ${targetLabel} services in ${locationLabel}? Fixbro connects customers with trusted local experts who provide reliable service solutions for homes, apartments, offices, retail shops, and commercial properties throughout ${locationLabel} and neighbouring areas like ${formattedAreas}.`,
+    `Looking for certified ${targetLabel} specialists near you in ${locationLabel}? Fixbro brings you background-verified trade experts equipped with advanced tools to handle home maintenance, retail support, and corporate installations around ${locationLabel} and neighbouring localities like ${formattedAreas}.`,
+    `If you are searching for high-quality ${targetLabel} in ${locationLabel}, our digital booking platform offers instant scheduling. Fixbro connects you with skilled pros serving residential complexes, offices, and retail properties in ${locationLabel} as well as adjacent sectors including ${formattedAreas}.`,
+    `Get verified doorstep assistance for ${targetLabel} in ${locationLabel}. Fixbro bridges the gap between home-owners and certified service professionals, delivering premium quality solutions across the entire ${locationLabel} region and surrounding areas like ${formattedAreas}.`
   ];
 
   const paragraph2List = [
@@ -191,10 +191,10 @@ export function getSpinnedLocalContent(data: SeoPlaceholderData & { templateIdx?
   ];
 
   const paragraph4List = [
-    `If you are searching for trusted ${targetLabel} near ${locationLabel}, ${cityName}, FixBro helps you connect with experienced professionals for quality service and dependable support.`,
+    `If you are searching for trusted ${targetLabel} near ${locationLabel}, ${cityName}, Fixbro helps you connect with experienced professionals for quality service and dependable support.`,
     `For anyone seeking reliable ${targetLabel} near me in ${locationLabel}, our certified technicians provide fast, professional, and friendly assistance.`,
-    `Get connected to the best ${targetLabel} near you in ${locationLabel} today. Experience standard-setting doorstep maintenance with FixBro.`,
-    `Searching for affordable ${targetLabel} near you in ${locationLabel}? Look no further. FixBro guarantees high-quality repairs with maximum convenience.`
+    `Get connected to the best ${targetLabel} near you in ${locationLabel} today. Experience standard-setting doorstep maintenance with Fixbro.`,
+    `Searching for affordable ${targetLabel} near you in ${locationLabel}? Look no further. Fixbro guarantees high-quality repairs with maximum convenience.`
   ];
 
   const selectedSubheadline = subheadlines[idx];
@@ -273,10 +273,10 @@ export function generateFreeCitySeoData(cityName: string, categoryNames: string[
   ];
 
   const descTemplates = [
-    `Looking for trusted home services in ${cityName} near you? FixBro connects you with certified experts for ${catsText}${localCoverageText}. Book online with upfront pricing!`,
+    `Looking for trusted home services in ${cityName} near you? Fixbro connects you with certified experts for ${catsText}${localCoverageText}. Book online with upfront pricing!`,
     `Need professional repair in ${cityName} near me? Find background-verified pros for ${catsText}${localCoverageText}. Scheduled convenience, zero hidden fees.`,
     `Get premium home maintenance in ${cityName} today. Our local handymen offer same-day service for ${catsText}${localCoverageText} with friendly assistance. Book your slot now!`,
-    `FixBro offers high-quality home repair in ${cityName} near you. Book verified experts for ${catsText}${localCoverageText} with upfront rates and guaranteed support.`
+    `Fixbro offers high-quality home repair in ${cityName} near you. Book verified experts for ${catsText}${localCoverageText} with upfront rates and guaranteed support.`
   ];
 
   const keywordsList: string[] = [
@@ -342,10 +342,10 @@ export function generateFreeAreaSeoData(cityName: string, areaName: string, cate
   ];
 
   const descTemplates = [
-    `Looking for trusted home services in ${areaName}, ${cityName} near you? FixBro connects you with certified experts for ${catsText}${localCoverageText}. Book online with upfront pricing!`,
+    `Looking for trusted home services in ${areaName}, ${cityName} near you? Fixbro connects you with certified experts for ${catsText}${localCoverageText}. Book online with upfront pricing!`,
     `Need professional repair in ${areaName} near me? Find background-verified pros for ${catsText}${localCoverageText} near ${cityName}. Scheduled convenience, zero hidden fees.`,
     `Get premium home maintenance in ${areaName} today. Our local handymen offer same-day service for ${catsText}${localCoverageText} with friendly assistance. Book your slot now!`,
-    `FixBro offers high-quality home repair in ${areaName} near you. Book verified experts for ${catsText}${localCoverageText} with upfront rates and guaranteed support.`
+    `Fixbro offers high-quality home repair in ${areaName} near you. Book verified experts for ${catsText}${localCoverageText} with upfront rates and guaranteed support.`
   ];
 
   const keywordsList: string[] = [
@@ -407,14 +407,14 @@ export function generateFreeCityCategorySeoData(cityName: string, categoryName: 
     `Trusted ${categoryName} Services in ${cityName} | Verified Local Experts`,
     `Best ${categoryName} Repair & Maintenance in ${cityName} Near Me`,
     `Premium ${categoryName} Services & Local Technicians in ${cityName}`,
-    `Doorstep ${categoryName} Services in ${cityName} Near You | FixBro`
+    `Doorstep ${categoryName} Services in ${cityName} Near You | Fixbro`
   ];
 
   const descTemplates = [
-    `Looking for trusted ${categoryName.toLowerCase()} services in ${cityName} near you? FixBro connects you with certified experts for ${servicesText}${localCoverageText}. Book online with upfront pricing!`,
+    `Looking for trusted ${categoryName.toLowerCase()} services in ${cityName} near you? Fixbro connects you with certified experts for ${servicesText}${localCoverageText}. Book online with upfront pricing!`,
     `Need professional ${categoryName.toLowerCase()} repair in ${cityName} near me? Find background-verified pros for ${servicesText}${localCoverageText}. Scheduled convenience, zero hidden fees.`,
     `Get premium ${categoryName.toLowerCase()} maintenance in ${cityName} today. Our local technicians offer same-day service for ${servicesText}${localCoverageText} with friendly assistance.`,
-    `FixBro offers top-quality ${categoryName.toLowerCase()} services in ${cityName} near you. Book verified specialists for ${servicesText}${localCoverageText} with upfront rates.`
+    `Fixbro offers top-quality ${categoryName.toLowerCase()} services in ${cityName} near you. Book verified specialists for ${servicesText}${localCoverageText} with upfront rates.`
   ];
 
   const cleanCat = categoryName.toLowerCase();
@@ -461,7 +461,7 @@ export function generateFreeCityCategorySeoData(cityName: string, categoryName: 
   const faqsList = [
     {
       question: `Do you provide ${categoryName.toLowerCase()} services in ${cityName}?`,
-      answer: `Yes, FixBro provides comprehensive, top-rated ${categoryName.toLowerCase()} services throughout ${cityName} and surrounding localities.`
+      answer: `Yes, Fixbro provides comprehensive, top-rated ${categoryName.toLowerCase()} services throughout ${cityName} and surrounding localities.`
     },
     {
       question: `How quickly can I book a professional ${categoryName.toLowerCase()} in ${cityName}?`,
@@ -506,14 +506,14 @@ export function generateFreeAreaCategorySeoData(cityName: string, areaName: stri
     `Trusted ${categoryName} Services in ${areaName}, ${cityName} | Verified Local Experts`,
     `Best ${categoryName} Repair & Maintenance in ${areaName} Near Me`,
     `Premium ${categoryName} Services & Local Technicians in ${areaName} near ${cityName}`,
-    `Doorstep ${categoryName} Services in ${areaName} Near You | FixBro`
+    `Doorstep ${categoryName} Services in ${areaName} Near You | Fixbro`
   ];
 
   const descTemplates = [
-    `Looking for trusted ${categoryName.toLowerCase()} services in ${areaName}, ${cityName} near you? FixBro connects you with certified experts for ${servicesText}. Book online with upfront pricing!`,
+    `Looking for trusted ${categoryName.toLowerCase()} services in ${areaName}, ${cityName} near you? Fixbro connects you with certified experts for ${servicesText}. Book online with upfront pricing!`,
     `Need professional ${categoryName.toLowerCase()} repair in ${areaName} near me? Find background-verified pros for ${servicesText} near ${cityName}. Scheduled convenience, zero hidden fees.`,
     `Get premium ${categoryName.toLowerCase()} maintenance in ${areaName} today. Our local technicians offer same-day service for ${servicesText} with friendly assistance.`,
-    `FixBro offers top-quality ${categoryName.toLowerCase()} services in ${areaName} near you. Book verified specialists for ${servicesText} covering ${nearbyList.slice(0, 3).join(', ')}.`
+    `Fixbro offers top-quality ${categoryName.toLowerCase()} services in ${areaName} near you. Book verified specialists for ${servicesText} covering ${nearbyList.slice(0, 3).join(', ')}.`
   ];
 
   const cleanCat = categoryName.toLowerCase();
@@ -561,7 +561,7 @@ export function generateFreeAreaCategorySeoData(cityName: string, areaName: stri
   const faqsList = [
     {
       question: `Do you provide ${categoryName.toLowerCase()} services in ${areaName}?`,
-      answer: `Yes, FixBro provides comprehensive, top-rated ${categoryName.toLowerCase()} services throughout ${areaName} and surrounding areas like ${formattedAreas}.`
+      answer: `Yes, Fixbro provides comprehensive, top-rated ${categoryName.toLowerCase()} services throughout ${areaName} and surrounding areas like ${formattedAreas}.`
     },
     {
       question: `How quickly can I book a professional ${categoryName.toLowerCase()} in ${areaName}?`,
@@ -604,14 +604,14 @@ export function generateFreeAreaServiceSeoData(cityName: string, areaName: strin
     `Trusted ${serviceName} in ${areaName}, ${cityName} | Verified Local Experts`,
     `Best ${serviceName} Repair & Maintenance in ${areaName} Near Me`,
     `Premium ${serviceName} & Local Technicians in ${areaName} near ${cityName}`,
-    `Doorstep ${serviceName} Services in ${areaName} Near You | FixBro`
+    `Doorstep ${serviceName} Services in ${areaName} Near You | Fixbro`
   ];
 
   const descTemplates = [
-    `Looking for trusted ${serviceName.toLowerCase()} in ${areaName}, ${cityName} near you? FixBro connects you with certified experts. Book online with upfront pricing!`,
+    `Looking for trusted ${serviceName.toLowerCase()} in ${areaName}, ${cityName} near you? Fixbro connects you with certified experts. Book online with upfront pricing!`,
     `Need professional ${serviceName.toLowerCase()} in ${areaName} near me? Find background-verified pros near ${cityName}. Scheduled convenience, zero hidden fees.`,
     `Get premium ${serviceName.toLowerCase()} in ${areaName} today. Our local technicians offer same-day service with friendly assistance.`,
-    `FixBro offers top-quality ${serviceName.toLowerCase()} services in ${areaName} near you. Book verified specialists covering ${nearbyList.slice(0, 3).join(', ')}.`
+    `Fixbro offers top-quality ${serviceName.toLowerCase()} services in ${areaName} near you. Book verified specialists covering ${nearbyList.slice(0, 3).join(', ')}.`
   ];
 
   const cleanSrv = serviceName.toLowerCase();
@@ -657,7 +657,7 @@ export function generateFreeAreaServiceSeoData(cityName: string, areaName: strin
   const faqsList = [
     {
       question: `Do you provide ${serviceName.toLowerCase()} in ${areaName}?`,
-      answer: `Yes, FixBro provides comprehensive, top-rated ${serviceName.toLowerCase()} throughout ${areaName} and surrounding areas like ${formattedAreas}.`
+      answer: `Yes, Fixbro provides comprehensive, top-rated ${serviceName.toLowerCase()} throughout ${areaName} and surrounding areas like ${formattedAreas}.`
     },
     {
       question: `How quickly can I book a professional for ${serviceName.toLowerCase()} in ${areaName}?`,

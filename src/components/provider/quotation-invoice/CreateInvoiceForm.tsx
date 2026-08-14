@@ -338,7 +338,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
       if (!invoiceSnap.exists()) throw new Error("Invoice not found.");
       const savedInvoice = { id: invoiceSnap.id, ...invoiceSnap.data() } as FirestoreInvoice;
       const companyInfo: CompanyDetailsForPdf = {
-        name: companySettings?.websiteName || "FixBro", address: companySettings?.address || "",
+        name: companySettings?.websiteName || "Fixbro", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",

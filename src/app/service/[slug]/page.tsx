@@ -149,8 +149,8 @@ export async function generateMetadata(
     cityName: cityName
   };
 
-  const title = replacePlaceholders(serviceData.seo_title || seoSettings.servicePageTitlePattern, placeholderData) || `${serviceData.name} in ${cityName} | FixBro`;
-  const description = replacePlaceholders(serviceData.seo_description || seoSettings.servicePageDescriptionPattern, placeholderData) || `${serviceData.name} in ${cityName}. Trusted experts, transparent pricing, and quality home solutions by FixBro.`;
+  const title = replacePlaceholders(serviceData.seo_title || seoSettings.servicePageTitlePattern, placeholderData) || `${serviceData.name} in ${cityName} | Fixbro`;
+  const description = replacePlaceholders(serviceData.seo_description || seoSettings.servicePageDescriptionPattern, placeholderData) || `${serviceData.name} in ${cityName}. Trusted experts, transparent pricing, and quality home solutions by Fixbro.`;
   const keywords = (replacePlaceholders(serviceData.seo_keywords || seoSettings.servicePageKeywordsPattern, placeholderData) || `${serviceData.name}, best ${serviceData.name} near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = serviceData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
@@ -223,7 +223,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     "image": schemaImage,
     "provider": {
       "@type": "LocalBusiness",
-      "name": "FixBro",
+      "name": "Fixbro",
       "telephone": seoSettings.structuredDataTelephone,
       "priceRange": `${symbol}${symbol}`,
       "image": schemaImage,
@@ -249,7 +249,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
     "image": schemaImage,
     "brand": {
       "@type": "Brand",
-      "name": "FixBro"
+      "name": "Fixbro"
     },
     "sku": serviceData.id,
     "mpn": serviceData.id,

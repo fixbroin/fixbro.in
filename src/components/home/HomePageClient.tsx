@@ -474,7 +474,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const citySnap = await getDocs(cityQuery);
             if (!citySnap.empty) {
                 fetchedCityData = {id: citySnap.docs[0].id, ...(citySnap.docs[0].data() as Omit<FirestoreCity, 'id'>)} as FirestoreCity;
-                currentH1 = initialH1Title || fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("FixBro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
+                currentH1 = initialH1Title || fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("Fixbro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
                 currentCityNameForLd = fetchedCityData.name;
             }
         } catch (e) { console.error("Error fetching city data for H1/LD:", e); }
@@ -493,7 +493,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setPageH1(currentH1);
       setCache('pageH1', currentH1);
 
-      const siteName = fetchedSeoSettings.siteName || 'FixBro';
+      const siteName = fetchedSeoSettings.siteName || 'Fixbro';
       const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://fixbro.in') + '/android-chrome-512x512.png';
 
       let webSettingsData: GlobalWebSettings | null = null;
@@ -848,7 +848,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <LazySection>
             <section className="py-8 md:py-10">
             <div className="container mx-auto px-4">
-                <SectionHeader title="Why Choose FixBro?" />
+                <SectionHeader title="Why Choose Fixbro?" />
                 <WhyChooseUs />
             </div>
             </section>
@@ -886,10 +886,10 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                         </h2>
                         <div className="prose prose-sm md:prose-base max-w-none text-muted-foreground">
                             <p>
-                                FixBro is your one-stop solution for all <strong>home services in Bangalore</strong>. Whether you are looking for a <strong>carpenter near me</strong>, a professional <strong>plumber in Bangalore</strong>, or an <strong>electrician in Whitefield</strong>, we have you covered. Our platform connects you with verified, background-checked experts for over 50+ services including AC repair, house cleaning, painting, and appliance maintenance.
+                                Fixbro is your one-stop solution for all <strong>home services in Bangalore</strong>. Whether you are looking for a <strong>carpenter near me</strong>, a professional <strong>plumber in Bangalore</strong>, or an <strong>electrician in Whitefield</strong>, we have you covered. Our platform connects you with verified, background-checked experts for over 50+ services including AC repair, house cleaning, painting, and appliance maintenance.
                             </p>
                             <p>
-                                We currently serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, and Jayanagar</strong>. With upfront pricing, same-day service availability, and a 99.9% satisfaction guarantee, FixBro is Bangalore's most trusted home maintenance partner.
+                                We currently serve all major localities in Bangalore, including <strong>Whitefield, HSR Layout, Koramangala, Indiranagar, Electronic City, and Jayanagar</strong>. With upfront pricing, same-day service availability, and a 99.9% satisfaction guarantee, Fixbro is Bangalore's most trusted home maintenance partner.
                             </p>
                         </div>
                     </div>
@@ -904,7 +904,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
               {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the FixBro difference."}
+              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
             </p>
             <Button
               size="lg"

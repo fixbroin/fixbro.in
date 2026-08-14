@@ -27,8 +27,8 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
 
-  const title = pageData?.metaTitle || `Contact Us | ${seoSettings.siteName || 'FixBro'}`;
-  const description = pageData?.metaDescription || "Contact FixBro for any queries, support, or feedback regarding our home services in Bangalore.";
+  const title = pageData?.metaTitle || `Contact Us | ${seoSettings.siteName || 'Fixbro'}`;
+  const description = pageData?.metaDescription || "Contact Fixbro for any queries, support, or feedback regarding our home services in Bangalore.";
 
   return {
     title: title,
@@ -114,12 +114,12 @@ export default async function ContactUsPage() {
   const contactSchema = {
     "@context": "https://schema.org",
     "@type": "ContactPage",
-    "name": "Contact FixBro",
-    "description": "Contact FixBro for professional home services in Bangalore. Reach us via phone, email, or visit our office.",
+    "name": "Contact Fixbro",
+    "description": "Contact Fixbro for professional home services in Bangalore. Reach us via phone, email, or visit our office.",
     "url": `${appBaseUrl}/contact-us`,
     "mainEntity": {
       "@type": "LocalBusiness",
-      "name": "FixBro",
+      "name": "Fixbro",
       "image": `${appBaseUrl}/android-chrome-512x512.png`,
       "telephone": "+91-7353113455",
       "email": "support@fixbro.in",

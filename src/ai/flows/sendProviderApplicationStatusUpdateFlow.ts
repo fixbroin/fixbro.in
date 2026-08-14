@@ -118,7 +118,7 @@ const providerApplicationStatusEmailFlow = ai.defineFlow(
       const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         providerName, providerEmail, applicationStatus, adminReviewNotes, applicationUrl,
-        siteName = "FixBro", logoUrl,
+        siteName = "Fixbro", logoUrl,
       } = details;
       
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;

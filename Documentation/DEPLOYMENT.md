@@ -1,6 +1,6 @@
-# FixBro VPS Deployment Guide
+# Fixbro VPS Deployment Guide
 
-This document describes the deployment procedures for the FixBro Next.js standalone application on a VPS using PM2.
+This document describes the deployment procedures for the Fixbro Next.js standalone application on a VPS using PM2.
 
 ---
 

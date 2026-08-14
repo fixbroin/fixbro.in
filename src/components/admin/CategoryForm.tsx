@@ -262,14 +262,14 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
         });
 
         const h1Title = `Professional ${categoryName} Services`;
-        const seoTitle = `Best ${categoryName} Services near me | FixBro`;
-        const seoDescription = `Book certified and background-verified ${categoryName.toLowerCase()} experts with FixBro. Quality service, upfront pricing, and trusted professionals.`;
+        const seoTitle = `Best ${categoryName} Services near me | Fixbro`;
+        const seoDescription = `Book certified and background-verified ${categoryName.toLowerCase()} experts with Fixbro. Quality service, upfront pricing, and trusted professionals.`;
         const seoKeywords = `${categoryName.toLowerCase()} services, best ${categoryName.toLowerCase()} near me, local ${categoryName.toLowerCase()}`;
         const imageHint = `${categoryName.toLowerCase()} services`;
 
         const faqsList = [
           {
-            question: `How do I book ${categoryName.toLowerCase()} services on FixBro?`,
+            question: `How do I book ${categoryName.toLowerCase()} services on Fixbro?`,
             answer: `You can easily book online. Select the required ${categoryName.toLowerCase()} service, choose a convenient date and time slot, and confirm your booking instantly.`
           },
           {
@@ -646,7 +646,7 @@ export default function CategoryForm({ onSubmit: onSubmitProp, initialData, onCa
             <FormItem><FormLabel>H1 Title</FormLabel><FormControl><Input placeholder="e.g., Expert Home Repair Services" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_title" render={({ field }) => (
-            <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Home Repair Services | FixBro" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Meta Title</FormLabel><FormControl><Input placeholder="e.g., Home Repair Services | Fixbro" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="seo_description" render={({ field }) => (
             <FormItem><FormLabel>Meta Description</FormLabel><FormControl><Textarea placeholder="e.g., Get reliable home repair services for plumbing, electrical, and more." {...field} rows={3} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>

@@ -31,7 +31,7 @@ const formatTimestampToReadable = (timestamp?: Timestamp | Date | string): strin
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-// Colors matching FixBro theme (Teal/Dark Gray)
+// Colors matching Fixbro theme (Teal/Dark Gray)
 const primaryColor = { r: 20, g: 110, b: 120 }; // Teal
 const secondaryColor = { r: 100, g: 110, b: 120 }; // Gray
 const textColor = { r: 30, g: 41, b: 59 }; // Slate
@@ -194,7 +194,7 @@ export const generateProviderApplicationPdf = async (
   let y = 22;
 
   const defaultCompanyDetails: CompanyDetailsForPdf = {
-    name: companyDetails?.name || "FixBro.in",
+    name: companyDetails?.name || "Fixbro.in",
     address: companyDetails?.address || "Company Address Placeholder",
     contactEmail: companyDetails?.contactEmail || 'support@example.com',
     contactMobile: companyDetails?.contactMobile || '+91-XXXXXXXXXX',
@@ -341,7 +341,7 @@ export const generateProviderApplicationPdf = async (
   
   doc.setFontSize(9.5);
   doc.setTextColor(secondaryColor.r, secondaryColor.g, secondaryColor.b);
-  const consentText = `I, ${application.fullName || 'the applicant'}, hereby declare that I have read, understood, and agreed to the Terms and Conditions of FixBro.in. I confirm that all information provided in this application is true and accurate to the best of my knowledge. I understand that any false information may lead to the rejection of my application or termination of my partnership. I provide my digital consent below as a formal agreement.`;
+  const consentText = `I, ${application.fullName || 'the applicant'}, hereby declare that I have read, understood, and agreed to the Terms and Conditions of Fixbro.in. I confirm that all information provided in this application is true and accurate to the best of my knowledge. I understand that any false information may lead to the rejection of my application or termination of my partnership. I provide my digital consent below as a formal agreement.`;
   const splitConsent = doc.splitTextToSize(consentText, 180);
   doc.text(splitConsent, 14, y);
   y += (splitConsent.length * 5) + 5;

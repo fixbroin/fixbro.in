@@ -229,7 +229,7 @@ export default function AdminBookingsPage() {
 
   const handleWhatsAppClick = (booking: FirestoreBooking) => {
     if (booking.customerPhone) {
-      const message = `Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`;
+      const message = `Hi ${booking.customerName}, I'm contacting you from Fixbro regarding your booking #${booking.bookingId}.`;
       openWhatsAppChooser(booking.customerPhone, message);
     }
   };

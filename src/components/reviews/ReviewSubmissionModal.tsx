@@ -157,7 +157,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
                     smtpUser: config.smtpUser,
                     smtpPass: config.smtpPass,
                     senderEmail: config.senderEmail,
-                    siteName: "FixBro", // Or from webSettings if available
+                    siteName: "Fixbro", // Or from webSettings if available
                 });
             }
         }

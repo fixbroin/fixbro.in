@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: 'Top-Rated Home Service Categories in Bangalore',
       description: 'Explore all professional home service categories in Bangalore. Find expert carpenters, plumbers, electricians, painters, and appliance technicians near you.',
       url: '/categories',
-      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png`, width: 512, height: 512, alt: 'FixBro Categories' }],
+      images: [{ url: `${appBaseUrl}/android-chrome-512x512.png`, width: 512, height: 512, alt: 'Fixbro Categories' }],
       type: 'website',
     },
   };

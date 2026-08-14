@@ -277,7 +277,7 @@ export default function ThankYouPage() {
                       cancellationFee: feeAmount,
                       refundableAmount: originalBookingData.paymentMethod === 'Online' ? Math.max(0, originalBookingData.totalAmount - feeAmount) : 0,
                       cancellationPaymentId: razorpayPaymentId || undefined,
-                      siteName: globalCompanySettings?.websiteName || "FixBro",
+                      siteName: globalCompanySettings?.websiteName || "Fixbro",
                       smtpHost: appConfig.smtpHost,
                       smtpPort: appConfig.smtpPort,
                       smtpUser: appConfig.smtpUser,

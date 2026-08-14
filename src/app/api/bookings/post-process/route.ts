@@ -253,7 +253,7 @@ export async function POST(request: Request) {
                         smtpUser: appConfig.smtpUser,
                         smtpPass: appConfig.smtpPass,
                         senderEmail: appConfig.senderEmail,
-                        siteName: seoSettings?.websiteName || "FixBro",
+                        siteName: seoSettings?.websiteName || "Fixbro",
                         logoUrl: seoSettings?.logoUrl,
                     });
                 } catch (emailErr) {
@@ -468,7 +468,7 @@ export async function POST(request: Request) {
     if (isCompleted) {
         try {
             const companyDetails = {
-                name: seoSettings?.websiteName || "FixBro",
+                name: seoSettings?.websiteName || "Fixbro",
                 address: appConfig?.companyAddress || "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",
                 contactEmail: appConfig?.companyEmail || 'support@fixbro.in',
                 contactMobile: appConfig?.companyPhone || '+91-7353113455',
@@ -510,7 +510,7 @@ export async function POST(request: Request) {
         totalAmount: booking.totalAmount,
         paymentMethod: booking.paymentMethod,
         status: booking.status,
-        siteName: seoSettings?.websiteName || "FixBro",
+        siteName: seoSettings?.websiteName || "Fixbro",
         logoUrl: seoSettings?.logoUrl,
         currencySymbol: appConfig.currencySymbol || "Rs.",
         smtpHost: appConfig.smtpHost,

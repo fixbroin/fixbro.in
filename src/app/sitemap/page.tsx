@@ -12,8 +12,8 @@ import { cache } from 'react';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Sitemap - FixBro Home Services',
-  description: 'Explore all pages, cities, categories, and services offered by FixBro. Your complete guide to our home service platform.',
+  title: 'Sitemap - Fixbro Home Services',
+  description: 'Explore all pages, cities, categories, and services offered by Fixbro. Your complete guide to our home service platform.',
   robots: {
     index: true,
     follow: true,
@@ -153,7 +153,7 @@ export default async function SitemapPage() {
       <div className="container mx-auto px-4 py-12">
         <div className="mb-12 text-center">
             <h1 className="text-4xl md:text-6xl font-headline font-bold text-foreground mb-4">Sitemap</h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">Your complete guide to FixBro. Find every service, city, and information page in one place.</p>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Your complete guide to Fixbro. Find every service, city, and information page in one place.</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">

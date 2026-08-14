@@ -80,7 +80,7 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
 
-  const title = replacePlaceholders(areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, placeholderData) || `${areaData.name}, ${areaData.parentCityData?.name} | FixBro`;
+  const title = replacePlaceholders(areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, placeholderData) || `${areaData.name}, ${areaData.parentCityData?.name} | Fixbro`;
   const description = replacePlaceholders(areaData.seo_description || areaData.metaDescription || seoSettings.areaPageDescriptionPattern, placeholderData) || `Trusted home services in ${areaData.name}, ${areaData.parentCityData?.name}.`;
   const keywords = replacePlaceholders(areaData.seo_keywords || areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 

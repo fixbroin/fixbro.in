@@ -206,8 +206,8 @@ export default function AreaServiceSeoForm({
       // Set fallback titles
       const cleanServiceName = selectedService.name;
       form.setValue("h1_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name}`);
-      form.setValue("meta_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name} | FixBro`);
-      form.setValue("meta_description", `Professional ${cleanServiceName} services in ${selectedArea.name}, ${selectedCity.name}. Trusted, transparent pricing, verified experts by FixBro.`);
+      form.setValue("meta_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name} | Fixbro`);
+      form.setValue("meta_description", `Professional ${cleanServiceName} services in ${selectedArea.name}, ${selectedCity.name}. Trusted, transparent pricing, verified experts by Fixbro.`);
       form.setValue("meta_keywords", `${cleanServiceName} in ${selectedArea.name}, ${cleanServiceName} near me, best ${cleanServiceName} in ${selectedCity.name}`);
 
       // Auto-populate SEO Content details from global/default template

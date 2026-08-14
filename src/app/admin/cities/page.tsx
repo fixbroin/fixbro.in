@@ -75,7 +75,7 @@ export default function AdminCitiesPage() {
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(countryInput)}&featuretype=country&limit=1`;
       const response = await fetch(nominatimUrl, {
         headers: {
-          'User-Agent': 'FixBro-Admin-App/1.0'
+          'User-Agent': 'Fixbro-Admin-App/1.0'
         }
       });
       const data = await response.json();
@@ -164,7 +164,7 @@ export default function AdminCitiesPage() {
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stateInput)}&limit=1`;
       const response = await fetch(nominatimUrl, {
         headers: {
-          'User-Agent': 'FixBro-Admin-App/1.0'
+          'User-Agent': 'Fixbro-Admin-App/1.0'
         }
       });
       const data = await response.json();

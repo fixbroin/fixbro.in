@@ -45,7 +45,7 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
   const sym = companyDetails?.currencySymbol || '₹';
 
   const defaultCompanyDetails: CompanyDetailsForPdf = {
-    name: companyDetails?.name || process.env.NEXT_PUBLIC_WEBSITE_NAME || "FixBro",
+    name: companyDetails?.name || process.env.NEXT_PUBLIC_WEBSITE_NAME || "Fixbro",
     address: companyDetails?.address || "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",
     contactEmail: companyDetails?.contactEmail || 'support@fixbro.in',
     contactMobile: companyDetails?.contactMobile || '+91-7353113455',

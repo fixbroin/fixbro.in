@@ -62,7 +62,7 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { cityName: cityData.name };
 
-  const title = replacePlaceholders(cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, placeholderData) || `${cityData.name} Home Services | FixBro`;
+  const title = replacePlaceholders(cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, placeholderData) || `${cityData.name} Home Services | Fixbro`;
   const description = replacePlaceholders(cityData.seo_description || cityData.metaDescription || seoSettings.cityPageDescriptionPattern, placeholderData) || `Trusted home services in ${cityData.name}.`;
   const keywords = replacePlaceholders(cityData.seo_keywords || cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
@@ -134,9 +134,9 @@ export default async function CityHomePage({ params }: CityPageProps) {
   const citySchema = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
-    "name": `FixBro ${cityData.name}`,
+    "name": `Fixbro ${cityData.name}`,
     "url": `${appBaseUrl}/${citySlug}`,
-    "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by FixBro.`,
+    "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by Fixbro.`,
     "telephone": seoSettings.structuredDataTelephone,
     "image": schemaImage,
     "priceRange": `${symbol}${symbol}`,

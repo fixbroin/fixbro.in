@@ -20,7 +20,7 @@ export async function generateMetadata(
   const webSettings = await getGlobalWebSettings();
   const appBaseUrl = getBaseUrl();
 
-  const title = seoSettings.homepageMetaTitle || seoSettings.siteName || 'FixBro';
+  const title = seoSettings.homepageMetaTitle || seoSettings.siteName || 'Fixbro';
   const description = seoSettings.homepageMetaDescription || seoSettings.defaultMetaDescription || '';
   const keywords = (seoSettings.homepageMetaKeywords || seoSettings.defaultMetaKeywords || '').split(',').map(k => k.trim()).filter(k => k);
 
@@ -28,7 +28,7 @@ export async function generateMetadata(
   const rawOgImage = ogImageFromWebSettings || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;
 
-  const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || 'FixBro';
+  const siteName = resolvedParent.openGraph?.siteName || seoSettings.siteName || 'Fixbro';
 
   return {
     title: title,
@@ -61,7 +61,7 @@ export default async function Page() {
   const symbol = appConfig?.currencySymbol || "₹";
 
   const appBaseUrl = getBaseUrl();
-  const siteName = homepageData.seoSettings.siteName || 'FixBro';
+  const siteName = homepageData.seoSettings.siteName || 'Fixbro';
   const seoSettings = homepageData.seoSettings;
 
   const rawSchemaImage = seoSettings.structuredDataImage || `/android-chrome-512x512.png`;
@@ -147,7 +147,7 @@ export default async function Page() {
         "name": "Who is the best carpenter in Bangalore for home repairs?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "FixBro provides top-rated, verified professional carpenters in Bangalore for all home furniture repairs, assembly, and custom woodwork with transparent pricing."
+          "text": "Fixbro provides top-rated, verified professional carpenters in Bangalore for all home furniture repairs, assembly, and custom woodwork with transparent pricing."
         }
       },
       {
@@ -155,7 +155,7 @@ export default async function Page() {
         "name": "How to book home services in Bangalore?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can easily book professional home services in Bangalore through FixBro. Choose your service, select your locality, and book an expert in under 60 seconds."
+          "text": "You can easily book professional home services in Bangalore through Fixbro. Choose your service, select your locality, and book an expert in under 60 seconds."
         }
       }
     ]

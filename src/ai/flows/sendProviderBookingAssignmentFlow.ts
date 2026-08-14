@@ -121,7 +121,7 @@ const providerBookingAssignmentEmailFlow = ai.defineFlow(
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         providerName, providerEmail, bookingId, bookingDocId, serviceName,
         scheduledDate, scheduledTimeSlot, customerName, customerAddress,
-        siteName = "FixBro", logoUrl,
+        siteName = "Fixbro", logoUrl,
       } = details;
 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;

@@ -1,6 +1,6 @@
 <?php
 /**
- * FixBro Remote Media Upload Bridge for Shared Hosting
+ * Fixbro Remote Media Upload Bridge for Shared Hosting
  * Upload this file as `upload.php` to your Shared Hosting subdomain (e.g. media.fixbro.in)
  */
 

@@ -73,7 +73,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
 
   const handleWhatsAppClick = () => {
     if (booking.customerPhone) {
-      const message = `Hi ${booking.customerName}, I'm contacting you from FixBro regarding your booking #${booking.bookingId}.`;
+      const message = `Hi ${booking.customerName}, I'm contacting you from Fixbro regarding your booking #${booking.bookingId}.`;
       openWhatsAppChooser(booking.customerPhone, message);
     }
   };

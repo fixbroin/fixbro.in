@@ -101,7 +101,7 @@ export async function generateMetadata(
   const appBaseUrl = getBaseUrl();
   const placeholderData = { categoryName: data.category.name };
 
-  const title = replacePlaceholders(data.category.meta_title || data.category.metaTitle || data.category.seo_title || seoSettings.categoryPageTitlePattern, placeholderData) || `${data.category.name} Services | FixBro`;
+  const title = replacePlaceholders(data.category.meta_title || data.category.metaTitle || data.category.seo_title || seoSettings.categoryPageTitlePattern, placeholderData) || `${data.category.name} Services | Fixbro`;
   const description = replacePlaceholders(data.category.meta_description || data.category.metaDescription || data.category.seo_description || seoSettings.categoryPageDescriptionPattern, placeholderData) || `Professional ${data.category.name} services near you.`;
   const keywords = replacePlaceholders(data.category.meta_keywords || data.category.metaKeywords || data.category.seo_keywords || seoSettings.categoryPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
 
@@ -169,7 +169,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       "image": schemaImage,
       "brand": {
         "@type": "Brand",
-        "name": "FixBro"
+        "name": "Fixbro"
       },
       "sku": data.category.id,
       "mpn": data.category.id,

@@ -353,7 +353,7 @@ export default function MyBookingsPage() {
                 paidAmount: booking.paymentMethod === 'Online' ? booking.totalAmount : 0,
                 cancellationFee: feeAmount,
                 refundableAmount: finalRefundAmount,
-                siteName: globalCompanySettings?.websiteName || "FixBro",
+                siteName: globalCompanySettings?.websiteName || "Fixbro",
                 smtpHost: appConfig.smtpHost,
                 smtpPort: appConfig.smtpPort,
                 smtpUser: appConfig.smtpUser,
@@ -439,7 +439,7 @@ export default function MyBookingsPage() {
     setIsDownloadingInvoice(booking.id);
     try {
       const companyDetailsForInvoice = {
-        name: globalCompanySettings?.websiteName || "FixBro.in",
+        name: globalCompanySettings?.websiteName || "Fixbro.in",
         address: globalCompanySettings?.address || "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",
         contactEmail: globalCompanySettings?.contactEmail || "support@fixbro.in",
         contactMobile: globalCompanySettings?.contactMobile || "+91-7353113455",
@@ -483,7 +483,7 @@ export default function MyBookingsPage() {
           <div className="text-center py-12">
             <PackageSearch className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
             <h2 className="text-2xl font-semibold mb-2">No Bookings Yet</h2>
-            <p className="text-muted-foreground mb-6">You haven't made any bookings with FixBro.</p>
+            <p className="text-muted-foreground mb-6">You haven't made any bookings with Fixbro.</p>
             <Link href="/categories" passHref>
               <Button>Book a Service</Button>
             </Link>

@@ -3,7 +3,7 @@ import type { GlobalWebSettings } from '@/types/firestore';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL } from '@/lib/colorUtils';
 
 export const defaultGlobalWebSettings: GlobalWebSettings = {
-  websiteName: "FixBro",
+  websiteName: "Fixbro",
   contactEmail: "support@fixbro.in",
   contactMobile: "+917353113455",
   address: "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",

@@ -308,7 +308,7 @@ export default function AdminUsersPage() {
 
   const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber: string) => {
     e.stopPropagation();
-    const message = "Hi, I'm contacting you from FixBro.";
+    const message = "Hi, I'm contacting you from Fixbro.";
     openWhatsAppChooser(mobileNumber, message);
   };
 

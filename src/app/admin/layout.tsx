@@ -254,7 +254,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-background text-center flex-col">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">FixBro Admin Secure Load...</p>
+        <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] animate-pulse">Fixbro Admin Secure Load...</p>
       </div>
     );
   }
