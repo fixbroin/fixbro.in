@@ -527,7 +527,7 @@
         </li>
         <li class="step-item">
           <strong>Ensure Local Database is Running (e.g., XAMPP):</strong>
-          <p>You must have a MySQL server running locally to test database integrations. If using <strong>XAMPP Control Panel</strong>, ensure the <strong>MySQL</strong> module is started and running on port 3306. Create a blank database schema (e.g. <code>wecanfix_db</code>) using phpMyAdmin or any MySQL tool.</p>
+          <p>You must have a MySQL server running locally to test database integrations. If using <strong>XAMPP Control Panel</strong>, ensure the <strong>MySQL</strong> module is started and running on port 3306. Create a blank database schema (e.g. <code>fixbro_db</code>) using phpMyAdmin or any MySQL tool.</p>
         </li>
         <li class="step-item">
           <strong>Configure Environment File:</strong>
@@ -549,8 +549,8 @@
           <strong>Update Branding and Domains (Search-and-Replace):</strong>
           <p>Use VS Code's global search (<code>Ctrl + Shift + F</code>) to customize hardcoded references:</p>
           <ul>
-            <li>Search for <strong><code>wecanfix</code></strong> and replace it with your custom brand name (e.g. <code>yourbrand</code>).</li>
-            <li>Search for <strong><code>wecanfix.in</code></strong> and replace it with your own website domain name (e.g. <code>yourdomain.com</code>).</li>
+            <li>Search for <strong><code>fixbro</code></strong> and replace it with your custom brand name (e.g. <code>yourbrand</code>).</li>
+            <li>Search for <strong><code>fixbro.in</code></strong> and replace it with your own website domain name (e.g. <code>yourdomain.com</code>).</li>
           </ul>
         </li>
         <li class="step-item">
@@ -858,11 +858,38 @@ server {
       <p>Save and restart Nginx once more:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nginx -t && sudo systemctl restart nginx</code></pre>
 
-      <h3>Step 7: Post-Deployment Verification</h3>
+       <h3>Step 7: Post-Deployment Verification</h3>
       <p>Verify that your Node app process and MySQL database are running without issues:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>pm2 status
 pm2 logs your-app-name
 sudo systemctl status mysql</code></pre>
+
+      <h3>Step 8: Updating the Application (Future Releases / Bug Fixes)</h3>
+      <p>When you push code changes to GitHub and want to deploy them to your VPS in the future, follow this sequence to avoid file lock conflicts and ensure cache is completely cleared:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code># 1. Navigate to your project folder
+cd /var/www/your-app-directory
+
+# 2. Pull the latest code updates from GitHub
+git pull origin main
+
+# 3. Install NPM packages
+npm install
+
+# 4. Compile the new production build
+npm run build
+
+# 5. Clean start PM2 process to clear active cache and reload completely
+pm2 delete your-app-name
+pm2 start npm --name "your-app-name" -- start
+pm2 save</code></pre>
+
+      <div class="alert alert-warning" style="margin-top: 16px;">
+        <strong>⚠️ Browser Caching Note:</strong> Next.js heavily caches assets in the user's browser. If your updates do not reflect immediately after deployment:
+        <ul>
+          <li>Open the website in an <strong>Incognito / Private window</strong>.</li>
+          <li>Or perform a <strong>Hard Reload</strong> (<code>Ctrl + F5</code> on Windows, or <code>Cmd + Shift + R</code> on Mac) to refresh the browser's script cache.</li>
+        </ul>
+      </div>
     </section>
 
     <!-- SECTION 8: LOCAL STANDALONE BUILD DEPLOYMENT (OPTIONAL) -->
@@ -1094,7 +1121,7 @@ define('MEDIA_BASE_URL', 'https://media.yourdomain.com');</code></pre>
       <ol>
         <li>Click the <strong>Search</strong> icon in the VS Code sidebar (or press <code>Ctrl + Shift + F</code> / <code>Cmd + Shift + F</code>).</li>
         <li>In the **Search** field, enter:
-          <pre><code>wecanfix</code></pre>
+          <pre><code>fixbro</code></pre>
         </li>
         <li>In the **Replace** field, enter your own desired website/brand name:
           <pre><code>YourBrandName</code></pre>
@@ -1102,7 +1129,7 @@ define('MEDIA_BASE_URL', 'https://media.yourdomain.com');</code></pre>
         <li>We recommend running this twice to match cases properly:
           <ul>
             <li>Search for capitalized <strong><code>Wecanfix</code></strong> ➔ Replace with capitalized <strong><code>YourBrandName</code></strong>.</li>
-            <li>Search for lowercase <strong><code>wecanfix</code></strong> ➔ Replace with lowercase/capitalized as needed.</li>
+            <li>Search for lowercase <strong><code>fixbro</code></strong> ➔ Replace with lowercase/capitalized as needed.</li>
           </ul>
         </li>
         <li>This will automatically update occurrences in files such as:

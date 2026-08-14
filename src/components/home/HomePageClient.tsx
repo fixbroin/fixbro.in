@@ -474,7 +474,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
             const citySnap = await getDocs(cityQuery);
             if (!citySnap.empty) {
                 fetchedCityData = {id: citySnap.docs[0].id, ...(citySnap.docs[0].data() as Omit<FirestoreCity, 'id'>)} as FirestoreCity;
-                currentH1 = initialH1Title || fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("Fixbro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
+                currentH1 = initialH1Title || fetchedCityData.h1_title || fetchedSeoSettings.homepageH1?.replace("FixBro", fetchedCityData.name) || `Services in ${fetchedCityData.name}`;
                 currentCityNameForLd = fetchedCityData.name;
             }
         } catch (e) { console.error("Error fetching city data for H1/LD:", e); }
@@ -493,7 +493,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setPageH1(currentH1);
       setCache('pageH1', currentH1);
 
-      const siteName = fetchedSeoSettings.siteName || 'Fixbro';
+      const siteName = fetchedSeoSettings.siteName || 'FixBro';
       const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://fixbro.in') + '/android-chrome-512x512.png';
 
       let webSettingsData: GlobalWebSettings | null = null;
@@ -848,7 +848,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
         <LazySection>
             <section className="py-8 md:py-10">
             <div className="container mx-auto px-4">
-                <SectionHeader title="Why Choose Fixbro?" />
+                <SectionHeader title="Why Choose FixBro?" />
                 <WhyChooseUs />
             </div>
             </section>
@@ -904,7 +904,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
               {settings.homepageContent?.footerCTA?.title || "Ready to get started?"}
             </h2>
             <p className="text-lg mb-6 max-w-xl mx-auto">
-              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the Fixbro difference."}
+              {settings.homepageContent?.footerCTA?.subtitle || "Book your service today and experience the FixBro difference."}
             </p>
             <Button
               size="lg"

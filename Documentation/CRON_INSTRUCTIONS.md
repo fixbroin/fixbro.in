@@ -1,6 +1,6 @@
-# Wecanfix VPS Cron Job & Google Indexing Configuration Guide
+# FixBro VPS Cron Job & Google Indexing Configuration Guide
 
-This document lists all active automated cron jobs for the Wecanfix server, how to authorize Google Search Console, and troubleshooting guidelines. Keep this guide for future reference.
+This document lists all active automated cron jobs for the FixBro server, how to authorize Google Search Console, and troubleshooting guidelines. Keep this guide for future reference.
 
 ---
 
@@ -12,7 +12,7 @@ Automatically compiles your dynamic URLs and submits them to Google Indexing in 
 * **Control:** Can be paused/started or monitored from the **Google Indexing Dashboard** inside your Admin Panel. Once all pages are submitted, it automatically stops querying the database.
 * **VPS Cron Command:**
   ```bash
-  0 1 * * * curl -s "https://yourdomain.com/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
+  0 1 * * * curl -s "https://yourdomain.com/api/indexing-cron?secret=fixbro123" >/dev/null 2>&1
   ```
 
 ---
@@ -25,7 +25,7 @@ Handles email automated flows, including abandoned cart reminders, booking remin
 * **Control:** Configured through the **Marketing Automation Settings** dashboard.
 * **VPS Cron Command:**
   ```bash
-  0 */2 * * * curl -s "https://yourdomain.com/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
+  0 */2 * * * curl -s "https://yourdomain.com/api/marketing-cron?secret=fixbro123" >/dev/null 2>&1
   ```
 
 ---
@@ -56,15 +56,15 @@ You must authorize the Google Cloud Service Account as an **Owner** of your site
 ## Manual Verification & Testing
 To manually test either of the cron jobs from your VPS terminal, run the following commands:
 
-**Test Indexing (Using your actual secret key `wecanfix123`):**
+**Test Indexing (Using your actual secret key `fixbro123`):**
 ```bash
-curl 'https://yourdomain.com/api/indexing-cron?secret=wecanfix123'
+curl 'https://yourdomain.com/api/indexing-cron?secret=fixbro123'
 ```
 *(Always wrap the URL in single quotes `'...'` to prevent terminal shell syntax errors).*
 
 **Test Marketing:**
 ```bash
-curl 'https://yourdomain.com/api/marketing-cron?secret=wecanfix123'
+curl 'https://yourdomain.com/api/marketing-cron?secret=fixbro123'
 ```
 
 ---
@@ -90,10 +90,10 @@ crontab -e
 Go to the very bottom of the file and paste:
 ```bash
 # 1. Google Indexing Cron (Runs Daily at 1:00 AM)
-0 1 * * * curl -s "https://yourdomain.com/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
+0 1 * * * curl -s "https://yourdomain.com/api/indexing-cron?secret=fixbro123" >/dev/null 2>&1
 
 # 2. Marketing Automation Cron (Runs Every 2 Hours)
-0 */2 * * * curl -s "https://yourdomain.com/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
+0 */2 * * * curl -s "https://yourdomain.com/api/marketing-cron?secret=fixbro123" >/dev/null 2>&1
 ```
 
 ### Step 3: Save and Exit

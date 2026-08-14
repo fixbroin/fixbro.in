@@ -167,7 +167,7 @@ FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "your_proje
 
 # Other APIs
 GEMINI_API_KEY=your_gemini_key
-CRON_SECRET=wecanfix123
+CRON_SECRET=fixbro123
 ```
 Save and exit (`Ctrl+O` ➔ `Enter` ➔ `Ctrl+X`).
 
@@ -354,3 +354,37 @@ sudo systemctl restart nginx
    Confirm you have generated and uploaded your customized brand logo assets and favicon images inside the `public/` directory (recommendation: compile your icons using the free tool at `https://usebro.in/tools/favicon-generator` to replace default placeholders).
 4. **Database Check:**
    Log into the admin panel (`https://yourdomain.com/admin/database-tools`) to verify MySQL database health.
+
+---
+
+## 🔄 Step 8: Updating the Application (Future Releases / Bug Fixes)
+
+When you make changes to your codebase and want to deploy them to your VPS in the future, follow these steps to ensure all cache is cleared and the files are updated cleanly without process lock conflicts:
+
+### 🚀 Update Deployment Command Sequence
+
+Run the following commands in order inside your VPS terminal:
+
+```bash
+# 1. Navigate to your project folder
+cd /var/www/your-app-directory
+
+# 2. Pull the latest code updates from GitHub
+git pull origin main
+
+# 3. Install NPM packages
+npm install
+
+# 4. Compile the new production build
+npm run build
+
+# 5. Clean start PM2 process to clear active cache and reload completely
+pm2 delete your-app-name
+pm2 start npm --name "your-app-name" -- start
+pm2 save
+```
+
+> [!IMPORTANT]
+> **Browser Caching:** Next.js heavily caches pages on the client-side. If your changes are not immediately visible in your browser after deployment:
+> 1. Try opening the website in an **Incognito / Private window**.
+> 2. Or perform a **Hard Reload** (`Ctrl + F5` on Windows, or `Cmd + Shift + R` on Mac) to force the browser to retrieve the latest chunks.

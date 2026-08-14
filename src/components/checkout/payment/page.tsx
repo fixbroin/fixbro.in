@@ -527,7 +527,7 @@ export default function PaymentPage() {
       const paymentDescription = isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment";
 
       const options = {
-        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: currencyCode, name: globalSettings?.websiteName || "Fixbro Services",
+        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: currencyCode, name: globalSettings?.websiteName || "FixBro Services",
         description: paymentDescription, order_id: orderDetails.id,
         handler: (response: any) => {
           localStorage.setItem('razorpayPaymentId', response.razorpay_payment_id);
@@ -556,7 +556,7 @@ export default function PaymentPage() {
           router.push('/checkout/thank-you');
         },
         prefill: { name: customerName, email: customerEmail, contact: customerContact },
-        notes: { address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Fixbro"} Service Booking`, ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) },
+        notes: { address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "FixBro"} Service Booking`, ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) },
         theme: { color: "#45A0A2" },
         modal: { ondismiss: () => { setIsProcessingPayment(false); hideLoading(); }}
       };

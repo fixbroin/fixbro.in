@@ -568,6 +568,14 @@ export interface LeaveRequest {
 
 export type LoginMethod = 'email' | 'otp' | 'google';
 
+export interface CustomBankField {
+  id: string;
+  name: string;
+  type: 'text' | 'number' | 'alphanumeric';
+  required: boolean;
+  placeholder: string;
+}
+
 export interface AppSettings {
   // General
   enableMinimumBookingPolicy: boolean;
@@ -586,6 +594,8 @@ export interface AppSettings {
   carouselAutoplayDelay: number;
   enableTaxOnVisitingCharge: boolean;
   visitingChargeTaxPercent: number;     
+  enableVisitorLogging: boolean;
+  enableUserPresence: boolean;
   // Payment
   enableOnlinePayment: boolean;
   razorpayKeyId: string;
@@ -623,6 +633,10 @@ export interface AppSettings {
   isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
   isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
+  enableCancelledChequeUpload?: boolean; // Toggle to completely enable/disable cancelled cheque section
+  enableSignatureUpload?: boolean; // Toggle to completely enable/disable signature section
+  customBankFields?: CustomBankField[]; // Dynamic custom bank details fields
+  enableDefaultIndianKyc?: boolean; // For toggling Aadhaar and PAN defaults
   maxProviderRadiusKm?: number; // New for provider work area
   autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
   
@@ -1346,6 +1360,7 @@ export interface BankDetails {
   accountNumber?: string;
   ifscCode?: string;
   cancelledChequeUrl?: string;
+  customFields?: Record<string, string>; // Dynamic custom fields like swiftCode, bankCode, etc.
   cancelledChequeFileName?: string;
   verified: boolean; // Default false
   adminNotes?: string;

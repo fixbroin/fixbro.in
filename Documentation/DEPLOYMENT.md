@@ -1,6 +1,6 @@
-# Wecanfix VPS Deployment Guide
+# FixBro VPS Deployment Guide
 
-This document describes the deployment procedures for the Wecanfix Next.js standalone application on a VPS using PM2.
+This document describes the deployment procedures for the FixBro Next.js standalone application on a VPS using PM2.
 
 ---
 
@@ -16,7 +16,7 @@ pm2 delete yourdomain.com || true
 # 2. Clean old files and clone the repository
 rm -rf /var/www/yourdomain.com
 cd /var/www/
-git clone https://github.com/wecanfixin/yourdomain.com.git
+git clone https://github.com/fixbroin/yourdomain.com.git
 cd /var/www/yourdomain.com
 
 # 3. Create and configure your environment variables

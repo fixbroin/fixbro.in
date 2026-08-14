@@ -376,7 +376,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
         key: appConfig.razorpayKeyId,
         amount: orderDetails.amount,
         currency: code,
-        name: globalSettings?.websiteName || "Fixbro",
+        name: globalSettings?.websiteName || "FixBro",
         description: "Service Booking",
         order_id: orderDetails.id,
         handler: (response: any) => {

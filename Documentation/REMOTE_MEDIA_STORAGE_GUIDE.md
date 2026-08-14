@@ -1,4 +1,4 @@
-# ☁️ Wecanfix Dual Media Storage & Remote Shared Hosting Guide
+# ☁️ FixBro Dual Media Storage & Remote Shared Hosting Guide
 
 This guide explains how to use your **Shared Hosting server** to store and serve all website images while running your **Next.js Website & MySQL Database on a VPS**.
 

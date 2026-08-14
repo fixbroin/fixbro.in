@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, PlaySquare, Percent, Ban, Users, Clock, DollarSign, CreditCard, Bell, Plus, Trash2, CalendarDays, Edit3 } from "lucide-react";
+import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, PlaySquare, Percent, Ban, Users, Clock, DollarSign, CreditCard, Bell, Plus, Trash2, CalendarDays, Edit3, Activity } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, getDocs, addDoc, deleteDoc, query, orderBy } from '@/lib/mysqlDb';
@@ -387,10 +387,18 @@ export default function AdminSettingsPage() {
   };
 
   const handleSelectCurrency = (currency: CurrencyOption) => {
+    let decimals = 2;
+    if (['JPY', 'VND'].includes(currency.code)) {
+      decimals = 0;
+    } else if (['KWD', 'BHD', 'OMR'].includes(currency.code)) {
+      decimals = 3;
+    }
+
     setSettings(prev => ({
       ...prev,
       currencyCode: currency.code,
       currencySymbol: currency.symbol,
+      currencyDecimalPoints: decimals,
     }));
   };
 
@@ -857,6 +865,7 @@ export default function AdminSettingsPage() {
                         <option value={0}>0</option>
                         <option value={1}>1</option>
                         <option value={2}>2</option>
+                        <option value={3}>3</option>
                       </select>
                     </div>
                   </div>
@@ -1089,6 +1098,40 @@ export default function AdminSettingsPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-4 p-4 border rounded-md shadow-sm">
+                <h3 className="text-lg font-semibold flex items-center"><Activity className="mr-2 h-5 w-5 text-muted-foreground"/>Performance & Logging</h3>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableVisitorLogging" className="text-base">Enable Visitor Logging</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Track and log anonymous visitor information for website analytics. Disable to reduce database connection usage.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableVisitorLogging"
+                    name="enableVisitorLogging" 
+                    checked={settings.enableVisitorLogging}
+                    onCheckedChange={(checked) => handleSwitchChange('enableVisitorLogging', checked)}
+                    disabled={isSaving}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableUserPresence" className="text-base">Enable User Presence Tracking (Last Seen)</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Keep track of user and provider online status (last seen timestamp). Disable to save database connection limit.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableUserPresence"
+                    name="enableUserPresence" 
+                    checked={settings.enableUserPresence}
+                    onCheckedChange={(checked) => handleSwitchChange('enableUserPresence', checked)}
+                    disabled={isSaving}
+                  />
+                </div>
               </div>
 
               <div className="space-y-4 p-4 border rounded-md shadow-sm">
