@@ -115,7 +115,7 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
       { protocol: 'https', hostname: 'fixbro.in' },
-      { protocol: 'https', hostname: 'Fixbro.in' },
+      { protocol: 'https', hostname: 'fixbro.in' },
       { protocol: 'https', hostname: '*.fixbro.in' }, // ADD THIS
       { protocol: 'https', hostname: 'ad.fixbro.in' },
       { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
