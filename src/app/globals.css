@@ -134,3 +134,31 @@ html, body {
 [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Hide fixed bottom navigation and action bars when keyboard is active to prevent floating */
+.keyboard-active nav.fixed.bottom-0,
+.keyboard-active div.fixed.bottom-0,
+.keyboard-active footer.fixed.bottom-0 {
+    display: none !important;
+}
+
+/* Mobile Form and Keyboard Viewport Layout Fixes */
+@media (max-width: 767px) {
+    /* Prevent sticky form footers/buttons from floating in the middle of the screen over inputs */
+    form .sticky.bottom-0,
+    form [class*="sticky"][class*="bottom-0"],
+    [role="dialog"] .sticky.bottom-0,
+    [role="dialog"] [class*="sticky"][class*="bottom-0"],
+    .dialog-content .sticky.bottom-0,
+    .dialog-content [class*="sticky"][class*="bottom-0"] {
+        position: static !important;
+    }
+
+    /* Provide a bottom scrollable area in mobile forms ONLY when keyboard is active so inputs can easily scroll above it */
+    .keyboard-active form.overflow-y-auto,
+    .keyboard-active .overflow-y-auto form,
+    .keyboard-active [role="dialog"] .overflow-y-auto,
+    .keyboard-active .dialog-content .overflow-y-auto {
+        padding-bottom: 160px !important;
+    }
+}
