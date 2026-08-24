@@ -41,14 +41,40 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isFocusedOnMobile, setIsFocusedOnMobile] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const { user: currentUser } = useAuth();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setTimeout(() => {
+        inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 800); // 800ms gives ample time for Firebase connection and page layout to stabilize
+    }
+  }, []);
+
   const handleFocus = () => {
     if (window.innerWidth < 768) {
-      setIsFocusedOnMobile(true);
       setTimeout(() => {
         if (scrollAreaRootRef.current) {
           const viewport = scrollAreaRootRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
@@ -61,7 +87,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   };
 
   const handleBlur = () => {
-    setIsFocusedOnMobile(false);
+    // no-op
   };
 
   const [adminProfile, setAdminProfile] = useState<{displayName?: string | null, photoURL?: string | null, uid?: string | null}>({
@@ -203,6 +229,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
     const tempNewMessage = newMessage;
     setNewMessage('');
+    inputRef.current?.blur();
     
     // Instantly append to local messages array for 0ms response
     const optimisticMessage: ChatMessage = {
@@ -401,12 +428,22 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
   return (
     <Card 
-      className={cn(
-        "h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border transition-all duration-300 ease-in-out origin-bottom",
-        isFocusedOnMobile ? "-translate-y-[150px] sm:translate-y-0" : ""
-      )}
+      className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border"
+      style={viewportHeight && window.innerWidth < 768 ? { 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        height: `${viewportHeight}px`, 
+        zIndex: 50, 
+        borderRadius: 0 
+      } : undefined}
     >
-      <CardHeader className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between">
+      <CardHeader 
+        className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between cursor-pointer"
+        onClick={() => inputRef.current?.blur()}
+      >
         <div className="flex items-center space-x-3">
           <div className="relative">
             <Avatar className="h-10 w-10 border-2 border-primary/10 ring-2 ring-background">
@@ -435,7 +472,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
       <CardContent className="p-0 flex-grow overflow-hidden relative bg-background">
        
         
-        <ScrollArea className="h-full px-4 py-6" ref={scrollAreaRootRef}>
+        <ScrollArea className="h-full px-4 py-6 cursor-pointer" ref={scrollAreaRootRef} onClick={() => inputRef.current?.blur()}>
           {isLoadingMessages ? (
             <div className="flex flex-col justify-center items-center h-full space-y-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
