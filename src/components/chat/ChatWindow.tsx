@@ -40,9 +40,29 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isFocusedOnMobile, setIsFocusedOnMobile] = useState(false);
   const { user: currentUser } = useAuth();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleFocus = () => {
+    if (window.innerWidth < 768) {
+      setIsFocusedOnMobile(true);
+      setTimeout(() => {
+        if (scrollAreaRootRef.current) {
+          const viewport = scrollAreaRootRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+          if (viewport) {
+            viewport.scrollTop = viewport.scrollHeight;
+          }
+        }
+      }, 150);
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocusedOnMobile(false);
+  };
 
   const [adminProfile, setAdminProfile] = useState<{displayName?: string | null, photoURL?: string | null, uid?: string | null}>({
     displayName: ADMIN_FALLBACK_NAME,
@@ -380,7 +400,12 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
 
   return (
-    <Card className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border">
+    <Card 
+      className={cn(
+        "h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border transition-all duration-300 ease-in-out origin-bottom",
+        isFocusedOnMobile ? "-translate-y-[150px] sm:translate-y-0" : ""
+      )}
+    >
       <CardHeader className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="relative">
@@ -420,7 +445,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
              <div className="flex flex-col justify-center items-center h-full text-center space-y-4 px-6 mt-10">
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in zoom-in duration-500">
                   <Bot className="h-10 w-10 text-primary mb-2 mx-auto" />
-                  <h3 className="text-sm font-semibold text-foreground">Welcome to Fixbro Support!</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Welcome to Wecanfix Support!</h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">How can we help you with your bookings or services today?</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 w-[calc(100%-6px)]">
@@ -515,8 +540,11 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
         <form onSubmit={handleSendMessage} className="flex w-full items-center gap-3">
           <div className="relative flex-grow group">
             <Input
+              ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               placeholder="Type your message here..."
               className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12"
               autoComplete="off"

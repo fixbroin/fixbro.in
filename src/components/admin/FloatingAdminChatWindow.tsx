@@ -65,7 +65,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
           exit="exit"
           variants={windowVariants}
           className={cn(
-            "fixed z-40 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
+            "fixed z-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
             isMobile 
               ? "inset-0 bg-background h-full w-full" 
               : cn(
