@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Clock, Loader2, AlertTriangle, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { getZonedDate, formatZonedDateToISO } from '@/lib/utils';
+import { getZonedDate, formatZonedDateToISO, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { getActiveCheckoutEntries } from '@/lib/cartManager';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,6 +47,7 @@ interface ScheduleSelectionProps {
 
 export default function ScheduleSelection({ onSelect, initialDate, initialSlot, latitude, longitude }: ScheduleSelectionProps) {
   const slotsSectionRef = useRef<HTMLDivElement>(null);
+  const confirmButtonRef = useRef<HTMLDivElement>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate);
   const [displayMonth, setDisplayMonth] = useState<Date>(initialDate || new Date());
   const [availableTimeSlots, setAvailableTimeSlots] = useState<{ slot: string; remainingCapacity: number; endDateTime: string; dailyTimeline?: { dateLabel: string; startTime: string; endTime: string }[] }[]>([]);
@@ -307,7 +308,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
                 toast({
                     variant: "destructive",
                     title: "No Slots Available",
-                    description: `Sorry, there are no slots available for ${selectedDate.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                    description: `Sorry, there are no slots available for ${formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata')}.`,
                 });
 
                 if (shouldAutoRedirect.current && !isSearchingForNextDay) {
@@ -356,7 +357,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
                         toast({
                             variant: "success" as any,
                             title: "Available Slots Found!",
-                            description: `We found slots for you on ${foundDay.date.toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}.`,
+                            description: `We found slots for you on ${formatDateInTimezone(foundDay.date, appConfig?.timezone || 'Asia/Kolkata')}.`,
                         });
                     } else {
                         toast({
@@ -401,6 +402,17 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
       setTimeout(() => {
         slotsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
+    }
+  };
+
+  const handleTimeSlotSelect = (slot: string) => {
+    setSelectedTimeSlot(slot);
+
+    // Scroll to confirm button on mobile
+    if (window.innerWidth < 1024) {
+      setTimeout(() => {
+        confirmButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 150);
     }
   };
 
@@ -450,7 +462,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
 
   const formatDateForDisplay = (date: Date | undefined): string => {
     if (!date) return "";
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatDateInTimezone(date, 'Asia/Kolkata');
   };
 
   if (isLoadingAppSettings) {
@@ -600,7 +612,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
                       <div className="p-4 bg-primary/[0.03] dark:bg-muted/10 border border-primary/10 rounded-2xl">
                         <RadioGroup
                           value={selectedTimeSlot}
-                          onValueChange={setSelectedTimeSlot}
+                          onValueChange={handleTimeSlotSelect}
                           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
                         >
                           {availableTimeSlots.map(({ slot, remainingCapacity }) => (
@@ -659,7 +671,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
                                 <p className="text-xs text-muted-foreground uppercase font-bold">Estimated Completion</p>
                                 <p className="text-sm font-bold">
                                   {selectedSlotData && (
-                                    `Ends on ${new Date(selectedSlotData.endDateTime).toLocaleDateString('en-IN', { timeZone: appConfig?.timezone, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at ${new Date(selectedSlotData.endDateTime).toLocaleTimeString('en-IN', { timeZone: appConfig?.timezone, hour: '2-digit', minute: '2-digit', hour12: true })}`
+                                  `Ends on ${formatDateInTimezone(new Date(selectedSlotData.endDateTime), appConfig?.timezone || 'Asia/Kolkata')} at ${formatTimeInTimezone(new Date(selectedSlotData.endDateTime), appConfig?.timezone || 'Asia/Kolkata')}`
                                   )}
                                 </p>
                               </div>
@@ -744,7 +756,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
         </div>
       </div>
 
-      <div className="sticky bottom-0 left-0 right-0 bg-background pt-4 pb-2 mt-auto border-t sm:border-none flex justify-end">
+      <div ref={confirmButtonRef} className="sticky bottom-0 left-0 right-0 bg-background pt-4 pb-2 mt-auto border-t sm:border-none flex justify-end">
         <Button 
           disabled={!selectedDate || !selectedTimeSlot} 
           onClick={handleConfirm}
