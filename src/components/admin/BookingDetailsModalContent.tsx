@@ -8,14 +8,15 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle } from 'lucide-react'; 
+import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
-import { getTimestampMillis, formatScheduledDate, formatCurrency } from '@/lib/utils';
+import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
+import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
 
 interface BookingDetailsModalContentProps {
   booking: FirestoreBooking;
@@ -24,7 +25,8 @@ interface BookingDetailsModalContentProps {
 const formatDetailTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean, taxPercent?: number): number => {
@@ -42,6 +44,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
   const code = appConfig?.currencyCode || 'INR';
   const [provider, setProvider] = useState<ProviderApplication | null>(null);
   const [isLoadingProvider, setIsLoadingProvider] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchProvider() {
@@ -165,11 +168,21 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-1 flex-grow min-w-0">
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-sm">{provider.fullName}</p>
-                  {booking.autoAssigned && (
-                    <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-tighter">Auto-Assigned</Badge>
-                  )}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-sm">{provider.fullName}</p>
+                    {booking.autoAssigned && (
+                      <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-tighter">Auto-Assigned</Badge>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-xs flex items-center gap-1 hover:bg-primary/10 border-primary/20 text-primary self-start sm:self-auto shrink-0"
+                    onClick={() => setIsWalletModalOpen(true)}
+                  >
+                    <Wallet className="h-3 w-3" /> Refund / Adjust Wallet
+                  </Button>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {provider.mobileNumber}</span>
@@ -199,7 +212,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <p><strong>Scheduled Time:</strong> {booking.scheduledTimeSlot}</p>
             {booking.estimatedEndTime && (
               <p className="text-green-600 font-bold">
-                <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
               </p>
             )}
             <div className="flex items-center gap-2">
@@ -217,8 +230,42 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                     }
                 </Badge>
             </div>
-            {booking.razorpayPaymentId && <p><strong>Razorpay Payment ID:</strong> <span className="text-xs">{booking.razorpayPaymentId}</span></p>}
-            {booking.razorpayOrderId && <p><strong>Razorpay Order ID:</strong> <span className="text-xs">{booking.razorpayOrderId}</span></p>}
+            {booking.razorpayPaymentId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Razorpay Payment ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.razorpayPaymentId}</span>
+              </div>
+            )}
+            {booking.razorpayOrderId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Razorpay Order ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.razorpayOrderId}</span>
+              </div>
+            )}
+            {booking.stripeSessionId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Stripe Session ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.stripeSessionId}</span>
+              </div>
+            )}
+            {booking.stripePaymentIntent && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Stripe Payment Intent ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.stripePaymentIntent}</span>
+              </div>
+            )}
+            {booking.status === 'Cancelled' && booking.cancellationFeePaid !== undefined && (
+              <div>
+                <strong>Cancellation Fee Paid:</strong>
+                <span className="font-bold text-red-600 ml-1.5">{symbol}{booking.cancellationFeePaid}</span>
+              </div>
+            )}
+            {booking.status === 'Cancelled' && booking.cancellationPaymentId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Cancellation Payment ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.cancellationPaymentId}</span>
+              </div>
+            )}
             {booking.createdAt && <p><strong>Booked On:</strong> {formatDetailTimestamp(booking.createdAt)}</p>}
             {booking.updatedAt && <p><strong>Last Updated:</strong> {formatDetailTimestamp(booking.updatedAt)}</p>}
           </div>
@@ -361,6 +408,16 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{booking.notes}</p>
           </CardContent>
         </Card>
+      )}
+
+      {provider && (
+        <ProviderWalletAdjustmentModal 
+          isOpen={isWalletModalOpen} 
+          onClose={() => setIsWalletModalOpen(false)} 
+          providerId={booking.providerId!} 
+          providerName={provider.fullName || 'Provider'}
+          bookingId={booking.bookingId}
+        />
       )}
     </div>
   );

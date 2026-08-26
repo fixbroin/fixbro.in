@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Fixbro-Admin-App/1.0 (contact: admin@fixbro.in)'
+        'User-Agent': 'Fixbro-Admin-App/1.0 (contact: fixbro.in@gmail.com)'
       }
     });
 

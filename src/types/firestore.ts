@@ -186,7 +186,7 @@ export interface AppliedPlatformFeeItem {
 
 export interface FirestoreBooking {
   id?: string; // Firestore document ID (optional before creation)
-  bookingId: string; // User-friendly booking ID (e.g., FIXBRO-TIMESTAMP-RANDOM)
+  bookingId: string; // User-friendly booking ID (e.g., Fixbro-TIMESTAMP-RANDOM)
   bookingNumber?: number; // Sequential Member ID for bookings
   userId?: string; // If user is logged in
   providerId?: string; // ID of the assigned provider
@@ -210,12 +210,15 @@ export interface FirestoreBooking {
   discountCode?: string;
   discountAmount?: number; // Discount applied to the sum of BASE prices + BASE visiting charge
   appliedPlatformFees?: AppliedPlatformFeeItem[]; // Store applied platform fees
+  platformFeeTotal?: number; // Total amount of platform fees including tax
   additionalCharges?: { name: string; amount: number }[]; // Extra costs added during service
   paymentMethod: string;
   paymentId?: string; // If online payment
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   razorpaySignature?: string;
+  stripeSessionId?: string;
+  stripePaymentIntent?: string;
   status: BookingStatus;
   notes?: string; // Any special instructions from customer
   previousScheduledDate?: string; // NEW: Store previous date before reschedule
@@ -301,6 +304,7 @@ export interface FirestoreUser {
     withdrawals: number;
     onlineNet: number;
     cashCommission: number;
+    cashNet?: number;
   };
   totalEarnings?: number; // Lifetime gross earnings
   totalCommissionPaid?: number; // Lifetime commission paid to admin
@@ -600,10 +604,17 @@ export interface AppSettings {
   enableVisitorLogging: boolean;
   enableUserPresence: boolean;
   enableKeyboardSuggestions?: boolean;
+  dateFormat?: string;
   // Payment
   enableOnlinePayment: boolean;
+  enableRazorpay: boolean;
+  enableStripe: boolean;
   razorpayKeyId: string;
   razorpayKeySecret: string;
+  razorpayWebhookSecret?: string;
+  stripePublishableKey: string;
+  stripeSecretKey: string;
+  stripeWebhookSecret: string;
   enableCOD: boolean; // Represents "Pay After Service"
   // Time Slots
   timeSlotSettings: {
@@ -656,6 +667,7 @@ export interface AppSettings {
   // Provider Fee Settings
   providerFeeType?: ProviderFeeType;
   providerFeeValue?: number;
+  providerExtraFeePercentage?: number;
 
   enableStatusUpdateEmails?: boolean; // New: Toggle for generic status update emails
 
@@ -1247,6 +1259,7 @@ export interface CompanyDetailsForPdf {
   contactMobile: string;
   logoUrl?: string;
   currencySymbol?: string;
+  dateFormat?: string;
 }
 
 // --- Homepage Features Configuration ---

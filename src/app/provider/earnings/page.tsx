@@ -24,13 +24,9 @@ const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, 
 };
 
 const isCashPayment = (method: string) => {
-    if (!method) return true;
+    if (!method) return false;
     const lower = method.toLowerCase();
-    return lower === 'cash' || 
-           lower === 'pay after service' || 
-           lower === 'cash on delivery' || 
-           lower === 'cod' || 
-           lower === 'offline';
+    return lower === 'pay after service';
 };
 
 export default function ProviderEarningsPage() {
@@ -38,6 +34,10 @@ export default function ProviderEarningsPage() {
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || "₹";
   const { toast } = useToast();
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = appConfig?.providerFeeValue || 0;
+  const providerExtraFeePercentage = appConfig?.providerExtraFeePercentage || 0;
   const [isSyncing, setIsSyncing] = useState(false);
 
   // EARNINGS DATA: Now read 100% from the User document (monthlyStats)
@@ -49,13 +49,13 @@ export default function ProviderEarningsPage() {
     // Default to zero if stats don't exist yet
     const stats = (firestoreUser?.monthlyStats?.monthKey === monthKey) 
         ? firestoreUser.monthlyStats 
-        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0 };
 
     const currentBalance = firestoreUser?.withdrawableBalance || 0;
     
     // Carry Forward = Current Balance - (This month's net activity)
-    // Net Activity = (Online Net) - (Cash Commission) - (Withdrawals)
-    const netActivityThisMonth = stats.onlineNet - stats.cashCommission - stats.withdrawals;
+    // Net Activity = (Online Net) - (Withdrawals)
+    const netActivityThisMonth = stats.onlineNet - stats.withdrawals;
     const balanceCarriedForward = currentBalance - netActivityThisMonth;
 
     return {
@@ -66,6 +66,7 @@ export default function ProviderEarningsPage() {
         monthlyWithdrawals: stats.withdrawals,
         monthlyCashCommission: stats.cashCommission,
         monthlyOnlineNet: stats.onlineNet,
+        monthlyCashNet: stats.cashNet || 0,
         balanceCarriedForward,
         lifetimePaidOut: firestoreUser?.totalPaidOut || 0,
         withdrawableBalance: currentBalance,
@@ -93,19 +94,20 @@ export default function ProviderEarningsPage() {
         const totalLifetimePaidOut = 0;
 
         // Stats for THIS month specifically
-        const mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+        const mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0 };
         
         bookingsSnap.docs.forEach(d => {
             const b = d.data() as FirestoreBooking;
-            const commission = calculateProviderFee(b.totalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+            const providerGross = (b.totalAmount || 0) - (b.platformFeeTotal || 0) - (b.taxAmount || 0);
+            const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             const isCash = isCashPayment(b.paymentMethod);
             const bDate = b.scheduledDate || "";
 
             const extraCharges = (b.additionalCharges || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-            const originalAmount = b.totalAmount - extraCharges;
+            const originalAmount = providerGross - extraCharges;
 
             // All-time calculation
-            totalNetEarnings += (b.totalAmount - commission);
+            totalNetEarnings += (providerGross - commission);
             if (isCash) {
                 totalCashCollected += b.totalAmount;
             } else {
@@ -114,16 +116,20 @@ export default function ProviderEarningsPage() {
 
             // Monthly calculation (if date is this month)
             if (bDate >= startOfMonthStr) {
-                mStats.gross += b.totalAmount;
+                mStats.gross += providerGross;
                 mStats.commission += commission;
                 if (isCash) {
                     mStats.cashCollected += b.totalAmount;
                     mStats.cashCommission += commission;
+                    mStats.cashNet += (providerGross - commission);
                 } else {
                     mStats.cashCollected += extraCharges;
-                    const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+                    const originalCommission = calculateProviderFee(originalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+                    const extraCommission = appConfig.providerFeeType === 'percentage' 
+                        ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+                        : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
                     mStats.cashCommission += extraCommission;
-                    mStats.onlineNet += (originalAmount - commission);
+                    mStats.onlineNet += (originalAmount - originalCommission);
                 }
             }
         });
@@ -186,20 +192,20 @@ export default function ProviderEarningsPage() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-primary/5 border-primary/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Gross</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyGrossEarnings.toFixed(2)}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyGrossEarnings.toFixed(decimals)}</p></CardContent>
           </Card>
-          <Card className="bg-destructive/5 border-destructive/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Admin Fee</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyAdminCommission.toFixed(2)}</p></CardContent>
+          <Card className="bg-amber-500/5 border-amber-500/20">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Cash Collected (Taken by You)</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-bold text-amber-600">{symbol}{earningsData.monthlyCashCollected.toFixed(decimals)}</p></CardContent>
           </Card>
           <Card className="bg-green-500/5 border-green-500/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Net Earnings</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold text-green-600">{symbol}{earningsData.monthlyNetEarnings.toFixed(2)}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Online Received (Your Net Share)</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-bold text-green-600">{symbol}{earningsData.monthlyOnlineNet.toFixed(decimals)}</p></CardContent>
           </Card>
           <Card className="bg-blue-500/5 border-blue-500/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Wallet Balance</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Withdrawable Balance</CardTitle></CardHeader>
             <CardContent>
-                <p className="text-2xl font-bold text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(decimals)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">Available to Withdraw</p>
             </CardContent>
              <CardFooter className="pt-0"><Link href="/provider/withdrawal" className="w-full"><Button size="sm" variant="outline" className="w-full h-8 text-xs">Withdraw</Button></Link></CardFooter>
@@ -208,41 +214,44 @@ export default function ProviderEarningsPage() {
 
         <CardContent className="pt-6">
             <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
-                <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <HandCoins className="h-4 w-4" /> Monthly Wallet Breakdown
+                <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                        <HandCoins className="h-4 w-4" /> Monthly Earnings Breakdown
+                    </span>
+                    <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 normal-case border-primary/20 bg-primary/5 text-primary self-start sm:self-auto">
+                        {providerFeeType === 'percentage' 
+                          ? `Admin Fee: ${providerFeeValue}%`
+                          : `Admin Fee: ${symbol}${providerFeeValue} (+ ${providerExtraFeePercentage}% on extra work)`
+                        }
+                    </Badge>
                 </h3>
                 
                 <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center py-1 border-b border-dashed">
-                        <span>Balance Carried Forward <span className="text-[10px] text-muted-foreground ml-1">(Previous months)</span></span>
-                        <span className="font-semibold text-blue-600">{symbol}{earningsData.balanceCarriedForward.toFixed(2)}</span>
+                    <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
+                        <span>Admin Fees for Cash Jobs <span className="text-[10px] text-muted-foreground ml-1">(Deducted from wallet)</span></span>
+                        <span className="font-semibold">- {symbol}{earningsData.monthlyCashCommission.toFixed(decimals)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-green-600">
                         <span>Online Jobs Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
-                        <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineNet.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
-                        <span>Admin Fees for Cash Jobs <span className="text-[10px] text-muted-foreground ml-1">(Deducted from wallet)</span></span>
-                        <span className="font-semibold">- {symbol}{earningsData.monthlyCashCommission.toFixed(2)}</span>
+                        <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineNet.toFixed(decimals)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
                         <span>Payouts requested this month</span>
-                        <span className="font-semibold">- {symbol}{earningsData.monthlyWithdrawals.toFixed(2)}</span>
+                        <span className="font-semibold">- {symbol}{earningsData.monthlyWithdrawals.toFixed(decimals)}</span>
                     </div>
 
                     <div className="flex justify-between items-center pt-2 font-bold text-base">
-                        <span>Total Available in Wallet</span>
-                        <span className="text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</span>
+                        <span>Total Withdrawable Balance</span>
+                        <span className="text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(decimals)}</span>
                     </div>
                 </div>
 
                 <div className="bg-primary/5 rounded-lg p-3 border border-primary/20 space-y-1">
                     <div className="flex justify-between items-center text-xs font-bold text-primary uppercase">
                         <span>Lifetime Total Paid Out</span>
-                        <span>{symbol}{earningsData.lifetimePaidOut.toFixed(2)}</span>
+                        <span>{symbol}{earningsData.lifetimePaidOut.toFixed(decimals)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground italic">
                         * This is your permanent record of all money successfully sent to your bank/UPI.
@@ -252,7 +261,7 @@ export default function ProviderEarningsPage() {
                 <div className="mt-4 pt-4 border-t border-muted-foreground/20 bg-primary/5 -mx-4 px-4 rounded-b-xl">
                     <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground uppercase font-bold">Total Cash Collected by You:</span>
-                        <span className="font-black text-primary text-sm">{symbol}{earningsData.monthlyCashCollected.toFixed(2)}</span>
+                        <span className="font-black text-primary text-sm">{symbol}{earningsData.monthlyCashCollected.toFixed(decimals)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 italic">
                         * Note: This cash is already with you. Only the Admin Fee was deducted from your wallet balance.
@@ -275,7 +284,7 @@ export default function ProviderEarningsPage() {
                     <HandCoins className="h-4 w-4 text-green-600" />
                     <AlertTitle className="text-green-800 font-bold">Wallet Status</AlertTitle>
                     <AlertDescription className="text-green-700">
-                        You have <span className="font-bold text-lg">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</span> ready to withdraw.
+                        You have <span className="font-bold text-lg">{symbol}{earningsData.withdrawableBalance.toFixed(decimals)}</span> ready to withdraw.
                     </AlertDescription>
                 </Alert>
             )}

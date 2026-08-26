@@ -16,7 +16,7 @@ import { getActiveCheckoutEntries, removeCheckedOutItemsFromCart } from '@/lib/c
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { sendBookingConfirmationEmail, type BookingConfirmationEmailInput } from '@/ai/flows/sendBookingEmailFlow';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
@@ -26,7 +26,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { sendWhatsAppFlow } from '@/ai/flows/sendWhatsAppFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { getHaversineDistance } from '@/lib/locationUtils';
@@ -39,10 +39,14 @@ declare global {
   }
 }
 
-interface DisplayBookingDetails extends FirestoreBooking {
+interface DisplayBookingDetails extends Omit<FirestoreBooking, 'createdAt' | 'latitude' | 'longitude' | 'discountCode'> {
     servicesSummary: string;
     scheduledDateDisplay: string;
     visitingChargeDisplayed: number;
+    createdAt: string;
+    latitude: number | null;
+    longitude: number | null;
+    discountCode: string | null;
 }
 
 const generateBookingId = () => {
@@ -116,11 +120,11 @@ const calculateIncrementalTotalPriceForItem = (service: FirestoreService, quanti
 };
 // --- END: Pricing Logic ---
 
-const formatDateForDisplay = (dateString: string | undefined): string => {
+const formatDateForDisplay = (dateString: string | undefined, appConfig?: any): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
     } catch (e) {
         return dateString;
     }
@@ -138,6 +142,7 @@ export default function ThankYouPage() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hideLoading } = useLoading();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { settings: globalCompanySettings } = useGlobalSettings();
@@ -182,16 +187,30 @@ export default function ThankYouPage() {
       const razorpaySignature = localStorage.getItem('razorpaySignature');
 
       // --- 1. Handle Cancellation Fee Payment Verification ---
-      if (isProcessingCancellationFee && bookingFirestoreDocIdForCancellation && feeAmountStr && razorpayPaymentId) {
+      const stripePaymentMethod = searchParams.get('payment_method');
+      const stripeSessionId = searchParams.get('session_id');
+      const isStripeCancellation = stripePaymentMethod === 'stripe' && !!stripeSessionId;
+
+      if (isProcessingCancellationFee && bookingFirestoreDocIdForCancellation && feeAmountStr && (razorpayPaymentId || isStripeCancellation)) {
         try {
-            const verificationResponse = await fetch('/api/razorpay/verify-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
-            });
-            const verificationResult = await verificationResponse.json();
-            if (!verificationResult.success || verificationResult.status !== 'captured') {
-                throw new Error(verificationResult.error || "Payment verification failed.");
+            let paymentTransactionId = razorpayPaymentId;
+            if (isStripeCancellation) {
+              const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}`);
+              const verifyData = await verifyRes.json();
+              if (!verifyData.success) {
+                throw new Error(verifyData.error || "Stripe payment verification failed.");
+              }
+              paymentTransactionId = verifyData.payment_intent || stripeSessionId;
+            } else {
+              const verificationResponse = await fetch('/api/razorpay/verify-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
+              });
+              const verificationResult = await verificationResponse.json();
+              if (!verificationResult.success || verificationResult.status !== 'captured') {
+                  throw new Error(verificationResult.error || "Payment verification failed.");
+              }
             }
             toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
             
@@ -208,7 +227,7 @@ export default function ThankYouPage() {
                     status: "Cancelled" as BookingStatus, 
                     updatedAt: Timestamp.now(),
                     cancellationFeePaid: feeAmount,
-                    cancellationPaymentId: razorpayPaymentId,
+                    cancellationPaymentId: paymentTransactionId,
                 });
 
                 // 1. Create and send notification to USER
@@ -276,7 +295,7 @@ export default function ThankYouPage() {
                       paidAmount: originalBookingData.paymentMethod === 'Online' ? originalBookingData.totalAmount : 0,
                       cancellationFee: feeAmount,
                       refundableAmount: originalBookingData.paymentMethod === 'Online' ? Math.max(0, originalBookingData.totalAmount - feeAmount) : 0,
-                      cancellationPaymentId: razorpayPaymentId || undefined,
+                      cancellationPaymentId: paymentTransactionId || undefined,
                       siteName: globalCompanySettings?.websiteName || "Fixbro",
                       smtpHost: appConfig.smtpHost,
                       smtpPort: appConfig.smtpPort,
@@ -314,6 +333,115 @@ export default function ThankYouPage() {
       }
 
       // --- 2. Handle Regular Booking Confirmation ---
+      const stripeBookingId = searchParams.get('bookingId');
+      const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
+
+      if (isStripeBooking) {
+        if (!stripeSessionId || !stripeBookingId) {
+            toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
+            router.push('/cart'); setIsLoadingPage(false); return;
+        }
+        try {
+            const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}`);
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                throw new Error(verifyData.error || "Stripe payment verification failed.");
+            }
+            toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
+
+            const bookingRef = doc(db, 'bookings', stripeBookingId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            if (bookingSnap.exists()) {
+                const bookingData = bookingSnap.data() as FirestoreBooking;
+                let finalBookingNum = bookingData.bookingNumber;
+
+                if (bookingData.status === 'Pending Payment') {
+                    const nextBookingNumber = await assignNewBookingNumber();
+                    finalBookingNum = nextBookingNumber;
+
+                    await updateDoc(bookingRef, {
+                        status: 'Confirmed',
+                        bookingNumber: nextBookingNumber,
+                        stripeSessionId: stripeSessionId,
+                        stripePaymentIntent: verifyData.payment_intent || null,
+                        updatedAt: Timestamp.now(),
+                    });
+
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                    fetch(`${appUrl}/api/bookings/post-process`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bookingDocId: stripeBookingId, triggerSource: 'stripe_checkout_thankyou' })
+                    }).catch(err => console.error("Error triggering post-process from thank-you:", err));
+
+                    const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+                    logUserActivity(
+                      'newBooking',
+                      {
+                        bookingId: bookingData.bookingId,
+                        bookingDocId: stripeBookingId,
+                        totalAmount: bookingData.totalAmount,
+                        paymentMethod: 'Online',
+                        customerName: bookingData.customerName,
+                        customerPhone: bookingData.customerPhone,
+                        servicesSummary
+                      },
+                      currentUser?.uid,
+                      !currentUser ? getGuestId() : null,
+                      bookingData.customerName
+                    );
+
+                    if (currentUser?.uid) {
+                        const userNotification: Omit<FirestoreNotification, 'id'> = {
+                          userId: currentUser.uid,
+                          title: "Booking Confirmed!",
+                          message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
+                          type: 'success',
+                          href: '/my-bookings',
+                          read: false,
+                          createdAt: Timestamp.now(),
+                        };
+                        await addDoc(collection(db, "userNotifications"), userNotification);
+                    }
+                }
+
+                const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+                setBookingDetailsForDisplay({ 
+                    ...bookingData, 
+                    id: stripeBookingId, 
+                    bookingNumber: finalBookingNum,
+                    servicesSummary, 
+                    createdAt: (() => {
+                        const millis = getTimestampMillis(bookingData.createdAt);
+                        if (!millis) return 'N/A';
+                        const d = new Date(millis);
+                        return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
+                    })(),
+                    scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
+                    latitude: bookingData.latitude === undefined ? null : bookingData.latitude, 
+                    longitude: bookingData.longitude === undefined ? null : bookingData.longitude, 
+                    visitingChargeDisplayed: bookingData.visitingCharge || 0, 
+                    discountCode: bookingData.discountCode || null, 
+                    discountAmount: bookingData.discountAmount || 0, 
+                });
+            } else {
+                throw new Error("Booking record not found.");
+            }
+
+        } catch (error: any) {
+            console.error("Error during Stripe payment confirmation:", error);
+            toast({ title: "Payment Error", description: error.message, variant: "destructive", duration: 7000 });
+            router.push('/checkout/payment'); 
+            setIsLoadingPage(false); 
+            return;
+        } finally {
+            await clearLocalStorageItems(currentUser?.uid);
+            setIsLoadingPage(false);
+        }
+        return;
+      }
+
       if (isOnlinePayment) {
         if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
             toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
@@ -340,7 +468,7 @@ export default function ThankYouPage() {
 
       try {
         const newBookingId = generateBookingId();
-        let customerEmail = "customer@example.com", scheduledDateStored = new Date().toLocaleDateString('en-CA'), scheduledTimeSlot = "10:00 AM";
+        let customerEmail = "", scheduledDateStored = new Date().toLocaleDateString('en-CA'), scheduledTimeSlot = "10:00 AM";
         let customerName = "Guest User", customerPhone = "N/A", addressLine1 = "N/A", addressLine2: string | undefined, city = "N/A", state = "N/A", pincode = "N/A";
         let latitude: number | undefined, longitude: number | undefined;
         let bookingDiscountCode: string | undefined, bookingDiscountAmount: number | undefined, appliedPromoCodeId: string | undefined;
@@ -351,7 +479,8 @@ export default function ThankYouPage() {
         let storedDailyTimeline: any[] = [];
 
         if (typeof window !== 'undefined') {
-          customerEmail = localStorage.getItem('fixbroCustomerEmail') || customerEmail;
+          const storedEmail = localStorage.getItem('fixbroCustomerEmail');
+          customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || "");
           currentCategoryId = localStorage.getItem('fixbroActiveCheckoutCategory');
           scheduledDateStored = localStorage.getItem('fixbroScheduledDate') || scheduledDateStored; 
           scheduledTimeSlot = localStorage.getItem('fixbroScheduledTimeSlot') || scheduledTimeSlot;
@@ -367,7 +496,7 @@ export default function ThankYouPage() {
           const platformFeesStr = localStorage.getItem('fixbroAppliedPlatformFees');
           if (platformFeesStr) { try { storedAppliedPlatformFees = JSON.parse(platformFeesStr); } catch (e) { console.error("Error parsing stored platform fees:", e); } }
           const addressDataString = localStorage.getItem('fixbroCustomerAddress');
-          if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
+          if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
         }
 
         let sumOfDisplayedItemPrices = 0;
@@ -443,7 +572,7 @@ export default function ThankYouPage() {
         let coverageType: 'provider_match' | 'admin_only' = 'admin_only';
         let suggestedProviderIds: string[] = [];
         let autoAssignedProviderId: string | undefined = undefined;
-        let bookingStatus: FirestoreBooking['status'] = (paymentMethod === 'later' || paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed";
+        let bookingStatus: FirestoreBooking['status'] = (paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed";
 
         // Assign Sequential Booking Number
         const nextBookingNumber = await assignNewBookingNumber();
@@ -463,11 +592,12 @@ export default function ThankYouPage() {
           subTotal: baseSubTotalForBooking,
           ...(baseVisitingChargeForBooking > 0 && { visitingCharge: baseVisitingChargeForBooking }),
           taxAmount: totalTaxForBooking, totalAmount: totalAmountForBooking,
+          platformFeeTotal: totalBasePlatformFees + totalTaxOnPlatformFees,
           ...(bookingDiscountCode !== undefined && { discountCode: bookingDiscountCode }),
           ...(bookingDiscountAmount !== undefined && { discountAmount: bookingDiscountAmount }),
           ...(storedAppliedPlatformFees.length > 0 && { appliedPlatformFees: storedAppliedPlatformFees }),
           paymentMethod: paymentMethod || "Unknown",
-          status: (paymentMethod === 'later' || paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed",
+          status: (paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed",
           ...(razorpayPaymentId && { razorpayPaymentId }),
           ...(razorpayOrderId && { razorpayOrderId }),
           ...(razorpaySignature && { razorpaySignature }),
@@ -535,10 +665,12 @@ export default function ThankYouPage() {
             servicesSummary, 
             createdAt: (() => {
                 const millis = getTimestampMillis(newBookingData.createdAt);
-                return millis ? new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                if (!millis) return 'N/A';
+                const d = new Date(millis);
+                return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
             })(),
  
-            scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate),
+            scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate, appConfig),
             latitude: newBookingData.latitude === undefined ? null : newBookingData.latitude, 
             longitude: newBookingData.longitude === undefined ? null : newBookingData.longitude, 
             visitingChargeDisplayed: baseVisitingChargeForBooking, 
@@ -705,7 +837,7 @@ export default function ThankYouPage() {
                         icon={Activity} 
                         label="Estimated Completion" 
                         valueClassName="text-emerald-600"
-                        value={`${new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at ${new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`} 
+                        value={`${formatDateInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')} ${formatTimeInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')}`} 
                     />
                     <Separator className="opacity-40" />
                   </>
@@ -808,12 +940,14 @@ export default function ThankYouPage() {
                 <SummaryItem icon={Activity} label="Status" value={bookingDetailsForDisplay.status} />
             </div>
 
-            <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center gap-3">
-               <Mail className="h-5 w-5 text-primary shrink-0" />
-               <p className="text-sm text-muted-foreground text-center">
-                 Confirmation sent to <span className="font-bold text-foreground">{bookingDetailsForDisplay.customerEmail}</span>
-               </p>
-            </div>
+            {bookingDetailsForDisplay.customerEmail && (
+              <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center gap-3">
+                 <Mail className="h-5 w-5 text-primary shrink-0" />
+                 <p className="text-sm text-muted-foreground text-center">
+                   Confirmation sent to <span className="font-bold text-foreground">{bookingDetailsForDisplay.customerEmail}</span>
+                 </p>
+              </div>
+            )}
           </div>
         </CardContent>
 

@@ -8,7 +8,7 @@ import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, Play
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, getDocs, addDoc, deleteDoc, query, orderBy } from '@/lib/mysqlDb';
-import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCustomDate } from '@/lib/utils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import type { AppSettings, DayAvailability } from '@/types/firestore'; 
 import { defaultAppSettings } from '@/config/appDefaults'; 
@@ -20,12 +20,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Check, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
+import { Check, Copy, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const APP_CONFIG_COLLECTION = "webSettings";
 const APP_CONFIG_DOC_ID = "applicationConfig";
+
+const DATE_FORMATS = [
+  'DD/MM/YYYY',
+  'DD-MM-YYYY',
+  'DD.MM.YYYY',
+  'MM/DD/YYYY',
+  'YYYY-MM-DD',
+  'YYYY/MM/DD',
+  'DD MMM YYYY',
+  'MMM DD, YYYY',
+  'DD MMMM YYYY',
+  'MMMM DD, YYYY',
+];
 
 interface TimezoneOption {
   label: string;
@@ -76,6 +90,39 @@ const generateTimezones = (): TimezoneOption[] => {
   }
 };
 
+const getTimezoneOffsetString = (timezone: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset'
+    }).formatToParts(new Date());
+    const tzName = parts.find(p => p.type === 'timeZoneName')?.value || '';
+    if (tzName === 'GMT') return '+00:00';
+    const offset = tzName.replace('GMT', '');
+    const match = offset.match(/^([+-])(\d{1,2}):(\d{2})$/);
+    if (match) {
+      const [_, sign, hours, mins] = match;
+      return `${sign}${hours.padStart(2, '0')}:${mins}`;
+    }
+    return offset;
+  } catch (e) {
+    return '';
+  }
+};
+
+const getLiveTimeInTimezone = (timezone: string, date: Date): string => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
+  } catch (e) {
+    return '';
+  }
+};
+
 interface CurrencyOption {
   code: string;
   symbol: string;
@@ -115,13 +162,25 @@ const ALL_TIMEZONES = generateTimezones();
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const symbol = settings.currencySymbol || '₹';
+  const previewDate = useMemo(() => new Date(), []);
   const [isSaving, setIsSaving] = useState(false);
+  const [copiedStripe, setCopiedStripe] = useState(false);
+  const [copiedRazorpay, setCopiedRazorpay] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [timezoneSearch, setTimezoneSearch] = useState("");
   const [isTimezoneDialogOpen, setIsTimezoneDialogOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
   const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
+  const [isDateFormatDialogOpen, setIsDateFormatDialogOpen] = useState(false);
   const [isVcTaxPickerOpen, setIsVcTaxPickerOpen] = useState(false);
   const [isCancelFeeTypePickerOpen, setIsCancelFeeTypePickerOpen] = useState(false);
 
@@ -140,16 +199,68 @@ export default function AdminSettingsPage() {
   const [editingLeaveId, setEditingLeaveId] = useState<string | null>(null);
 
   const filteredTimezones = useMemo(() => {
-    if (!timezoneSearch) return ALL_TIMEZONES;
-    const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
-    return ALL_TIMEZONES.filter((tz: TimezoneOption) => tz.searchLabel.includes(search));
-  }, [timezoneSearch]);
+    let result = ALL_TIMEZONES;
+    if (timezoneSearch) {
+      const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
+      result = ALL_TIMEZONES.filter((tz: TimezoneOption) => {
+        if (tz.searchLabel.includes(search)) return true;
+        const offsetStr = getTimezoneOffsetString(tz.value).toLowerCase();
+        if (offsetStr.includes(search) || offsetStr.replace(':', '').includes(search)) return true;
+        const liveTime = getLiveTimeInTimezone(tz.value, currentTime).toLowerCase();
+        if (liveTime.includes(search) || liveTime.replace(':', '').includes(search)) return true;
+        return false;
+      });
+    }
+    const kolkataIndex = result.findIndex(tz => tz.value === 'Asia/Kolkata' || tz.value === 'Asia/Calcutta');
+    if (kolkataIndex > -1) {
+      const kolkataTz = result[kolkataIndex];
+      const withoutKolkata = result.filter(tz => tz.value !== 'Asia/Kolkata' && tz.value !== 'Asia/Calcutta');
+      return [kolkataTz, ...withoutKolkata];
+    }
+    return result;
+  }, [timezoneSearch, currentTime]);
 
   const filteredCurrencies = useMemo(() => {
     if (!currencySearch) return currenciesList;
     const search = currencySearch.toLowerCase().trim();
     return currenciesList.filter(c => c.code.toLowerCase().includes(search) || c.name.toLowerCase().includes(search));
   }, [currencySearch]);
+
+  // Scroll selected timezone into view when dialog opens
+  useEffect(() => {
+    if (isTimezoneDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-timezone-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isTimezoneDialogOpen]);
+
+  // Scroll selected date format into view when dialog opens
+  useEffect(() => {
+    if (isDateFormatDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-dateformat-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isDateFormatDialogOpen]);
+
+  // Scroll selected currency into view when dialog opens
+  useEffect(() => {
+    if (isCurrencyDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-currency-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isCurrencyDialogOpen]);
 
   const loadSettingsFromFirestore = useCallback(async () => {
     setIsLoadingSettings(true);
@@ -715,22 +826,28 @@ export default function AdminSettingsPage() {
                         variant="outline"
                         role="combobox"
                         aria-expanded={isTimezoneDialogOpen}
-                        className="w-full justify-between text-left font-normal h-10"
+                        className="w-full justify-between text-left font-normal h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
                         disabled={isSaving}
                         type="button"
                       >
                         {settings.timezone ? (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            <span>{ALL_TIMEZONES.find((tz) => tz.value === settings.timezone)?.label || settings.timezone}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 font-mono text-sm w-full pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-4 w-4 text-primary shrink-0 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                              <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{getTimezoneOffsetString(settings.timezone)}</span>
+                              <span className="text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                              <span className="text-primary font-bold group-hover:text-primary-foreground group-focus:text-primary-foreground">{getLiveTimeInTimezone(settings.timezone, currentTime)}</span>
+                            </div>
+                            <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                            <span className="text-slate-600 dark:text-slate-400 truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{settings.timezone}</span>
                           </div>
                         ) : (
                           "Select application timezone..."
                         )}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[425px]">
+                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[550px] md:max-w-[600px]">
                       <DialogHeader>
                         <DialogTitle>Select Application Timezone</DialogTitle>
                         <DialogDescription>
@@ -752,21 +869,27 @@ export default function AdminSettingsPage() {
                             {filteredTimezones.map((tz) => (
                               <Button
                                 key={tz.value}
-                                variant={settings.timezone === tz.value ? "secondary" : "ghost"}
-                                className="w-full justify-start text-left h-auto py-3 px-3 relative group whitespace-normal"
+                                variant={settings.timezone === tz.value ? "default" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative group whitespace-normal hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
                                 onClick={() => {
                                   handleSelectChange('timezone', tz.value);
                                   setIsTimezoneDialogOpen(false);
                                   setTimezoneSearch("");
                                 }}
                                 type="button"
+                                data-timezone-active={settings.timezone === tz.value ? "true" : "false"}
                               >
-                                <div className="flex flex-col gap-0.5 pr-8">
-                                  <span className="font-semibold text-sm">{tz.label}</span>
-                                  <span className="text-xs text-muted-foreground font-mono">{tz.subLabel}</span>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 font-mono text-sm w-full pr-8">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{getTimezoneOffsetString(tz.value)}</span>
+                                    <span className="text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                    <span className={settings.timezone === tz.value ? "text-primary-foreground font-bold" : "text-primary font-bold group-hover:text-primary-foreground group-focus:text-primary-foreground"}>{getLiveTimeInTimezone(tz.value, currentTime)}</span>
+                                  </div>
+                                  <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                  <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{tz.value}</span>
                                 </div>
                                 {settings.timezone === tz.value && (
-                                  <Check className="absolute right-3 top-4 h-4 w-4 text-green-500" />
+                                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                                 )}
                               </Button>
                             ))}
@@ -780,6 +903,82 @@ export default function AdminSettingsPage() {
                   </Dialog>
                   <p className="text-xs text-muted-foreground">
                     Search and select from all world timezones. This will be used for booking slots, email timestamps, and all date/time calculations.
+                  </p>
+                </div>
+              </div>
+
+              {/* Date Format Configuration */}
+              <div className="space-y-4 p-4 border rounded-md shadow-sm bg-muted/5">
+                <h3 className="text-lg font-semibold flex items-center">
+                  <CalendarDays className="mr-2 h-5 w-5 text-primary" /> Application Date Format
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="dateFormat">Select Date Format</Label>
+                  <Dialog open={isDateFormatDialogOpen} onOpenChange={setIsDateFormatDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        id="dateFormat"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isDateFormatDialogOpen}
+                        className="w-full justify-between text-left font-normal h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
+                        disabled={isSaving}
+                        type="button"
+                      >
+                        {settings.dateFormat ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm w-full pr-2">
+                            <div className="flex items-center gap-2">
+                              <CalendarDays className="h-4 w-4 text-primary shrink-0 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                              <span className="font-semibold group-hover:text-primary-foreground group-focus:text-primary-foreground">{settings.dateFormat}</span>
+                            </div>
+                            <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">Example: {formatCustomDate(previewDate, settings.dateFormat, settings.timezone)}</span>
+                          </div>
+                        ) : (
+                          "Choose a date format..."
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[500px] md:max-w-[550px]">
+                      <DialogHeader>
+                        <DialogTitle>Select Application Date Format</DialogTitle>
+                        <DialogDescription>
+                          Choose the display format that matches your country's standard.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <ScrollArea className="h-[280px] rounded-md border p-2">
+                          <div className="space-y-1">
+                            {DATE_FORMATS.map((fmt) => (
+                              <Button
+                                key={fmt}
+                                variant={settings.dateFormat === fmt ? "default" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative group whitespace-normal hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
+                                onClick={() => {
+                                  handleSelectChange('dateFormat', fmt);
+                                  setIsDateFormatDialogOpen(false);
+                                }}
+                                type="button"
+                                data-dateformat-active={settings.dateFormat === fmt ? "true" : "false"}
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-sm w-full pr-8">
+                                  <span className="font-semibold group-hover:text-primary-foreground group-focus:text-primary-foreground">{fmt}</span>
+                                  <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                  <span className="text-xs text-muted-foreground truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">Example: {formatCustomDate(previewDate, fmt, settings.timezone)}</span>
+                                </div>
+                                {settings.dateFormat === fmt && (
+                                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                                )}
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the date display format that matches your country's standard. This format will be used across the entire website, client/provider dashboards, emails, and PDFs.
                   </p>
                 </div>
               </div>
@@ -801,16 +1000,22 @@ export default function AdminSettingsPage() {
                           variant="outline"
                           role="combobox"
                           aria-expanded={isCurrencyDialogOpen}
-                          className="w-full justify-between h-10 border-border/60 hover:bg-muted/50"
+                          className="w-full justify-between h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
                         >
                           {(() => {
                             const cur = currenciesList.find(c => c.code === (settings.currencyCode || 'INR')) || currenciesList[0];
-                            return `${cur.code} - ${cur.name}`;
+                            return (
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm w-full pr-2 text-left">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{cur.code}</span>
+                                <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{cur.name}</span>
+                              </div>
+                            );
                           })()}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
+                      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[500px] md:max-w-[550px]">
                         <DialogHeader>
                           <DialogTitle>Select Country Currency</DialogTitle>
                           <DialogDescription>Search and select your local business currency.</DialogDescription>
@@ -827,22 +1032,26 @@ export default function AdminSettingsPage() {
                           </div>
                           <ScrollArea className="h-[250px] rounded-md border p-2">
                             <div className="space-y-1">
-                              {filteredCurrencies.map((c) => (
+                               {filteredCurrencies.map((c) => (
                                 <Button
                                   key={c.code}
-                                  variant={settings.currencyCode === c.code ? "secondary" : "ghost"}
-                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative group"
+                                  variant={settings.currencyCode === c.code ? "default" : "ghost"}
+                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative group hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
                                   onClick={() => {
                                     handleSelectCurrency(c);
                                     setIsCurrencyDialogOpen(false);
                                     setCurrencySearch("");
                                   }}
                                   type="button"
+                                  data-currency-active={settings.currencyCode === c.code ? "true" : "false"}
                                 >
-                                  <span className="font-bold text-sm mr-2">{c.code}</span>
-                                  <span className="text-xs text-muted-foreground">{c.name}</span>
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-sm w-full pr-8">
+                                    <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{c.code}</span>
+                                    <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{c.name}</span>
+                                  </div>
                                   {settings.currencyCode === c.code && (
-                                    <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                                   )}
                                 </Button>
                               ))}
@@ -1238,7 +1447,7 @@ export default function AdminSettingsPage() {
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="enableOnlinePayment" className="text-base">Enable Online Payments (Razorpay)</Label>
+                  <Label htmlFor="enableOnlinePayment" className="text-base">Enable Online Payments (Razorpay & Stripe)</Label>
                   <p className="text-sm text-muted-foreground">
                     Allow customers to pay using online methods like UPI, Cards, Netbanking.
                   </p>
@@ -1253,29 +1462,173 @@ export default function AdminSettingsPage() {
               </div>
 
               {settings.enableOnlinePayment && (
-                <div className="space-y-4 pl-4 border-l-2 border-primary ml-2 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
-                    <Input
-                      id="razorpayKeyId"
-                      name="razorpayKeyId"
-                      value={settings.razorpayKeyId}
-                      onChange={handleInputChange}
-                      placeholder="rzp_live_xxxxxxxxxxxxxx"
-                      disabled={isSaving}
-                    />
+                <div className="space-y-6 pl-4 border-l-2 border-primary ml-2 pt-4">
+                  {/* Razorpay Configurations */}
+                  <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-md font-bold">Razorpay Payment Gateway</Label>
+                        <p className="text-xs text-muted-foreground">Enable Razorpay checkout payments.</p>
+                      </div>
+                      <Switch
+                        id="enableRazorpay"
+                        name="enableRazorpay"
+                        checked={settings.enableRazorpay}
+                        onCheckedChange={(checked) => handleSwitchChange('enableRazorpay', checked)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    {settings.enableRazorpay && (
+                      <div className="space-y-4 pt-2 border-t border-dashed">
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
+                          <Input
+                            id="razorpayKeyId"
+                            name="razorpayKeyId"
+                            value={settings.razorpayKeyId || ""}
+                            onChange={handleInputChange}
+                            placeholder="rzp_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
+                          <Input
+                            id="razorpayKeySecret"
+                            name="razorpayKeySecret"
+                            type="password"
+                            value={settings.razorpayKeySecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="••••••••••••••••••••••"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayWebhookSecret">Razorpay Webhook Secret</Label>
+                          <Input
+                            id="razorpayWebhookSecret"
+                            name="razorpayWebhookSecret"
+                            type="password"
+                            value={settings.razorpayWebhookSecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="••••••••••••••••••••••"
+                            disabled={isSaving}
+                          />
+                          <p className="text-[10px] text-muted-foreground leading-normal mt-1">
+                            Required to authenticate webhook callbacks from Razorpay.
+                          </p>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
+                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Razorpay Webhook Endpoint URL:</p>
+                          <div className="flex gap-2 items-center">
+                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                              {typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook"}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-background"
+                              onClick={() => {
+                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook";
+                                navigator.clipboard.writeText(url);
+                                setCopiedRazorpay(true);
+                                setTimeout(() => setCopiedRazorpay(false), 2000);
+                              }}
+                            >
+                              {copiedRazorpay ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                            Register this URL in your Razorpay Dashboard under Settings &gt; Webhooks.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
-                    <Input
-                      id="razorpayKeySecret"
-                      name="razorpayKeySecret"
-                      type="password"
-                      value={settings.razorpayKeySecret}
-                      onChange={handleInputChange}
-                      placeholder="••••••••••••••••••••••"
-                      disabled={isSaving}
-                    />
+
+                  {/* Stripe Configurations */}
+                  <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-md font-bold">Stripe Payment Gateway</Label>
+                        <p className="text-xs text-muted-foreground">Enable Stripe checkout payments.</p>
+                      </div>
+                      <Switch
+                        id="enableStripe"
+                        name="enableStripe"
+                        checked={settings.enableStripe}
+                        onCheckedChange={(checked) => handleSwitchChange('enableStripe', checked)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    {settings.enableStripe && (
+                      <div className="space-y-4 pt-2 border-t border-dashed">
+                        <div className="space-y-2">
+                          <Label htmlFor="stripePublishableKey">Stripe Publishable Key</Label>
+                          <Input
+                            id="stripePublishableKey"
+                            name="stripePublishableKey"
+                            value={settings.stripePublishableKey || ""}
+                            onChange={handleInputChange}
+                            placeholder="pk_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                          <Input
+                            id="stripeSecretKey"
+                            name="stripeSecretKey"
+                            type="password"
+                            value={settings.stripeSecretKey || ""}
+                            onChange={handleInputChange}
+                            placeholder="sk_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="stripeWebhookSecret">Stripe Webhook Secret</Label>
+                          <Input
+                            id="stripeWebhookSecret"
+                            name="stripeWebhookSecret"
+                            type="password"
+                            value={settings.stripeWebhookSecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="whsec_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                          <p className="text-[10px] text-muted-foreground leading-normal mt-1">
+                            Required to authenticate webhook callbacks from Stripe.
+                          </p>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
+                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Stripe Webhook Endpoint URL:</p>
+                          <div className="flex gap-2 items-center">
+                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                              {typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook"}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-background"
+                              onClick={() => {
+                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook";
+                                navigator.clipboard.writeText(url);
+                                setCopiedStripe(true);
+                                setTimeout(() => setCopiedStripe(false), 2000);
+                              }}
+                            >
+                              {copiedStripe ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                            Register this URL in your Stripe Dashboard under Developers &gt; Webhooks. Select event: <strong className="text-foreground">checkout.session.completed</strong>.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

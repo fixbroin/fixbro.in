@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronDown, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2 } from "lucide-react";
+import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronDown, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2, Wallet } from "lucide-react";
 import type { FirestoreUser, Address } from '@/types/firestore';
 import { db } from '@/lib/firebase'; 
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, limit, startAfter, getDocs, where, type QueryDocumentSnapshot } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import UserDetailsModal from '@/components/admin/UserDetailsModal'; 
+import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -26,7 +27,8 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArchivedUsers } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { toggleUserStatusAction } from '@/app/actions/userStatusActions';
 
 import { initializeUserNumbers } from '@/lib/systemStatsUtils';
@@ -38,10 +40,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
-const formatUserTimestamp = (timestamp?: unknown): string => {
+const formatUserTimestamp = (timestamp?: unknown, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
 };
 
 const StatusBadge = ({ isActive, isLoading }: { isActive: boolean, isLoading: boolean }) => (
@@ -73,6 +75,7 @@ const availableFields: { key: SelectableUserField; label: string }[] = [
 const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
+  const { config: appConfig } = useApplicationConfig();
   const { stats } = useAdminStats();
   const { adminPermissions } = useAuth();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
@@ -88,6 +91,8 @@ export default function AdminUsersPage() {
 
   const [selectedUserForModal, setSelectedUserForModal] = useState<FirestoreUser | null>(null);
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  const [selectedUserForWallet, setSelectedUserForWallet] = useState<FirestoreUser | null>(null);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -345,7 +350,7 @@ export default function AdminUsersPage() {
         }
         if (key === 'createdAt' || key === 'lastLoginAt') {
           const timestamp = user[key];
-          return timestamp ? formatUserTimestamp(timestamp) : "N/A";
+          return timestamp ? formatUserTimestamp(timestamp, appConfig) : "N/A";
         }
         if (key === 'isActive') return user.isActive ? "Active" : "Disabled";
         return user[key as keyof FirestoreUser] ?? 'N/A';
@@ -430,7 +435,7 @@ export default function AdminUsersPage() {
         </div>
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <Calendar className="h-3.5 w-3.5 text-primary/60" />
-          <span>Joined {formatUserTimestamp(user.createdAt)}</span>
+          <span>Joined {formatUserTimestamp(user.createdAt, appConfig)}</span>
         </div>
       </div>
 
@@ -595,7 +600,7 @@ export default function AdminUsersPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs font-black text-muted-foreground uppercase tracking-tighter">{formatUserTimestamp(user.createdAt)}</TableCell>
+                          <TableCell className="text-xs font-black text-muted-foreground uppercase tracking-tighter">{formatUserTimestamp(user.createdAt, appConfig)}</TableCell>
                           <TableCell className="text-center">
                             <PermissionGuard moduleId="users" action="write" fallback={<StatusBadge isActive={user.isActive} isLoading={false} />}>
                               <button onClick={() => handleToggleUserStatus(user.id, user.isActive)} className="focus:outline-none" disabled={isUpdatingStatus === user.id}>
@@ -605,6 +610,17 @@ export default function AdminUsersPage() {
                           </TableCell>
                           <TableCell className="pr-8 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {user.roles?.includes('provider') && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-9 w-9 rounded-xl hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-sm border border-emerald-500/10" 
+                                  onClick={() => { setSelectedUserForWallet(user); setIsWalletModalOpen(true); }}
+                                  title="Adjust Wallet"
+                                >
+                                  <Wallet className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm border border-primary/10" onClick={() => handleViewDetails(user)}><Eye className="h-4 w-4" /></Button>
                               <PermissionGuard moduleId="users" action="delete">
                                 <AlertDialog>
@@ -734,6 +750,15 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selectedUserForWallet && (
+        <ProviderWalletAdjustmentModal 
+          isOpen={isWalletModalOpen}
+          onClose={() => { setIsWalletModalOpen(false); setSelectedUserForWallet(null); }}
+          providerId={selectedUserForWallet.id || selectedUserForWallet.uid!}
+          providerName={selectedUserForWallet.displayName || 'Provider'}
+        />
+      )}
     </div>
   );
 }

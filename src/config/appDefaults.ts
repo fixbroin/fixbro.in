@@ -23,11 +23,17 @@ export const defaultAppSettings: AppSettings = {
   visitingChargeTaxPercent: 5,     
   enableVisitorLogging: true,
   enableUserPresence: true,
-   enableKeyboardSuggestions: true,
+  enableKeyboardSuggestions: true,
   // Payment
   enableOnlinePayment: true,
+  enableRazorpay: true,
+  enableStripe: false,
   razorpayKeyId: "",
   razorpayKeySecret: "",
+  razorpayWebhookSecret: "",
+  stripePublishableKey: "",
+  stripeSecretKey: "",
+  stripeWebhookSecret: "",
   enableCOD: true, // Represents "Pay After Service"
   // Time Slots
   timeSlotSettings: {
@@ -82,6 +88,7 @@ export const defaultAppSettings: AppSettings = {
   // Provider Fee Settings
   providerFeeType: 'fixed', // 'fixed' or 'percentage'
   providerFeeValue: 0, // Default to 0, meaning no fee
+  providerExtraFeePercentage: 0,
 
   enableStatusUpdateEmails: true,
   enableAccountDisabledEmail: true,
@@ -94,6 +101,8 @@ export const defaultAppSettings: AppSettings = {
 
   // UI/UX
   loaderType: 'logo-pulse',
+
+  dateFormat: 'DD/MM/YYYY',
 
   updatedAt: undefined, // No default for updatedAt
 };

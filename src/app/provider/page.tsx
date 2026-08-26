@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Briefcase, CheckCircle, Clock, Loader2, PackageSearch, ExternalLink, ShoppingBag, XCircle, PlayCircle, Tag, MapPin, User, Calendar, Phone, ArrowRight, TrendingUp } from "lucide-react";
+import { Briefcase, CheckCircle, Clock, Loader2, PackageSearch, ExternalLink, ShoppingBag, XCircle, PlayCircle, Tag, MapPin, User, Calendar, Phone, ArrowRight, TrendingUp, Wallet } from "lucide-react";
 import type { FirestoreBooking, BookingStatus } from '@/types/firestore';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, collectionGroup, getDoc, addDoc, getDocs, limit } from '@/lib/mysqlDb';
@@ -12,171 +12,27 @@ import { getProviderBookingCountsAction } from '@/app/actions/dbActions';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { logUserActivity } from '@/lib/activityLogger';
+import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import ProviderJobCard from '@/components/provider/ProviderJobCard';
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
-};
-
-const ProviderJobCard: React.FC<{
-  job: FirestoreBooking;
-  type: 'new' | 'ongoing' | 'completed';
-  onAccept?: (bookingId: string) => void;
-  onReject?: (bookingId: string) => void;
-  onStartWork?: (bookingId: string) => void;
-  onCompleteWork?: (bookingId: string) => void;
-  isProcessingAction?: boolean;
-}> = ({ job, type, onAccept, onReject, onStartWork, onCompleteWork, isProcessingAction }) => {
-  const { showLoading } = useLoading();
-  const isJobCompleted = job.status === 'Completed';
-
-  const handleViewDetailsClick = () => {
-    showLoading();
-  };
-
-  const getStatusVariant = (status: FirestoreBooking['status']) => {
-    if (status === 'ProviderAccepted' || status === 'InProgressByProvider') return 'default';
-    if (status === 'Completed') return 'default';
-    if (status === 'AssignedToProvider' || status === 'Rescheduled') return 'secondary';
-    return 'outline';
-  };
-
-  const getStatusClasses = (status: FirestoreBooking['status']) => {
-    if (status === 'ProviderAccepted' || status === 'InProgressByProvider') return 'bg-blue-500 text-white hover:bg-blue-600 border-none';
-    if (status === 'Completed') return 'bg-green-500 text-white hover:bg-green-600 border-none';
-    if (status === 'Cancelled' || status === 'ProviderRejected') return 'bg-red-500 text-white border-none';
-    if (status === 'Rescheduled') return 'bg-orange-500 text-white hover:bg-orange-600 border-none';
-    return '';
-  };
-
-  const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber: string) => {
-    e.stopPropagation();
-    const sanitizedPhone = mobileNumber.replace(/\D/g, '');
-    const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
-    const message = encodeURIComponent(`Hi ${job.customerName}, I'm your Fixbro provider for booking #${job.bookingId}.`);
-    window.open(`https://wa.me/${internationalPhone}?text=${message}`, '_blank');
-  };
-
-  return (
-    <Card className="group overflow-hidden border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card/50 backdrop-blur-sm flex flex-col h-full">
-      <div className={cn(
-        "h-1.5 w-full",
-        type === 'new' ? "bg-primary" : type === 'ongoing' ? "bg-blue-500" : "bg-green-500"
-      )} />
-      
-      <CardHeader className="p-4 sm:p-5">
-        <div className="flex justify-between items-start gap-2 mb-2">
-          <CardTitle className="text-base sm:text-lg font-bold leading-tight line-clamp-2 min-h-[3rem]">
-            {job.services.map(s => s.name).join(', ')}
-          </CardTitle>
-          <Badge variant={getStatusVariant(job.status)} className={cn("capitalize whitespace-nowrap shadow-sm shrink-0", getStatusClasses(job.status))}>
-            {job.status.replace(/([A-Z])/g, ' $1').replace('Provider ', '')}
-          </Badge>
-        </div>
-        <div className="flex items-center text-[10px] sm:text-xs font-mono bg-muted/50 w-fit px-2 py-1 rounded text-muted-foreground">
-          ID: {job.bookingId}
-        </div>
-      </CardHeader>
-
-      <CardContent className="px-4 sm:p-5 pt-0 space-y-3 flex-grow">
-        <div className="grid gap-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4 text-primary shrink-0" />
-            <span className="font-medium text-foreground">{formatDateForDisplay(job.scheduledDate)}</span>
-          </div>
-          
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4 text-primary shrink-0" />
-            <span className="font-medium text-foreground">{job.scheduledTimeSlot}</span>
-          </div>
-
-          {job.estimatedEndTime && (
-            <div className="flex items-center gap-2 bg-green-50/50 dark:bg-green-950/20 p-2 rounded-lg border border-green-100 dark:border-green-900/30">
-              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-              <div className="text-[11px] leading-tight">
-                <p className="text-green-600/70 font-bold uppercase tracking-wider">Est. Completion</p>
-                <p className="text-green-700 dark:text-green-400 font-semibold">
-                  {new Date(job.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} {new Date(job.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-start gap-2 text-muted-foreground pt-1 border-t border-muted/50 mt-1">
-            <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span className="line-clamp-2 text-xs">
-              {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <User className="h-4 w-4 text-primary shrink-0" />
-              <span className="font-medium text-foreground truncate max-w-[120px]">
-                {isJobCompleted ? "[Hidden]" : job.customerName}
-              </span>
-            </div>
-            
-            {!isJobCompleted && job.customerPhone && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-3 gap-2 rounded-full border-primary/20 hover:bg-primary/5 text-primary"
-                onClick={(e) => handleWhatsAppClick(e, job.customerPhone!)}
-              >
-                <AppImage src="/whatsapp.png" alt="WhatsApp" width={16} height={16} />
-                <span className="text-xs font-bold">Contact</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-
-      <CardFooter className="p-4 sm:p-5 pt-0 flex flex-col sm:flex-row justify-end gap-2">
-        <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
-          <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
-            <ExternalLink className="mr-1.5 h-3.5 w-3.5"/>View Details
-          </Link>
-        </Button>
-        
-        {type === 'new' && onAccept && onReject && (
-          <>
-            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
-              {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <XCircle className="mr-1.5 h-3.5 w-3.5"/>} Reject
-            </Button>
-            <Button size="sm" onClick={() => onAccept(job.id!)} disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
-              {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <CheckCircle className="mr-1.5 h-3.5 w-3.5"/>} Accept
-            </Button>
-          </>
-        )}
-
-        {type === 'ongoing' && job.status === 'ProviderAccepted' && onStartWork && (
-          <Button size="sm" onClick={() => onStartWork(job.id!)} disabled={isProcessingAction} className="w-full sm:w-auto text-xs bg-blue-500 hover:bg-blue-600 text-white border-none">
-            {isProcessingAction ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin"/> : <PlayCircle className="mr-1.5 h-4 w-4"/>} Start Work
-          </Button>
-        )}
-        
-        {type === 'ongoing' && job.status === 'InProgressByProvider' && onCompleteWork && (
-          <Button size="sm" onClick={() => onCompleteWork(job.id!)} disabled={isProcessingAction} className="w-full sm:w-auto text-xs bg-green-600 hover:bg-green-700 text-white border-none">
-            {isProcessingAction ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin"/> : <CheckCircle className="mr-1.5 h-4 w-4"/>} Mark Complete
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-  );
 };
 
 const StatCard = ({ title, value, icon: Icon, colorClass, delay }: { title: string, value: number, icon: any, colorClass: string, delay: string }) => (
@@ -196,16 +52,37 @@ const StatCard = ({ title, value, icon: Icon, colorClass, delay }: { title: stri
 
 export default function ProviderDashboardPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
+  const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [bookingCounts, setBookingCounts] = useState({ completed: 0, newRequests: 0, ongoing: 0 });
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
 
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      }
+    }).catch(err => console.error("Error loading wallet balance:", err));
+
+    // Fetch minimum balance setting
+    getProviderWalletSettingsAction().then(settings => {
+      setMinBalanceForJobs(settings.minBalanceForJobs);
+    }).catch(err => console.error("Error loading wallet settings:", err));
+  }, [providerUser, authIsLoading]);
 
   useEffect(() => {
     if (!providerUser || authIsLoading) {
@@ -265,7 +142,21 @@ export default function ProviderDashboardPage() {
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
 
-      await updateDoc(bookingDocRef, updateData);
+      if (!providerUser?.uid) {
+        throw new Error("No authenticated provider session found.");
+      }
+
+      const result = await updateBookingStatusByProviderAction(
+        bookingId,
+        providerUser.uid,
+        newStatus,
+        additionalCharges,
+        finalizedPaymentMethod
+      );
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
       // Log provider activity
       if (providerUser) {
@@ -349,6 +240,23 @@ export default function ProviderDashboardPage() {
         </Button>
       </header>
 
+      {providerWalletBalance < minBalanceForJobs && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-4 rounded-2xl font-bold flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-left">
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-xl bg-destructive/10 text-destructive">⚠️</span>
+            <div>
+              <p className="font-extrabold text-base">You don't have enough balance to accept jobs!</p>
+              <p className="text-xs font-semibold opacity-90 mt-0.5">Please add money to your wallet to unlock assigned bookings. Minimum required: {appConfig?.currencySymbol || "₹"}{minBalanceForJobs.toFixed(decimals)}</p>
+            </div>
+          </div>
+          <Button size="sm" variant="destructive" className="font-bold shrink-0 w-full sm:w-auto" asChild>
+            <Link href="/provider/wallet">
+              <Wallet className="mr-1.5 h-4 w-4" /> Top Up Wallet
+            </Link>
+          </Button>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title="New Requests" value={bookingCounts.newRequests} icon={Tag} colorClass="bg-primary" delay="0" />
@@ -374,6 +282,8 @@ export default function ProviderDashboardPage() {
                 onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
                 onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
                 isProcessingAction={processingBookingAction === job.id}
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
               />
             ))}
           </div>
@@ -404,6 +314,8 @@ export default function ProviderDashboardPage() {
                 onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
                 onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                 isProcessingAction={processingBookingAction === job.id}
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
               />
             ))}
           </div>
@@ -429,7 +341,10 @@ export default function ProviderDashboardPage() {
         {completedJobs.length > 0 ? (
           <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {completedJobs.slice(0, 3).map((job) => (
-              <ProviderJobCard key={job.id} job={job} type="completed" />
+              <ProviderJobCard key={job.id} job={job} type="completed"
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
+              />
             ))}
           </div>
         ) : (

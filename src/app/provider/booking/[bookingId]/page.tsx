@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Loader2, ArrowLeft, MapPin, Phone, Mail, CalendarDays, Clock, UserCircle, ExternalLink, ListOrdered, AlertTriangle, DollarSign, PlayCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, MapPin, Phone, Mail, CalendarDays, Clock, UserCircle, ExternalLink, ListOrdered, AlertTriangle, DollarSign, PlayCircle, CheckCircle, XCircle, Wallet } from 'lucide-react';
 import type { FirestoreBooking, BookingStatus, FirestoreNotification } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, getDoc, collection, query, where, getDocs, limit, addDoc } from '@/lib/mysqlDb';
@@ -16,26 +16,25 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
 import type { UserActivityEventType } from '@/types/firestore';
+import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true
-  });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
 };
 
@@ -55,6 +54,139 @@ export default function ProviderBookingDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
+  const [isWalletLoaded, setIsWalletLoaded] = useState(false);
+
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+  const getCommission = (amount: number, feeType: string, feeVal: number) => {
+    if (feeType === 'percentage') return (amount * feeVal) / 100;
+    return feeVal;
+  };
+  const paymentMethod = booking?.paymentMethod || 'Cash';
+  const isCash = paymentMethod.toLowerCase() === 'pay after service';
+  const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
+  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
+  const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
+    providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
+  const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : providerGross;
+
+
+  const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
+    if (!booking?.id || !providerUser) return;
+    setIsProcessingAction(true);
+    try {
+      const result = await updateBookingStatusByProviderAction(
+        booking.id,
+        providerUser.uid,
+        newStatus,
+        additionalCharges,
+        finalizedPaymentMethod
+      );
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      // Log provider activity
+      if (providerUser) {
+        let eventType: UserActivityEventType = 'providerAcceptJob';
+        if (newStatus === 'ProviderRejected') {
+          eventType = 'providerRejectJob';
+        } else if (newStatus === 'InProgressByProvider') {
+          eventType = 'providerStartWork';
+        } else if (newStatus === 'Completed') {
+          eventType = 'providerCompleteWork';
+        }
+
+        logUserActivity(
+          eventType,
+          { 
+            bookingId: booking.bookingId || bookingId, 
+            bookingDocId: booking.id,
+            status: newStatus,
+            additionalCharges: additionalCharges || [],
+            paymentMethod: finalizedPaymentMethod || booking.paymentMethod || 'N/A'
+          },
+          providerUser.uid,
+          null,
+          providerUser.displayName
+        ).catch(err => console.error("Error logging provider activity:", err));
+      }
+
+      toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
+      setIsCompleteDialogOpen(false);
+
+      // --- TRIGGER POST-PROCESS (Emails, Push, WhatsApp) ---
+      fetch('/api/bookings/post-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingDocId: booking.id }),
+      }).catch(err => console.error("Provider trigger error:", err));
+
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    const balancePromise = getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      } else {
+        setProviderWalletBalance(0);
+      }
+    }).catch(err => {
+      console.error("Error loading wallet balance:", err);
+      setProviderWalletBalance(0);
+    });
+
+    // Fetch minimum balance setting
+    const settingsPromise = getProviderWalletSettingsAction().then(settings => {
+      setMinBalanceForJobs(settings.minBalanceForJobs);
+    }).catch(err => {
+      console.error("Error loading wallet settings:", err);
+      setMinBalanceForJobs(50);
+    });
+
+    Promise.all([balancePromise, settingsPromise]).finally(() => {
+      setIsWalletLoaded(true);
+    });
+  }, [providerUser, authIsLoading]);
+
+  // Auto-Accept or Redirect based on balance when booking loads
+  useEffect(() => {
+    if (!booking || isLoadingBooking || isProcessingAction) return;
+    if (!isWalletLoaded || providerWalletBalance === null || minBalanceForJobs === null) return;
+
+    const isAssigned = booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled';
+    if (isAssigned) {
+      const requiredAmount = Math.max(minBalanceForJobs, requiredCommission);
+
+      if (providerWalletBalance < requiredAmount) {
+        // Redirect provider back to dashboard with error toast
+        toast({
+          title: "Prepaid Balance Low",
+          description: `You need a minimum balance of ${symbol}${requiredAmount.toFixed(decimals)} to accept/view this job.`,
+          variant: "destructive"
+        });
+        router.replace('/provider');
+      } else {
+        // Auto-accept immediately and deduct commission
+        updateBookingStatus('ProviderAccepted');
+      }
+    }
+  }, [booking, isLoadingBooking, isWalletLoaded, providerWalletBalance, minBalanceForJobs, requiredCommission, decimals, symbol, router, toast]);
 
   useEffect(() => {
     if (!bookingId || !providerUser) {
@@ -106,74 +238,7 @@ export default function ProviderBookingDetailsPage() {
     router.back();
   }
 
-  const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
-    if (!booking?.id || !providerUser) return;
-    setIsProcessingAction(true);
-    try {
-      const bookingDocRef = doc(db, "bookings", booking.id);
-      const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
-      
-      let updatedTotal = booking.totalAmount;
-      if (newStatus === "Completed") {
-        if (booking.status !== "Completed") {
-          updateData.isReviewedByCustomer = false;
-        }
-        if (additionalCharges && additionalCharges.length > 0) {
-          updateData.additionalCharges = additionalCharges;
-          const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
-          updatedTotal = (booking.totalAmount || 0) + extraTotal;
-          updateData.totalAmount = updatedTotal;
-        }
-        if (finalizedPaymentMethod) {
-          updateData.paymentMethod = finalizedPaymentMethod;
-        }
-      }
 
-      await updateDoc(bookingDocRef, updateData);
-
-      // Log provider activity
-      if (providerUser) {
-        let eventType: UserActivityEventType = 'providerAcceptJob';
-        if (newStatus === 'ProviderRejected') {
-          eventType = 'providerRejectJob';
-        } else if (newStatus === 'InProgressByProvider') {
-          eventType = 'providerStartWork';
-        } else if (newStatus === 'Completed') {
-          eventType = 'providerCompleteWork';
-        }
-
-        logUserActivity(
-          eventType,
-          { 
-            bookingId: booking.bookingId || bookingId, 
-            bookingDocId: booking.id,
-            status: newStatus,
-            additionalCharges: additionalCharges || [],
-            paymentMethod: finalizedPaymentMethod || booking.paymentMethod || 'N/A'
-          },
-          providerUser.uid,
-          null,
-          providerUser.displayName
-        ).catch(err => console.error("Error logging provider activity:", err));
-      }
-
-      toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
-      setIsCompleteDialogOpen(false);
-
-      // --- TRIGGER POST-PROCESS (Emails, Push, WhatsApp) ---
-      fetch('/api/bookings/post-process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingDocId: booking.id }),
-      }).catch(err => console.error("Provider trigger error:", err));
-
-    } catch (error) {
-      console.error("Error updating job status:", error);
-      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
-    } finally {
-      setIsProcessingAction(false);
-    }
-  };
 
 
   if (isLoadingBooking || authIsLoading) {
@@ -209,6 +274,8 @@ export default function ProviderBookingDetailsPage() {
 
   const isJobCompleted = booking.status === 'Completed';
 
+
+
   return (
     <div className="max-w-3xl mx-auto">
       <Button onClick={handleNavigateBack} variant="outline" size="sm" className="mb-4">
@@ -239,9 +306,9 @@ export default function ProviderBookingDetailsPage() {
           <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><UserCircle className="mr-2 text-primary"/>Customer Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : booking.customerName}</p>
-              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : (booking.customerEmail || 'N/A')}</p>
-              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : (
+              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : !isAccepted ? "[Hidden until Accepted]" : booking.customerName}</p>
+              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : !isAccepted ? "[Hidden until Accepted]" : (booking.customerEmail || 'N/A')}</p>
+              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : !isAccepted ? "[Hidden until Accepted]" : (
                 <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline font-medium">{booking.customerPhone}</a>
               )}</p>
             </div>
@@ -260,7 +327,7 @@ export default function ProviderBookingDetailsPage() {
                 </>
               )}
             </div>
-            {!isJobCompleted && booking.latitude && booking.longitude && (
+            {!isJobCompleted && !isLowBalance && isAccepted && booking.latitude && booking.longitude && (
                 <Button variant="link" size="sm" onClick={handleViewOnMap} className="px-0 text-xs mt-1">
                     View on Google Maps <ExternalLink className="ml-1 h-3 w-3"/>
                 </Button>
@@ -274,7 +341,7 @@ export default function ProviderBookingDetailsPage() {
               <p><strong>Time Slot:</strong> {booking.scheduledTimeSlot}</p>
               {booking.estimatedEndTime && (
                 <p className="text-green-600 font-bold sm:col-span-2 mt-2">
-                  <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
                 </p>
               )}
             </div>
@@ -322,7 +389,7 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><ListOrdered className="mr-2 text-primary"/>Services Booked</h3>
             <ul className="space-y-1 text-sm list-disc list-inside">
               {booking.services.map(service => (
-                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(2)} each</li>
+                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(decimals)} each</li>
               ))}
             </ul>
           </section>
@@ -330,13 +397,14 @@ export default function ProviderBookingDetailsPage() {
            <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
-                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(2)}</p>
-                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(2)} ({booking.discountCode})</p>}
-                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(2)}</p>}
+                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
+                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(decimals)} ({booking.discountCode})</p>}
+                {isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
+                   <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
+                 ))}
+                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(decimals)}</p>}
                 
-                {booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
-                  <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
-                ))}
+
 
                 {booking.additionalCharges && booking.additionalCharges.length > 0 && (
                   <div className="bg-amber-50 p-2 rounded-md border border-amber-100 my-2">
@@ -344,14 +412,14 @@ export default function ProviderBookingDetailsPage() {
                     {booking.additionalCharges.map((c, i) => (
                       <div key={i} className="flex justify-between text-amber-900">
                         <span>{c.name}</span>
-                        <span>+ {symbol}{c.amount.toFixed(2)}</span>
+                        <span>+ {symbol}{c.amount.toFixed(decimals)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(2)}</p>
-                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{booking.totalAmount.toFixed(2)}</p>
+                {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
+                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
              </div>
            </section>
@@ -369,7 +437,17 @@ export default function ProviderBookingDetailsPage() {
            <div className="text-xs text-muted-foreground">
              <p>Booked On: {formatTimestampForDisplay(booking.createdAt)}</p>
              {booking.updatedAt && <p>Last Updated: {formatTimestampForDisplay(booking.updatedAt)}</p>}
-           </div>
+           </div>            {isLowBalance && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1.5 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <span>⚠️</span>
+                  <span>Low Wallet Balance</span>
+                </div>
+                <p className="font-semibold text-xs leading-snug">
+                  Add money to accept this booking. Minimum balance required: {symbol}{Math.max(minBalanceForJobs || 0, requiredCommission).toFixed(decimals)}
+                </p>
+              </div>
+            )}
         </CardContent>
         {/* Action Buttons Footer */}
         <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 bg-muted/20 border-t p-3">
@@ -378,20 +456,29 @@ export default function ProviderBookingDetailsPage() {
                     <Button 
                         variant="destructive" 
                         onClick={() => updateBookingStatus('ProviderRejected')} 
-                        disabled={isProcessingAction}
+                        disabled={isProcessingAction || isLowBalance}
                         className="w-full sm:w-auto"
                     >
                         {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                         Reject Booking
                     </Button>
-                    <Button 
-                        onClick={() => updateBookingStatus('ProviderAccepted')} 
-                        disabled={isProcessingAction}
-                        className="w-full sm:w-auto"
-                    >
-                        {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                        Accept Booking
-                    </Button>
+                    {isLowBalance ? (
+                      <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold" asChild>
+                        <Link href="/provider/wallet">
+                          <Wallet className="mr-2 h-4 w-4" />
+                          Top Up Wallet
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button 
+                          onClick={() => updateBookingStatus('ProviderAccepted')} 
+                          disabled={isProcessingAction}
+                          className="w-full sm:w-auto"
+                      >
+                          {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                          Accept Booking
+                      </Button>
+                    )}
                 </>
             )}
 

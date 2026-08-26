@@ -28,6 +28,7 @@ interface CompanyDetails {
   logoUrl?: string;
   timezone?: string;
   currencySymbol?: string;
+  dateFormat?: string;
 }
 
 const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean, taxPercent?: number): number => {
@@ -74,14 +75,15 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
 
   doc.setFontSize(10);
   doc.text(`Invoice #: ${booking.bookingId}`, 196, 30, { align: "right" });
-  doc.text(`Date: ${formatDateInTimezone(new Date(), timezone)}`, 196, 36, { align: "right" });
+  const dateFormat = companyDetails?.dateFormat || 'DD/MM/YYYY';
+  doc.text(`Date: ${formatDateInTimezone(new Date(), timezone, dateFormat)}`, 196, 36, { align: "right" });
   
   // Format scheduledDate correctly
   let displayScheduledDate = booking.scheduledDate || 'N/A';
   if (booking.scheduledDate && booking.scheduledDate.includes('-')) {
       const [y, m, d] = booking.scheduledDate.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
-      displayScheduledDate = formatDateInTimezone(dateObj, timezone);
+      displayScheduledDate = formatDateInTimezone(dateObj, timezone, dateFormat);
   }
   doc.text(`Service Date: ${displayScheduledDate}`, 196, 42, { align: "right" });
 
@@ -248,6 +250,9 @@ if (booking.additionalCharges && booking.additionalCharges.length > 0) {
   if (booking.razorpayPaymentId) {
     finalY += 6;
     doc.text(`Payment ID: ${booking.razorpayPaymentId}`, 14, finalY);
+  } else if (booking.stripePaymentIntent || booking.stripeSessionId) {
+    finalY += 6;
+    doc.text(`Payment ID: ${booking.stripePaymentIntent || booking.stripeSessionId}`, 14, finalY);
   }
 
   const pageHeight = doc.internal.pageSize.height;

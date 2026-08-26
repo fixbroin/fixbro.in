@@ -76,6 +76,7 @@ export default function ProviderControlsPage() {
               >
                 <Banknote className="mr-2 h-4 w-4"/>Withdrawals
               </TabsTrigger>
+
               <TabsTrigger 
                 value="registration_access"
                 className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
@@ -112,6 +113,7 @@ export default function ProviderControlsPage() {
           <TabsContent value="withdrawal_settings">
             <WithdrawalSettingsTab />
           </TabsContent>
+
           <TabsContent value="registration_access">
             <ProviderRegistrationToggleTab />
           </TabsContent>

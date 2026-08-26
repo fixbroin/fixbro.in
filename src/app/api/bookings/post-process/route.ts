@@ -12,7 +12,7 @@ import { getZonedDate, formatScheduledDate } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
-const ADMIN_EMAIL = "fixbro.in@gmail.com"; 
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com"; 
 
 export async function POST(request: Request) {
   try {
@@ -250,7 +250,10 @@ export async function POST(request: Request) {
                             userId: booking.providerId, 
                             title: "New Job Assigned!", 
                             body: `Booking ${booking.bookingId} is assigned to you. Check details now.`, 
-                            href: `/provider/booking/${bookingDocId}` 
+                            href: `/provider/booking/${bookingDocId}`,
+                            variables: {
+                                bookingId: booking.bookingId || ""
+                            }
                         }),
                     });
                 } catch (pushErr) {
@@ -266,10 +269,11 @@ export async function POST(request: Request) {
                         bookingId: booking.bookingId,
                         bookingDocId: bookingDocId,
                         serviceName: servicesSummary,
-                        scheduledDate: booking.scheduledDate,
+                        scheduledDate: formatScheduledDate(booking.scheduledDate, appConfig.dateFormat || "DD/MM/YYYY"),
                         scheduledTimeSlot: booking.scheduledTimeSlot,
                         customerName: booking.customerName,
                         customerAddress: `${booking.addressLine1}, ${booking.addressLine2 ? booking.addressLine2 + ', ' : ''}${booking.city}`,
+                        customerPhone: booking.customerPhone || "N/A",
                         smtpHost: appConfig.smtpHost,
                         smtpPort: appConfig.smtpPort,
                         smtpUser: appConfig.smtpUser,
@@ -332,7 +336,8 @@ export async function POST(request: Request) {
             const providerDoc = await transaction.get(providerDocRef);
             const providerData = providerDoc.exists ? providerDoc.data() : {};
             const currentWithdrawableBalance = providerData?.withdrawableBalance || 0;
-            const commission = calculateProviderFee(booking.totalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+            const providerGross = (booking.subTotal || 0) + (booking.visitingCharge || 0) - (booking.discountAmount || 0);
+            const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             
             // Monthly Stats Logic using Configured Timezone
             const timezone = appConfig.timezone || 'Asia/Kolkata';
@@ -346,23 +351,26 @@ export async function POST(request: Request) {
             }
 
             let balanceChange = 0;
-            stats.gross += booking.totalAmount;
+            stats.gross += providerGross;
             stats.commission += commission;
 
             const extraCharges = (booking.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-            const originalAmount = booking.totalAmount - extraCharges;
+            const originalAmount = providerGross - extraCharges;
 
             if (isCashPayment(booking.paymentMethod)) {
-                balanceChange = -commission;
+                balanceChange = booking.commissionPaidFromWallet ? 0 : -commission;
                 stats.cashCollected += booking.totalAmount;
                 stats.cashCommission += commission;
             } else {
                 // Customer prepaid online, but extra charges are collected by provider on-site (Pay After Service)
-                balanceChange = originalAmount - commission;
+                const originalCommission = calculateProviderFee(originalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+                const extraCommission = appConfig.providerFeeType === 'percentage' 
+                    ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+                    : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
+                balanceChange = originalAmount - originalCommission;
                 stats.cashCollected += extraCharges;
-                const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
                 stats.cashCommission += extraCommission;
-                stats.onlineNet += (originalAmount - commission);
+                stats.onlineNet += (originalAmount - originalCommission);
             }
             
             transaction.set(providerDocRef, { 
@@ -401,7 +409,20 @@ export async function POST(request: Request) {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: pUserId, title: pTitle, body: pBody, href: pHref }),
+                body: JSON.stringify({ 
+                    userId: pUserId, 
+                    title: pTitle, 
+                    body: pBody, 
+                    href: pHref,
+                    variables: {
+                        bookingId: booking.bookingId || "",
+                        customerName: booking.customerName || "Customer",
+                        providerName: providerName || "Provider",
+                        scheduledDate: booking.scheduledDate ? formatScheduledDate(booking.scheduledDate) : "",
+                        scheduledTimeSlot: booking.scheduledTimeSlot || "",
+                        totalAmount: String(booking.totalAmount || 0)
+                    }
+                }),
             });
         } catch (e) {
             console.error(`Error triggering push for ${pUserId}:`, e);
@@ -518,6 +539,7 @@ export async function POST(request: Request) {
                 contactMobile: appConfig?.companyPhone || '+91-7353113455',
                 timezone: appConfig?.timezone || 'Asia/Kolkata',
                 currencySymbol: appConfig?.currencySymbol || "₹",
+                dateFormat: appConfig?.dateFormat || "DD/MM/YYYY",
             };
             const pdfDataUri = await generateInvoicePdf(booking, companyDetails);
             if (pdfDataUri && pdfDataUri.includes(',')) {
@@ -562,6 +584,7 @@ export async function POST(request: Request) {
         smtpUser: appConfig.smtpUser,
         smtpPass: appConfig.smtpPass,
         senderEmail: appConfig.senderEmail,
+        dateFormat: appConfig.dateFormat || "DD/MM/YYYY",
         invoicePdfBase64: invoicePdfBase64 || undefined,
         additionalCharges: booking.additionalCharges,
         appliedPlatformFees: booking.appliedPlatformFees?.map((fee: any) => ({ 
@@ -618,6 +641,7 @@ export async function POST(request: Request) {
 
     // --- NEW: Referral Reward Logic on Completion ---
     if (isCompleted && userId) {
+        let pushParams: any = null;
         const referralTask = adminDb.runTransaction(async (transaction) => {
             // 1. Check if this user was referred
             const referralQuery = await adminDb.collection('referrals')
@@ -688,11 +712,34 @@ export async function POST(request: Request) {
                         createdAt: Timestamp.now()
                     };
                     transaction.set(adminDb.collection('userNotifications').doc(), notification);
+
+                    pushParams = {
+                        userId: referralData.referrerId,
+                        title: "Referral Bonus Credited!",
+                        body: `Your friend ${booking.customerName} completed their first booking. ${currencySymbol}${bonusAmount.toFixed(2)} has been added to your wallet.`,
+                        href: '/referral?tab=wallet',
+                        type: 'referral_reward_completed',
+                        variables: {
+                            friendName: booking.customerName,
+                            amount: bonusAmount.toFixed(2),
+                            currencySymbol
+                        }
+                    };
                 }
+            }
+        }).then(() => {
+            if (pushParams) {
+                const baseUrl = getBaseUrl();
+                fetch(`${baseUrl}/api/send-push`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pushParams)
+                }).catch(e => console.error("Error triggering referral completed push:", e));
             }
         });
         tasks.push(referralTask);
     }
+
     tasks.push(triggerRefresh('bookings'));
 
     // --- CRITICAL: Wait for all parallel tasks to finish ---

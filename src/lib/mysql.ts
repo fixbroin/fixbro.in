@@ -182,7 +182,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'admins':
-        await insert('superadmin', null, { email: 'fixbro.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
+        await insert('superadmin', null, { email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'fixbro.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
         break;
 
       case 'appConfiguration':
@@ -270,9 +270,9 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         await insert('applicationConfig', null, {
           smtpHost: "smtp.gmail.com",
           smtpPort: "465",
-          smtpUser: "fixbro.in@gmail.com",
+          smtpUser: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com",
           smtpPass: "your_app_password_here",
-          senderEmail: "fixbro.in@gmail.com",
+          senderEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com",
           razorpayKeyId: "rzp_test_key_here",
           razorpayKeySecret: "rzp_secret_here",
           commissionPercentage: 15,
@@ -338,7 +338,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'adminPromoCodes':
-        await insert('FIXBRO20', null, { code: 'FIXBRO20', type: 'percentage', value: 20, minOrderValue: 500, maxDiscountAmount: 200, isActive: true, usageLimit: 100, usageCount: 0 });
+        await insert('Fixbro20', null, { code: 'Fixbro20', type: 'percentage', value: 20, minOrderValue: 500, maxDiscountAmount: 200, isActive: true, usageLimit: 100, usageCount: 0 });
         break;
       case 'taxes':
         await insert('gst', null, { name: 'GST', rate: 18, type: 'percentage', isActive: true });
