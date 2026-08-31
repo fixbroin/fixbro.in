@@ -57,7 +57,9 @@ const TABLES = [
   'push_templates',
   'email_templates',
   'indexingProgress',
-  'promoCodeUsage'
+  'promoCodeUsage',
+  'providerWalletTransactions',
+  'providerComplaints'
 ];
 
 /**
