@@ -55,7 +55,9 @@ const TABLES = [
   'outOfZoneRequests',
   'customServiceRequests',
   'push_templates',
-  'email_templates'
+  'email_templates',
+  'indexingProgress',
+  'promoCodeUsage'
 ];
 
 /**
