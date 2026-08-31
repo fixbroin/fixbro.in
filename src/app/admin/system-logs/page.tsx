@@ -12,6 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from "@/components/admin/PermissionGuard";
 import { motion } from "framer-motion";
+import { auth } from '@/lib/firebase';
 
 interface LogEntry {
   id: number;
@@ -33,7 +34,12 @@ export default function SystemLogsPage() {
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/admin/system-logs');
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/admin/system-logs', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       if (data.success) {
         setLogs(data.logs || []);
@@ -214,7 +220,7 @@ export default function SystemLogsPage() {
               <div className="w-3 h-3 rounded-full bg-red-500/80" />
               <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
               <div className="w-3 h-3 rounded-full bg-green-500/80" />
-              <span className="ml-2 font-mono text-xs text-slate-400">me.fixbro.in (~/pm2/logs)</span>
+              <span className="ml-2 font-mono text-xs text-slate-400">fixbro.in (~/pm2/logs)</span>
             </div>
             <span className="text-[10px] font-mono text-slate-400">Showing {filteredLogs.length} lines</span>
           </div>

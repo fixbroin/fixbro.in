@@ -230,6 +230,9 @@ export interface FirestoreBooking {
   updatedAt?: Timestamp;
   isReviewedByCustomer?: boolean;
   cancellationFeePaid?: number;
+  cancellationFeeCharged?: number;
+  refundableAmount?: number;
+  cancellationRefundStatus?: 'Pending' | 'Processed' | 'Failed' | 'N/A';
   cancellationPaymentId?: string;
   isStatsTracked?: boolean;
   isCompletionStatsTracked?: boolean;
@@ -641,6 +644,9 @@ export interface AppSettings {
   freeCancellationMinutes?: number;
   cancellationFeeType?: 'fixed' | 'percentage';
   cancellationFeeValue?: number;
+  enableFinalCancellationWindow?: boolean;
+  finalCancellationHours?: number;
+  finalCancellationMinutes?: number;
   chatNotificationSoundUrl?: string; // New: default sound for chat notifications
   currencyCode?: string;
   currencySymbol?: string;
