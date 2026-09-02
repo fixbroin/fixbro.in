@@ -139,7 +139,14 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
                 userId: adminUid,
                 title: adminNotification.title,
                 body: adminNotification.message,
-                href: adminNotification.href
+                href: adminNotification.href,
+                variables: {
+                    customerName: user.displayName || 'Customer',
+                    serviceName: serviceToReview.name,
+                    rating: data.rating,
+                    comment: data.comment || '',
+                    siteName: 'Fixbro'
+                }
             });
 
             // Send Email Notification
@@ -157,7 +164,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
                     smtpUser: config.smtpUser,
                     smtpPass: config.smtpPass,
                     senderEmail: config.senderEmail,
-                    siteName: "Fixbro", // Or from webSettings if available
+                    siteName: "Wecanfix", // Or from webSettings if available
                 });
             }
         }

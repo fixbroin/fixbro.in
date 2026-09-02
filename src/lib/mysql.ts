@@ -5,7 +5,7 @@ export { Timestamp };
 const host = process.env.MYSQL_HOST || 'localhost';
 const user = process.env.MYSQL_USER || 'root';
 const password = process.env.MYSQL_PASSWORD || '';
-const databaseName = process.env.MYSQL_DATABASE || 'fixbro_db';
+const databaseName = process.env.MYSQL_DATABASE || 'wecanfix_db';
 const port = parseInt(process.env.MYSQL_PORT || '3306', 10);
 
 let poolPromise: Promise<mysql.Pool> | null = null;
@@ -59,7 +59,10 @@ const TABLES = [
   'indexingProgress',
   'promoCodeUsage',
   'providerWalletTransactions',
-  'providerComplaints'
+  'providerComplaints',
+  'providerControlOptions',
+  'adminCoupons',
+  'services'
 ];
 
 /**
@@ -189,7 +192,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'admins':
-        await insert('superadmin', null, { email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'fixbro.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
+        await insert('superadmin', null, { email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'wecanfix.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
         break;
 
       case 'appConfiguration':
@@ -208,17 +211,17 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
 
       case 'webSettings':
         await insert('global', null, {
-          websiteName: "Fixbro",
-          contactEmail: "support@fixbro.in",
+          websiteName: "Wecanfix",
+          contactEmail: "support@wecanfix.in",
           contactMobile: "+917353113455",
           address: "#44 Electronic City Phase 2, Bangalore - 560100",
           logoUrl: "/android-chrome-512x512.png",
           faviconUrl: "/favicon.ico",
           websiteIconUrl: "/android-chrome-512x512.png",
           socialMediaLinks: {
-            facebook: "https://facebook.com/fixbro.in",
-            instagram: "https://instagram.com/fixbro.in",
-            twitter: "https://x.com/fixbro_in"
+            facebook: "https://facebook.com/wecanfix.in",
+            instagram: "https://instagram.com/wecanfix.in",
+            twitter: "https://x.com/wecanfix_in"
           },
           themeColors: {
             light: {
@@ -277,9 +280,9 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         await insert('applicationConfig', null, {
           smtpHost: "smtp.gmail.com",
           smtpPort: "465",
-          smtpUser: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com",
+          smtpUser: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com",
           smtpPass: "your_app_password_here",
-          senderEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com",
+          senderEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com",
           razorpayKeyId: "rzp_test_key_here",
           razorpayKeySecret: "rzp_secret_here",
           commissionPercentage: 15,
@@ -300,7 +303,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         });
         await insert('chatSettings', null, {
           isAiBotEnabled: false,
-          botGreetingMessage: "Hello! Welcome to Fixbro. How can we help you today?",
+          botGreetingMessage: "Hello! Welcome to Wecanfix. How can we help you today?",
           supportWorkingHours: "9:00 AM - 6:00 PM"
         });
         await insert('whatsappSettings', null, {
@@ -311,9 +314,9 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
           isActive: false
         });
         await insert('seo', null, {
-          title: "Fixbro | Premium Home Services on Demand",
+          title: "Wecanfix | Premium Home Services on Demand",
           description: "Book certified professionals for cleaning, plumbing, electrical, and other premium home services.",
-          keywords: "home services, cleaning service, plumber, electrician, fixbro",
+          keywords: "home services, cleaning service, plumber, electrician, wecanfix",
           ogImage: "/android-chrome-512x512.png"
         });
         await insert('loginSettings', null, {
@@ -334,7 +337,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'contentPages':
-        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About Fixbro</h1><p>Fixbro is India\'s premium on-demand home services platform...</p>', isActive: true });
+        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About Wecanfix</h1><p>Wecanfix is India\'s premium on-demand home services platform...</p>', isActive: true });
         await insert('terms-and-conditions', null, { slug: 'terms-and-conditions', title: 'Terms & Conditions', content: '<h1>Terms & Conditions</h1><p>Please read these terms carefully before booking...</p>', isActive: true });
         await insert('privacy-policy', null, { slug: 'privacy-policy', title: 'Privacy Policy', content: '<h1>Privacy Policy</h1><p>We respect your privacy and protect your data...</p>', isActive: true });
         break;
@@ -345,7 +348,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'adminPromoCodes':
-        await insert('Fixbro20', null, { code: 'Fixbro20', type: 'percentage', value: 20, minOrderValue: 500, maxDiscountAmount: 200, isActive: true, usageLimit: 100, usageCount: 0 });
+        await insert('Wecanfix20', null, { code: 'Wecanfix20', type: 'percentage', value: 20, minOrderValue: 500, maxDiscountAmount: 200, isActive: true, usageLimit: 100, usageCount: 0 });
         break;
       case 'taxes':
         await insert('gst', null, { name: 'GST', rate: 18, type: 'percentage', isActive: true });
@@ -800,7 +803,7 @@ function resolveFieldValues(target: any, source: any): any {
   }
 
   if (Array.isArray(source)) {
-    return source.map((item, idx) => resolveFieldValues(Array.isArray(target) ? target[idx] : undefined, item));
+    return source.map((item) => resolveFieldValues(undefined, item));
   }
 
   if (typeof source === 'object' && !isTimestamp(source)) {
