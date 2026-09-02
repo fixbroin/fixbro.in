@@ -47,14 +47,13 @@ export async function POST(request: Request) {
     const seoSettings = seoSettingsDoc.data() as any;
 
     // --- SERVER-SIDE SMART TAGGING & AUTO-DISPATCH ---
-    if (!booking.providerId && booking.workCategoryId && booking.latitude && booking.longitude && currentStatus !== 'Cancelled' && !booking.autoDispatchBypassed) {
+    if (!booking.providerId && (booking.workCategoryId || (booking.services && booking.services.length > 0)) && booking.latitude && booking.longitude && currentStatus !== 'Cancelled' && !booking.autoDispatchBypassed) {
         try {
             const providersSnapshot = await adminDb.collection('providerApplications')
                 .where('status', '==', 'approved')
-                .where('workCategoryId', '==', booking.workCategoryId)
                 .get();
 
-            const providersWithDistance = providersSnapshot.docs.map(doc => {
+            const providersWithDistance = providersSnapshot.docs.map((doc: any) => {
                 const pData = doc.data() as any;
                 let distance = Infinity;
                 if (pData.workAreaCenter && pData.workAreaRadiusKm) {
@@ -66,7 +65,25 @@ export async function POST(request: Request) {
                     );
                 }
                 return { id: doc.id, ...pData, distance };
-            }).filter(p => p.distance <= (p.workAreaRadiusKm || 0));
+            }).filter(p => {
+                // Availability check: Provider must be online
+                if (p.isOnline === false) return false;
+
+                // Distance check
+                if (p.distance > (p.workAreaRadiusKm || 0)) return false;
+
+                // Full booking coverage check: Provider must support every service in this booking
+                if (!booking.services || booking.services.length === 0) return true;
+                return booking.services.every((s: any) => {
+                    const hasCategory = booking.workCategoryId && (
+                        p.workCategoryId === booking.workCategoryId ||
+                        (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(booking.workCategoryId))
+                    );
+                    const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(s.serviceId)) ||
+                                              (Array.isArray(p.additionalServices) && p.additionalServices.some((item: any) => item.id === s.serviceId));
+                    return hasCategory || hasSpecificService;
+                });
+            });
 
             if (providersWithDistance.length > 0) {
                 // Sort by distance
