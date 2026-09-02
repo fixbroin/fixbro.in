@@ -60,11 +60,11 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setActiveCategoryId(localStorage.getItem('wecanfixActiveCheckoutCategory'));
+      setActiveCategoryId(localStorage.getItem('fixbroActiveCheckoutCategory'));
     }
   }, []);
 
-  const currentCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixActiveCheckoutCategory') : null);
+  const currentCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null);
 
   const applicableServiceZones = useMemo(() => {
     const adminZones = allServiceZones.filter(zone => {
@@ -84,7 +84,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
         const activeEntries = getActiveCheckoutEntries();
         const activeServiceIds = activeEntries.map(e => e.serviceId).filter(Boolean);
-        const effectiveCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixActiveCheckoutCategory') : null);
+        const effectiveCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null);
 
         if (effectiveCategoryId || activeServiceIds.length > 0) {
           const providersQuery = query(
@@ -144,7 +144,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
     if (!user) {
       if (!isLoadingAuth) {
         setIsLoadingAddresses(false);
-        const savedGuestAddressRaw = localStorage.getItem('wecanfixCustomerAddress');
+        const savedGuestAddressRaw = localStorage.getItem('fixbroCustomerAddress');
         if (savedGuestAddressRaw) {
           try {
             const savedGuestAddress: Address = JSON.parse(savedGuestAddressRaw);
@@ -314,7 +314,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
         }
       } else {
         const newAddress: Address = { ...data, id: editingAddress?.id || 'guest_address', isDefault: true };
-        localStorage.setItem('wecanfixCustomerAddress', JSON.stringify(newAddress));
+        localStorage.setItem('fixbroCustomerAddress', JSON.stringify(newAddress));
         setSavedAddresses([newAddress]);
         setSelectedAddressId(newAddress.id);
         toast({ title: "Success", description: "Address saved." });

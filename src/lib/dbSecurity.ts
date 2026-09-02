@@ -49,7 +49,7 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
  * Determines if the authenticated user has administrator privileges.
  */
 export function isUserAdmin(user: RequestUser): boolean {
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com";
   return (
     user.isInternal ||
     user.role === 'super_admin' ||

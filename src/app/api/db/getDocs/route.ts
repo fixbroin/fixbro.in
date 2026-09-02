@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (path === 'users') {
-        const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+        const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com";
         const isAdminQuery = constraints.some((c: any) => 
           (c && c.type === 'where' && c.field === 'email' && c.value === ADMIN_EMAIL) || 
           (c && c.type === 'where' && c.field === 'role' && (c.value === 'super_admin' || c.value === 'finance_admin'))
