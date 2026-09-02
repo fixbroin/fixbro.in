@@ -92,6 +92,8 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'areas',
     'pinCodeAreaMappings',
     'serviceZones',
+    'adminPromoCodes',
+    'adminCoupons',
     'seoSettings',
     'cityCategorySeoSettings',
     'areaCategorySeoSettings',
@@ -108,7 +110,12 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return isOwner;
   }
 
-  // 4. Provider Applications (Owner can write/read own; Public read allowed for approved providers for serviceable zone mapping & checkout availability)
+  // 4. Admins table (Users can read/check their own admin doc; admin writes)
+  if (table === 'admins') {
+    return isOwner;
+  }
+
+  // 5. Provider Applications (Owner can write/read own; Public read allowed for approved providers for serviceable zone mapping & checkout availability)
   if (table === 'providerApplications') {
     if (action === 'read') return true;
     return isOwner;
