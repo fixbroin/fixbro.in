@@ -49,7 +49,7 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
  * Determines if the authenticated user has administrator privileges.
  */
 export function isUserAdmin(user: RequestUser): boolean {
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com";
+  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
   return (
     user.isInternal ||
     user.role === 'super_admin' ||
@@ -108,8 +108,9 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return isOwner;
   }
 
-  // 4. Provider Applications (Owner only)
+  // 4. Provider Applications (Owner can write/read own; Public read allowed for approved providers for serviceable zone mapping & checkout availability)
   if (table === 'providerApplications') {
+    if (action === 'read') return true;
     return isOwner;
   }
 
