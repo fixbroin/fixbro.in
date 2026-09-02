@@ -62,7 +62,7 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
  * Determines if the authenticated user has administrator privileges.
  */
 export function isUserAdmin(user: RequestUser): boolean {
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com";
   const userEmail = (user.email || '').toLowerCase();
   return (
     user.isInternal ||
@@ -72,7 +72,7 @@ export function isUserAdmin(user: RequestUser): boolean {
     user.role === 'admin' ||
     user.role === 'staff' ||
     userEmail === ADMIN_EMAIL.toLowerCase() ||
-    userEmail === 'wecanfix.in@gmail.com' ||
+    userEmail === 'fixbro.in@gmail.com' ||
     userEmail === 'fixbro.in@gmail.com' ||
     false
   );
@@ -119,7 +119,8 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'seoSettings',
     'cityCategorySeoSettings',
     'areaCategorySeoSettings',
-    'areaServiceSeoSettings'
+    'areaServiceSeoSettings',
+    'adminTaxes'
   ];
 
   if (PUBLIC_READ_TABLES.includes(table)) {

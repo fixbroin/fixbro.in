@@ -504,7 +504,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
              <div className="flex flex-col justify-center items-center h-full text-center space-y-4 px-6 mt-10">
                 <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 animate-in fade-in zoom-in duration-500">
                   <Bot className="h-10 w-10 text-primary mb-2 mx-auto" />
-                  <h3 className="text-sm font-semibold text-foreground">Welcome to Wecanfix Support!</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Welcome to Fixbro Support!</h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">How can we help you with your bookings or services today?</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 w-[calc(100%-6px)]">

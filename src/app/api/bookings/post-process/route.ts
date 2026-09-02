@@ -12,7 +12,7 @@ import { getZonedDate, formatScheduledDate } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com"; 
 
 export async function POST(request: Request) {
   try {
@@ -299,7 +299,7 @@ export async function POST(request: Request) {
                         smtpUser: appConfig.smtpUser,
                         smtpPass: appConfig.smtpPass,
                         senderEmail: appConfig.senderEmail,
-                        siteName: seoSettings?.websiteName || "Wecanfix",
+                        siteName: seoSettings?.websiteName || "Fixbro",
                         logoUrl: seoSettings?.logoUrl,
                     });
                 } catch (emailErr) {
@@ -553,9 +553,9 @@ export async function POST(request: Request) {
     if (isCompleted) {
         try {
             const companyDetails = {
-                name: seoSettings?.websiteName || "Wecanfix",
+                name: seoSettings?.websiteName || "Fixbro",
                 address: appConfig?.companyAddress || "#44 G S Palya Road Konappana Agrahara Electronic City Phase 2 -560100",
-                contactEmail: appConfig?.companyEmail || 'support@wecanfix.in',
+                contactEmail: appConfig?.companyEmail || 'support@fixbro.in',
                 contactMobile: appConfig?.companyPhone || '+91-7353113455',
                 timezone: appConfig?.timezone || 'Asia/Kolkata',
                 currencySymbol: appConfig?.currencySymbol || "₹",
@@ -596,7 +596,7 @@ export async function POST(request: Request) {
         totalAmount: booking.totalAmount,
         paymentMethod: booking.paymentMethod,
         status: booking.status,
-        siteName: seoSettings?.websiteName || "Wecanfix",
+        siteName: seoSettings?.websiteName || "Fixbro",
         logoUrl: seoSettings?.logoUrl,
         currencySymbol: appConfig.currencySymbol || "Rs.",
         smtpHost: appConfig.smtpHost,
