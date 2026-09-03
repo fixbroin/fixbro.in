@@ -19,6 +19,7 @@ interface FloatingAdminChatWindowProps {
 
 export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdminChatWindowProps) {
   const [selectedChatUser, setSelectedChatUser] = useState<FirestoreUser | null>(null);
+  const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -52,8 +53,14 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   useEffect(() => {
     if (!isOpen) {
       setSelectedChatUser(null);
+      setSelectedChatSessionId(null);
     }
   }, [isOpen]);
+
+  const handleSelectUser = (user: FirestoreUser, sessionId?: string) => {
+    setSelectedChatUser(user);
+    setSelectedChatSessionId(sessionId || null);
+  };
 
   if (!isMounted) return null;
 
@@ -133,14 +140,17 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                 {!selectedChatUser ? (
                   <div className="absolute inset-0">
                     <AdminUserListForChat 
-                      onSelectUser={setSelectedChatUser} 
+                      onSelectUser={handleSelectUser} 
                       selectedUserId={(selectedChatUser as any)?.id || ""}
                       scrollAreaHeightClass="h-[calc(100vh-64px)]"
                     />
                   </div>
                 ) : (
                   <div className="absolute inset-0">
-                    <AdminChatMessageArea selectedUser={selectedChatUser} />
+                    <AdminChatMessageArea 
+                      selectedUser={selectedChatUser} 
+                      selectedSessionId={selectedChatSessionId} 
+                    />
                   </div>
                 )}
               </div>
@@ -183,13 +193,16 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
               <CardContent className="p-0 flex-grow overflow-hidden flex bg-muted/5">
                 <div className="w-[320px] shrink-0 border-r bg-card/50 backdrop-blur-sm">
                   <AdminUserListForChat
-                    onSelectUser={setSelectedChatUser}
+                    onSelectUser={handleSelectUser}
                     selectedUserId={selectedChatUser?.id}
                     scrollAreaHeightClass={isMaximized ? "h-[calc(100vh-160px)]" : "h-[560px]"}
                   />
                 </div>
                 <div className="flex-grow flex flex-col bg-background">
-                  <AdminChatMessageArea selectedUser={selectedChatUser} />
+                  <AdminChatMessageArea 
+                    selectedUser={selectedChatUser} 
+                    selectedSessionId={selectedChatSessionId} 
+                  />
                 </div>
               </CardContent>
             </Card>

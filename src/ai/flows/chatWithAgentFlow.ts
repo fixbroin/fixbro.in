@@ -259,8 +259,8 @@ async function getUserAndBookings(userId?: string): Promise<{ name: string; emai
     bookings.push({ id: bDoc.id, ...bDoc.data() } as FirestoreBooking);
   });
   
-  // Find the primary admin UID for chat session lookup
-  const adminQuery = await adminDb.collection("users").where("email", "==", "fixbro.in@gmail.com").limit(1).get();
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "fixbro.in@gmail.com";
+  const adminQuery = await adminDb.collection("users").where("email", "==", adminEmail).limit(1).get();
   if (!adminQuery.empty) {
     adminId = adminQuery.docs[0].id;
   }
@@ -297,7 +297,12 @@ function buildSystemPrompt(params: {
     const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
     const symbol = appConfig.currencySymbol || '₹';
     const fee = appConfig.cancellationFeeType === 'fixed' ? `${symbol}${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
-    cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply. Detailed policy: ${baseUrl}/cancellation-policy`;
+    cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply.`;
+    if (appConfig.enableFinalCancellationWindow) {
+      const finalTime = `${appConfig.finalCancellationHours || 0}h ${appConfig.finalCancellationMinutes || 0}m`;
+      cancellationDetails += ` Cancellations made within ${finalTime} before the service start time will incur a 100% cancellation charge (no refund).`;
+    }
+    cancellationDetails += ` Detailed policy: ${baseUrl}/cancellation-policy`;
   }
 
   return `
@@ -508,7 +513,7 @@ const chatAgentFlow = ai.defineFlow(
     });
 
     const response = await ai.generate({
-      model: 'googleai/gemini-2.0-flash',
+      model: 'googleai/gemini-3.6-flash',
       system: systemPrompt,
       prompt: message,
       config: { temperature: 0.4 },

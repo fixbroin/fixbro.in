@@ -3,14 +3,14 @@
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, PackageSearch } from "lucide-react";
+import { ArrowLeft, PackageSearch, HandCoins } from "lucide-react";
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { getContentPageData, getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
-import { formatDateInTimezone } from '@/lib/utils';
+import { formatDateInTimezone, formatCurrency } from '@/lib/utils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -84,6 +84,28 @@ export default async function CancellationPolicyPage() {
   try {
     const pageData = await getContentPageData(PAGE_SLUG);
     const appConfig = await getGlobalAppSettings();
+    
+    const symbol = appConfig?.currencySymbol || "₹";
+    const decimals = appConfig?.currencyDecimalPoints ?? 2;
+    const code = appConfig?.currencyCode || "INR";
+
+    const freeDays = appConfig?.freeCancellationDays || 0;
+    const freeHours = appConfig?.freeCancellationHours || 0;
+    const freeMins = appConfig?.freeCancellationMinutes || 0;
+
+    let freeWindowText = "";
+    if (freeDays > 0) freeWindowText += `${freeDays} day(s) `;
+    if (freeHours > 0) freeWindowText += `${freeHours} hour(s) `;
+    if (freeMins > 0 || freeWindowText === "") freeWindowText += `${freeMins} minute(s)`;
+    freeWindowText = freeWindowText.trim();
+
+    const finalHours = appConfig?.finalCancellationHours || 0;
+    const finalMins = appConfig?.finalCancellationMinutes || 0;
+
+    let finalWindowText = "";
+    if (finalHours > 0) finalWindowText += `${finalHours} hour(s) `;
+    if (finalMins > 0 || finalWindowText === "") finalWindowText += `${finalMins} minute(s)`;
+    finalWindowText = finalWindowText.trim();
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -148,20 +170,87 @@ export default async function CancellationPolicyPage() {
             )}
           </div>
           
-          {pageData.content ? (
-              <article
-              className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
-                        prose-headings:font-headline prose-headings:text-foreground
-                        prose-p:text-foreground/80
-                        prose-a:text-primary hover:prose-a:text-primary/80
-                        prose-strong:text-foreground
-                        prose-ul:list-disc prose-ol:list-decimal
-                        prose-li:marker:text-primary"
-              dangerouslySetInnerHTML={{ __html: pageData.content }}
-              />
-          ): (
-              <p className="text-muted-foreground">No content available for this page yet.</p>
-          )}
+          {/* Dynamic Active Policy Card */}
+          <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 mb-8">
+            <h2 className="text-xl font-semibold text-foreground mb-4">Active Cancellation Rules</h2>
+            {!appConfig?.enableCancellationPolicy ? (
+              <p className="text-sm text-muted-foreground">
+                Cancellation policy is currently disabled. You can cancel any booking at any time for a full 100% refund.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {/* 1. Free Cancellation */}
+                <div className="flex gap-4 items-start">
+                  <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0 text-green-500 font-bold text-sm">1</div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Free Cancellation Window</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Cancel at least{" "}
+                      <strong>{freeWindowText}</strong>{" "}
+                      before your scheduled service time for a <strong>100% refund</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Standard Cancellation Fee */}
+                <div className="flex gap-4 items-start border-t pt-4">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-500 font-bold text-sm">2</div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Standard Cancellation Fee</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {appConfig.enableFinalCancellationWindow ? (
+                        <>
+                          Cancellations made between <strong>{freeWindowText}</strong> and <strong>{finalWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
+                          </strong>.
+                        </>
+                      ) : (
+                        <>
+                          Cancellations made after the free cancellation window has passed (less than <strong>{freeWindowText}</strong> before the scheduled service start time) will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
+                          </strong>.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Final Restricted Window */}
+                {appConfig.enableFinalCancellationWindow && (
+                  <div className="flex gap-4 items-start border-t pt-4">
+                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-sm">3</div>
+                    <div>
+                      <h3 className="font-semibold text-destructive">Final Restricted Window (No Refund)</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Cancellations made within{" "}
+                        <strong>{finalWindowText}</strong>{" "}
+                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / {formatCurrency(0, symbol, decimals, code)} Refund)</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Pay After Service / COD Note */}
+                <div className="flex gap-4 items-start border-t pt-4">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">
+                    <HandCoins className="h-4.5 w-4.5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Pay After Service / Cash on Delivery</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or restricted charge must be paid securely online before the cancellation request is processed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
