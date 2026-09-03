@@ -502,20 +502,16 @@ export async function POST(req: NextRequest) {
         const limitLateBookingHours = enableLimitLateBookings ? (appConfig.limitLateBookingHours ?? DEFAULT_HOURS_WHEN_LIMIT_ENABLED) : 0;
 
         const uniqueCartCategoryIds = new Set<string>();
-        const cartItemsDetails: { serviceId: string; categoryId?: string }[] = [];
         let totalCartDuration = 0;
         cartEntries.forEach((entry: CartEntry) => {
             const service = servicesData[entry.serviceId];
             if (service) {
                 totalCartDuration += getServiceDurationInMinutes(service) * entry.quantity;
                 const subCat = subCatsData[service.subCategoryId];
-                const catId = subCat?.parentId;
-                if (catId) uniqueCartCategoryIds.add(catId);
-                cartItemsDetails.push({ serviceId: entry.serviceId, categoryId: catId });
+                if (subCat?.parentId) uniqueCartCategoryIds.add(subCat.parentId);
             }
         });
         const cartCategoryIds = Array.from(uniqueCartCategoryIds);
-        const cartServiceIds = cartEntries.map((e: CartEntry) => e.serviceId);
 
         // --- Cache Logic Start ---
         const bookingsHash = bookingsSnap.docs
@@ -622,48 +618,35 @@ export async function POST(req: NextRequest) {
         const now = getZonedDate(new Date(), timezone);
         const earliestBookableTime = new Date(now.getTime() + (limitLateBookingHours * 60 * 60 * 1000));
 
-        // Fetch local approved providers that can fulfill ALL items in the customer's cart
-        let eligibleLocalProviders: any[] = [];
-        if (latitude !== undefined && longitude !== undefined) {
-            try {
-                const providersSnapshot = await adminDb.collection('providerApplications')
-                    .where('status', '==', 'approved')
-                    .get();
-
-                eligibleLocalProviders = providersSnapshot.docs.map((doc: any) => {
-                    const pData = doc.data() as any;
-                    let distance = Infinity;
-                    if (pData.workAreaCenter && pData.workAreaRadiusKm) {
-                        distance = getHaversineDistance(
-                            Number(latitude),
-                            Number(longitude),
-                            Number(pData.workAreaCenter.latitude),
-                            Number(pData.workAreaCenter.longitude)
-                        );
-                    }
-                    return { id: doc.id, ...pData, distance };
-                }).filter(p => {
-                    // Availability check: Provider must be online
-                    if (p.isOnline === false) return false;
-
-                    // Distance radius check
-                    if (p.distance > (p.workAreaRadiusKm || 0)) return false;
-
-                    // Full cart validation: Provider must support EVERY service in the cart
-                    const canFulfillWholeCart = cartItemsDetails.length > 0 && cartItemsDetails.every(item => {
-                        const hasCategory = item.categoryId && (
-                            p.workCategoryId === item.categoryId || 
-                            (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(item.categoryId))
-                        );
-                        const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(item.serviceId)) ||
-                                                  (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === item.serviceId));
-                        return hasCategory || hasSpecificService;
-                    });
-                    return canFulfillWholeCart;
-                });
-            } catch (err) {
-                console.error("Error loading eligible local providers for cart:", err);
+        // Fetch local approved providers for the required category IDs that cover the customer's coordinates
+        const localProvidersMap = new Map<string, any[]>();
+        for (const catId of cartCategoryIds) {
+            let providersList: any[] = [];
+            if (latitude !== undefined && longitude !== undefined) {
+                try {
+                    const providersSnapshot = await adminDb.collection('providerApplications')
+                        .where('status', '==', 'approved')
+                        .where('workCategoryId', '==', catId)
+                        .get();
+                    
+                    providersList = providersSnapshot.docs.map(doc => {
+                        const pData = doc.data() as any;
+                        let distance = Infinity;
+                        if (pData.workAreaCenter && pData.workAreaRadiusKm) {
+                            distance = getHaversineDistance(
+                                Number(latitude),
+                                Number(longitude),
+                                Number(pData.workAreaCenter.latitude),
+                                Number(pData.workAreaCenter.longitude)
+                            );
+                        }
+                        return { id: doc.id, ...pData, distance };
+                    }).filter(p => p.distance <= (p.workAreaRadiusKm || 0));
+                } catch (err) {
+                    console.error(`Error loading providers for category ${catId}:`, err);
+                }
             }
+            localProvidersMap.set(catId, providersList);
         }
 
         const availableSlots: { slot: string; remainingCapacity: number, endDateTime: string }[] = [];
@@ -740,8 +723,9 @@ export async function POST(req: NextRequest) {
 
                         const remainingAdminCapacity = Math.max(0, adminLimit - adminBookings);
                         
-                        // Count available local providers capable of the entire cart
-                        const availableProviders = eligibleLocalProviders.filter(p => !busyProviderIds.has(p.id)).length;
+                        // Count available local providers
+                        const localProviders = localProvidersMap.get(catId) || [];
+                        const availableProviders = localProviders.filter(p => !busyProviderIds.has(p.id)).length;
 
                         // Dynamic Remaining Capacity
                         const remaining = remainingAdminCapacity + availableProviders;

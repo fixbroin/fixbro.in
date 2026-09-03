@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET() {
   try {
     const data = await getGlobalSEOSettings();

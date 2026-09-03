@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, RefreshCw, Map } from "lucide-react";
 import type { FirestoreArea, FirestoreCity } from '@/types/firestore';
 import AreaForm from '@/components/admin/AreaForm';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, getDoc, orderBy, query, Timestamp, where, limit } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -230,13 +230,9 @@ export default function AdminAreasPage() {
         out center;
       `;
 
-      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/overpass', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: overpassQuery })
       });
       const data = await response.json();
@@ -474,12 +470,7 @@ export default function AdminAreasPage() {
 
       try {
         const q = `${area.name}, ${parentCity.name}, India`;
-        const token = await auth.currentUser?.getIdToken();
-        const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
         const data = await res.json();
         
         if (data.lat && data.lon) {

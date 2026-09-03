@@ -1,13 +1,7 @@
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool, getDocsInternal, addDocInternal, deleteDocInternal } from '@/lib/mysql';
 
-export async function GET(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function GET() {
   try {
     const pool = await getPool();
     const rawNotifications = await getDocsInternal(pool, 'userNotifications', [{ type: 'orderBy', field: 'createdAt', direction: 'desc' }]);
@@ -18,12 +12,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function POST(request: Request) {
   try {
     const data = await request.json();
     const pool = await getPool();
@@ -37,12 +26,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

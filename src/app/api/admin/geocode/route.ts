@@ -1,12 +1,6 @@
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q');
   if (!q) {

@@ -1,13 +1,7 @@
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool, getDocsInternal, updateDocInternal } from '@/lib/mysql';
 
-export async function GET(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function GET() {
   try {
     const pool = await getPool();
     const rawWithdrawals = await getDocsInternal(pool, 'withdrawalRequests', [{ type: 'orderBy', field: 'requestedAt', direction: 'desc' }]);
@@ -18,12 +12,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function PUT(request: Request) {
   try {
     const { id, data } = await request.json();
     const pool = await getPool();

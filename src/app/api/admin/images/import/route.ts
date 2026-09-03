@@ -1,16 +1,10 @@
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 // src/app/api/admin/images/import/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
 import path from 'path';
 import fs from 'fs';
 
-export async function POST(req: NextRequest) {
-  const user = await verifyRequest(req);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;

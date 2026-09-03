@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, Globe } from "lucide-react"; // Added PackageSearch, Globe
 import type { FirestoreCity } from '@/types/firestore';
 import CityForm from '@/components/admin/CityForm';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where, limit } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { triggerRefresh } from '@/lib/revalidateUtils';
@@ -101,13 +101,9 @@ export default function AdminCitiesPage() {
           out body;
         `;
 
-        const token = await auth.currentUser?.getIdToken();
         const overpassResponse = await fetch('/api/admin/overpass', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: overpassQuery })
         });
         const overpassData = await overpassResponse.json();
@@ -140,13 +136,9 @@ export default function AdminCitiesPage() {
         out body;
       `;
 
-      const tokenDirect = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/overpass', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenDirect}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: overpassQuery })
       });
       const data = await response.json();
@@ -198,13 +190,9 @@ export default function AdminCitiesPage() {
           out body;
         `;
 
-        const token = await auth.currentUser?.getIdToken();
         const overpassResponse = await fetch('/api/admin/overpass', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: overpassQuery })
         });
         const overpassData = await overpassResponse.json();
@@ -237,13 +225,9 @@ export default function AdminCitiesPage() {
         out body;
       `;
 
-      const tokenDirect = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/overpass', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${tokenDirect}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: overpassQuery })
       });
       const data = await response.json();

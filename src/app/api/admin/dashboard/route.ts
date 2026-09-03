@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/mysql';
 
-import { NextRequest } from 'next/server';
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const user = await verifyRequest(req);
-    if (!user || !isUserAdmin(user)) {
-      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-    }
     const pool = await getPool();
 
     // Run count queries in parallel

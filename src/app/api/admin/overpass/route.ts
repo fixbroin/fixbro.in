@@ -7,15 +7,8 @@ const OVERPASS_ENDPOINTS = [
   'https://overpass.kumi.systems/api/interpreter'
 ];
 
-import { NextRequest } from 'next/server';
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const user = await verifyRequest(request);
-    if (!user || !isUserAdmin(user)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const { query } = await request.json();
     if (!query) {
       return NextResponse.json({ error: 'Missing query' }, { status: 400 });

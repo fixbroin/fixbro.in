@@ -408,13 +408,7 @@ export default function CustomServiceRequestForm({
           userId: adminUid,
           title: adminNotification.title,
           body: adminNotification.message,
-          href: adminNotification.href,
-          variables: {
-            customerName: user.displayName || user.email || 'Customer',
-            serviceName: data.serviceTitle,
-            preferredDate: data.preferredStartDate ? data.preferredStartDate.toLocaleDateString() : 'As soon as possible',
-            siteName: 'Fixbro'
-          }
+          href: adminNotification.href
         });
 
         if (appConfig.smtpHost && appConfig.senderEmail) {
@@ -564,7 +558,7 @@ export default function CustomServiceRequestForm({
                     <DialogHeader className="p-4 border-b">
                       <DialogTitle>Select a Category</DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[80vh]">
+                    <ScrollArea className="h-72">
                       <div className="p-2">
                         {categories.map((c) => (
                           <div

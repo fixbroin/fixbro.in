@@ -101,9 +101,8 @@ export function useApplicationConfig(initialData?: AppSettings | null): UseAppli
 
         const localVersion = parseInt(localStorage.getItem(`${CACHE_KEY}-version`) || "0");
         const cached = getCache<AppSettings>(CACHE_KEY, true);
-        const isCheckoutOrPolicy = pathname?.includes('/checkout') || pathname?.includes('/cancellation-policy') || pathname?.includes('/my-bookings');
 
-        if (cached && !isAdmin && !isCheckoutOrPolicy && remoteVersion <= localVersion) {
+        if (cached && !isAdmin && remoteVersion <= localVersion) {
           setConfig(processData(cached));
           setIsLoading(false);
           return;

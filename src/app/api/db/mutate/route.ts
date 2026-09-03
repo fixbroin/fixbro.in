@@ -1,26 +1,9 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool, addDocInternal, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess } from '@/lib/dbSecurity';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const user = await verifyRequest(request);
-    if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-    }
-
     const { action, path, id, docId, data, options } = await request.json();
-
-    // Reconstruct the full document path to validate access properly
-    const targetId = id || docId;
-    const fullPath = targetId ? `${path}/${targetId}` : path;
-
-    // Check Firestore-style access rules
-    const isWriteAllowed = validateAccess(user, fullPath, 'write');
-    if (!isWriteAllowed) {
-      return NextResponse.json({ success: false, error: `Forbidden: No write access to "${fullPath}".` }, { status: 403 });
-    }
-
     const pool = await getPool();
 
     if (action === 'addDoc') {

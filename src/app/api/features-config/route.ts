@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFeaturesConfigServer, getMarketingAutomationSettings } from '@/lib/webServerUtils';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET() {
   try {
     const [features, marketing] = await Promise.all([

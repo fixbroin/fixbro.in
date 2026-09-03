@@ -19,7 +19,6 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
-import { getActiveCheckoutEntries } from '@/lib/cartManager';
 
 const MapAddressSelector = dynamic(() => import('@/components/checkout/MapAddressSelector'), {
   loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin" /></div>,
@@ -56,15 +55,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
   const [providerZones, setProviderZones] = useState<ServiceZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setActiveCategoryId(localStorage.getItem('fixbroActiveCheckoutCategory'));
-    }
-  }, []);
-
-  const currentCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null);
+  const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null;
 
   const applicableServiceZones = useMemo(() => {
     const adminZones = allServiceZones.filter(zone => {
@@ -82,54 +73,26 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
         const zonesSnapshot = await getDocs(zonesQuery);
         setAllServiceZones(zonesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone)));
 
-        const activeEntries = getActiveCheckoutEntries();
-        const activeServiceIds = activeEntries.map(e => e.serviceId).filter(Boolean);
-        const effectiveCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null);
-
-        if (effectiveCategoryId || activeServiceIds.length > 0) {
+        if (currentCategoryId) {
           const providersQuery = query(
             collection(db, 'providerApplications'), 
-            where('status', '==', 'approved')
+            where('status', '==', 'approved'),
+            where('workCategoryId', '==', currentCategoryId)
           );
           const providersSnapshot = await getDocs(providersQuery);
-
-          const matchingDocs = providersSnapshot.docs.filter(doc => {
-            const p = doc.data();
-            if (p.isOnline === false) return false;
-            if (!p.workAreaCenter || !p.workAreaRadiusKm) return false;
-
-            // If there are active services in checkout, provider must be able to do EVERY service in the cart:
-            if (activeServiceIds.length > 0) {
-              return activeServiceIds.every(sId => {
-                const hasCategory = effectiveCategoryId && (
-                  p.workCategoryId === effectiveCategoryId ||
-                  (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(effectiveCategoryId))
-                );
-                const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(sId)) ||
-                                           (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === sId));
-                return hasCategory || hasSpecificService;
-              });
-            }
-
-            // Fallback if no specific service IDs are in the cart:
-            const matchesCategory = effectiveCategoryId && (
-              p.workCategoryId === effectiveCategoryId ||
-              (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(effectiveCategoryId))
-            );
-            return matchesCategory;
-          });
-
-          setProviderZones(matchingDocs.map(doc => {
-            const data = doc.data();
-            return {
-              id: `provider_${doc.id}`,
-              name: data.fullName || 'Service Provider',
-              center: { latitude: data.workAreaCenter.latitude, longitude: data.workAreaCenter.longitude },
-              radiusKm: data.workAreaRadiusKm,
-              isActive: true,
-              createdAt: data.createdAt || Timestamp.now(),
-            } as ServiceZone;
-          }));
+          setProviderZones(providersSnapshot.docs
+            .filter(doc => doc.data().workAreaCenter && doc.data().workAreaRadiusKm)
+            .map(doc => {
+              const data = doc.data();
+              return {
+                id: `provider_${doc.id}`,
+                name: data.fullName || 'Service Provider',
+                center: { latitude: data.workAreaCenter.latitude, longitude: data.workAreaCenter.longitude },
+                radiusKm: data.workAreaRadiusKm,
+                isActive: true,
+                createdAt: data.createdAt || Timestamp.now(),
+              } as ServiceZone;
+            }));
         }
       } catch (error) {
         console.error("Error fetching serviceability data:", error);
@@ -138,7 +101,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       }
     };
     fetchZonesAndProviders();
-  }, [activeCategoryId]);
+  }, [currentCategoryId]);
 
   useEffect(() => {
     if (!user) {

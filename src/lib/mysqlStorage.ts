@@ -2,7 +2,6 @@
 
 export const storage = { type: 'storage' };
 export const getStorage = () => storage;
-import { auth } from './firebase';
 
 // Global map to hold resolved URLs for uploaded references
 const resolvedUrls = new Map<string, string>();
@@ -67,15 +66,8 @@ export function uploadBytesResumable(refInstance: MySQLStorageRef, file: File | 
           formData.append('file', file, filename);
           formData.append('uploadPath', uploadPath);
 
-          const token = await auth.currentUser?.getIdToken();
-          const headers: Record<string, string> = {};
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-
           const res = await fetch('/api/upload', {
             method: 'POST',
-            headers,
             body: formData
           });
 
@@ -106,15 +98,8 @@ export async function uploadBytes(refInstance: MySQLStorageRef, file: File | Blo
   formData.append('file', file, filename);
   formData.append('uploadPath', uploadPath);
 
-  const token = await auth.currentUser?.getIdToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
   const res = await fetch('/api/upload', {
     method: 'POST',
-    headers,
     body: formData
   });
 
@@ -160,17 +145,11 @@ export async function deleteObject(refInstance: any): Promise<void> {
   }
 
   try {
-    const token = await auth.currentUser?.getIdToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     const res = await fetch('/api/upload', {
       method: 'DELETE',
-      headers,
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ fileUrl: cleanUrl })
     });
     const data = await res.json();

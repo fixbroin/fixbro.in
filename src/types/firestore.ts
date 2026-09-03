@@ -230,9 +230,6 @@ export interface FirestoreBooking {
   updatedAt?: Timestamp;
   isReviewedByCustomer?: boolean;
   cancellationFeePaid?: number;
-  cancellationFeeCharged?: number;
-  refundableAmount?: number;
-  cancellationRefundStatus?: 'Pending' | 'Processed' | 'Failed' | 'N/A';
   cancellationPaymentId?: string;
   isStatsTracked?: boolean;
   isCompletionStatsTracked?: boolean;
@@ -644,9 +641,6 @@ export interface AppSettings {
   freeCancellationMinutes?: number;
   cancellationFeeType?: 'fixed' | 'percentage';
   cancellationFeeValue?: number;
-  enableFinalCancellationWindow?: boolean;
-  finalCancellationHours?: number;
-  finalCancellationMinutes?: number;
   chatNotificationSoundUrl?: string; // New: default sound for chat notifications
   currencyCode?: string;
   currencySymbol?: string;
@@ -1080,10 +1074,6 @@ export interface ChatSession {
   adminUnreadCount: number; // Messages sent by user that admin hasn't read
   participants: (string | null | undefined)[]; // Array containing UIDs of participants (e.g., [userId, adminId])
   aiAgentActive?: boolean; 
-  isUserTyping?: boolean;
-  isAdminTyping?: boolean;
-  userTypingAt?: Timestamp | number | null;
-  adminTypingAt?: Timestamp | number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -1404,15 +1394,10 @@ export interface ProviderApplication {
   id?: string; // Firestore document ID (same as userId)
   userId: string; // Firebase Auth UID of the applicant
   status: ProviderApplicationStatus;
-  isOnline?: boolean; // Availability toggle (true = online/accepting bookings, false = offline)
 
   // Step 1: Client Category & Skills
   workCategoryId?: string;
   workCategoryName?: string; // Denormalized
-  additionalCategories?: { id: string; name: string }[];
-  allCategoryIds?: string[];
-  additionalServices?: { id: string; name: string; categoryName?: string }[];
-  additionalServiceIds?: string[];
   experienceLevelId?: string;
   experienceLevelLabel?: string; // Denormalized
   skillLevelId?: string;

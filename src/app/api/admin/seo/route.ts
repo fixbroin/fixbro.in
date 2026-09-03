@@ -1,13 +1,7 @@
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getPool, getDocInternal, getDocsInternal, setDocInternal } from '@/lib/mysql';
 
-export async function GET(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function GET() {
   try {
     const pool = await getPool();
     const globalSeo = await getDocInternal(pool, 'seoSettings', 'global');
@@ -25,12 +19,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const user = await verifyRequest(request);
-  if (!user || !isUserAdmin(user)) {
-    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
-  }
-
+export async function POST(request: Request) {
   try {
     const { section, id, data } = await request.json();
     const pool = await getPool();

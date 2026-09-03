@@ -9,29 +9,6 @@ import {
   executeDbBatch 
 } from '@/app/actions/dbActions';
 import { Timestamp, isTimestamp } from './timestamp';
-import { auth } from './firebase';
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  };
-
-  if (typeof window === 'undefined') {
-    const secret = process.env.INTERNAL_API_SECRET || "fixbro_internal_secret_j7K9R2pX_2026";
-    headers['x-internal-token'] = secret;
-  } else {
-    try {
-      if (auth.currentUser) {
-        const token = await auth.currentUser.getIdToken();
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-    } catch (e) {
-      console.error("Error getting idToken in mysqlDb:", e);
-    }
-  }
-
-  return headers;
-}
 
 export { Timestamp };
 
@@ -216,7 +193,7 @@ function getApiUrl(path: string): string {
   if (typeof window !== 'undefined') {
     return path;
   }
-  const port = process.env.PORT || '3006';
+  const port = process.env.PORT || '3001';
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${port}`;
   return `${baseUrl.replace(/\/$/, '')}${path}`;
 }
@@ -226,7 +203,7 @@ export async function getDoc(docRef: DocumentReference): Promise<DocumentSnapsho
   try {
     const res = await fetch(getApiUrl('/api/db/getDoc'), {
       method: 'POST',
-      headers: await getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: docRef.path })
     });
     if (res.ok) {
@@ -252,7 +229,7 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
   try {
     const res = await fetch(getApiUrl('/api/db/getDocs'), {
       method: 'POST',
-      headers: await getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: queryRef.path, constraints: cleanConstraints })
     });
     if (res.ok) {
@@ -299,7 +276,7 @@ export async function addDoc(collectionRef: CollectionReference, data: any) {
   const cleanData = serializeClientData(data);
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
-    headers: await getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'addDoc', path: collectionRef.path, data: cleanData })
   });
   if (!res.ok) {
@@ -320,7 +297,7 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
   const cleanData = serializeClientData(data);
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
-    headers: await getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'setDoc', path: collectionPath, id: docId, data: cleanData, options })
   });
   if (!res.ok) {
@@ -337,7 +314,7 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
   const cleanData = serializeClientData(data);
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
-    headers: await getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'updateDoc', path: collectionPath, id: docId, data: cleanData })
   });
   if (!res.ok) {
@@ -350,7 +327,7 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
 export async function deleteDoc(docRef: DocumentReference) {
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
-    headers: await getAuthHeaders(),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'deleteDoc', path: docRef.path })
   });
   if (!res.ok) {
@@ -386,7 +363,7 @@ export function writeBatch(dbInstance: any) {
     commit: async () => {
       const res = await fetch(getApiUrl('/api/db/batch'), {
         method: 'POST',
-        headers: await getAuthHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operations })
       });
       if (!res.ok) {
@@ -465,13 +442,11 @@ export function onSnapshot(
 export function onSnapshot(queryOrDocRef: any, arg2: any, arg3?: any, arg4?: any): () => void {
   let callback: (snapshot: any) => void;
   let onError: ((error: any) => void) | undefined;
-  let customInterval: number | undefined;
 
   if (typeof arg2 === 'function') {
     callback = arg2;
     onError = arg3;
   } else {
-    customInterval = arg2?.intervalMs;
     callback = arg3;
     onError = arg4;
   }
@@ -479,9 +454,6 @@ export function onSnapshot(queryOrDocRef: any, arg2: any, arg3?: any, arg4?: any
   let isCancelled = false;
   let intervalId: any = null;
   let lastDataHash = '';
-
-  const isChat = queryOrDocRef?.path?.startsWith('chats');
-  const pollInterval = customInterval || (isChat ? 2000 : 8000);
 
   const run = async () => {
     try {
@@ -513,7 +485,7 @@ export function onSnapshot(queryOrDocRef: any, arg2: any, arg3?: any, arg4?: any
   };
 
   run();
-  intervalId = setInterval(run, pollInterval);
+  intervalId = setInterval(run, 8000);
 
   return () => {
     isCancelled = true;
