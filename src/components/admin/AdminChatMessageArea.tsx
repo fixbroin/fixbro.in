@@ -31,8 +31,11 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, getTimestampMillis } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { CANONICAL_SUPPORT_ADMIN_UID } from './AdminUserListForChat';
+
 interface AdminChatMessageAreaProps {
   selectedUser: FirestoreUser | null;
+  selectedSessionId?: string | null;
 }
 
 const ADMIN_FALLBACK_AVATAR_INITIAL_CHAT_AREA = "S";
@@ -45,15 +48,18 @@ const linkify = (text: string) => {
     });
 };
 
-export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageAreaProps) {
+export default function AdminChatMessageArea({ selectedUser, selectedSessionId }: AdminChatMessageAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isClearingChat, setIsClearingChat] = useState(false);
   const [isAiActive, setIsAiActive] = useState(true);
   const [isUpdatingAi, setIsUpdatingAi] = useState(false);
+  const [isUserTyping, setIsUserTyping] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const adminTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAdminTypingReportRef = useRef<number>(0);
   const { user: loggedInAdminUser } = useAuth();
   const { toast } = useToast();
 
@@ -77,10 +83,10 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
             uid: adminUid
           });
         } else {
-          setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: 'fallback_admin_uid' });
+          setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: CANONICAL_SUPPORT_ADMIN_UID });
         }
       } catch (error) {
-        setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: 'fallback_admin_uid' });
+        setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: CANONICAL_SUPPORT_ADMIN_UID });
       } finally {
         setIsLoadingSupportAdminProfile(false);
       }
@@ -92,7 +98,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
     return [userId1, userId2].sort().join('_');
   }, []);
 
-  const currentChatSessionId = selectedUser && supportAdminProfile.uid ? getChatSessionId(selectedUser.id, supportAdminProfile.uid) : null;
+  const currentChatSessionId = selectedSessionId || (selectedUser && supportAdminProfile.uid ? getChatSessionId(selectedUser.id, supportAdminProfile.uid) : null);
 
   useEffect(() => {
     if (currentChatSessionId && selectedUser && !isLoadingSupportAdminProfile) {
@@ -103,6 +109,11 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
           if (docSnap.exists()) {
               const data = docSnap.data() as ChatSession;
               setIsAiActive(data.aiAgentActive !== false);
+              const userTypingAt = data.userTypingAt ? getTimestampMillis(data.userTypingAt) : 0;
+              const isRecent = userTypingAt ? (Date.now() - userTypingAt < 5000) : false;
+              setIsUserTyping(Boolean(data.isUserTyping && (isRecent || !data.userTypingAt)));
+          } else {
+              setIsUserTyping(false);
           }
       });
 
@@ -148,9 +159,87 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       };
     } else {
       setMessages([]);
+      setIsUserTyping(false);
       if (!isLoadingSupportAdminProfile) setIsLoadingMessages(false);
     }
   }, [currentChatSessionId, selectedUser, isLoadingSupportAdminProfile, supportAdminProfile.uid]);
+
+  const reportAdminTyping = useCallback((isTyping: boolean) => {
+    if (!currentChatSessionId) return;
+    try {
+      const sessionDocRef = doc(db, 'chats', currentChatSessionId);
+      setDoc(sessionDocRef, {
+        isAdminTyping: isTyping,
+        adminTypingAt: isTyping ? Date.now() : null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (e) {
+      console.error("AdminChatMessageArea: Error reporting admin typing:", e);
+    }
+  }, [currentChatSessionId]);
+
+  const handleAdminInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setNewMessage(val);
+
+    if (val.trim()) {
+      const now = Date.now();
+      if (now - lastAdminTypingReportRef.current > 2000) {
+        lastAdminTypingReportRef.current = now;
+        reportAdminTyping(true);
+      }
+
+      if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+      adminTypingTimeoutRef.current = setTimeout(() => {
+        reportAdminTyping(false);
+      }, 3000);
+    } else {
+      if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+      reportAdminTyping(false);
+    }
+  };
+
+  const handleAdminBlur = () => {
+    if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+    reportAdminTyping(false);
+  };
+
+  useEffect(() => {
+    const handleLeave = () => {
+      if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+      if (currentChatSessionId) {
+        reportAdminTyping(false);
+        try {
+          fetch('/api/db/mutate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'setDoc',
+              path: 'chats',
+              id: currentChatSessionId,
+              data: { isAdminTyping: false, adminTypingAt: null },
+              options: { merge: true }
+            }),
+            keepalive: true
+          });
+        } catch (e) {
+          // ignore unload error
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    window.addEventListener('pagehide', handleLeave);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleLeave);
+      window.removeEventListener('pagehide', handleLeave);
+      if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+      if (currentChatSessionId) {
+        reportAdminTyping(false);
+      }
+    };
+  }, [currentChatSessionId, reportAdminTyping]);
 
   useEffect(() => {
     if (scrollAreaRootRef.current) {
@@ -159,7 +248,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
       }
     }
-  }, [messages, isLoadingMessages]);
+  }, [messages, isLoadingMessages, isUserTyping]);
 
   const handleToggleAi = async (checked: boolean) => {
       if (!currentChatSessionId) return;
@@ -198,6 +287,9 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedUser || !loggedInAdminUser || !currentChatSessionId || !supportAdminProfile.uid) return;
+
+    if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+    reportAdminTyping(false);
 
     const messageData: Omit<ChatMessage, 'id'> = {
       chatSessionId: currentChatSessionId,
@@ -242,6 +334,8 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         userUnreadCount: currentUserUnreadCount + 1,
         adminUnreadCount: 0,
         aiAgentActive: false,
+        isAdminTyping: false,
+        adminTypingAt: null,
         updatedAt: messageData.timestamp,
         ...(currentSessionData ? {} : { createdAt: messageData.timestamp })
       }, { merge: true });
@@ -343,7 +437,14 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
                     <h3 className="text-sm font-bold truncate max-w-[150px]">{selectedUser.displayName || selectedUser.email}</h3>
                     <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
                   </div>
-                  <p className="text-[10px] text-muted-foreground truncate">{selectedUser.email}</p>
+                  {isUserTyping ? (
+                    <p className="text-[10px] text-primary font-bold uppercase tracking-wider flex items-center animate-pulse">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary mr-1.5 animate-ping" />
+                      typing...
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground truncate">{selectedUser.email}</p>
+                  )}
               </div>
             </div>
 
@@ -469,6 +570,28 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
                   </div>
                 );
               })}
+              {isUserTyping && (
+                <div className="flex items-end space-x-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <Avatar className="h-8 w-8 shrink-0 mb-1 shadow-sm border border-background">
+                    <AvatarImage src={selectedUser.photoURL || undefined} />
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-bold">
+                      {selectedUser.displayName ? selectedUser.displayName.charAt(0).toUpperCase() : <UserCircle size={16}/>}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col space-y-1">
+                    <span className="text-[10px] text-muted-foreground font-medium pl-1">
+                      {selectedUser.displayName || "User"} is typing...
+                    </span>
+                    <div className="bg-card text-foreground rounded-2xl rounded-bl-none border px-3.5 py-2.5 shadow-sm w-fit">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+                        <span className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+                        <span className="h-1.5 w-1.5 bg-primary rounded-full animate-bounce" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               {isLoadingMessages && messages.length > 0 && (
                 <div className="flex justify-center py-2">
                   <Loader2 className="h-4 w-4 animate-spin text-primary/40" />
@@ -485,7 +608,8 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
             <textarea
               ref={inputRef}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={handleAdminInputChange}
+              onBlur={handleAdminBlur}
               onKeyDown={handleKeyDown}
               placeholder="Write a message..."
               className="w-full pr-12 pl-4 py-3.5 bg-muted/30 border-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 h-12 rounded-2xl text-sm transition-all resize-none no-keyboard-scroll overflow-y-auto"

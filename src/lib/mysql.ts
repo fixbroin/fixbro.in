@@ -879,49 +879,28 @@ export async function setDocInternal(conn: mysql.PoolConnection | mysql.Pool, pa
       const merged = resolveFieldValues(serializeDbData(existing.data), cleanData);
       merged.id = resolved.docId;
       
-      const createdAtDate = extractDate(merged.createdAt);
-      const updatedAtDate = extractDate(merged.updatedAt);
+      const createdAtDate = extractDate(merged.createdAt) || new Date();
+      const updatedAtDate = extractDate(cleanData.updatedAt) || new Date();
+      merged.updatedAt = updatedAtDate;
 
-      if (createdAtDate && updatedAtDate) {
-        await conn.query(
-          `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`, \`updatedAt\`) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
-          [resolved.docId, resolved.parentId, JSON.stringify(merged), createdAtDate, updatedAtDate]
-        );
-      } else if (createdAtDate) {
-        await conn.query(
-          `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`)`,
-          [resolved.docId, resolved.parentId, JSON.stringify(merged), createdAtDate]
-        );
-      } else {
-        await conn.query(
-          `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`)`,
-          [resolved.docId, resolved.parentId, JSON.stringify(merged)]
-        );
-      }
+      await conn.query(
+        `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`, \`updatedAt\`) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
+        [resolved.docId, resolved.parentId, JSON.stringify(merged), createdAtDate, updatedAtDate]
+      );
       return;
     }
   }
 
   const finalData = { ...cleanData, id: resolved.docId };
-  const createdAtDate = extractDate(finalData.createdAt);
-  const updatedAtDate = extractDate(finalData.updatedAt);
+  const createdAtDate = extractDate(finalData.createdAt) || new Date();
+  const updatedAtDate = extractDate(finalData.updatedAt) || new Date();
+  finalData.createdAt = createdAtDate;
+  finalData.updatedAt = updatedAtDate;
 
-  if (createdAtDate && updatedAtDate) {
-    await conn.query(
-      `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`, \`updatedAt\`) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
-      [resolved.docId, resolved.parentId, JSON.stringify(finalData), createdAtDate, updatedAtDate]
-    );
-  } else if (createdAtDate) {
-    await conn.query(
-      `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`)`,
-      [resolved.docId, resolved.parentId, JSON.stringify(finalData), createdAtDate]
-    );
-  } else {
-    await conn.query(
-      `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`)`,
-      [resolved.docId, resolved.parentId, JSON.stringify(finalData)]
-    );
-  }
+  await conn.query(
+    `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`, \`createdAt\`, \`updatedAt\`) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`createdAt\` = VALUES(\`createdAt\`), \`updatedAt\` = VALUES(\`updatedAt\`)`,
+    [resolved.docId, resolved.parentId, JSON.stringify(finalData), createdAtDate, updatedAtDate]
+  );
 }
 
 export async function updateDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput: string, data: any) {
