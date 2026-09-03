@@ -504,9 +504,9 @@ export default function PaymentPage() {
       const addressDataString = localStorage.getItem('fixbroCustomerAddress');
       if (addressDataString) { 
         const addressData = JSON.parse(addressDataString); 
-        customerName = addressData.fullName || customerName; 
-        customerPhone = addressData.phone || customerPhone; 
-        customerEmail = addressData.email || customerEmail; 
+        customerName = addressData.fullName || currentUser?.displayName || customerName; 
+        customerPhone = addressData.phone || (currentUser as any)?.phoneNumber || customerPhone; 
+        customerEmail = addressData.email || currentUser?.email || customerEmail; 
         addressLine1 = addressData.addressLine1 || addressLine1; 
         addressLine2 = addressData.addressLine2 || undefined; 
         city = addressData.city || city; 
@@ -514,6 +514,10 @@ export default function PaymentPage() {
         pincode = addressData.pincode || pincode; 
         latitude = addressData.latitude === null ? undefined : addressData.latitude; 
         longitude = addressData.longitude === null ? undefined : addressData.longitude; 
+      } else if (currentUser) {
+        customerName = currentUser.displayName || customerName;
+        customerEmail = currentUser.email || customerEmail;
+        customerPhone = (currentUser as any)?.phoneNumber || customerPhone;
       }
     }
 
