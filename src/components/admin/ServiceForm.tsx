@@ -458,7 +458,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
       if (result) {
         form.setValue('description', result.shortDescription, { shouldValidate: true });
         form.setValue('shortDescription', result.fullDescription, { shouldValidate: true });
-        form.setValue('fullDescription', (result.pleaseNote || []).join('\n'), { shouldValidate: true });
+        form.setValue('fullDescription', (result.pleaseNote || []).join('\n\n'), { shouldValidate: true });
         form.setValue('imageHint', result.imageHint, { shouldValidate: true });
         replaceHighlights((result.serviceHighlights || []).map(h => ({ value: h })));
         replaceIncluded((result.includedItems || []).map(i => ({ value: i })));
