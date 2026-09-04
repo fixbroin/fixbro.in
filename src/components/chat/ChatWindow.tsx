@@ -25,13 +25,28 @@ interface ChatWindowProps {
 const ADMIN_FALLBACK_NAME = "Support";
 const ADMIN_FALLBACK_AVATAR_INITIAL = "S";
 
-// Function to find URLs in text and wrap them in anchor tags
-const linkify = (text: string) => {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlRegex, (url) => {
-        const fullUrl = url.startsWith('www.') ? `http://${url}` : url;
-        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary font-medium underline hover:text-primary/80 transition-colors">${url}</a>`;
-    });
+// Function to format chat messages with clean markdown links, bold text, and clickable URLs
+const formatChatMessage = (text: string) => {
+  if (!text) return '';
+  // 1. Convert Markdown links: [Title](url) -> <a href="url">Title</a>
+  const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let formatted = text.replace(mdLinkRegex, (_, title, url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
+  });
+
+  // 2. Convert Bold: **text** -> <strong>text</strong>
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 3. Convert Strikethrough: ~~text~~ -> <del class="opacity-75">text</del>
+  formatted = formatted.replace(/~~([^~]+)~~/g, '<del class="opacity-75">$1</del>');
+
+  // 4. Auto-link remaining raw URLs that are not already inside href
+  const rawUrlRegex = /(?<!href="|href='|">)(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+  formatted = formatted.replace(rawUrlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${url}</a>`;
+  });
+
+  return formatted;
 };
 
 
@@ -116,36 +131,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
     return [userId1, userId2].sort().join('_');
   }, []);
 
-  const chatSessionId = activeSessionId || (currentUser && adminProfile.uid ? getChatSessionId(currentUser.uid, adminProfile.uid) : null);
-
-  // Automatically find if user already has an active support chat session in the database
-  useEffect(() => {
-    if (!currentUser) return;
-    let isMounted = true;
-
-    const findExistingSession = async () => {
-      try {
-        const userChatsQuery = query(collection(db, "chats"), where("userId", "==", currentUser.uid), limit(5));
-        const userChatsSnap = await getDocs(userChatsQuery);
-        if (isMounted && !userChatsSnap.empty) {
-          const sessions = userChatsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ChatSession));
-          sessions.sort((a, b) => {
-            const timeA = Math.max(getTimestampMillis(a.updatedAt), getTimestampMillis(a.lastMessageTimestamp));
-            const timeB = Math.max(getTimestampMillis(b.updatedAt), getTimestampMillis(b.lastMessageTimestamp));
-            return timeB - timeA;
-          });
-          if (sessions[0]?.id) {
-            setActiveSessionId(sessions[0].id);
-          }
-        }
-      } catch (err) {
-        console.error("Error finding user chat session:", err);
-      }
-    };
-
-    findExistingSession();
-    return () => { isMounted = false; };
-  }, [currentUser]);
+  const chatSessionId = currentUser && adminProfile.uid ? getChatSessionId(currentUser.uid, adminProfile.uid) : null;
 
   useEffect(() => {
     const fetchAdminProfile = async () => {
@@ -166,7 +152,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
         const adminUid = adminSnapshot.docs[0].id;
         setAdminProfile({ displayName: adminData.displayName || null, photoURL: adminData.photoURL || null, uid: adminUid });
       } else {
-        setAdminProfile({ displayName: ADMIN_FALLBACK_NAME, photoURL: null, uid: CANONICAL_SUPPORT_ADMIN_UID });
+        setAdminProfile({ displayName: ADMIN_FALLBACK_NAME, photoURL: null, uid: 'admin_master_id' });
       }
       setIsLoadingAdminProfile(false);
     };
@@ -683,7 +669,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
                         {msg.text && (
                           <div 
                             className="whitespace-pre-wrap leading-relaxed" 
-                            dangerouslySetInnerHTML={{ __html: linkify(msg.text) }} 
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }} 
                           />
                         )}
                       </div>

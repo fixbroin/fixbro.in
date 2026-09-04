@@ -40,15 +40,31 @@ interface AdminChatMessageAreaProps {
 
 const ADMIN_FALLBACK_AVATAR_INITIAL_CHAT_AREA = "S";
 
-const linkify = (text: string) => {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlRegex, (url) => {
-        const fullUrl = url.startsWith('www.') ? `http://${url}` : url;
-        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary font-medium underline hover:text-primary/80 transition-colors">${url}</a>`;
-    });
+// Function to format chat messages with clean markdown links, bold text, and clickable URLs
+const formatChatMessage = (text: string) => {
+  if (!text) return '';
+  // 1. Convert Markdown links: [Title](url) -> <a href="url">Title</a>
+  const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let formatted = text.replace(mdLinkRegex, (_, title, url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
+  });
+
+  // 2. Convert Bold: **text** -> <strong>text</strong>
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 3. Convert Strikethrough: ~~text~~ -> <del class="opacity-75">text</del>
+  formatted = formatted.replace(/~~([^~]+)~~/g, '<del class="opacity-75">$1</del>');
+
+  // 4. Auto-link remaining raw URLs that are not already inside href
+  const rawUrlRegex = /(?<!href="|href='|">)(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+  formatted = formatted.replace(rawUrlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${url}</a>`;
+  });
+
+  return formatted;
 };
 
-export default function AdminChatMessageArea({ selectedUser, selectedSessionId }: AdminChatMessageAreaProps) {
+export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -83,10 +99,10 @@ export default function AdminChatMessageArea({ selectedUser, selectedSessionId }
             uid: adminUid
           });
         } else {
-          setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: CANONICAL_SUPPORT_ADMIN_UID });
+          setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: 'fallback_admin_uid' });
         }
       } catch (error) {
-        setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: CANONICAL_SUPPORT_ADMIN_UID });
+        setSupportAdminProfile({ displayName: "Support", photoURL: null, uid: 'fallback_admin_uid' });
       } finally {
         setIsLoadingSupportAdminProfile(false);
       }
@@ -98,7 +114,7 @@ export default function AdminChatMessageArea({ selectedUser, selectedSessionId }
     return [userId1, userId2].sort().join('_');
   }, []);
 
-  const currentChatSessionId = selectedSessionId || (selectedUser && supportAdminProfile.uid ? getChatSessionId(selectedUser.id, supportAdminProfile.uid) : null);
+  const currentChatSessionId = selectedUser && supportAdminProfile.uid ? getChatSessionId(selectedUser.id, supportAdminProfile.uid) : null;
 
   useEffect(() => {
     if (currentChatSessionId && selectedUser && !isLoadingSupportAdminProfile) {
@@ -543,7 +559,7 @@ export default function AdminChatMessageArea({ selectedUser, selectedSessionId }
                         {msg.text && (
                           <div 
                             className="text-sm leading-relaxed whitespace-pre-wrap" 
-                            dangerouslySetInnerHTML={{ __html: linkify(msg.text) }}
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }}
                           />
                         )}
                         <span className={cn(
