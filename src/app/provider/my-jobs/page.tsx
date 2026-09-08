@@ -269,8 +269,9 @@ export default function ProviderMyJobsPage() {
           isOpen={isCompleteDialogOpen}
           onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }}
           onConfirm={(charges, pMethod) => updateBookingStatus(bookingToComplete.id!, 'Completed', charges, pMethod)}
+          booking={bookingToComplete}
           originalAmount={bookingToComplete.totalAmount}
-          currentPaymentMethod={bookingToComplete.paymentMethod || "Cash"}
+          currentPaymentMethod={bookingToComplete.paymentMethod || "Pay After Service"}
           isProcessing={processingBookingAction === bookingToComplete.id}
         />
       )}

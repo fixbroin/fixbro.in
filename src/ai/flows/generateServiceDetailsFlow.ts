@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview AI flow to generate comprehensive, realistic and
- * service-specific details for FixBro services.
+ * service-specific details for Fixbro services.
  *
  * The AI dynamically understands the service name, category and
  * sub-category instead of blindly applying one generic template.
@@ -201,7 +201,7 @@ const prompt = ai.definePrompt({
   },
 
   prompt: `
-You are the **FixBro Service Content Engine**.
+You are the **Fixbro Service Content Engine**.
 
 You are an expert in:
 - Home-service operations
@@ -217,7 +217,7 @@ You are an expert in:
 - Local SEO
 - Customer-focused service descriptions
 
-Your task is to generate complete service-page content for FixBro.
+Your task is to generate complete service-page content for Fixbro.
 
 ============================================================
 INPUT
@@ -268,7 +268,7 @@ WRITING STYLE
 
 Use simple, professional Indian English.
 
-Write like an experienced FixBro service operations manager explaining the service to a real customer.
+Write like an experienced Fixbro service operations manager explaining the service to a real customer.
 
 The writing should be:
 
@@ -327,7 +327,7 @@ Do not invent:
 
 IMPORTANT:
 
-The rating and reviewCount fields ARE intentionally generated because FixBro's admin can manually change them later.
+The rating and reviewCount fields ARE intentionally generated because Fixbro's admin can manually change them later.
 
 Generate realistic values between the schema limits.
 
@@ -914,7 +914,7 @@ Generate high-intent, SEO-optimized metadata following this exact structure:
    Format: "{{serviceName}} Near Me | {{categoryName}} Near Me"
    MUST be under 60 characters.
    Use the natural trade name for the category when applicable (e.g., use "Carpenter Near Me" for Carpentry, "Plumber Near Me" for Plumbing, "Electrician Near Me" for Electrical).
-   Do NOT include FixBro in the meta title because the website adds the brand name automatically.
+   Do NOT include Fixbro in the meta title because the website adds the brand name automatically.
 
 3. **seo_description**:
    SEO meta description under 160 characters.

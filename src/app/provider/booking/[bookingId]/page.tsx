@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -64,15 +64,16 @@ export default function ProviderBookingDetailsPage() {
     if (feeType === 'percentage') return (amount * feeVal) / 100;
     return feeVal;
   };
-  const paymentMethod = booking?.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'pay after service';
+  const paymentMethod = booking?.paymentMethod || 'Pay After Service';
+  const isCash = isCashPayment(paymentMethod);
   const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
     providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
   const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
-  const displayTotal = isCash ? (booking?.totalAmount || 0) : providerGross;
+  const extraChargesTotal = (booking?.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : (providerGross + extraChargesTotal);
 
 
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
@@ -428,6 +429,19 @@ export default function ProviderBookingDetailsPage() {
                 {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
+                {extraChargesTotal > 0 && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed">
+                    {!isCash ? (
+                      <p>
+                        <strong>Online Payment:</strong> {symbol}{providerGross.toFixed(decimals)} was paid online. Additional charges of <strong>{symbol}{extraChargesTotal.toFixed(decimals)}</strong> collected in cash by you.
+                      </p>
+                    ) : (
+                      <p>
+                        <strong>Pay After Service:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected by you.
+                      </p>
+                    )}
+                  </div>
+                )}
              </div>
            </section>
 
@@ -518,8 +532,9 @@ export default function ProviderBookingDetailsPage() {
           isOpen={isCompleteDialogOpen}
           onClose={() => setIsCompleteDialogOpen(false)}
           onConfirm={(charges, pMethod) => updateBookingStatus('Completed', charges, pMethod)}
+          booking={booking}
           originalAmount={booking.totalAmount}
-          currentPaymentMethod={booking.paymentMethod || "Cash"}
+          currentPaymentMethod={booking.paymentMethod || "Pay After Service"}
           isProcessing={isProcessingAction}
         />
       )}
