@@ -775,18 +775,17 @@ export default function Step4LocationBank({
 
       {/* Popups Flow */}
       <Dialog open={isMapModalOpen} onOpenChange={(open) => { if (!open) setIsMapModalOpen(false); }}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 flex flex-col overflow-hidden" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()} hideCloseButton={true}>
-          <DialogHeader className="p-3.5 border-b bg-card">
-            <DialogTitle>Set Your Service Location & Radius</DialogTitle>
-            <DialogDescription>Choose a Fixbro service zone or pinpoint your work center and set your coverage radius.</DialogDescription>
+        <DialogContent className="max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()} hideCloseButton={true}>
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Set Your Service Location</DialogTitle>
+            <DialogDescription>Select the center point from where you will provide services.</DialogDescription>
           </DialogHeader>
-          <div className="flex-grow relative overflow-hidden">
+          <div className="flex-grow relative">
             {!isLoadingAppSettings && appConfig.googleMapsApiKey ? (
               <ProviderMapZoneSelector 
                 apiKey={appConfig.googleMapsApiKey} 
                 initialCenter={form.getValues('workAreaCenter') || null}
                 initialRadiusKm={form.getValues('workAreaRadiusKm') || 5}
-                initialAddress={selectedAddressText || form.getValues('workAreaAddress') || ""}
                 maxRadiusKm={maxRadius}
                 onConfirm={handleLocationConfirm} 
                 onClose={() => setIsMapModalOpen(false)} 

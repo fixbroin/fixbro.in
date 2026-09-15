@@ -1,107 +1,74 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Loader2, LocateFixed, MapPin, Search, Globe2, Sliders, Check } from 'lucide-react';
+import type { AddressFormData } from '@/components/forms/AddressForm';
+import { Loader2, Search, Sliders } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import type { ServiceZone } from '@/types/firestore';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from '@/lib/mysqlDb';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProviderMapZoneSelectorProps {
   apiKey: string;
-  initialCenter?: { lat: number; lng: number } | null;
-  initialRadiusKm?: number;
-  initialAddress?: string;
-  maxRadiusKm?: number;
   onConfirm: (data: {
     center: { lat: number; lng: number };
     radiusKm: number;
     address: string;
   }) => void;
   onClose: () => void;
+  initialCenter: { lat: number; lng: number } | null;
+  initialRadiusKm?: number;
+  maxRadiusKm?: number;
 }
 
 const DEFAULT_CENTER = { lat: 12.9716, lng: 77.5946 }; // Bangalore
-const DEFAULT_ZOOM = 11;
-const DETAILED_ZOOM = 14;
+const DEFAULT_ZOOM = 10;
+const DETAILED_ZOOM = 17;
 
-const GOOGLE_MAPS_SCRIPT_ID = "fixbro-google-maps-provider-script";
-const GOOGLE_MAPS_CALLBACK_NAME = `initFixbroProviderMapCallback_${Math.random().toString(36).substring(2, 15)}`;
+const GOOGLE_MAPS_SCRIPT_ID = "fixbro-google-maps-places-script";
+const GOOGLE_MAPS_CALLBACK_NAME = `initFixbroProviderMapSelectorCallback_${Math.random().toString(36).substring(2, 15)}`;
 
 const PRESET_RADII = [3, 5, 10, 15, 20, 25];
 
-export default function ProviderMapZoneSelector({
+const ProviderMapZoneSelector: React.FC<ProviderMapZoneSelectorProps> = ({
   apiKey,
-  initialCenter,
-  initialRadiusKm = 5,
-  initialAddress = "",
-  maxRadiusKm = 50,
   onConfirm,
   onClose,
-}: ProviderMapZoneSelectorProps) {
-  const { toast } = useToast();
+  initialCenter,
+  initialRadiusKm = 5,
+  maxRadiusKm = 50,
+}) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
 
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
 
-  // Active center, radius, and address
-  const [currentCenter, setCurrentCenter] = useState<{ lat: number; lng: number }>(
-    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
-  );
-  const [radiusKm, setRadiusKm] = useState<number>(Math.min(initialRadiusKm || 5, maxRadiusKm));
-  const [addressText, setAddressText] = useState<string>(initialAddress || "");
-  const [hasSelected, setHasSelected] = useState<boolean>(!!(initialCenter?.lat && initialCenter?.lng));
-
-  // Service zones from /admin/service-zones
-  const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
-  const [isLoadingZones, setIsLoadingZones] = useState(true);
-  const [selectedZoneId, setSelectedZoneId] = useState<string>("custom");
-
-  // Google Maps instances
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const autocompleteInstanceRef = useRef<google.maps.places.Autocomplete | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const circleRef = useRef<google.maps.Circle | null>(null);
-  const zoneCirclesRef = useRef<google.maps.Circle[]>([]);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
-  const autocompleteInstanceRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  // 1. Fetch active service zones
-  useEffect(() => {
-    let isMounted = true;
-    const fetchZones = async () => {
-      try {
-        const q = query(collection(db, "serviceZones"), where("isActive", "==", true));
-        const snapshot = await getDocs(q);
-        if (isMounted) {
-          const zones = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone));
-          setServiceZones(zones);
-        }
-      } catch (err) {
-        console.error("Error fetching service zones:", err);
-      } finally {
-        if (isMounted) setIsLoadingZones(false);
-      }
-    };
-    fetchZones();
-    return () => { isMounted = false; };
-  }, []);
+  const placeChangedListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const markerDragEndListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
-  // 2. Load Google Maps script safely (without duplicating)
+  const [selectedAddress, setSelectedAddress] = useState<Partial<AddressFormData> | null>(null);
+  const [showPermissionDeniedDialog, setShowPermissionDeniedDialog] = useState(false);
+  const [hasManuallySelected, setHasManuallySelected] = useState(false);
+  const [radiusKm, setRadiusKm] = useState<number>(Math.min(initialRadiusKm || 5, maxRadiusKm));
+
+  const { toast } = useToast();
+
   const loadGoogleMapsScript = useCallback(() => {
     if (window.google && window.google.maps && window.google.maps.places && window.google.maps.Geocoder) {
       setIsScriptLoaded(true);
@@ -109,25 +76,22 @@ export default function ProviderMapZoneSelector({
       return;
     }
 
-    const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) ||
-      document.getElementById("fixbro-google-maps-places-script") ||
-      document.getElementById("fixbro-google-maps-script-zone");
-
-    if (existingScript) {
-      const handleLoaded = () => {
+    if (document.getElementById(GOOGLE_MAPS_SCRIPT_ID)) {
+      if (!(window as any)[GOOGLE_MAPS_CALLBACK_NAME]) {
+        (window as any)[GOOGLE_MAPS_CALLBACK_NAME] = () => {
+          setIsScriptLoaded(true);
+          setIsLoading(false);
+        };
+      }
+      if (window.google && window.google.maps && window.google.maps.places && window.google.maps.Geocoder) {
         setIsScriptLoaded(true);
         setIsLoading(false);
-      };
-      if (window.google && window.google.maps) {
-        handleLoaded();
-      } else {
-        existingScript.addEventListener('load', handleLoaded);
-        return () => existingScript.removeEventListener('load', handleLoaded);
       }
       return;
     }
 
     setIsLoading(true);
+
     (window as any)[GOOGLE_MAPS_CALLBACK_NAME] = () => {
       setIsScriptLoaded(true);
       setIsLoading(false);
@@ -141,7 +105,11 @@ export default function ProviderMapZoneSelector({
     script.onerror = () => {
       console.error("ProviderMapZoneSelector: Google Maps script failed to load.");
       setIsLoading(false);
+      const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
+      if (existingScript) existingScript.remove();
+      if ((window as any)[GOOGLE_MAPS_CALLBACK_NAME]) delete (window as any)[GOOGLE_MAPS_CALLBACK_NAME];
     };
+
     document.head.appendChild(script);
   }, [apiKey]);
 
@@ -149,238 +117,170 @@ export default function ProviderMapZoneSelector({
     if (apiKey) {
       loadGoogleMapsScript();
     } else {
+      console.warn("ProviderMapZoneSelector: Google Maps API Key is missing.");
       setIsLoading(false);
     }
-  }, [apiKey, loadGoogleMapsScript]);
-
-  // 3. Reverse geocode position to readable address text
-  const geocodePosition = useCallback((latLng: google.maps.LatLng | google.maps.LatLngLiteral) => {
-    if (!window.google?.maps?.Geocoder) return;
-    if (!geocoderRef.current) {
-      geocoderRef.current = new window.google.maps.Geocoder();
-    }
-    setIsGeocoding(true);
-    geocoderRef.current.geocode({ location: latLng }, (results, status) => {
-      setIsGeocoding(false);
-      if (status === 'OK' && results && results[0]) {
-        const formatted = results[0].formatted_address;
-        setAddressText(formatted);
-        if (autocompleteInputRef.current) {
-          autocompleteInputRef.current.value = formatted;
-        }
-      }
-    });
-  }, []);
-
-  // 4. Update the center marker and radius circle on the map
-  const updateMarkerAndCircle = useCallback((pos: { lat: number; lng: number }, radius: number) => {
-    if (!mapInstanceRef.current || !window.google?.maps) return;
-    const map = mapInstanceRef.current;
-
-    // Center marker
-    if (!markerRef.current) {
-      markerRef.current = new window.google.maps.Marker({
-        position: pos,
-        map: map,
-        draggable: true,
-        animation: window.google.maps.Animation.DROP,
-        title: "Your Work Center",
-      });
-
-      markerRef.current.addListener('dragend', () => {
-        const newPos = markerRef.current?.getPosition();
-        if (newPos) {
-          const coords = { lat: newPos.lat(), lng: newPos.lng() };
-          setCurrentCenter(coords);
-          setHasSelected(true);
-          setSelectedZoneId("custom");
-          geocodePosition(coords);
-        }
-      });
-    } else {
-      markerRef.current.setPosition(pos);
-    }
-
-    // Provider's work coverage circle
-    if (!circleRef.current) {
-      circleRef.current = new window.google.maps.Circle({
-        strokeColor: "#45A0A2",
-        strokeOpacity: 0.9,
-        strokeWeight: 2.5,
-        fillColor: "#45A0A2",
-        fillOpacity: 0.22,
-        map: map,
-        center: pos,
-        radius: radius * 1000,
-      });
-    } else {
-      circleRef.current.setCenter(pos);
-      circleRef.current.setRadius(radius * 1000);
-    }
-  }, [geocodePosition]);
-
-  // 5. Draw existing Fixbro service zones for context
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.google?.maps || serviceZones.length === 0) return;
-
-    zoneCirclesRef.current.forEach(c => c.setMap(null));
-    zoneCirclesRef.current = [];
-
-    serviceZones.forEach(zone => {
-      if (zone.center?.latitude && zone.center?.longitude) {
-        const zoneCircle = new window.google.maps.Circle({
-          strokeColor: "#2563eb",
-          strokeOpacity: 0.45,
-          strokeWeight: 1.5,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.07,
-          map: mapInstanceRef.current,
-          center: { lat: zone.center.latitude, lng: zone.center.longitude },
-          radius: (zone.radiusKm || 5) * 1000,
-        });
-        zoneCirclesRef.current.push(zoneCircle);
-      }
-    });
 
     return () => {
-      zoneCirclesRef.current.forEach(c => c.setMap(null));
-      zoneCirclesRef.current = [];
-    };
-  }, [serviceZones, isScriptLoaded]);
-
-  // 6. Handle GPS "Locate Me"
-  const handleLocateMe = useCallback(() => {
-    if (!navigator.geolocation || !mapInstanceRef.current) {
-      toast({
-        title: "Geolocation Unavailable",
-        description: "Your browser does not support GPS or permissions are denied.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
-        setCurrentCenter(coords);
-        setHasSelected(true);
-        setSelectedZoneId("custom");
-        mapInstanceRef.current?.setCenter(coords);
-        mapInstanceRef.current?.setZoom(DETAILED_ZOOM);
-        updateMarkerAndCircle(coords, radiusKm);
-        geocodePosition(coords);
-        setIsLocating(false);
-      },
-      () => {
-        setIsLocating(false);
-        toast({
-          title: "Location Access Denied",
-          description: "Please enable GPS/location permissions or search your area in the search bar.",
-          variant: "destructive"
-        });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }, [radiusKm, updateMarkerAndCircle, geocodePosition, toast]);
-
-  // 7. Initialize Map
-  useEffect(() => {
-    if (!isScriptLoaded || !mapRef.current || mapInstanceRef.current) return;
-
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: currentCenter,
-      zoom: hasSelected ? DETAILED_ZOOM : DEFAULT_ZOOM,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      zoomControlOptions: {
-        position: window.google.maps.ControlPosition.RIGHT_CENTER,
-      },
-    });
-    mapInstanceRef.current = map;
-
-    // Click map to set center
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        const coords = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-        setCurrentCenter(coords);
-        setHasSelected(true);
-        setSelectedZoneId("custom");
-        updateMarkerAndCircle(coords, radiusKm);
-        geocodePosition(coords);
+      if (placeChangedListenerRef.current && autocompleteInstanceRef.current) {
+        window.google?.maps?.event?.removeListener(placeChangedListenerRef.current);
       }
-    });
+      if (mapClickListenerRef.current && mapInstanceRef.current) {
+        window.google?.maps?.event?.removeListener(mapClickListenerRef.current);
+      }
+      if (markerDragEndListenerRef.current && markerRef.current) {
+        window.google?.maps?.event?.removeListener(markerDragEndListenerRef.current);
+      }
+    };
+  }, [apiKey, loadGoogleMapsScript]);
 
-    // Places autocomplete
-    if (autocompleteInputRef.current) {
-      const autocomplete = new window.google.maps.places.Autocomplete(autocompleteInputRef.current, {
-        componentRestrictions: { country: 'in' },
-        fields: ["geometry", "name", "formatted_address"]
+  const processAddressResult = useCallback(
+    (result: google.maps.places.PlaceResult | google.maps.GeocoderResult, latLng?: google.maps.LatLng | null, updateInput = true) => {
+      setHasManuallySelected(true);
+      const addressComponents = result.address_components;
+      if (!addressComponents) {
+        console.warn("ProviderMapZoneSelector: No address components found for result.");
+        return;
+      }
+
+      let streetNumber = "";
+      let route = "";
+      let sublocalityLevel1 = "";
+      let sublocalityLevel2 = "";
+      let locality = "";
+      let administrativeAreaLevel1 = "";
+      let postalCode = "";
+      let premise = "";
+
+      for (const component of addressComponents) {
+        const types = component.types;
+        if (types.includes("premise")) premise = component.long_name;
+        if (types.includes("street_number")) streetNumber = component.long_name;
+        if (types.includes("route")) route = component.long_name;
+        if (types.includes("sublocality_level_2")) sublocalityLevel2 = component.long_name;
+        if (types.includes("sublocality_level_1")) sublocalityLevel1 = component.long_name;
+        if (types.includes("locality")) locality = component.long_name;
+        if (types.includes("administrative_area_level_1")) administrativeAreaLevel1 = component.long_name;
+        if (types.includes("postal_code")) postalCode = component.long_name;
+      }
+
+      let determinedAddressLine1 = "";
+      const streetLevelInfo = [streetNumber, route].filter(Boolean).join(" ");
+      const placeName = 'name' in result && result.name && result.name !== locality && result.name !== administrativeAreaLevel1 ? result.name : null;
+
+      if (premise) {
+        determinedAddressLine1 = [premise, streetLevelInfo].filter(Boolean).join(", ");
+      } else if (placeName && streetLevelInfo && placeName !== streetLevelInfo) {
+        determinedAddressLine1 = [placeName, streetLevelInfo].filter(Boolean).join(", ");
+      } else if (placeName && !streetLevelInfo) {
+        determinedAddressLine1 = placeName;
+      } else if (streetLevelInfo) {
+        determinedAddressLine1 = streetLevelInfo;
+      }
+
+      if (!determinedAddressLine1 && sublocalityLevel2) {
+        determinedAddressLine1 = sublocalityLevel2;
+      } else if (!determinedAddressLine1 && sublocalityLevel1) {
+        determinedAddressLine1 = sublocalityLevel1;
+      }
+
+      let determinedAddressLine2 = "";
+      if (sublocalityLevel1 && determinedAddressLine1 && !determinedAddressLine1.includes(sublocalityLevel1)) {
+        determinedAddressLine2 = sublocalityLevel1;
+      } else if (sublocalityLevel2 && determinedAddressLine1 && !determinedAddressLine1.includes(sublocalityLevel2) && sublocalityLevel1 === determinedAddressLine1) {
+        determinedAddressLine2 = sublocalityLevel2;
+      } else if (placeName && determinedAddressLine1 === placeName) {
+        if (sublocalityLevel2) determinedAddressLine2 = sublocalityLevel2;
+        else if (sublocalityLevel1) determinedAddressLine2 = sublocalityLevel1;
+      }
+
+      if (result.formatted_address && !determinedAddressLine1) {
+        const parts = result.formatted_address.split(',');
+        determinedAddressLine1 = parts[0]?.trim();
+        if (parts.length > 1 && !determinedAddressLine2 && parts[1]?.trim() !== locality) {
+          determinedAddressLine2 = parts[1]?.trim();
+        }
+      }
+
+      const currentLatLng = latLng || result.geometry?.location;
+      const finalAddress = {
+        addressLine1: determinedAddressLine1 || "",
+        addressLine2: determinedAddressLine2 || "",
+        city: locality,
+        state: administrativeAreaLevel1,
+        pincode: postalCode,
+        latitude: currentLatLng?.lat() || null,
+        longitude: currentLatLng?.lng() || null,
+      };
+      setSelectedAddress(finalAddress);
+
+      if (updateInput && autocompleteInputRef.current && result.formatted_address) {
+        autocompleteInputRef.current.value = result.formatted_address;
+      }
+    },
+    []
+  );
+
+  const geocodePosition = useCallback((position: google.maps.LatLng | google.maps.LatLngLiteral, updateInput = true) => {
+    if (geocoderRef.current) {
+      geocoderRef.current.geocode({ location: position }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          processAddressResult(results[0], position instanceof window.google.maps.LatLng ? position : new window.google.maps.LatLng(position), updateInput);
+        } else {
+          console.warn('ProviderMapZoneSelector: Geocode was not successful: ' + status);
+        }
       });
-      autocompleteInstanceRef.current = autocomplete;
+    }
+  }, [processAddressResult]);
 
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-          const loc = place.geometry.location;
-          const coords = { lat: loc.lat(), lng: loc.lng() };
-          setCurrentCenter(coords);
-          setHasSelected(true);
-          setSelectedZoneId("custom");
-          map.setCenter(coords);
-          map.setZoom(DETAILED_ZOOM);
-          updateMarkerAndCircle(coords, radiusKm);
-          if (place.formatted_address) {
-            setAddressText(place.formatted_address);
-          } else {
-            geocodePosition(coords);
+  const updateMarker = useCallback((position: google.maps.LatLng | google.maps.LatLngLiteral, map: google.maps.Map, shouldGeocode = false, updateInput = true) => {
+    if (!window.google || !window.google.maps) return;
+
+    if (markerRef.current) {
+      markerRef.current.setPosition(position);
+    } else {
+      markerRef.current = new window.google.maps.Marker({
+        position: position,
+        map: map,
+        draggable: true,
+      });
+
+      if (markerDragEndListenerRef.current) {
+        window.google.maps.event.removeListener(markerDragEndListenerRef.current);
+      }
+      markerDragEndListenerRef.current = markerRef.current.addListener('dragend', () => {
+        if (markerRef.current) {
+          const newPosition = markerRef.current.getPosition();
+          if (newPosition) {
+            updateMarker(newPosition, map, true, true);
           }
         }
       });
     }
 
-    // Place initial marker and circle
-    updateMarkerAndCircle(currentCenter, radiusKm);
-    if (!addressText && hasSelected) {
-      geocodePosition(currentCenter);
+    // Work Coverage Radius Circle
+    if (!circleRef.current) {
+      circleRef.current = new window.google.maps.Circle({
+        strokeColor: "#45A0A2",
+        strokeOpacity: 0.85,
+        strokeWeight: 2,
+        fillColor: "#45A0A2",
+        fillOpacity: 0.20,
+        map: map,
+        center: position,
+        radius: radiusKm * 1000,
+      });
+    } else {
+      circleRef.current.setCenter(position);
+      circleRef.current.setRadius(radiusKm * 1000);
     }
-  }, [isScriptLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 8. Keep marker & circle synced with state updates
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      updateMarkerAndCircle(currentCenter, radiusKm);
+    if (shouldGeocode) {
+      geocodePosition(position, updateInput);
     }
-  }, [currentCenter, radiusKm, updateMarkerAndCircle]);
+  }, [geocodePosition, radiusKm]);
 
-  // 9. Zone Selection dropdown change
-  const handleZoneSelect = (zoneId: string) => {
-    setSelectedZoneId(zoneId);
-    if (zoneId === "custom") return;
-
-    const zone = serviceZones.find(z => z.id === zoneId);
-    if (zone && zone.center?.latitude && zone.center?.longitude) {
-      const coords = { lat: zone.center.latitude, lng: zone.center.longitude };
-      const newRadius = Math.min(zone.radiusKm || 5, maxRadiusKm);
-      setCurrentCenter(coords);
-      setRadiusKm(newRadius);
-      setHasSelected(true);
-      const zoneName = `${zone.name} (Service Zone)`;
-      setAddressText(zoneName);
-      if (autocompleteInputRef.current) {
-        autocompleteInputRef.current.value = zoneName;
-      }
-
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.setCenter(coords);
-        mapInstanceRef.current.setZoom(13);
-      }
-      updateMarkerAndCircle(coords, newRadius);
-    }
-  };
-
-  // 10. Radius change handler
+  // Dynamic radius update for circle
   const handleRadiusChange = (newRadius: number) => {
     const clamped = Math.max(1, Math.min(newRadius, maxRadiusKm));
     setRadiusKm(clamped);
@@ -389,87 +289,198 @@ export default function ProviderMapZoneSelector({
     }
   };
 
-  // 11. Confirm selection
-  const handleConfirm = () => {
-    if (!hasSelected && !currentCenter) {
+  const handleLocateMe = useCallback(() => {
+    const locateButton = document.getElementById('map-locate-me-button') as HTMLButtonElement | null;
+    if (!locateButton) return;
+
+    if (navigator.geolocation && mapInstanceRef.current) {
+      locateButton.disabled = true;
+      const currentMap = mapInstanceRef.current;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+          currentMap.setCenter(pos);
+          currentMap.setZoom(DETAILED_ZOOM);
+          updateMarker(pos, currentMap, true, true);
+          locateButton.disabled = false;
+        },
+        () => {
+          setShowPermissionDeniedDialog(true);
+          locateButton.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      alert("Geolocation is not supported or the map is not ready.");
+    }
+  }, [updateMarker]);
+
+  const initMapAndControls = useCallback(() => {
+    if (!isScriptLoaded || !mapRef.current || mapInstanceRef.current) return;
+
+    const centerPosition = initialCenter || DEFAULT_CENTER;
+    const zoomLevel = initialCenter ? DETAILED_ZOOM : DEFAULT_ZOOM;
+
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: centerPosition,
+      zoom: zoomLevel,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControlOptions: { position: window.google.maps.ControlPosition.RIGHT_BOTTOM },
+      zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_BOTTOM },
+    });
+    mapInstanceRef.current = map;
+    geocoderRef.current = new window.google.maps.Geocoder();
+
+    mapClickListenerRef.current = map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng && mapInstanceRef.current) {
+        updateMarker(e.latLng, mapInstanceRef.current, true, true);
+      }
+    });
+
+    if (autocompleteInputRef.current) {
+      const inputElement = autocompleteInputRef.current;
+      const ac = new window.google.maps.places.Autocomplete(inputElement, {
+        componentRestrictions: { country: 'in' },
+        fields: ["address_components", "geometry", "name", "formatted_address"],
+      });
+      autocompleteInstanceRef.current = ac;
+
+      placeChangedListenerRef.current = ac.addListener('place_changed', () => {
+        const place = ac.getPlace();
+        if (place.geometry && place.geometry.location && mapInstanceRef.current) {
+          mapInstanceRef.current.setCenter(place.geometry.location);
+          mapInstanceRef.current.setZoom(DETAILED_ZOOM);
+          updateMarker(place.geometry.location, mapInstanceRef.current);
+          processAddressResult(place, place.geometry.location, true);
+        } else {
+          if (autocompleteInputRef.current) autocompleteInputRef.current.value = "";
+        }
+      });
+    }
+
+    const locateMeButtonContainer = document.createElement('div');
+    locateMeButtonContainer.style.marginRight = '10px';
+    locateMeButtonContainer.style.marginBottom = '22px';
+
+    const locateMeButton = document.createElement('button');
+    locateMeButton.id = 'map-locate-me-button';
+    locateMeButton.type = 'button';
+    locateMeButton.title = "Locate Me";
+    const bodyStyles = getComputedStyle(document.body);
+    const textColorForLocate = bodyStyles.color;
+    const backgroundColorForLocate = bodyStyles.backgroundColor;
+    const borderColorForLocate = bodyStyles.borderColor || 'rgba(0,0,0,0.1)';
+
+    locateMeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${textColorForLocate}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+    Object.assign(locateMeButton.style, {
+      backgroundColor: backgroundColorForLocate,
+      border: `1px solid ${borderColorForLocate}`,
+      borderRadius: '4px',
+      boxShadow: '0 2px 6px rgba(0,0,0,.3)',
+      cursor: 'pointer',
+      padding: '8px',
+      textAlign: 'center',
+      height: '38px',
+      width: '38px',
+    });
+
+    locateMeButton.onclick = handleLocateMe;
+    locateMeButtonContainer.appendChild(locateMeButton);
+
+    map.controls[window.google.maps.ControlPosition.RIGHT_BOTTOM].push(locateMeButtonContainer);
+
+    if (initialCenter) {
+      updateMarker(centerPosition, map, true, false);
+      setHasManuallySelected(true);
+    } else {
+      updateMarker(centerPosition, map, false, false);
+    }
+  }, [isScriptLoaded, initialCenter, handleLocateMe, updateMarker, processAddressResult]);
+
+  useEffect(() => {
+    initMapAndControls();
+  }, [initMapAndControls]);
+
+  // Handle confirmation
+  const handleConfirmAndClose = () => {
+    if (!hasManuallySelected || !selectedAddress?.latitude || !selectedAddress?.longitude) {
       toast({
-        title: "Location Not Set",
-        description: "Please search an area, click on the map, or select a zone.",
-        variant: "destructive"
+        title: "Location Not Selected",
+        description: "Please search for an address or click/drag the pin on the map to set your location.",
+        variant: "destructive",
       });
       return;
     }
 
-    const finalAddress = addressText || `${currentCenter.lat.toFixed(5)}, ${currentCenter.lng.toFixed(5)}`;
+    const formattedAddress = [
+      selectedAddress.addressLine1,
+      selectedAddress.addressLine2,
+      selectedAddress.city,
+      selectedAddress.state,
+      selectedAddress.pincode
+    ].filter(Boolean).join(", ") || autocompleteInputRef.current?.value || `${selectedAddress.latitude.toFixed(5)}, ${selectedAddress.longitude.toFixed(5)}`;
+
     onConfirm({
-      center: currentCenter,
+      center: { lat: selectedAddress.latitude, lng: selectedAddress.longitude },
       radiusKm,
-      address: finalAddress,
+      address: formattedAddress,
     });
+    onClose();
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2 text-sm text-muted-foreground">Loading Map...</p>
+      </div>
+    );
+  }
+
+  if (!isScriptLoaded && !isLoading && apiKey) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-destructive text-center">Could not load Google Maps. Check API key or network. Reload to try again.</p>
+      </div>
+    );
+  }
+
+  if (!apiKey && !isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground text-center">Google Maps API key not configured. Set in admin settings.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full w-full bg-background rounded-lg overflow-hidden">
-      {/* Top Controls: Zone Quick-Select & Search Bar */}
-      <div className="p-3.5 border-b bg-card space-y-2.5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          {/* Fixbro Service Zone Quick Selector */}
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
-              <Globe2 className="h-3.5 w-3.5 text-primary" />
-              Fixbro Service Zone (Quick Select)
-            </label>
-            <Select value={selectedZoneId} onValueChange={handleZoneSelect} disabled={isLoadingZones}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder={isLoadingZones ? "Loading service zones..." : "Select a service zone..."} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="custom" className="text-xs font-medium">
-                  📍 Custom Location (Pin on map / Search)
-                </SelectItem>
-                {serviceZones.map(zone => (
-                  <SelectItem key={zone.id} value={zone.id} className="text-xs">
-                    {zone.name} ({zone.radiusKm} km radius)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <>
+      <div className="w-full h-full flex flex-col">
+        {/* Top Search bar & Radius Control */}
+        <div className="p-2 sm:p-4 border-b bg-background z-10 space-y-2.5">
+          <div className="relative">
+            <Input
+              id="address-search-input"
+              ref={autocompleteInputRef}
+              type="text"
+              placeholder="Search for building, area, street, or address..."
+              className="shadow-md h-9 pr-10 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+            />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
           </div>
 
-          {/* Autocomplete Places Search */}
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
-              <Search className="h-3.5 w-3.5 text-primary" />
-              Or Search Any Address / Area
-            </label>
-            <div className="relative">
-              <Input
-                ref={autocompleteInputRef}
-                placeholder="Search area, landmark, or street..."
-                className="h-9 text-xs pr-8"
-                defaultValue={addressText}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.preventDefault();
-                }}
-              />
-              {isGeocoding && (
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Radius Adjuster Controls */}
-        <div className="bg-muted/40 rounded-md p-2.5 border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-grow max-w-sm">
-            <Sliders className="h-4 w-4 text-primary shrink-0" />
-            <div className="flex-grow space-y-1">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-foreground">Service Radius:</span>
-                <span className="font-bold text-primary">{radiusKm} km</span>
-              </div>
+          {/* Service Radius Slider & Presets */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t text-xs">
+            <div className="flex items-center gap-2 flex-grow max-w-sm">
+              <Sliders className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="font-medium text-muted-foreground whitespace-nowrap">Service Radius:</span>
               <Slider
                 value={[radiusKm]}
                 min={1}
@@ -478,82 +489,54 @@ export default function ProviderMapZoneSelector({
                 onValueChange={(val) => handleRadiusChange(val[0])}
                 className="cursor-pointer"
               />
+              <span className="font-bold text-primary whitespace-nowrap min-w-[45px] text-right">{radiusKm} km</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-muted-foreground mr-0.5">Presets:</span>
+              {PRESET_RADII.filter(r => r <= maxRadiusKm).map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => handleRadiusChange(r)}
+                  className={`px-2 py-0.5 rounded text-xs border transition-colors ${
+                    radiusKm === r
+                      ? 'bg-primary text-primary-foreground border-primary font-semibold shadow-sm'
+                      : 'bg-muted/50 hover:bg-muted border-border text-foreground'
+                  }`}
+                >
+                  {r}km
+                </button>
+              ))}
             </div>
           </div>
-
-          {/* Quick preset buttons */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] text-muted-foreground mr-1">Presets:</span>
-            {PRESET_RADII.filter(r => r <= maxRadiusKm).map(r => (
-              <Button
-                key={r}
-                type="button"
-                variant={radiusKm === r ? "default" : "outline"}
-                size="sm"
-                className={`h-7 px-2.5 text-xs font-medium ${radiusKm === r ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => handleRadiusChange(r)}
-              >
-                {r} km
-              </Button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Map Display */}
-      <div className="relative flex-grow w-full min-h-[350px]">
-        {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/60 z-20 gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-xs text-muted-foreground font-medium">Loading Map...</p>
-          </div>
-        )}
-        <div ref={mapRef} className="w-full h-full" />
-
-        {/* Floating GPS Locate Me Button */}
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon"
-          title="Locate my current position"
-          onClick={handleLocateMe}
-          disabled={isLocating}
-          className="absolute bottom-4 right-4 z-10 h-10 w-10 rounded-full shadow-lg bg-background hover:bg-muted border border-border"
-        >
-          {isLocating ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <LocateFixed className="h-4 w-4 text-primary" />}
-        </Button>
-
-        {/* Map Legend / Tip */}
-        <div className="absolute top-3 left-3 z-10 bg-background/90 backdrop-blur-sm border shadow-md rounded-md px-2.5 py-1.5 text-[11px] text-muted-foreground flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#45A0A2] border border-white shadow-sm shrink-0" />
-          <span>Click anywhere or drag the pin to position your center point</span>
-        </div>
-      </div>
-
-      {/* Footer Info & Confirmation */}
-      <div className="p-3.5 border-t bg-card flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-start gap-2 w-full sm:w-auto overflow-hidden">
-          <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-          <div className="text-xs truncate max-w-md">
-            <p className="font-semibold text-foreground truncate">
-              {addressText || "Selected Location on Map"}
-            </p>
-            <p className="text-muted-foreground text-[11px]">
-              Coverage: <span className="font-medium text-primary">{radiusKm} km</span> radius around ({currentCenter.lat.toFixed(4)}, {currentCenter.lng.toFixed(4)})
-            </p>
-          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} className="h-9 px-4 text-xs">
-            Cancel
-          </Button>
-          <Button type="button" size="sm" onClick={handleConfirm} className="h-9 px-5 text-xs font-semibold gap-1.5">
-            <Check className="h-3.5 w-3.5" />
-            Use Selected Location & Radius
+        {/* Map Canvas */}
+        <div className="relative w-full flex-grow" style={{ minHeight: '300px' }}>
+          <div ref={mapRef} className="w-full h-full rounded-md" />
+        </div>
+
+        {/* Footer Actions matching MapAddressSelector */}
+        <div className="p-4 border-t bg-background mt-auto flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleConfirmAndClose} className="w-full sm:flex-grow">
+            Use Selected Address & Close
           </Button>
         </div>
       </div>
-    </div>
+
+      <AlertDialog open={showPermissionDeniedDialog} onOpenChange={setShowPermissionDeniedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader className="text-center">
+            <AlertDialogTitle className="text-2xl">Location Access Denied</AlertDialogTitle>
+            <AlertDialogDescription className="text-red-600 font-semibold text-lg py-4">
+              Please search for your address manually in the search bar or click/drag the pin on the map to set your location.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogAction onClick={() => { setShowPermissionDeniedDialog(false); }}>Got it</AlertDialogAction>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
-}
+};
+
+export default ProviderMapZoneSelector;
