@@ -182,6 +182,7 @@ export interface AppliedPlatformFeeItem {
   calculatedFeeAmount: number; // Base amount of the fee calculated
   taxRatePercentOnFee: number; // Tax rate APPLIED TO THIS FEE's value (e.g., 18 for 18% tax on the fee amount). 0 if no tax.
   taxAmountOnFee: number; // Tax calculated on this fee
+  amount?: number; // Total fee including tax (calculatedFeeAmount + taxAmountOnFee)
 }
 
 export interface FirestoreBooking {
@@ -912,6 +913,7 @@ export interface MarketingSettings {
   whatsAppPhoneNumberId?: string;
   whatsAppBusinessAccountId?: string;
   whatsAppVerifyToken?: string;
+  whatsAppAppSecret?: string;
   updatedAt?: Timestamp;
 }
 

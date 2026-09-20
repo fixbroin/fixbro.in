@@ -542,10 +542,12 @@ export default function PaymentPage() {
       };
     }).filter(Boolean);
 
+    const effectiveUserId = currentUser?.uid || auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null);
+
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: 0,
-      ...(currentUser?.uid && { userId: currentUser.uid }),
+      ...(effectiveUserId && { userId: effectiveUserId }),
       customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
       ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
       scheduledDate: localStorage.getItem('fixbroScheduledDate') || "",
@@ -679,6 +681,9 @@ export default function PaymentPage() {
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
+          if (pendingBookingDocId) {
+            localStorage.setItem('pendingBookingDocId', pendingBookingDocId);
+          }
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
@@ -812,6 +817,7 @@ export default function PaymentPage() {
 
       localStorage.setItem('fixbroPaymentMethod', 'Online');
       localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
+      localStorage.setItem('pendingBookingDocId', docRef.id);
       if (appliedPromoCode) {
         localStorage.setItem('fixbroBookingDiscountCode', appliedPromoCode.code);
         localStorage.setItem('fixbroBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
