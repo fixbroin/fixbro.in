@@ -9,7 +9,7 @@ import { getTimestampMillis } from '@/lib/utils';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
+import { doc, getDoc, getDocs, updateDoc, setDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
 
 export interface WalletProviderSettings {
   minDepositAmount: number;
@@ -362,7 +362,7 @@ export async function updateBookingStatusByProviderAction(
 ) {
   try {
     const bookingDocRef = doc(db, 'bookings', bookingId);
-    const providerUserRef = doc(db, 'users', providerId);
+    let providerUserRef = doc(db, 'users', providerId);
 
     const bookingSnap = await getDoc(bookingDocRef);
     if (!bookingSnap.exists()) {
@@ -370,11 +370,60 @@ export async function updateBookingStatusByProviderAction(
     }
     const bookingData = bookingSnap.data() as any;
 
-    const providerSnap = await getDoc(providerUserRef);
-    if (!providerSnap.exists()) {
-      throw new Error("Provider user document not found.");
+    let providerSnap = await getDoc(providerUserRef);
+    let providerData: any = providerSnap.exists() ? providerSnap.data() || {} : null;
+    let matchedAppId: string | null = null;
+
+    // Self-healing: If provider user document does not exist in `users`, resolve from `providerApplications`
+    if (!providerData) {
+      let appSnap = await getDoc(doc(db, 'providerApplications', providerId));
+      if (!appSnap.exists()) {
+        const appQuery = query(collection(db, 'providerApplications'), where('userId', '==', providerId), limit(1));
+        const appDocs = await getDocs(appQuery);
+        if (!appDocs.empty) {
+          appSnap = appDocs.docs[0];
+        }
+      }
+      if (!appSnap.exists() && bookingData.providerId) {
+        const bAppSnap = await getDoc(doc(db, 'providerApplications', bookingData.providerId));
+        if (bAppSnap.exists()) {
+          appSnap = bAppSnap;
+        }
+      }
+
+      if (appSnap.exists()) {
+        matchedAppId = appSnap.id;
+        const appData = appSnap.data() || {};
+        const targetUserId = appData.userId || providerId;
+        providerUserRef = doc(db, 'users', targetUserId);
+        const existingUserSnap = await getDoc(providerUserRef);
+        if (existingUserSnap.exists()) {
+          providerData = existingUserSnap.data() || {};
+        } else {
+          providerData = {
+            id: targetUserId,
+            displayName: appData.fullName || 'Provider',
+            email: appData.email || '',
+            mobileNumber: appData.mobileNumber || '',
+            role: 'provider',
+            providerWalletBalance: appData.providerWalletBalance || 0,
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          };
+          await setDoc(providerUserRef, providerData, { merge: true });
+        }
+      } else {
+        // Fallback: create minimal provider user record so provider operations do not crash
+        providerData = {
+          id: providerId,
+          role: 'provider',
+          providerWalletBalance: 0,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        };
+        await setDoc(providerUserRef, providerData, { merge: true });
+      }
     }
-    const providerData = providerSnap.data() || {};
 
     const currentStatus = bookingData.status;
     const updateData: any = { 
@@ -408,10 +457,20 @@ export async function updateBookingStatusByProviderAction(
         const totalDeduction = commission + platformFeeVal + taxFeeVal;
 
         if (totalDeduction > 0) {
-          // Deduct from wallet in MySQL
+          const newBalance = currentWalletBalance - totalDeduction;
+          // Deduct from wallet in MySQL users
           await updateDoc(providerUserRef, { 
-            providerWalletBalance: currentWalletBalance - totalDeduction 
+            providerWalletBalance: newBalance 
           });
+
+          // Sync with providerApplications if matched
+          if (matchedAppId) {
+            try {
+              await updateDoc(doc(db, 'providerApplications', matchedAppId), {
+                providerWalletBalance: newBalance
+              });
+            } catch (_) {}
+          }
 
           // Write deduction ledger log in MySQL
           await addDoc(collection(db, 'providerWalletTransactions'), {
@@ -448,9 +507,18 @@ export async function updateBookingStatusByProviderAction(
 
         if (extraCommission > 0) {
           const currentWalletBalance = providerData.providerWalletBalance || 0;
+          const newBalance = currentWalletBalance - extraCommission;
           await updateDoc(providerUserRef, { 
-            providerWalletBalance: currentWalletBalance - extraCommission 
+            providerWalletBalance: newBalance 
           });
+
+          if (matchedAppId) {
+            try {
+              await updateDoc(doc(db, 'providerApplications', matchedAppId), {
+                providerWalletBalance: newBalance
+              });
+            } catch (_) {}
+          }
 
           await addDoc(collection(db, 'providerWalletTransactions'), {
             providerId,

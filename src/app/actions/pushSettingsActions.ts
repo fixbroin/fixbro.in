@@ -418,11 +418,33 @@ export async function sendBulkPushNotificationAction(params: {
 
     // 5. Cleanup dead tokens
     if (deadTokensToDelete.length > 0) {
-      await Promise.all(deadTokensToDelete.map(item => 
-        adminDb.collection('users').doc(item.uid).update({
-          [`fcmTokens.${item.token}`]: admin.firestore.FieldValue.delete()
-        }).catch(err => console.error("Failed to delete dead token:", err))
-      ));
+      // Group dead tokens by user ID
+      const tokensByUser: Record<string, string[]> = {};
+      for (const item of deadTokensToDelete) {
+        if (!tokensByUser[item.uid]) tokensByUser[item.uid] = [];
+        tokensByUser[item.uid].push(item.token);
+      }
+
+      await Promise.all(Object.entries(tokensByUser).map(async ([uid, deadList]) => {
+        try {
+          const uDoc = await adminDb.collection('users').doc(uid).get();
+          if (uDoc.exists) {
+            const currentTokens = { ...(uDoc.data()?.fcmTokens || {}) };
+            let changed = false;
+            for (const t of deadList) {
+              if (t in currentTokens) {
+                delete currentTokens[t];
+                changed = true;
+              }
+            }
+            if (changed) {
+              await adminDb.collection('users').doc(uid).update({ fcmTokens: currentTokens });
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to prune dead tokens for user ${uid}:`, err);
+        }
+      }));
     }
 
     return { 

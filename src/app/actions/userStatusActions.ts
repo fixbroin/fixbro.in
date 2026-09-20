@@ -92,12 +92,13 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
             }
           };
 
+          const deadTokens: string[] = [];
+
           const sendPromises = tokens.map(token => 
             messaging.send({
               ...messagePayload,
               token,
             }).catch(async (err: any) => {
-              console.error(`Failed to send account disabled push to token ${token}:`, err);
               const isDeadToken = 
                   err.code === 'messaging/registration-token-not-registered' || 
                   err.code === 'messaging/invalid-argument' ||
@@ -107,19 +108,37 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
                   err.errorInfo?.code === 'messaging/registration-token-not-registered';
 
               if (isDeadToken) {
-                  try {
-                      await userDocRef.update({
-                          [`fcmTokens.${token}`]: admin.firestore.FieldValue.delete()
-                      });
-                  } catch (deleteErr) {
-                      console.error(`Failed to delete dead FCM token ${token}:`, deleteErr);
-                  }
+                  deadTokens.push(token);
+              } else {
+                  console.error(`Failed to send account disabled push to token ${token}:`, err);
               }
               return null;
             })
           );
 
           await Promise.all(sendPromises);
+
+          if (deadTokens.length > 0) {
+            try {
+              const freshDoc = await userDocRef.get();
+              if (freshDoc.exists) {
+                const freshData = freshDoc.data() || {};
+                const currentTokens = { ...(freshData.fcmTokens || {}) };
+                let changed = false;
+                for (const dt of deadTokens) {
+                  if (dt in currentTokens) {
+                    delete currentTokens[dt];
+                    changed = true;
+                  }
+                }
+                if (changed) {
+                  await userDocRef.update({ fcmTokens: currentTokens });
+                }
+              }
+            } catch (deleteErr) {
+              console.error(`Failed to delete dead FCM tokens for user ${userId}:`, deleteErr);
+            }
+          }
         } catch (pushError) {
           console.error("Firebase admin messaging error:", pushError);
         }
