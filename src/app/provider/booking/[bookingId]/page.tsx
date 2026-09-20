@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,6 @@ export default function ProviderBookingDetailsPage() {
   const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
   const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
-  const attemptedAutoAcceptRef = useRef<Set<string>>(new Set());
 
   const providerFeeType = appConfig?.providerFeeType || 'percentage';
   const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
@@ -187,31 +186,27 @@ export default function ProviderBookingDetailsPage() {
     });
   }, [providerUser, authIsLoading]);
 
-  // Auto-Accept or Redirect based on balance when booking loads (Guarded against infinite retry loops)
+  // Auto-Accept or Redirect based on balance when booking loads
   useEffect(() => {
-    if (!booking || !booking.id || isLoadingBooking || isProcessingAction) return;
+    if (!booking || isLoadingBooking || isProcessingAction) return;
     if (!isWalletLoaded || providerWalletBalance === null || minBalanceForJobs === null) return;
 
     const isAssigned = booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled';
-    if (!isAssigned) return;
+    if (isAssigned) {
+      const requiredAmount = Math.max(minBalanceForJobs, requiredCommission);
 
-    // Guard: Prevent repetitive execution loop if already attempted for this booking
-    if (attemptedAutoAcceptRef.current.has(booking.id)) return;
-    attemptedAutoAcceptRef.current.add(booking.id);
-
-    const requiredAmount = Math.max(minBalanceForJobs, requiredCommission);
-
-    if (providerWalletBalance < requiredAmount) {
-      // Redirect provider back to dashboard with error toast
-      toast({
-        title: "Prepaid Balance Low",
-        description: `You need a minimum balance of ${symbol}${requiredAmount.toFixed(decimals)} to accept/view this job.`,
-        variant: "destructive"
-      });
-      router.replace('/provider');
-    } else {
-      // Auto-accept immediately and deduct commission
-      updateBookingStatus('ProviderAccepted');
+      if (providerWalletBalance < requiredAmount) {
+        // Redirect provider back to dashboard with error toast
+        toast({
+          title: "Prepaid Balance Low",
+          description: `You need a minimum balance of ${symbol}${requiredAmount.toFixed(decimals)} to accept/view this job.`,
+          variant: "destructive"
+        });
+        router.replace('/provider');
+      } else {
+        // Auto-accept immediately and deduct commission
+        updateBookingStatus('ProviderAccepted');
+      }
     }
   }, [booking, isLoadingBooking, isWalletLoaded, providerWalletBalance, minBalanceForJobs, requiredCommission, decimals, symbol, router, toast]);
 

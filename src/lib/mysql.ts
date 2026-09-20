@@ -811,7 +811,7 @@ function resolveFieldValues(target: any, source: any): any {
       return arr.filter(item => !elementsToRemove.includes(JSON.stringify(item)));
     }
 
-    if (source.type === 'deleteField' || source._methodName === 'FieldValue.delete' || (source.constructor && source.constructor.name === 'DeleteTransform')) {
+    if (source.type === 'deleteField') {
       return undefined;
     }
 
