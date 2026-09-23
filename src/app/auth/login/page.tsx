@@ -18,7 +18,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { auth } from '@/lib/firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, GoogleAuthProvider, signInWithCredential, type ConfirmationResult } from 'firebase/auth';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
@@ -109,6 +109,66 @@ export default function LoginPage() {
       router.push(finalRedirectPath);
     }
   }, [user, authContextIsLoading, router, searchParams]);
+
+  const isSigningInWithNativeRef = useRef(false);
+
+  useEffect(() => {
+    const handleNativeGoogleSuccess = async (e: any) => {
+      if (isSigningInWithNativeRef.current) {
+        console.warn("Native Google sign-in already in progress, skipping duplicate invocation.");
+        return;
+      }
+
+      const { idToken, accessToken } = e.detail || {};
+      if (!idToken) return;
+
+      isSigningInWithNativeRef.current = true;
+      try {
+        const credential = GoogleAuthProvider.credential(idToken, accessToken || undefined);
+        const userCredential = await signInWithCredential(auth, credential);
+        await handleSuccessfulAuth(userCredential);
+      } catch (err: any) {
+        // If auth/duplicate-raw-id occurs due to concurrent request, check if already signed in
+        if (
+          err?.code === 'auth/duplicate-raw-id' ||
+          err?.message?.toLowerCase().includes('duplicate-raw-id')
+        ) {
+          console.warn("Duplicate raw ID detected; checking if user is already authenticated:", auth.currentUser?.email);
+          if (auth.currentUser) {
+            // Already signed in successfully via the parallel call
+            return;
+          }
+        }
+        console.error("Error signing in with native Google credential:", err);
+        toast({
+          title: "Google Sign-in Failed",
+          description: err.message || "Failed to authenticate with Google credentials.",
+          variant: "destructive"
+        });
+      } finally {
+        setTimeout(() => {
+          isSigningInWithNativeRef.current = false;
+        }, 1500);
+      }
+    };
+
+    const handleNativeGoogleError = (e: any) => {
+      const errorMsg = e.detail?.error || "Google Sign-in failed";
+      toast({
+        title: "Google Sign-in",
+        description: errorMsg,
+        variant: "destructive"
+      });
+    };
+
+    window.addEventListener('nativeGoogleSignIn', handleNativeGoogleSuccess);
+    window.addEventListener('nativeGoogleSignInError', handleNativeGoogleError);
+
+    return () => {
+      window.removeEventListener('nativeGoogleSignIn', handleNativeGoogleSuccess);
+      window.removeEventListener('nativeGoogleSignInError', handleNativeGoogleError);
+    };
+  }, [handleSuccessfulAuth, toast]);
 
   const onEmailSubmit = async (data: LoginFormValues) => {
     emailLoginForm.clearErrors('email');
