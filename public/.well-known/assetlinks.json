@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fix.bro.user",
+      "sha256_cert_fingerprints": [
+        "98:FF:E0:91:DD:E0:D9:28:B8:AE:24:D5:85:79:BD:C2:43:E8:09:0D:8D:04:B3:B7:3E:58:30:C5:03:F9:DF:A3",
+        "A2:22:8C:7D:B5:5D:C9:BB:D2:75:C5:71:23:2A:20:55:EF:F7:B4:BA:A3:EE:69:C6:70:03:E1:4D:42:F5:51:67"
+      ]
+    }
+  }
+]
