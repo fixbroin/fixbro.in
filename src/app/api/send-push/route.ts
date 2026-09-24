@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     const smartVariables: Record<string, string> = {
       title,
       body,
-      siteName: process.env.NEXT_PUBLIC_APP_NAME || 'Wecanfix',
+      siteName: process.env.NEXT_PUBLIC_APP_NAME || 'Fixbro',
       senderName: inferredSender || 'Support',
       customerName: inferredCustomer || 'Customer',
       name: inferredCustomer || inferredSender || 'Customer',
