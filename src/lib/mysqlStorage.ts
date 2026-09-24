@@ -79,9 +79,17 @@ export function uploadBytesResumable(refInstance: MySQLStorageRef, file: File | 
             body: formData
           });
 
-          const data = await res.json();
-          if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Upload failed');
+          let data: any = null;
+          const text = await res.text();
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = null;
+          }
+
+          if (!res.ok || !data?.success) {
+            const errorMsg = data?.error || (res.status === 413 ? "File size exceeds server limit (Max 5MB)." : `Upload failed (Status ${res.status}: ${res.statusText || 'Error'})`);
+            throw new Error(errorMsg);
           }
 
           // Store the resolved public URL
@@ -118,9 +126,17 @@ export async function uploadBytes(refInstance: MySQLStorageRef, file: File | Blo
     body: formData
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Upload failed');
+  let data: any = null;
+  const text = await res.text();
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = null;
+  }
+
+  if (!res.ok || !data?.success) {
+    const errorMsg = data?.error || (res.status === 413 ? "File size exceeds server limit (Max 5MB)." : `Upload failed (Status ${res.status}: ${res.statusText || 'Error'})`);
+    throw new Error(errorMsg);
   }
 
   resolvedUrls.set(refInstance.path, data.url);

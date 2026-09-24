@@ -9,8 +9,10 @@ export async function compressImage(file: File, maxMb: number = 1.5): Promise<Fi
     return file;
   }
 
-  // Only compress common image formats
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+  // Detect image via MIME type or file extension (supports Android camera 'image/jpg', blank MIME, etc.)
+  const isImageMime = file.type && (file.type.startsWith("image/") || ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type.toLowerCase()));
+  const isImageExt = /\.(jpe?g|png|webp|heic|heif|bmp)$/i.test(file.name);
+  if (!isImageMime && !isImageExt) {
     return file;
   }
 
