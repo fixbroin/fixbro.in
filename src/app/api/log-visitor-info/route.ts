@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         }
     }
     
-    const visitorLog: Omit<FirestoreVisitorInfoLog, 'id' | 'timestamp'> = {
+    const visitorLog: any = {
       ipAddress: userIp,
       city: geoData.city,
       region: geoData.region,
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
       ispOrganization: geoData.isp,
       pathname: pathname,
       userAgent: userAgent,
+      source: body.source || (userAgent.toLowerCase().includes('fixbroapp') ? 'app' : 'web'),
+      platform: body.platform || (userAgent.toLowerCase().includes('fixbroapp') ? 'App (Android)' : 'Web'),
     };
 
     await addDoc(collection(db, 'visitorInfoLogs'), {
