@@ -12,12 +12,13 @@ import type { WithdrawalRequest, WithdrawalStatus, FirestoreNotification, Firest
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Banknote, RefreshCw, Wallet, History, Settings } from "lucide-react";
+import { Users, Banknote, RefreshCw, Wallet, History, Settings, IndianRupee } from "lucide-react";
 import { cn, formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getProviderWalletDetailsAction } from '@/app/actions/providerWalletActions';
 import WalletComplaintsTab from '@/components/admin/provider-controls/WalletComplaintsTab';
 import WalletSettingsTab from '@/components/admin/provider-controls/WalletSettingsTab';
+import BookingFeesBreakdownTab from '@/components/admin/provider-controls/BookingFeesBreakdownTab';
 import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
 import {
   DropdownMenu,
@@ -457,6 +458,12 @@ export default function ProviderWithdrawalsPage() {
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
               <Wallet className="mr-2 h-4 w-4"/> Provider Wallet Details
+            </TabsTrigger>
+            <TabsTrigger 
+              value="booking_fees" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <IndianRupee className="mr-2 h-4 w-4"/> Booking Fees Breakdown
             </TabsTrigger>
             <TabsTrigger 
               value="wallet_settings" 
@@ -1069,6 +1076,10 @@ export default function ProviderWithdrawalsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="booking_fees">
+          <BookingFeesBreakdownTab />
         </TabsContent>
 
         <TabsContent value="wallet_settings">

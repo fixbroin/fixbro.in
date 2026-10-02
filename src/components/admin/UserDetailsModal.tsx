@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { FirestoreUser, Address, UserCart, FirestoreService } from '@/types/firestore';
+import type { FirestoreUser, Address, UserCart, FirestoreService, FirestoreBooking, BookingStatus } from '@/types/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { 
   UserCircle, 
   Mail, 
@@ -31,11 +32,12 @@ import {
 } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import AppImage from '@/components/ui/AppImage';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, getBookingScheduledTimestamp } from '@/lib/utils';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from '@/lib/mysqlDb';
+import { doc, getDoc, onSnapshot, collection, query, where, getDocs } from '@/lib/mysqlDb';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+
 
 interface CartItemDetail {
   serviceId: string;
@@ -77,7 +79,81 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
   const [cartUpdatedAt, setCartUpdatedAt] = useState<any>(null);
   const [isLoadingCart, setIsLoadingCart] = useState(true);
 
+  const [userBookings, setUserBookings] = useState<FirestoreBooking[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+
   const targetUid = user.uid || user.id;
+
+  useEffect(() => {
+    if (!targetUid && !user.email && !user.mobileNumber) {
+      setIsLoadingBookings(false);
+      return;
+    }
+
+    setIsLoadingBookings(true);
+    const fetchUserBookings = async () => {
+      try {
+        const bookingsRef = collection(db, 'bookings');
+        const queries = [];
+        if (targetUid) {
+          queries.push(query(bookingsRef, where('userId', '==', targetUid)));
+        }
+        if (user.mobileNumber) {
+          const rawPhone = user.mobileNumber.trim();
+          const digitsOnly = rawPhone.replace(/\D/g, '');
+          if (rawPhone) queries.push(query(bookingsRef, where('customerPhone', '==', rawPhone)));
+          if (digitsOnly && digitsOnly !== rawPhone) queries.push(query(bookingsRef, where('customerPhone', '==', digitsOnly)));
+          if (digitsOnly) queries.push(query(bookingsRef, where('customerPhone', '==', `+${digitsOnly}`)));
+          if (digitsOnly) queries.push(query(bookingsRef, where('customerPhone', '==', `91${digitsOnly.replace(/^91/, '')}`)));
+          if (digitsOnly) queries.push(query(bookingsRef, where('customerPhone', '==', `+91${digitsOnly.replace(/^91/, '')}`)));
+        }
+        if (user.email) {
+          queries.push(query(bookingsRef, where('customerEmail', '==', user.email.trim())));
+          queries.push(query(bookingsRef, where('customerEmail', '==', user.email.trim().toLowerCase())));
+        }
+
+        const snapshots = await Promise.all(queries.map(q => getDocs(q)));
+        const results: FirestoreBooking[] = [];
+        snapshots.forEach(snap => {
+          snap.docs.forEach(docSnap => {
+            results.push({ ...docSnap.data(), id: docSnap.id } as FirestoreBooking);
+          });
+        });
+
+        const uniqueBookings = Array.from(new Map(results.map(b => [b.id || b.bookingId, b])).values());
+        uniqueBookings.sort((a, b) => getBookingScheduledTimestamp(b) - getBookingScheduledTimestamp(a));
+        setUserBookings(uniqueBookings);
+      } catch (err) {
+        console.error("Error fetching user bookings for modal:", err);
+      } finally {
+        setIsLoadingBookings(false);
+      }
+    };
+    fetchUserBookings();
+  }, [targetUid, user.email, user.mobileNumber]);
+
+  const formatDateForDisplay = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+      if (dateString.includes('-')) {
+        const [y, m, d] = dateString.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        return formatDateInTimezone(dateObj, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
+      }
+      return formatDateInTimezone(dateString, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
+    } catch (e) { return dateString; }
+  };
+
+  const getStatusBadgeClass = (status: BookingStatus) => {
+    switch (status) {
+      case 'Completed': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30';
+      case 'Confirmed': case 'ProviderAccepted': case 'AssignedToProvider': case 'InProgressByProvider': return 'bg-blue-500/10 text-blue-600 border-blue-500/30';
+      case 'Pending Payment': case 'Rescheduled': return 'bg-orange-500/10 text-orange-600 border-orange-500/30';
+      case 'Processing': return 'bg-purple-500/10 text-purple-600 border-purple-500/30';
+      case 'Cancelled': case 'ProviderRejected': return 'bg-destructive/10 text-destructive border-destructive/30';
+      default: return 'bg-muted text-muted-foreground border-border';
+    }
+  };
 
   useEffect(() => {
     if (!targetUid) {
@@ -426,6 +502,111 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                   <ShoppingCart className="h-8 w-8 text-muted-foreground/40 mb-2" />
                   <p className="text-xs font-medium text-muted-foreground">User cart is currently empty</p>
                   <p className="text-[11px] text-muted-foreground/70">No services currently added in this user's cart.</p>
+                </div>
+              )}
+            </div>
+
+            <Separator className="my-4"/>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold">User Bookings</h3>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                    {userBookings.length} {userBookings.length === 1 ? 'booking' : 'bookings'}
+                  </span>
+                </div>
+                {userBookings.length > 0 && (
+                  <Link 
+                    href={`/admin/bookings?search=${encodeURIComponent(user.mobileNumber || user.email || user.displayName || '')}`}
+                    target="_blank"
+                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                  >
+                    View All in Bookings <ExternalLink className="h-3 w-3" />
+                  </Link>
+                )}
+              </div>
+
+              {isLoadingBookings ? (
+                <div className="flex items-center justify-center p-6 border rounded-xl bg-muted/20">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                  <span className="text-xs text-muted-foreground">Loading booking history...</span>
+                </div>
+              ) : userBookings.length > 0 ? (
+                <div className="space-y-3">
+                  {userBookings.map((b) => {
+                    const statusClass = getStatusBadgeClass(b.status);
+                    const formattedDate = formatDateForDisplay(b.scheduledDate);
+                    return (
+                      <div key={b.id || b.bookingId} className="p-3 sm:p-3.5 border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-colors space-y-2.5">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-sm text-foreground">
+                              #{b.bookingId}
+                            </span>
+                            {b.bookingNumber && (
+                              <span className="text-[11px] text-muted-foreground font-semibold">
+                                (No: {b.bookingNumber})
+                              </span>
+                            )}
+                            <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border", statusClass)}>
+                              {b.status.replace(/([A-Z])/g, ' $1').trim()}
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-primary">
+                              {symbol}{Number(b.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[11px] font-bold px-2 flex items-center gap-1"
+                              asChild
+                            >
+                              <Link href={`/admin/bookings?search=${encodeURIComponent(b.bookingId)}`} target="_blank">
+                                <ExternalLink className="h-3 w-3" />
+                                Details
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1 font-medium">
+                            <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{formattedDate}</span>
+                            {b.scheduledTimeSlot && <span className="font-semibold text-foreground">({b.scheduledTimeSlot})</span>}
+                          </div>
+                          {b.paymentMethod && (
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <span className="font-semibold">Payment:</span> {b.paymentMethod}
+                            </div>
+                          )}
+                        </div>
+
+                        {b.services && b.services.length > 0 && (
+                          <div className="pt-1.5 border-t border-border/40 text-xs">
+                            <p className="font-semibold text-muted-foreground text-[11px] mb-1">Services:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {b.services.map((s, idx) => (
+                                <span key={idx} className="bg-background px-2 py-0.5 rounded border text-[11px] font-medium text-foreground">
+                                  {s.name} x {s.quantity}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 px-4 border rounded-xl bg-muted/10 text-center">
+                  <CalendarDays className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                  <p className="text-xs font-medium text-muted-foreground">No booking history found</p>
+                  <p className="text-[11px] text-muted-foreground/70">This user has not placed any bookings yet.</p>
                 </div>
               )}
             </div>

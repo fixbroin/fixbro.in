@@ -890,3 +890,151 @@ export async function deleteWalletComplaintAction(complaintId: string) {
     return { success: false, message: error.message || "Failed to delete complaint." };
   }
 }
+
+// 12. Recalculate and synchronize provider stats & earnings (MySQL)
+export async function recalculateProviderStatsAction(providerId: string) {
+  try {
+    if (!providerId) {
+      return { success: false, message: "Invalid provider ID." };
+    }
+
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? (configSnap.data() as any) : {};
+
+    const providerUserRef = doc(db, 'users', providerId);
+    const providerUserSnap = await getDoc(providerUserRef);
+    if (!providerUserSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+    const firestoreUser = providerUserSnap.data() as any;
+
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("providerId", "==", providerId),
+      where("status", "==", "Completed")
+    );
+    const withdrawalsQuery = query(
+      collection(db, "withdrawalRequests"),
+      where("providerId", "==", providerId)
+    );
+
+    const [bookingsSnap, withdrawalsSnap] = await Promise.all([
+      getDocs(bookingsQuery),
+      getDocs(withdrawalsQuery)
+    ]);
+
+    let totalNetOnlineEarnings = 0;
+
+    const mStats = {
+      monthKey,
+      gross: 0,
+      commission: 0,
+      cashCollected: 0,
+      withdrawals: 0,
+      onlineNet: 0,
+      cashCommission: 0,
+      cashNet: 0,
+      onlineGross: 0,
+      onlineCommission: 0,
+      extraCharges: 0
+    };
+
+    bookingsSnap.docs.forEach(d => {
+      const b = d.data() as any;
+      const isCash = isCashPayment(b.paymentMethod);
+      const bDate = b.scheduledDate || "";
+
+      const baseGross = (b.subTotal || 0) + (b.visitingCharge || 0) - (b.discountAmount || 0);
+      const extraCharges = (b.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+      const totalBookingGross = baseGross + extraCharges;
+
+      if (isCash) {
+        const commission = calculateProviderFee(totalBookingGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+        const cashNet = totalBookingGross - commission;
+        if (bDate >= startOfMonthStr) {
+          mStats.gross += totalBookingGross;
+          mStats.commission += commission;
+          mStats.cashCollected += (b.totalAmount || totalBookingGross);
+          mStats.cashCommission += commission;
+          mStats.cashNet += cashNet;
+          if (extraCharges > 0) {
+            mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
+          }
+        }
+      } else {
+        const onlineGross = baseGross;
+        const onlineCommission = calculateProviderFee(onlineGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+        const onlineNet = onlineGross - onlineCommission;
+        
+        const extraCommission = extraCharges > 0 
+          ? (appConfig?.providerFeeType === 'percentage' 
+              ? calculateProviderFee(extraCharges, appConfig?.providerFeeType, appConfig?.providerFeeValue) 
+              : (extraCharges * (appConfig?.providerExtraFeePercentage || 0)) / 100)
+          : 0;
+
+        totalNetOnlineEarnings += onlineNet;
+
+        if (bDate >= startOfMonthStr) {
+          mStats.gross += totalBookingGross;
+          mStats.commission += (onlineCommission + extraCommission);
+          mStats.onlineGross += onlineGross;
+          mStats.onlineCommission += onlineCommission;
+          mStats.onlineNet += onlineNet;
+          if (extraCharges > 0) {
+            mStats.cashCollected += extraCharges;
+            mStats.cashCommission += extraCommission;
+            mStats.cashNet += Math.max(0, extraCharges - extraCommission);
+            mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
+          }
+        }
+      }
+    });
+
+    const withdrawalHistory = withdrawalsSnap.docs.map(d => d.data() as any);
+    const visibleCompletedPayouts = withdrawalHistory
+      .filter(req => req.status === 'completed')
+      .reduce((sum, req) => sum + req.amount, 0);
+
+    const storedTotalPaidOut = firestoreUser?.totalPaidOut || 0;
+    const finalTotalPaidOut = Math.max(storedTotalPaidOut, visibleCompletedPayouts);
+
+    const currentPendingAmount = withdrawalHistory
+      .filter(req => ['processing', 'approved', 'pending'].includes(req.status))
+      .reduce((sum, req) => sum + req.amount, 0);
+
+    const withdrawalsThisMonth = withdrawalHistory
+      .filter(req => {
+        const reqMillis = getTimestampMillis(req.requestedAt);
+        return reqMillis > 0 && reqMillis >= startOfMonth.getTime();
+      })
+      .reduce((sum, req) => sum + req.amount, 0);
+    mStats.withdrawals = withdrawalsThisMonth;
+
+    const realBalance = Math.max(0, totalNetOnlineEarnings - finalTotalPaidOut - currentPendingAmount);
+
+    await updateDoc(providerUserRef, {
+      withdrawableBalance: realBalance,
+      totalPaidOut: finalTotalPaidOut,
+      monthlyStats: mStats
+    });
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/earnings');
+
+    return { 
+      success: true, 
+      message: "Provider balance and earnings recalculated successfully.",
+      withdrawableBalance: realBalance,
+      monthlyStats: mStats
+    };
+  } catch (error: any) {
+    console.error("Error in recalculateProviderStatsAction:", error);
+    return { success: false, message: error.message || "Failed to recalculate provider stats." };
+  }
+}
+

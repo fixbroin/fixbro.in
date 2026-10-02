@@ -25,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateInvoicePdf as generateInvoicePdfForDownload } from '@/lib/invoiceGenerator'; 
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from "@/hooks/useGlobalSettings";
+import { recalculateProviderStatsAction } from '@/app/actions/providerWalletActions';
 import AssignProviderModal from '@/components/admin/AssignProviderModal'; 
 import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
@@ -426,6 +427,11 @@ export default function AdminBookingsPage() {
 
       await updateDoc(doc(db, "bookings", booking.id), updateData);
 
+      // Trigger automatic recalculation for provider stats if provider was set
+      if (booking.providerId) {
+        recalculateProviderStatsAction(booking.providerId).catch(err => console.error("Error recalculating provider stats:", err));
+      }
+
       // Manually update local state to reflect changes immediately
       setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updateData } : b));
       if (selectedBooking?.id === booking.id) {
@@ -503,6 +509,9 @@ export default function AdminBookingsPage() {
   const handleConfirmAssignment = async (bookingId: string, providerId: string, providerName: string) => {
     setIsUpdatingStatus(bookingId);
     try {
+      const targetBooking = bookings.find(b => b.id === bookingId);
+      const oldProviderId = targetBooking?.providerId;
+
       const updateData = { 
         providerId, 
         status: "AssignedToProvider" as BookingStatus, 
@@ -511,6 +520,13 @@ export default function AdminBookingsPage() {
       };
       await updateDoc(doc(db, "bookings", bookingId), updateData);
       
+      // Recalculate stats for old provider if different
+      if (oldProviderId && oldProviderId !== providerId) {
+        recalculateProviderStatsAction(oldProviderId).catch(err => console.error("Error syncing old provider stats:", err));
+      }
+      // Recalculate stats for new provider
+      recalculateProviderStatsAction(providerId).catch(err => console.error("Error syncing new provider stats:", err));
+
       // Manually update local state to reflect changes immediately
       setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, ...updateData } : b));
       if (selectedBooking?.id === bookingId) {
@@ -528,6 +544,8 @@ export default function AdminBookingsPage() {
     if (!booking.id) return;
     setIsUpdatingStatus(booking.id);
     try {
+      const oldProviderId = booking.providerId;
+
       const updateData = { 
         providerId: deleteField(), 
         status: "Confirmed" as BookingStatus, 
@@ -536,6 +554,10 @@ export default function AdminBookingsPage() {
         updatedAt: Timestamp.now() 
       };
       await updateDoc(doc(db, "bookings", booking.id), updateData);
+      
+      if (oldProviderId) {
+        recalculateProviderStatsAction(oldProviderId).catch(err => console.error("Error syncing unassigned provider stats:", err));
+      }
       
       // Notify the provider they have been unassigned
       if (booking.providerId) {
