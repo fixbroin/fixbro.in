@@ -319,7 +319,13 @@ export default function ProviderBookingDetailsPage() {
   }
 
   const isJobCompleted = booking.status === 'Completed';
-  const dayCat = getDayCategory(booking.scheduledDate);
+  const dayCat = !isJobCompleted ? getDayCategory(booking.scheduledDate) : 'later';
+
+  const dateBoxClass = 
+    dayCat === 'today' ? "border-2 border-red-500/70 bg-red-500/10 text-red-800 dark:text-red-300" :
+    dayCat === 'tomorrow' ? "border-2 border-amber-500/70 bg-amber-500/10 text-amber-900 dark:text-amber-300" :
+    dayCat === 'dayAfter' ? "border-2 border-emerald-500/70 bg-emerald-500/10 text-emerald-900 dark:text-emerald-300" :
+    "border-2 border-primary/40 bg-primary/5 text-primary";
 
 
 
@@ -387,33 +393,29 @@ export default function ProviderBookingDetailsPage() {
                 </div>
             )}
           </section>
-          <Separator />          <section>
+          <Separator />
+          <section>
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
               <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 text-primary"/>Schedule</h3>
-              {dayCat === 'today' && <Badge className="bg-red-600 text-white font-black text-xs uppercase tracking-wider animate-pulse">🚨 TODAY - URGENT</Badge>}
-              {dayCat === 'tomorrow' && <Badge className="bg-amber-600 text-white font-bold text-xs uppercase tracking-wider">⏰ TOMORROW</Badge>}
-              {dayCat === 'dayAfter' && <Badge className="bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider">📅 IN 2 DAYS</Badge>}
+              {!isJobCompleted && dayCat === 'today' && <Badge className="bg-red-600 text-white font-black text-xs uppercase tracking-wider animate-pulse">🚨 TODAY - URGENT</Badge>}
+              {!isJobCompleted && dayCat === 'tomorrow' && <Badge className="bg-amber-600 text-white font-bold text-xs uppercase tracking-wider">⏰ TOMORROW</Badge>}
+              {!isJobCompleted && dayCat === 'dayAfter' && <Badge className="bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider">📅 IN 2 DAYS</Badge>}
             </div>
 
-            <div className={cn("p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all", 
-              dayCat === 'today' ? "border-2 border-red-500/70 bg-red-500/10 text-red-800 dark:text-red-300" :
-              dayCat === 'tomorrow' ? "border-2 border-amber-500/70 bg-amber-500/10 text-amber-900 dark:text-amber-300" :
-              dayCat === 'dayAfter' ? "border-2 border-emerald-500/70 bg-emerald-500/10 text-emerald-900 dark:text-emerald-300" :
-              "border-2 border-primary/40 bg-primary/5 text-primary"
-            )}>
+            <div className={cn("p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all", dateBoxClass)}>
               <div className="flex items-center gap-2.5 font-black text-sm sm:text-base">
                 <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
                 <span>Date: {formatDateForDisplay(booking.scheduledDate)}</span>
               </div>
-              <div className="flex items-center gap-2 font-black text-sm sm:text-base bg-background/90 px-3.5 py-2 rounded-xl border shadow-xs text-foreground">
+              <div className="flex items-center gap-2 font-extrabold text-sm sm:text-base bg-background/90 px-3.5 py-2 rounded-xl border shadow-2xs text-foreground">
                 <Clock className="h-5 w-5 text-primary shrink-0" />
-                <span>Slot: {booking.scheduledTimeSlot}</span>
+                <span>Time Slot: {booking.scheduledTimeSlot}</span>
               </div>
             </div>
 
             {booking.estimatedEndTime && (
-              <p className="text-green-600 font-bold text-xs sm:text-sm mt-2.5 flex items-center gap-1.5">
-                <Clock className="h-4 w-4 shrink-0 text-green-600" />
+              <p className="text-green-600 font-bold text-sm mt-3 flex items-center gap-1.5">
+                <Clock className="h-4 w-4 shrink-0" />
                 <span>Estimated Completion: {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}</span>
               </p>
             )}
@@ -470,8 +472,8 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
                 <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
-                {Boolean(booking.discountAmount && booking.discountAmount > 0) && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount?.toFixed(decimals)} ({booking.discountCode})</p>}
-                {isCash && Boolean(booking.appliedPlatformFees && (booking.appliedPlatformFees?.length ?? 0) > 0) && booking.appliedPlatformFees?.map((fee, idx) => (
+                {(booking.discountAmount ?? 0) > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount?.toFixed(decimals)} ({booking.discountCode})</p>}
+                {Boolean(isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0) && booking.appliedPlatformFees!.map((fee, idx) => (
                    <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
                  ))}
                 {Boolean(booking.visitingCharge && booking.visitingCharge > 0) && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge?.toFixed(decimals)}</p>}
@@ -488,7 +490,7 @@ export default function ProviderBookingDetailsPage() {
                   </div>
                 )}
 
-                {isCash && Boolean(booking.taxAmount && booking.taxAmount > 0) && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount?.toFixed(decimals)}</p>}
+                {Boolean(isCash && booking.taxAmount && booking.taxAmount > 0) && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount?.toFixed(decimals)}</p>}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
                 {extraChargesTotal > 0 && (
