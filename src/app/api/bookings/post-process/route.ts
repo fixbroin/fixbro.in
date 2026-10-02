@@ -653,10 +653,17 @@ export async function POST(request: Request) {
 
     // G. Send WhatsApp
     if (marketingConfig?.isWhatsAppEnabled) {
+        const internalHeaders: Record<string, string> = { 
+          'Content-Type': 'application/json' 
+        };
+        if (process.env.INTERNAL_API_SECRET) {
+          internalHeaders['x-internal-token'] = process.env.INTERNAL_API_SECRET;
+        }
+
         if (isCompleted && marketingConfig.whatsAppOnBookingCompleted?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: internalHeaders,
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingCompleted.templateName,
@@ -666,7 +673,7 @@ export async function POST(request: Request) {
         } else if (!isCompleted && marketingConfig.whatsAppOnBookingConfirmed?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: internalHeaders,
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingConfirmed.templateName,
@@ -676,7 +683,7 @@ export async function POST(request: Request) {
         } else if (isCancelled && marketingConfig.whatsAppOnBookingCancelled?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: internalHeaders,
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingCancelled.templateName,

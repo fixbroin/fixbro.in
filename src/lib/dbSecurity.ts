@@ -51,10 +51,18 @@ export async function verifyRequest(req: NextRequest | Request): Promise<Request
           role = adminData.role;
         }
       } else {
-        // Check if user has an approved provider application
-        const providerDoc = await adminDb.collection('providerApplications').doc(uid).get();
-        if (providerDoc.exists && providerDoc.data()?.status === 'approved') {
-          role = 'provider';
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          if (userData?.role && ['super_admin', 'superadmin', 'admin', 'finance_admin', 'staff'].includes(userData.role)) {
+            role = userData.role;
+          }
+        }
+        if (role === 'customer') {
+          const providerDoc = await adminDb.collection('providerApplications').doc(uid).get();
+          if (providerDoc.exists && providerDoc.data()?.status === 'approved') {
+            role = 'provider';
+          }
         }
       }
     } catch (dbErr) {

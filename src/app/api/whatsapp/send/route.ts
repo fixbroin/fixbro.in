@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
     return rateLimitResponse(rl.resetTime);
   }
 
-  // 2. Privilege Verification (Admins or Internal system tasks only)
+  // 2. Privilege Verification (Admins, authenticated users, or internal system tasks)
   const verification = await verifyRequest(req);
-  if (!verification.isInternalBypass && !verification.isAdmin) {
+  if (!verification.isInternalBypass && !verification.isAdmin && (!verification.uid || verification.uid === 'guest')) {
     return NextResponse.json(
       { success: false, error: 'Unauthorized: WhatsApp dispatch requires administrative authorization.' },
       { status: 401 }
