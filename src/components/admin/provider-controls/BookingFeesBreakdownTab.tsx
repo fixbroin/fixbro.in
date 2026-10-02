@@ -342,7 +342,7 @@ export default function BookingFeesBreakdownTab() {
                             asChild
                             title="View Booking Details"
                           >
-                            <Link href={`/admin/bookings?search=${encodeURIComponent(b.bookingId)}`} target="_blank">
+                            <Link href={`/admin/bookings?search=${encodeURIComponent(b.bookingId)}&openBookingId=${encodeURIComponent(b.bookingId)}`} target="_blank">
                               <ExternalLink className="h-3.5 w-3.5" />
                             </Link>
                           </Button>

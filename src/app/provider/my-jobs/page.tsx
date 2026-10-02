@@ -187,6 +187,21 @@ export default function ProviderMyJobsPage() {
       .sort((a, b) => getBookingScheduledTimestamp(b) - getBookingScheduledTimestamp(a));
   }, [bookings]);
 
+  const defaultTab = useMemo(() => {
+    if (newJobRequests.length > 0) return 'new';
+    if (ongoingJobs.length > 0) return 'ongoing';
+    if (completedJobs.length > 0) return 'completed';
+    return 'new';
+  }, [newJobRequests.length, ongoingJobs.length, completedJobs.length]);
+
+  const [activeTab, setActiveTab] = useState<string>('new');
+  const [hasUserSelectedTab, setHasUserSelectedTab] = useState(false);
+
+  useEffect(() => {
+    if (!hasUserSelectedTab) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab, hasUserSelectedTab]);
 
   if (authIsLoading || isLoadingBookings) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -201,7 +216,7 @@ export default function ProviderMyJobsPage() {
         </CardHeader>
       </Card>
       
-      <Tabs defaultValue="new" className="w-full">
+      <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setHasUserSelectedTab(true); }} className="w-full">
         <div className="relative mb-6">
           <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
              <TabsTrigger 
@@ -234,8 +249,8 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="new" className="mt-0 focus-visible:outline-none">
           {newJobRequests.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {newJobRequests.map(job => (
-                <ProviderJobCard key={job.id} job={job} type="new"
+              {newJobRequests.map((job, idx) => (
+                <ProviderJobCard key={job.id} job={job} type="new" queuePosition={idx + 1}
                   onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
                   onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
                   isProcessingAction={processingBookingAction === job.id}
@@ -250,8 +265,8 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="ongoing">
            {ongoingJobs.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {ongoingJobs.map(job => (
-                <ProviderJobCard key={job.id} job={job} type="ongoing"
+              {ongoingJobs.map((job, idx) => (
+                <ProviderJobCard key={job.id} job={job} type="ongoing" queuePosition={idx + 1}
                   onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
                   onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                   isProcessingAction={processingBookingAction === job.id}

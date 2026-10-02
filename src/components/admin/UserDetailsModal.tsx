@@ -565,7 +565,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                               className="h-7 text-[11px] font-bold px-2 flex items-center gap-1"
                               asChild
                             >
-                              <Link href={`/admin/bookings?search=${encodeURIComponent(b.bookingId)}`} target="_blank">
+                              <Link href={`/admin/bookings?search=${encodeURIComponent(b.bookingId)}&openBookingId=${encodeURIComponent(b.bookingId)}`} target="_blank">
                                 <ExternalLink className="h-3 w-3" />
                                 Details
                               </Link>

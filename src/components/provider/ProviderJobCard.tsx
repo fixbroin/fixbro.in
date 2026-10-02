@@ -5,17 +5,19 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock, Wallet } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock, Wallet, CalendarDays } from "lucide-react";
 import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { useMemo } from 'react';
 
 interface ProviderJobCardProps {
   job: FirestoreBooking;
   type: 'new' | 'ongoing' | 'completed';
+  queuePosition?: number;
   onAccept?: (bookingId: string) => void;
   onReject?: (bookingId: string) => void;
   onStartWork?: (bookingId: string) => void;
@@ -31,6 +33,60 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
         const date = new Date(dateString.replace(/-/g, '/'));
         return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
+};
+
+const getDayCategory = (dateString: string | undefined): 'today' | 'tomorrow' | 'dayAfter' | 'later' => {
+  if (!dateString) return 'later';
+  try {
+    const now = new Date();
+    const todayStr = formatDateInTimezone(now, 'Asia/Kolkata', 'YYYY-MM-DD');
+    
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowStr = formatDateInTimezone(tomorrow, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const dayAfter = new Date(now);
+    dayAfter.setDate(now.getDate() + 2);
+    const dayAfterStr = formatDateInTimezone(dayAfter, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const cleanDateStr = dateString.split('T')[0];
+    if (cleanDateStr === todayStr) return 'today';
+    if (cleanDateStr === tomorrowStr) return 'tomorrow';
+    if (cleanDateStr === dayAfterStr) return 'dayAfter';
+    return 'later';
+  } catch (e) {
+    return 'later';
+  }
+};
+
+const getQueueBadge = (pos?: number) => {
+  if (!pos) return null;
+  if (pos === 1) {
+    return (
+      <Badge className="bg-red-600 text-white hover:bg-red-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-red-400">
+        🥇 #1 DUE FIRST
+      </Badge>
+    );
+  }
+  if (pos === 2) {
+    return (
+      <Badge className="bg-amber-600 text-white hover:bg-amber-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-amber-400">
+        🥈 #2 DUE NEXT
+      </Badge>
+    );
+  }
+  if (pos === 3) {
+    return (
+      <Badge className="bg-yellow-600 text-white hover:bg-yellow-700 font-extrabold text-[11px] px-2.5 py-0.5 shadow-sm border border-yellow-400">
+        🥉 #3 DUE THIRD
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="font-bold text-[11px] px-2.5 py-0.5 bg-background">
+      #{pos} DUE
+    </Badge>
+  );
 };
 
 const getStatusBadgeVariant = (status: FirestoreBooking['status']) => {
@@ -75,6 +131,7 @@ const getStatusBadgeClass = (status: FirestoreBooking['status']) => {
 const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   job,
   type,
+  queuePosition,
   onAccept,
   onReject,
   onStartWork,
@@ -110,6 +167,49 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const extraChargesTotal = (job.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
   const displayTotal = isCash ? (job.totalAmount || 0) : (providerGross + extraChargesTotal);
 
+  const dayCat = useMemo(() => !isJobCompleted ? getDayCategory(job.scheduledDate) : 'later', [job.scheduledDate, isJobCompleted]);
+
+  const cardBorderClass = useMemo(() => {
+    if (isJobCompleted) return "border-l-4 border-l-gray-400";
+    switch (dayCat) {
+      case 'today':
+        return "border-l-4 border-l-red-600 border-red-200 dark:border-red-950 bg-red-500/5 shadow-red-100/50";
+      case 'tomorrow':
+        return "border-l-4 border-l-amber-500 border-amber-200 dark:border-amber-950 bg-amber-500/5 shadow-amber-100/50";
+      case 'dayAfter':
+        return "border-l-4 border-l-emerald-500 border-emerald-200 dark:border-emerald-950 bg-emerald-500/5 shadow-emerald-100/50";
+      default:
+        return "border-l-4 border-l-primary/60 border-border";
+    }
+  }, [dayCat, isJobCompleted]);
+
+  const dateBoxClass = useMemo(() => {
+    switch (dayCat) {
+      case 'today':
+        return "border-2 border-red-500/70 bg-red-500/10 text-red-800 dark:text-red-300";
+      case 'tomorrow':
+        return "border-2 border-amber-500/70 bg-amber-500/10 text-amber-900 dark:text-amber-300";
+      case 'dayAfter':
+        return "border-2 border-emerald-500/70 bg-emerald-500/10 text-emerald-900 dark:text-emerald-300";
+      default:
+        return "border-2 border-primary/40 bg-primary/5 text-primary";
+    }
+  }, [dayCat]);
+
+  const dayCategoryBadge = useMemo(() => {
+    if (isJobCompleted) return null;
+    switch (dayCat) {
+      case 'today':
+        return <Badge className="bg-red-600 text-white font-black text-[10px] uppercase tracking-wider animate-pulse">🚨 TODAY - URGENT</Badge>;
+      case 'tomorrow':
+        return <Badge className="bg-amber-600 text-white font-bold text-[10px] uppercase tracking-wider">⏰ TOMORROW</Badge>;
+      case 'dayAfter':
+        return <Badge className="bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-wider">📅 IN 2 DAYS</Badge>;
+      default:
+        return null;
+    }
+  }, [dayCat, isJobCompleted]);
+
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {
       e.preventDefault();
@@ -134,8 +234,14 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   };
 
   return (
-    <Card className="shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader>
+    <Card className={cn("shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden", cardBorderClass)}>
+      <CardHeader className="pb-3">
+        {(queuePosition || dayCategoryBadge) && (
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {queuePosition && getQueueBadge(queuePosition)}
+            {dayCategoryBadge}
+          </div>
+        )}
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg font-semibold">{job.services.map(s => s.name).join(', ')}</CardTitle>
            <Badge variant={getStatusBadgeVariant(job.status)} className={`capitalize text-xs ${getStatusBadgeClass(job.status)}`}>
@@ -157,7 +263,19 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             ))}
           </ul>
         </div>
-        <p><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)} at {job.scheduledTimeSlot}</p>
+
+        {/* Highlighted Date & Time Slot Box */}
+        <div className={cn("p-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-3 transition-all", dateBoxClass)}>
+          <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <span>Date: {formatDateForDisplay(job.scheduledDate)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm bg-background/90 px-3 py-1.5 rounded-xl border shadow-2xs text-foreground">
+            <Clock className="h-4 w-4 text-primary shrink-0" />
+            <span>Slot: {job.scheduledTimeSlot}</span>
+          </div>
+        </div>
+
         {job.estimatedEndTime && (
           <p className="text-green-600 font-medium">
             <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -157,12 +157,42 @@ export default function AdminBookingsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [filterStatus, setFilterStatus] = useState<BookingStatus | "All">("All");
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams?.get('search') || '';
+  const urlOpenBookingId = searchParams?.get('openBookingId') || searchParams?.get('bookingId') || '';
+
+  const [searchTerm, setSearchTerm] = useState(urlSearch || urlOpenBookingId || "");
   const { toast } = useToast();
   const router = useRouter();
   const [selectedBooking, setSelectedBooking] = useState<FirestoreBooking | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+
+  useEffect(() => {
+    if ((urlSearch || urlOpenBookingId) && !searchTerm) {
+      setSearchTerm(urlSearch || urlOpenBookingId);
+    }
+  }, [urlSearch, urlOpenBookingId]);
+
+  useEffect(() => {
+    if (urlOpenBookingId && bookings.length > 0) {
+      const target = bookings.find(b => 
+        b.bookingId === urlOpenBookingId || 
+        b.id === urlOpenBookingId || 
+        b.bookingNumber?.toString() === urlOpenBookingId
+      );
+      if (target) {
+        setSelectedBooking(target);
+        setIsDetailsModalOpen(true);
+        setTimeout(() => {
+          const el = document.getElementById(`booking-row-${target.id || target.bookingId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+      }
+    }
+  }, [urlOpenBookingId, bookings]);
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
@@ -859,7 +889,7 @@ export default function AdminBookingsPage() {
                   {filteredBookings.slice(0, displayLimit).map((b, index) => {
                     return (
                       <React.Fragment key={b.id}>
-                        <TableRow className="hover:bg-transparent border-b-0">
+                        <TableRow id={`booking-row-${b.id || b.bookingId}`} className="hover:bg-transparent border-b-0 transition-colors">
                           <TableCell className="text-xs font-black text-primary bg-primary/5 rounded-lg text-center h-8 w-8 flex items-center justify-center mt-3 ml-2">{b.bookingNumber || '...'}</TableCell>
                           <TableCell>
                             <div className="font-mono text-xs font-bold text-primary">{b.bookingId}</div>
