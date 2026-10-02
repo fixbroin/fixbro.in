@@ -38,6 +38,30 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
     } catch (e) { return dateString; }
 };
 
+const getDayCategory = (dateString: string | undefined): 'today' | 'tomorrow' | 'dayAfter' | 'later' => {
+  if (!dateString) return 'later';
+  try {
+    const now = new Date();
+    const todayStr = formatDateInTimezone(now, 'Asia/Kolkata', 'YYYY-MM-DD');
+    
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowStr = formatDateInTimezone(tomorrow, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const dayAfter = new Date(now);
+    dayAfter.setDate(now.getDate() + 2);
+    const dayAfterStr = formatDateInTimezone(dayAfter, 'Asia/Kolkata', 'YYYY-MM-DD');
+
+    const cleanDateStr = dateString.split('T')[0];
+    if (cleanDateStr === todayStr) return 'today';
+    if (cleanDateStr === tomorrowStr) return 'tomorrow';
+    if (cleanDateStr === dayAfterStr) return 'dayAfter';
+    return 'later';
+  } catch (e) {
+    return 'later';
+  }
+};
+
 
 export default function ProviderBookingDetailsPage() {
   const params = useParams();
@@ -295,6 +319,7 @@ export default function ProviderBookingDetailsPage() {
   }
 
   const isJobCompleted = booking.status === 'Completed';
+  const dayCat = getDayCategory(booking.scheduledDate);
 
 
 
@@ -362,18 +387,36 @@ export default function ProviderBookingDetailsPage() {
                 </div>
             )}
           </section>
-          <Separator />
-          <section>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><CalendarDays className="mr-2 text-primary"/>Schedule</h3>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <p><strong>Date:</strong> {formatDateForDisplay(booking.scheduledDate)}</p>
-              <p><strong>Time Slot:</strong> {booking.scheduledTimeSlot}</p>
-              {booking.estimatedEndTime && (
-                <p className="text-green-600 font-bold sm:col-span-2 mt-2">
-                  <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
-                </p>
-              )}
+          <Separator />          <section>
+            <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+              <h3 className="text-lg font-semibold flex items-center"><CalendarDays className="mr-2 text-primary"/>Schedule</h3>
+              {dayCat === 'today' && <Badge className="bg-red-600 text-white font-black text-xs uppercase tracking-wider animate-pulse">🚨 TODAY - URGENT</Badge>}
+              {dayCat === 'tomorrow' && <Badge className="bg-amber-600 text-white font-bold text-xs uppercase tracking-wider">⏰ TOMORROW</Badge>}
+              {dayCat === 'dayAfter' && <Badge className="bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider">📅 IN 2 DAYS</Badge>}
             </div>
+
+            <div className={cn("p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all", 
+              dayCat === 'today' ? "border-2 border-red-500/70 bg-red-500/10 text-red-800 dark:text-red-300" :
+              dayCat === 'tomorrow' ? "border-2 border-amber-500/70 bg-amber-500/10 text-amber-900 dark:text-amber-300" :
+              dayCat === 'dayAfter' ? "border-2 border-emerald-500/70 bg-emerald-500/10 text-emerald-900 dark:text-emerald-300" :
+              "border-2 border-primary/40 bg-primary/5 text-primary"
+            )}>
+              <div className="flex items-center gap-2.5 font-black text-sm sm:text-base">
+                <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+                <span>Date: {formatDateForDisplay(booking.scheduledDate)}</span>
+              </div>
+              <div className="flex items-center gap-2 font-black text-sm sm:text-base bg-background/90 px-3.5 py-2 rounded-xl border shadow-xs text-foreground">
+                <Clock className="h-5 w-5 text-primary shrink-0" />
+                <span>Slot: {booking.scheduledTimeSlot}</span>
+              </div>
+            </div>
+
+            {booking.estimatedEndTime && (
+              <p className="text-green-600 font-bold text-xs sm:text-sm mt-2.5 flex items-center gap-1.5">
+                <Clock className="h-4 w-4 shrink-0 text-green-600" />
+                <span>Estimated Completion: {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}</span>
+              </p>
+            )}
 
             {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (
               <div className="mt-4 py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground max-w-xl">
@@ -427,13 +470,11 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
                 <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
-                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(decimals)} ({booking.discountCode})</p>}
-                {isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
+                {Boolean(booking.discountAmount && booking.discountAmount > 0) && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount?.toFixed(decimals)} ({booking.discountCode})</p>}
+                {isCash && Boolean(booking.appliedPlatformFees && (booking.appliedPlatformFees?.length ?? 0) > 0) && booking.appliedPlatformFees?.map((fee, idx) => (
                    <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
                  ))}
-                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(decimals)}</p>}
-                
-
+                {Boolean(booking.visitingCharge && booking.visitingCharge > 0) && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge?.toFixed(decimals)}</p>}
 
                 {booking.additionalCharges && booking.additionalCharges.length > 0 && (
                   <div className="bg-amber-50 p-2 rounded-md border border-amber-100 my-2">
@@ -447,7 +488,7 @@ export default function ProviderBookingDetailsPage() {
                   </div>
                 )}
 
-                {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
+                {isCash && Boolean(booking.taxAmount && booking.taxAmount > 0) && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount?.toFixed(decimals)}</p>}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
                 {extraChargesTotal > 0 && (
