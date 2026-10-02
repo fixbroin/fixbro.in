@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from '@/components/ui/separator';
-import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, getBookingScheduledTimestamp } from '@/lib/utils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
@@ -223,9 +223,23 @@ export default function ProviderDashboardPage() {
     }
   };
 
-  const newJobRequests = useMemo(() => bookings.filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled'), [bookings]);
-  const ongoingJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider'), [bookings]);
-  const completedJobs = useMemo(() => bookings.filter(b => b.status === 'Completed'), [bookings]);
+  const newJobRequests = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled')
+      .sort((a, b) => getBookingScheduledTimestamp(a) - getBookingScheduledTimestamp(b));
+  }, [bookings]);
+
+  const ongoingJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider')
+      .sort((a, b) => getBookingScheduledTimestamp(a) - getBookingScheduledTimestamp(b));
+  }, [bookings]);
+
+  const completedJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'Completed')
+      .sort((a, b) => getBookingScheduledTimestamp(b) - getBookingScheduledTimestamp(a));
+  }, [bookings]);
 
   if (authIsLoading || isLoadingBookings) {
     return (

@@ -396,3 +396,65 @@ export function formatCurrency(
     return `${symbol}${amount.toFixed(decimals)}`;
   }
 }
+
+/**
+ * Calculates epoch timestamp in milliseconds for a booking's scheduled date and time slot.
+ * Used for chronological sorting of bookings (nearest appointment first).
+ */
+export function getBookingScheduledTimestamp(b: any): number {
+  if (!b) return 0;
+  const dateStr = b.scheduledDate || b.bookingDate;
+  const timeStr = b.scheduledTimeSlot || b.bookingTime;
+
+  if (dateStr && typeof dateStr === 'string') {
+    try {
+      let year = 0, month = 0, day = 0;
+      
+      if (dateStr.includes('-')) {
+        const parts = dateStr.split('T')[0].split('-').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          if (parts[0] > 1000) {
+            [year, month, day] = parts;
+          } else {
+            [day, month, year] = parts;
+          }
+        }
+      } else if (dateStr.includes('/')) {
+        const parts = dateStr.split('/').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          if (parts[2] > 1000) {
+            [day, month, year] = parts;
+          } else if (parts[0] > 1000) {
+            [year, month, day] = parts;
+          }
+        }
+      }
+
+      if (year > 0 && month > 0 && day > 0) {
+        let timeHours = 12;
+        let timeMinutes = 0;
+        if (timeStr && typeof timeStr === 'string') {
+          const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+          if (match) {
+            let h = parseInt(match[1], 10);
+            const m = parseInt(match[2], 10);
+            const ampm = match[3]?.toUpperCase();
+            if (ampm === 'PM' && h < 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+            timeHours = h;
+            timeMinutes = m;
+          }
+        }
+        return new Date(year, month - 1, day, timeHours, timeMinutes).getTime();
+      }
+
+      const parsedDate = new Date(dateStr);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.getTime();
+      }
+    } catch (e) {}
+  }
+  
+  return getTimestampMillis(b.createdAt);
+}
+

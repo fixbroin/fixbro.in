@@ -470,8 +470,8 @@ export default function ProviderApplicationDetailsModal({
   return (
     <>
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-[calc(100vw-6px)] sm:w-[90vw] h-[calc(100vh-6px)] max-h-[calc(100vh-6px)] grid grid-rows-[auto_1fr_auto] p-0 overflow-x-hidden">
-        <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0 w-full max-w-full overflow-hidden">
+      <DialogContent className="max-w-3xl w-[94vw] sm:w-[90vw] h-[85dvh] max-h-[85dvh] sm:h-[88vh] sm:max-h-[88vh] grid grid-rows-[auto_1fr_auto] p-0 overflow-x-hidden rounded-2xl border-none shadow-2xl">
+        <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0 w-full max-w-full overflow-hidden pr-12">
           <div className="flex items-start sm:items-center space-x-3 sm:space-x-4">
             <Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
               <AvatarImage src={application.profilePhotoUrl || undefined} alt={application.fullName || "Provider"} />

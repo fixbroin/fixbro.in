@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency, getBookingScheduledTimestamp } from '@/lib/utils';
 import AppImage from '@/components/ui/AppImage';
 import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
@@ -371,10 +371,23 @@ export default function AdminBookingsPage() {
     }
     
     return [...filtered].sort((a, b) => {
-      const numA = Number(a.bookingNumber) || 0;
-      const numB = Number(b.bookingNumber) || 0;
-      if (numA !== numB) return numB - numA;
-      return getBookingTimestampMillis(b) - getBookingTimestampMillis(a);
+      const isACompleted = a.status === 'Completed' || a.status === 'Cancelled' || a.status === 'ProviderRejected';
+      const isBCompleted = b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected';
+
+      if (!isACompleted && isBCompleted) return -1;
+      if (isACompleted && !isBCompleted) return 1;
+
+      if (!isACompleted && !isBCompleted) {
+        const timeA = getBookingScheduledTimestamp(a);
+        const timeB = getBookingScheduledTimestamp(b);
+        if (timeA !== timeB) return timeA - timeB;
+        return (Number(b.bookingNumber) || 0) - (Number(a.bookingNumber) || 0);
+      } else {
+        const timeA = getBookingScheduledTimestamp(a);
+        const timeB = getBookingScheduledTimestamp(b);
+        if (timeA !== timeB) return timeB - timeA;
+        return (Number(b.bookingNumber) || 0) - (Number(a.bookingNumber) || 0);
+      }
     });
   }, [bookings, filterStatus, searchTerm]);
 
