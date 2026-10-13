@@ -60,6 +60,11 @@ export function isCashPayment(method?: string): boolean {
   return lower !== 'online';
 }
 
+export function hasOnlinePaymentProof(booking?: any): boolean {
+  if (!booking) return false;
+  return !!(booking.razorpayPaymentId || booking.stripePaymentIntent || booking.stripeSessionId);
+}
+
 export const isPayAfterService = isCashPayment;
 
 /**

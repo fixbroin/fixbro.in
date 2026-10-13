@@ -377,6 +377,7 @@ export async function updateBookingStatusByProviderAction(
     const providerData = providerSnap.data() || {};
 
     const currentStatus = bookingData.status;
+    const hasOnlineProof = !!(bookingData.razorpayPaymentId || bookingData.stripePaymentIntent || bookingData.stripeSessionId);
     const updateData: any = { 
       status: newStatus,
       updatedAt: Timestamp.now(),
@@ -386,7 +387,8 @@ export async function updateBookingStatusByProviderAction(
     if (newStatus === 'ProviderAccepted') {
       const paymentMethod = finalizedPaymentMethod || bookingData.paymentMethod || 'Pay After Service';
       
-      if (isCashPayment(paymentMethod)) {
+      // Treat as cash (Pay After Service) unless there is verified online payment proof
+      if (isCashPayment(paymentMethod) || !hasOnlineProof) {
         // Load settings and config
         const settings = await getProviderWalletSettingsAction();
         const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
@@ -462,7 +464,10 @@ export async function updateBookingStatusByProviderAction(
           });
         }
       }
-      if (finalizedPaymentMethod) {
+      // Never mark a booking as 'Online' on completion if there is no verified online payment ID
+      if (!hasOnlineProof) {
+        updateData.paymentMethod = 'Pay After Service';
+      } else if (finalizedPaymentMethod) {
         updateData.paymentMethod = finalizedPaymentMethod;
       }
     }

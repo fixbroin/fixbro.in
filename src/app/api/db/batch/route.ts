@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess } from '@/lib/dbSecurity';
+import { verifyRequest, validateAccess, isUserAdmin, isFieldProtectedFromCustomerMutation } from '@/lib/dbSecurity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,13 +10,51 @@ export async function POST(request: NextRequest) {
     }
 
     const { operations = [] } = await request.json();
+    const isAdmin = isUserAdmin(user);
 
-    // Verify access for all operations in the batch first
+    // Verify access and sanitize fields for all operations in the batch first
     for (const op of operations) {
       const pathToCheck = op.collection ? `${op.collection}/${op.id || ''}` : op.id || '';
       const isAllowed = validateAccess(user, pathToCheck, 'write');
       if (!isAllowed) {
         return NextResponse.json({ success: false, error: `Forbidden: No write access to "${pathToCheck}".` }, { status: 403 });
+      }
+
+      if (!isAdmin && (op.collection === 'users' || pathToCheck.startsWith('users/'))) {
+        if (op.data && typeof op.data === 'object') {
+          for (const key of Object.keys(op.data)) {
+            if (isFieldProtectedFromCustomerMutation(key)) {
+              delete op.data[key];
+            }
+          }
+        }
+      }
+
+      if (!isAdmin && (op.collection === 'bookings' || pathToCheck.startsWith('bookings/'))) {
+        if (op.action === 'deleteDoc') {
+          return NextResponse.json({ success: false, error: 'Forbidden: Bookings cannot be deleted directly by clients.' }, { status: 403 });
+        }
+        if (op.data && typeof op.data === 'object') {
+          delete op.data.razorpayPaymentId;
+          delete op.data.razorpayOrderId;
+          delete op.data.razorpaySignature;
+          delete op.data.stripeSessionId;
+          delete op.data.stripePaymentIntent;
+
+          const restrictedStatuses = [
+            'Confirmed',
+            'AssignedToProvider',
+            'ProviderAccepted',
+            'InProgressByProvider',
+            'Completed',
+          ];
+          if (op.data.status && restrictedStatuses.includes(op.data.status)) {
+            return NextResponse.json(
+              { success: false, error: 'Forbidden: Booking status progression must be processed via authoritative server endpoints.' },
+              { status: 403 }
+            );
+          }
+        }
       }
     }
 

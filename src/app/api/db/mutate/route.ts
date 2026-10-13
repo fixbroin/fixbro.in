@@ -37,18 +37,31 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Financial & Booking Security Rules (Issue 4):
-    // Direct client cannot delete bookings or elevate booking status to Confirmed/Completed
-    if (!isAdmin && path === 'bookings') {
+    // Direct client cannot delete bookings, elevate booking status, or inject payment gateway proof fields
+    if (!isAdmin && (path === 'bookings' || fullPath.startsWith('bookings/'))) {
       if (action === 'deleteDoc') {
         return NextResponse.json({ success: false, error: 'Forbidden: Bookings cannot be deleted directly by clients.' }, { status: 403 });
       }
 
       if (cleanData && typeof cleanData === 'object') {
-        // Prevent client from setting status to Confirmed without server payment verification
-        if (cleanData.status === 'Confirmed' || cleanData.status === 'Completed') {
+        // Strip payment gateway proof fields from direct client mutations
+        delete cleanData.razorpayPaymentId;
+        delete cleanData.razorpayOrderId;
+        delete cleanData.razorpaySignature;
+        delete cleanData.stripeSessionId;
+        delete cleanData.stripePaymentIntent;
+
+        const restrictedStatuses = [
+          'Confirmed',
+          'AssignedToProvider',
+          'ProviderAccepted',
+          'InProgressByProvider',
+          'Completed',
+        ];
+        if (cleanData.status && restrictedStatuses.includes(cleanData.status)) {
           return NextResponse.json({ 
             success: false, 
-            error: 'Forbidden: Confirmed and Completed booking states must be processed via authoritative payment verification endpoints.' 
+            error: 'Forbidden: Booking status progression must be processed via authoritative server endpoints.' 
           }, { status: 403 });
         }
       }

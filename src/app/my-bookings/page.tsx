@@ -153,11 +153,32 @@ export default function MyBookingsPage() {
     const bookingsCollectionRef = collection(db, "bookings");
     const userEmail = user.email ? user.email.toLowerCase().trim() : null;
 
+    // Trigger background cleanup of any stale unpaid online booking attempts
+    fetch('/api/bookings/cancel-pending-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sweepStale: true }),
+    }).catch(() => {});
+
     const processAndSetBookings = async (docs: any[]) => {
-      const fetchedBookings = docs.map(docSnap => ({ 
-        ...docSnap.data(),
-        id: docSnap.id, 
-      } as FirestoreBooking));
+      const fetchedBookings = docs
+        .map(docSnap => ({ 
+          ...docSnap.data(),
+          id: docSnap.id, 
+        } as FirestoreBooking))
+        .filter(booking => {
+          // Never show abandoned unpaid Online payment attempts in customer's My Bookings
+          const isOnline = (booking.paymentMethod || '').toLowerCase().trim() === 'online';
+          const hasPaymentId = !!(
+            booking.razorpayPaymentId ||
+            (booking as any).stripePaymentIntent ||
+            (booking as any).stripeSessionId
+          );
+          if (booking.status === 'Pending Payment' && isOnline && !hasPaymentId) {
+            return false;
+          }
+          return true;
+        });
 
       // Auto-link any matching email booking missing userId
       if (user.uid) {

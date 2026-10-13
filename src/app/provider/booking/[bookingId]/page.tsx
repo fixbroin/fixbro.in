@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -89,8 +89,8 @@ export default function ProviderBookingDetailsPage() {
     if (feeType === 'percentage') return (amount * feeVal) / 100;
     return feeVal;
   };
-  const paymentMethod = booking?.paymentMethod || 'Pay After Service';
-  const isCash = isCashPayment(paymentMethod);
+  const isCash = isCashPayment(booking?.paymentMethod) || !hasOnlinePaymentProof(booking);
+  const paymentMethod = isCash ? 'Pay After Service' : 'Online';
   const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 

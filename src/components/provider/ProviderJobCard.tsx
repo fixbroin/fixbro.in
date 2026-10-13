@@ -10,7 +10,7 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
-import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
+import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useMemo } from 'react';
 
@@ -155,8 +155,8 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
     return feeVal;
   };
 
-  const paymentMethod = job.paymentMethod || 'Pay After Service';
-  const isCash = isCashPayment(paymentMethod);
+  const isCash = isCashPayment(job.paymentMethod) || !hasOnlinePaymentProof(job);
+  const paymentMethod = isCash ? 'Pay After Service' : 'Online';
   const providerGross = (job.subTotal || 0) + (job.visitingCharge || 0) - (job.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0) + (job.taxAmount || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 

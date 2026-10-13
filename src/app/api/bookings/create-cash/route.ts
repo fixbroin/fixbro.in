@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
 
       const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
       const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+      const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
       const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
       if (!razorpayKeySecret) {
@@ -107,6 +109,51 @@ export async function POST(req: NextRequest) {
           { success: false, error: 'Invalid online payment signature.' },
           { status: 400 }
         );
+      }
+
+      // Replay protection: ensure this razorpayPaymentId hasn't already been used for another booking
+      const existingSnap = await adminDb
+        .collection('bookings')
+        .where('razorpayPaymentId', '==', razorpayPaymentId)
+        .limit(1)
+        .get();
+      if (!existingSnap.empty) {
+        const existingDoc = existingSnap.docs[0];
+        const existingData = existingDoc.data() as any;
+        return NextResponse.json({
+          success: true,
+          bookingId: existingData.bookingId,
+          bookingDocId: existingDoc.id,
+          booking: { ...existingData, id: existingDoc.id },
+        });
+      }
+
+      // Authoritative Server-to-Server Razorpay Payment Status & Amount Verification
+      if (razorpayKeyId && razorpayKeySecret) {
+        const instance = new Razorpay({
+          key_id: razorpayKeyId,
+          key_secret: razorpayKeySecret,
+        });
+        const paymentEntity: any = await instance.payments.fetch(razorpayPaymentId);
+        if (!paymentEntity || (paymentEntity.status !== 'captured' && paymentEntity.status !== 'authorized')) {
+          return NextResponse.json(
+            { success: false, error: `Payment is not captured/authorized on Razorpay (status: ${paymentEntity?.status || 'unknown'}).` },
+            { status: 400 }
+          );
+        }
+        if (paymentEntity.order_id && paymentEntity.order_id !== razorpayOrderId) {
+          return NextResponse.json(
+            { success: false, error: 'Razorpay order ID mismatch.' },
+            { status: 400 }
+          );
+        }
+        const expectedAmountPaise = Math.round(pricing.totalAmount * 100);
+        if (typeof paymentEntity.amount === 'number' && paymentEntity.amount < expectedAmountPaise - 100) {
+          return NextResponse.json(
+            { success: false, error: 'Paid amount is less than the authoritative booking total.' },
+            { status: 400 }
+          );
+        }
       }
 
       finalPaymentMethod = 'Online';

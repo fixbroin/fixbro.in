@@ -88,18 +88,30 @@ const getCoverageBadge = (booking: FirestoreBooking) => {
 };
 
 const getPaymentBadgeClass = (method: string | undefined, status: string, booking?: any) => {
+    const hasVerifiedOnlineProof = !!(booking?.razorpayPaymentId || booking?.stripePaymentIntent || booking?.stripeSessionId);
+    const isMarkedOnline = (method || '').toLowerCase().trim() === 'online';
+
+    if (hasVerifiedOnlineProof) {
+      return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
+    }
+    if (isMarkedOnline && !hasVerifiedOnlineProof) {
+      return 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-50';
+    }
     if (status === 'Completed') return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
-    const isOnline = (method || '').toLowerCase().trim() === 'online' || !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
-    if (!isOnline) return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50';
-    return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
+    return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50';
 };
 
 const getPaymentLabel = (method: string | undefined, status: string, booking?: any) => {
-    const isOnline = (method || '').toLowerCase().trim() === 'online' || !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
-    const label = isOnline ? 'Online' : 'Pay After Service';
-    if (status !== 'Completed') return label;
-    if (!isOnline) return "Paid (Pay After Service)";
-    return `Paid (Online)`;
+    const hasVerifiedOnlineProof = !!(booking?.razorpayPaymentId || booking?.stripePaymentIntent || booking?.stripeSessionId);
+    const isMarkedOnline = (method || '').toLowerCase().trim() === 'online';
+
+    if (hasVerifiedOnlineProof) {
+      return status === 'Completed' ? 'Paid (Online)' : 'Online';
+    }
+    if (isMarkedOnline && !hasVerifiedOnlineProof) {
+      return status === 'Completed' ? 'Pay After Service (No Online TXN)' : 'Unpaid (Online Abandoned)';
+    }
+    return status === 'Completed' ? 'Paid (Pay After Service)' : 'Pay After Service';
 };
 
 const PAGE_SIZE = 10;
@@ -167,6 +179,21 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<FirestoreBooking | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+
+  useEffect(() => {
+    fetch('/api/bookings/cancel-pending-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sweepStale: true }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.deletedCount > 0) {
+          setRefreshTrigger(prev => prev + 1);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if ((urlSearch || urlOpenBookingId) && !searchTerm) {

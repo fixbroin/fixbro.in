@@ -476,8 +476,6 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       return;
     }
 
-    let pendingBookingDocId: string | null = null;
-
     try {
       const getCurrencySubunitDecimals = (currencyCode: string): number => {
         const c = currencyCode.toUpperCase();
@@ -487,8 +485,36 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       };
       const currencyDecimals = getCurrencySubunitDecimals(code);
 
-      const { docRef, customerName, customerEmail, customerPhone } = await createPendingBookingRecord();
-      pendingBookingDocId = docRef.id;
+      let customerName = "Guest User", customerEmail = "", customerPhone = "N/A";
+      let currentCategoryId: string | null = null;
+
+      if (typeof window !== 'undefined') {
+        const oldPendingId = localStorage.getItem('pendingBookingDocId');
+        if (oldPendingId) {
+          localStorage.removeItem('pendingBookingDocId');
+          fetch('/api/bookings/cancel-pending-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: oldPendingId }),
+          }).catch(() => {});
+        }
+
+        const storedEmail = localStorage.getItem('fixbroCustomerEmail');
+        customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (auth.currentUser?.email || "");
+        currentCategoryId = localStorage.getItem('fixbroActiveCheckoutCategory');
+        const addressDataString = localStorage.getItem('fixbroCustomerAddress');
+        if (addressDataString) {
+          try {
+            const addressData = JSON.parse(addressDataString);
+            customerName = addressData.fullName || auth.currentUser?.displayName || customerName;
+            customerPhone = addressData.phone || (auth.currentUser as any)?.phoneNumber || customerPhone;
+            customerEmail = addressData.email || customerEmail;
+          } catch (e) {}
+        } else if (auth.currentUser) {
+          customerName = auth.currentUser.displayName || customerName;
+          customerPhone = (auth.currentUser as any)?.phoneNumber || customerPhone;
+        }
+      }
 
       const res = await fetch('/api/razorpay/create-order', {
           method: 'POST',
@@ -496,18 +522,17 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           body: JSON.stringify({ 
               amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
               currency: code,
+              cartEntries,
+              promoCode: appliedPromo?.code || undefined,
+              categoryId: currentCategoryId || undefined,
               notes: {
                 type: 'booking',
-                bookingId: pendingBookingDocId,
                 amount: totalAmountDue.toString()
               }
           }),
       });
 
       if (!res.ok) {
-        if (pendingBookingDocId) {
-          try { await deleteDoc(doc(db, 'bookings', pendingBookingDocId)); } catch (e) {}
-        }
         const errorResult = await res.json();
         throw new Error(errorResult.error || 'Failed to create Razorpay order.');
       }
@@ -527,16 +552,14 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
-          if (pendingBookingDocId) {
-            localStorage.setItem('pendingBookingDocId', pendingBookingDocId);
-          }
+          localStorage.removeItem('pendingBookingDocId');
           if (appliedPromo) {
             localStorage.setItem('fixbroBookingDiscountCode', appliedPromo.code);
             localStorage.setItem('fixbroBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
             localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromo.id);
           }
           if (calculatedPlatformFees.length > 0) localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
-          router.push(`/checkout/thank-you?payment_method=razorpay&bookingId=${pendingBookingDocId}`);
+          router.push(`/checkout/thank-you?payment_method=razorpay`);
         },
         prefill: {
           name: customerName,
@@ -544,34 +567,24 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           contact: customerPhone !== 'N/A' ? customerPhone : undefined
         },
         notes: {
-          type: 'booking',
-          bookingId: pendingBookingDocId
+          type: 'booking'
         },
         theme: { color: "#45A0A2" },
         modal: { 
           ondismiss: async () => { 
             setIsProcessingPayment(false); 
             hideLoading(); 
-            if (pendingBookingDocId) {
-              try {
-                const bRef = doc(db, 'bookings', pendingBookingDocId);
-                const bSnap = await getDoc(bRef);
-                if (bSnap.exists() && bSnap.data()?.status === 'Pending Payment') {
-                  await deleteDoc(bRef);
-                }
-              } catch (e) {
-                console.error("Error cleaning up dismissed booking:", e);
-              }
-            }
           }
         }
       };
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response: any) => {
+        toast({ title: "Payment Failed", description: response.error?.description || "An error occurred.", variant: "destructive" });
+        setIsProcessingPayment(false);
+        hideLoading();
+      });
       rzp.open();
     } catch (e: any) {
-      if (pendingBookingDocId) {
-        try { await deleteDoc(doc(db, 'bookings', pendingBookingDocId)); } catch (err) {}
-      }
       toast({ title: "Payment Error", description: e.message || "Failed to initiate payment.", variant: "destructive" });
       setIsProcessingPayment(false);
       hideLoading();
@@ -600,7 +613,13 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       });
 
       if (!res.ok) {
-        try { await deleteDoc(doc(db, 'bookings', docRef.id)); } catch (e) {}
+        try {
+          await fetch('/api/bookings/cancel-pending-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: docRef.id }),
+          });
+        } catch (e) {}
         const err = await res.json();
         throw new Error(err.error || 'Failed to initiate Stripe checkout.');
       }

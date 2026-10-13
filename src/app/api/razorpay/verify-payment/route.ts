@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
 
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
     const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     if (!razorpayKeySecret) {
@@ -46,7 +48,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid payment signature.' }, { status: 400 });
     }
 
-    // Signature is cryptographically verified!
+    // Verify directly against Razorpay API that the payment is actually captured/authorized
+    if (razorpayKeyId && razorpayKeySecret) {
+      const instance = new Razorpay({
+        key_id: razorpayKeyId,
+        key_secret: razorpayKeySecret,
+      });
+      const paymentEntity: any = await instance.payments.fetch(razorpay_payment_id);
+      if (!paymentEntity || (paymentEntity.status !== 'captured' && paymentEntity.status !== 'authorized')) {
+        return NextResponse.json(
+          { success: false, error: `Payment not captured on Razorpay (status: ${paymentEntity?.status || 'unknown'}).` },
+          { status: 400 }
+        );
+      }
+      if (paymentEntity.order_id && paymentEntity.order_id !== razorpay_order_id) {
+        return NextResponse.json(
+          { success: false, error: 'Razorpay Order ID mismatch.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Signature and gateway status are cryptographically verified!
     let updatedBooking: any = null;
 
     if (bookingId) {

@@ -15,6 +15,15 @@ export async function POST(req: NextRequest) {
     rawBody = await req.text();
     const signature = req.headers.get('x-razorpay-signature') || '';
 
+    const payload = JSON.parse(rawBody);
+    const event: string = payload?.event || '';
+
+    // Silently acknowledge global Razorpay bank/UPI downtime status broadcasts
+    // so they don't spam PM2 logs or trigger unnecessary database reads every few seconds
+    if (event.startsWith('payment.downtime.')) {
+      return NextResponse.json({ success: true, ignored: true });
+    }
+
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
@@ -35,8 +44,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid webhook signature.' }, { status: 400 });
     }
 
-    const payload = JSON.parse(rawBody);
-    const event = payload.event;
     console.log(`Received Razorpay Webhook Event: ${event}`);
 
     if (event === 'order.paid' || event === 'payment.captured') {

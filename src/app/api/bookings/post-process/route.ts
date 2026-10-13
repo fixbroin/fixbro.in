@@ -35,6 +35,16 @@ export async function POST(request: Request) {
     let isCancelled = currentStatus === 'Cancelled';
     let isRescheduled = currentStatus === 'Rescheduled';
 
+    // Guard: Never auto-dispatch or send confirmation notifications for an unpaid Online booking
+    const isOnlineMethod = (booking.paymentMethod || '').toLowerCase().trim() === 'online';
+    const hasOnlineProof = !!(booking.razorpayPaymentId || booking.stripePaymentIntent || booking.stripeSessionId);
+    if (isOnlineMethod && currentStatus === 'Pending Payment' && !hasOnlineProof) {
+      return NextResponse.json(
+        { message: 'Skipped post-processing for unpaid online pending booking.' },
+        { status: 200 }
+      );
+    }
+
     // 2. Fetch App Settings for Email/WhatsApp/Dispatch
     const [appConfigDoc, marketingConfigDoc, seoSettingsDoc] = await Promise.all([
         adminDb.collection('webSettings').doc('applicationConfig').get(),

@@ -599,32 +599,39 @@ export default function PaymentPage() {
       };
       const currencyDecimals = getCurrencySubunitDecimals(currencyCode);
 
-      let pendingBookingDocId: string | null = null;
       let customerNameForPrefill = "Guest";
       let customerEmailForPrefill = "guest@example.com";
       let customerContactForPrefill: string | undefined = undefined;
+      const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null;
 
-      if (!isCancellationFeeMode) {
-        const { docRef, customerName, customerEmail, customerPhone } = await createPendingBooking();
-        pendingBookingDocId = docRef.id;
-        customerNameForPrefill = customerName;
-        customerEmailForPrefill = customerEmail;
-        customerContactForPrefill = customerPhone !== 'N/A' ? customerPhone : undefined;
-      } else {
-        const customerAddressDataString = localStorage.getItem('fixbroCustomerAddress');
-        if (customerAddressDataString) { 
-          try { 
-            const addr = JSON.parse(customerAddressDataString); 
-            customerNameForPrefill = addr.fullName || customerNameForPrefill; 
-            customerEmailForPrefill = addr.email || customerEmailForPrefill; 
-            customerContactForPrefill = addr.phone || undefined; 
-          } catch (e) { 
-            console.error("Error parsing address for Razorpay:", e); 
-          } 
-        } else if (auth.currentUser) { 
-          customerNameForPrefill = auth.currentUser.displayName || customerNameForPrefill; 
-          customerEmailForPrefill = auth.currentUser.email || customerEmailForPrefill; 
+      // Clean up any leftover pending online booking ID from a previous abandoned session
+      if (typeof window !== 'undefined') {
+        const oldPendingId = localStorage.getItem('pendingBookingDocId');
+        if (oldPendingId) {
+          localStorage.removeItem('pendingBookingDocId');
+          fetch('/api/bookings/cancel-pending-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: oldPendingId }),
+          }).catch(() => {});
         }
+      }
+
+      const customerAddressDataString = localStorage.getItem('fixbroCustomerAddress');
+      if (customerAddressDataString) { 
+        try { 
+          const addr = JSON.parse(customerAddressDataString); 
+          customerNameForPrefill = addr.fullName || currentUser?.displayName || customerNameForPrefill; 
+          customerEmailForPrefill = addr.email || currentUser?.email || customerEmailForPrefill; 
+          customerContactForPrefill = addr.phone || (currentUser as any)?.phoneNumber || undefined; 
+        } catch (e) { 
+          console.error("Error parsing address for Razorpay:", e); 
+        } 
+      } else if (currentUser || auth.currentUser) { 
+        const u = currentUser || auth.currentUser;
+        customerNameForPrefill = u?.displayName || customerNameForPrefill; 
+        customerEmailForPrefill = u?.email || customerEmailForPrefill; 
+        customerContactForPrefill = (u as any)?.phoneNumber || undefined;
       }
 
       const orderCreationResponse = await fetch('/api/razorpay/create-order', {
@@ -633,22 +640,23 @@ export default function PaymentPage() {
           body: JSON.stringify({ 
               amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
               currency: currencyCode,
+              ...(!isCancellationFeeMode && {
+                cartEntries,
+                promoCode: appliedPromoCode?.code || undefined,
+                categoryId: currentCategoryId || undefined,
+              }),
               notes: isCancellationFeeMode && cancellationFeeDetails ? {
                 type: 'cancellation_fee',
                 bookingId: cancellationFeeDetails.bookingId,
                 amount: cancellationFeeDetails.feeAmount.toString()
               } : {
                 type: 'booking',
-                bookingId: pendingBookingDocId,
                 amount: totalAmountDue.toString()
               }
           }),
       });
 
       if (!orderCreationResponse.ok) {
-        if (pendingBookingDocId) {
-          try { await deleteDoc(doc(db, 'bookings', pendingBookingDocId)); } catch (e) {}
-        }
         const errorResult = await orderCreationResponse.json();
         throw new Error(errorResult.error || 'Failed to create Razorpay order.');
       }
@@ -669,9 +677,7 @@ export default function PaymentPage() {
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
-          if (pendingBookingDocId) {
-            localStorage.setItem('pendingBookingDocId', pendingBookingDocId);
-          }
+          localStorage.removeItem('pendingBookingDocId');
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
@@ -689,32 +695,20 @@ export default function PaymentPage() {
               localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromoCode.id);
             }
             if (calculatedPlatformFees.length > 0) localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('fixbroAppliedPlatformFees');
-            router.push(`/checkout/thank-you?payment_method=razorpay&bookingId=${pendingBookingDocId}`);
+            router.push(`/checkout/thank-you?payment_method=razorpay`);
           }
         },
         prefill: { name: customerNameForPrefill, email: customerEmailForPrefill, contact: customerContactForPrefill },
         notes: { 
           address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Fixbro"} Service Booking`, 
           ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), 
-          ...(!isCancellationFeeMode && pendingBookingDocId && {type: 'booking', bookingId: pendingBookingDocId}),
-          ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) 
+          ...(!isCancellationFeeMode && {type: 'booking', cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) 
         },
         theme: { color: "#45A0A2" },
         modal: { 
           ondismiss: async () => { 
             setIsProcessingPayment(false); 
             hideLoading(); 
-            if (pendingBookingDocId) {
-              try {
-                const bRef = doc(db, 'bookings', pendingBookingDocId);
-                const bSnap = await getDoc(bRef);
-                if (bSnap.exists() && bSnap.data()?.status === 'Pending Payment') {
-                  await deleteDoc(bRef);
-                }
-              } catch (e) {
-                console.error("Error cleaning up dismissed booking:", e);
-              }
-            }
           }
         }
       };
@@ -723,17 +717,6 @@ export default function PaymentPage() {
         toast({ title: "Payment Failed", description: response.error.description || "An error occurred.", variant: "destructive" }); 
         setIsProcessingPayment(false); 
         hideLoading(); 
-        if (pendingBookingDocId) {
-          try {
-            const bRef = doc(db, 'bookings', pendingBookingDocId);
-            const bSnap = await getDoc(bRef);
-            if (bSnap.exists() && bSnap.data()?.status === 'Pending Payment') {
-              await deleteDoc(bRef);
-            }
-          } catch (e) {
-            console.error("Error cleaning up failed booking:", e);
-          }
-        }
       });
       rzp.open();
     } catch (error) { 
@@ -796,7 +779,13 @@ export default function PaymentPage() {
       });
 
       if (!res.ok) {
-        try { await deleteDoc(doc(db, 'bookings', docRef.id)); } catch (e) {}
+        try {
+          await fetch('/api/bookings/cancel-pending-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: docRef.id }),
+          });
+        } catch (e) {}
         const err = await res.json();
         throw new Error(err.error || 'Failed to initiate Stripe checkout.');
       }

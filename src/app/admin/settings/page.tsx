@@ -1592,30 +1592,52 @@ export default function AdminSettingsPage() {
                             Required to authenticate webhook callbacks from Razorpay.
                           </p>
                         </div>
-                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
-                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Razorpay Webhook Endpoint URL:</p>
-                          <div className="flex gap-2 items-center">
-                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
-                              {typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook"}
-                            </code>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 bg-background"
-                              onClick={() => {
-                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook";
-                                navigator.clipboard.writeText(url);
-                                setCopiedRazorpay(true);
-                                setTimeout(() => setCopiedRazorpay(false), 2000);
-                              }}
-                            >
-                              {copiedRazorpay ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                            </Button>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs space-y-2.5">
+                          <div>
+                            <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Razorpay Webhook Endpoint URL:</p>
+                            <div className="flex gap-2 items-center">
+                              <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                                {typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook"}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 bg-background"
+                                onClick={() => {
+                                  const url = typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook";
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedRazorpay(true);
+                                  setTimeout(() => setCopiedRazorpay(false), 2000);
+                                }}
+                              >
+                                {copiedRazorpay ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                              Register this URL in your Razorpay Dashboard under <strong className="text-foreground">Account &amp; Settings &gt; Webhooks</strong>.
+                            </p>
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
-                            Register this URL in your Razorpay Dashboard under Settings &gt; Webhooks.
-                          </p>
+
+                          <div className="pt-2 border-t border-primary/15 space-y-1.5">
+                            <p className="font-bold text-foreground text-[11px]">
+                              ✅ Compulsory Webhook Events to Enable (Select ONLY these):
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <code className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-[11px]">
+                                order.paid
+                              </code>
+                              <code className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-[11px]">
+                                payment.captured
+                              </code>
+                              <code className="px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground font-mono font-semibold text-[11px]">
+                                payment.failed (optional)
+                              </code>
+                            </div>
+                            <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium leading-normal">
+                              ⚠️ Do <strong>NOT</strong> select &quot;Select All Events&quot; or enable <code className="font-mono">payment.downtime.*</code> events — those broadcast nationwide bank/UPI fluctuations every few seconds.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1676,30 +1698,43 @@ export default function AdminSettingsPage() {
                             Required to authenticate webhook callbacks from Stripe.
                           </p>
                         </div>
-                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
-                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Stripe Webhook Endpoint URL:</p>
-                          <div className="flex gap-2 items-center">
-                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
-                              {typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook"}
-                            </code>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 bg-background"
-                              onClick={() => {
-                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook";
-                                navigator.clipboard.writeText(url);
-                                setCopiedStripe(true);
-                                setTimeout(() => setCopiedStripe(false), 2000);
-                              }}
-                            >
-                              {copiedStripe ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                            </Button>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs space-y-2.5">
+                          <div>
+                            <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Stripe Webhook Endpoint URL:</p>
+                            <div className="flex gap-2 items-center">
+                              <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                                {typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook"}
+                              </code>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 bg-background"
+                                onClick={() => {
+                                  const url = typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook";
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedStripe(true);
+                                  setTimeout(() => setCopiedStripe(false), 2000);
+                                }}
+                              >
+                                {copiedStripe ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                              Register this URL in your Stripe Dashboard under <strong className="text-foreground">Developers &gt; Webhooks</strong>.
+                            </p>
                           </div>
-                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
-                            Register this URL in your Stripe Dashboard under Developers &gt; Webhooks. Select event: <strong className="text-foreground">checkout.session.completed</strong>.
-                          </p>
+
+                          <div className="pt-2 border-t border-primary/15 space-y-1.5">
+                            <p className="font-bold text-foreground text-[11px]">
+                              ✅ Compulsory Webhook Event to Enable:
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <code className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-[11px]">
+                                checkout.session.completed
+                              </code>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}

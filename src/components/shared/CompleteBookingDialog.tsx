@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, CheckCircle2, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { formatCurrency, isCashPayment } from '@/lib/utils';
+import { formatCurrency, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
 import type { FirestoreBooking } from '@/types/firestore';
 
 interface AdditionalCharge {
@@ -48,7 +48,7 @@ export default function CompleteBookingDialog({
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
   
   const paymentMethodName = booking?.paymentMethod || currentPaymentMethod || 'Pay After Service';
-  const isPrepaidOnline = !isCashPayment(paymentMethodName);
+  const isPrepaidOnline = !isCashPayment(paymentMethodName) && hasOnlinePaymentProof(booking);
 
   const addCharge = () => {
     setCharges([...charges, { name: "", amount: 0 }]);

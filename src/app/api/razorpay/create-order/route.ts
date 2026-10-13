@@ -68,7 +68,8 @@ function calculateServerCancellationFee(bookingData: any, appConfig: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { amount, currency = 'INR', notes } = await req.json();
+    const body = await req.json();
+    const { amount, currency = 'INR', notes, cartEntries: bodyCartEntries, promoCode: bodyPromoCode, categoryId: bodyCategoryId } = body;
 
     if (!amount || typeof amount !== 'number' || amount < 100) { // Razorpay minimum is 1 INR (100 paise)
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest) {
     const type = notes?.type;
     const bookingId = notes?.bookingId;
     const providerId = notes?.providerId;
+    const rawCartEntries = bodyCartEntries || notes?.cartEntries;
+    const rawPromoCode = bodyPromoCode ?? notes?.promoCode;
+    const rawCategoryId = bodyCategoryId ?? notes?.categoryId;
 
     let reconciledBaseAmount = amount / 100;
 
@@ -121,13 +125,13 @@ export async function POST(req: NextRequest) {
       } else if (type === 'cancellation_fee') {
         reconciledBaseAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
-    } else if (type === 'booking' && notes?.cartEntries) {
+    } else if (type === 'booking' && rawCartEntries) {
       try {
-        const parsedCart = typeof notes.cartEntries === 'string' ? JSON.parse(notes.cartEntries) : notes.cartEntries;
+        const parsedCart = typeof rawCartEntries === 'string' ? JSON.parse(rawCartEntries) : rawCartEntries;
         const calculation = await calculateServerBookingTotal({
           cartEntries: parsedCart,
-          promoCode: notes.promoCode,
-          categoryId: notes.categoryId,
+          promoCode: rawPromoCode,
+          categoryId: rawCategoryId,
         });
         reconciledBaseAmount = calculation.totalAmount;
       } catch (err) {
@@ -156,14 +160,20 @@ export async function POST(req: NextRequest) {
       key_secret: razorpayKeySecret,
     });
 
+    const sanitizedNotes: Record<string, string> = {};
+    if (notes && typeof notes === 'object') {
+      for (const [k, v] of Object.entries(notes)) {
+        if (k === 'cartEntries' || v === undefined || v === null) continue;
+        sanitizedNotes[k] = String(v).slice(0, 250);
+      }
+    }
+    sanitizedNotes.amount = reconciledBaseAmount.toString();
+
     const options = {
       amount: reconciledAmountPaise, // amount in the smallest currency unit (paise)
       currency: currency,
       receipt: `receipt_${nanoid()}`,
-      notes: {
-        ...(notes || {}),
-        amount: reconciledBaseAmount.toString()
-      },
+      notes: sanitizedNotes,
     };
 
     const order = await instance.orders.create(options);
