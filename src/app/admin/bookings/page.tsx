@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { generateInvoicePdf as generateInvoicePdfForDownload } from '@/lib/invoiceGenerator'; 
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from "@/hooks/useGlobalSettings";
-import { recalculateProviderStatsAction } from '@/app/actions/providerWalletActions';
+import { recalculateProviderStatsAction, updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
 import AssignProviderModal from '@/components/admin/AssignProviderModal'; 
 import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
@@ -482,7 +482,20 @@ export default function AdminBookingsPage() {
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
 
-      await updateDoc(doc(db, "bookings", booking.id), updateData);
+      if (newStatus === "Completed" && booking.providerId) {
+        const result = await updateBookingStatusByProviderAction(
+          booking.id,
+          booking.providerId,
+          newStatus,
+          additionalCharges,
+          finalizedPaymentMethod
+        );
+        if (!result.success) {
+          throw new Error(result.message || "Failed to complete booking.");
+        }
+      } else {
+        await updateDoc(doc(db, "bookings", booking.id), updateData);
+      }
 
       // Trigger automatic recalculation for provider stats if provider was set
       if (booking.providerId) {
