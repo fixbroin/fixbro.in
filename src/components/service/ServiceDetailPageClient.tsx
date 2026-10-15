@@ -31,11 +31,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, getTimestampMillis, formatCurrency } from '@/lib/utils';
 import { LazySection } from '@/components/shared/LazySection';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import RecommendedServicesSection from '@/components/service/RecommendedServicesSection';
 
 interface ServiceDetailPageClientProps {
   serviceSlug: string;
   initialServiceData?: ClientServiceData | null;
   initialH1Title?: string;
+  initialRecommendedServices?: FirestoreService[];
 }
 
 const generateAiHint = (hint?: string, name?: string): string => {
@@ -124,6 +126,7 @@ export default function ServiceDetailPageClient({
   serviceSlug,
   initialServiceData,
   initialH1Title,
+  initialRecommendedServices,
 }: ServiceDetailPageClientProps) {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
@@ -711,6 +714,18 @@ export default function ServiceDetailPageClient({
           </div>
         </div>
       </Card>
+
+      {/* RECOMMENDED SERVICES (SAME CATEGORY & SUBCATEGORY) */}
+      <LazySection>
+        <RecommendedServicesSection
+          currentServiceId={service.id}
+          subCategoryId={service.subCategoryId}
+          parentCategoryId={service.parentCategoryId}
+          parentCategoryName={service.parentCategoryName}
+          parentCategorySlug={service.parentCategorySlug}
+          initialServices={initialRecommendedServices}
+        />
+      </LazySection>
 
       {/* FAQ SECTION */}
       {service.serviceFaqs && service.serviceFaqs.length > 0 && (

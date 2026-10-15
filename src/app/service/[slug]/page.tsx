@@ -13,6 +13,7 @@ import { notFound } from 'next/navigation';
 import { getAggregateRating } from '@/lib/homepageUtils';
 import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { serializeFirestoreData } from '@/lib/serializeUtils';
 
 export const revalidate = false; // Persistent Cache (Smart Revalidation Only)
 
@@ -131,6 +132,72 @@ const getServiceData = cache(async (slug: string): Promise<ClientServiceData | n
   )();
 });
 
+const getRecommendedServices = cache(async (
+  currentServiceId: string, 
+  subCategoryId?: string, 
+  parentCategoryId?: string
+): Promise<FirestoreService[]> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const servRef = adminDb.collection('adminServices');
+        const results: FirestoreService[] = [];
+
+        // 1. Fetch other services from the same subcategory
+        if (subCategoryId) {
+          const qSub = servRef
+            .where('subCategoryId', '==', subCategoryId)
+            .where('isActive', '==', true)
+            .limit(12);
+          const snapSub = await qSub.get();
+          snapSub.docs.forEach(docSnap => {
+            if (docSnap.id !== currentServiceId) {
+              const data = serializeFirestoreData<any>(docSnap.data());
+              results.push({ id: docSnap.id, ...data });
+            }
+          });
+        }
+
+        // 2. If fewer than 6, also fetch from other subcategories in the same parent category
+        if (results.length < 6 && parentCategoryId) {
+          const subCatRef = adminDb.collection('adminSubCategories');
+          const qOtherSubCats = subCatRef
+            .where('parentId', '==', parentCategoryId)
+            .where('isActive', '==', true)
+            .limit(8);
+          const snapOtherSubCats = await qOtherSubCats.get();
+          const otherSubCatIds = snapOtherSubCats.docs
+            .map(d => d.id)
+            .filter(id => id !== subCategoryId);
+
+          if (otherSubCatIds.length > 0) {
+            const qCatServices = servRef
+              .where('subCategoryId', 'in', otherSubCatIds.slice(0, 10))
+              .where('isActive', '==', true)
+              .limit(12);
+            const snapCatServices = await qCatServices.get();
+            snapCatServices.docs.forEach(docSnap => {
+              if (docSnap.id !== currentServiceId && !results.some(r => r.id === docSnap.id)) {
+                const data = serializeFirestoreData<any>(docSnap.data());
+                results.push({ id: docSnap.id, ...data });
+              }
+            });
+          }
+        }
+
+        return results
+          .sort((a, b) => (a.order || 0) - (b.order || 0) || (b.rating || 0) - (a.rating || 0))
+          .slice(0, 12);
+      } catch (err) {
+        console.error('Error fetching recommended services server-side:', err);
+        return [];
+      }
+    },
+    [`recommended-services-${currentServiceId}-${subCategoryId || 'none'}`],
+    { revalidate: false, tags: ['services', 'global-cache'] }
+  )();
+});
+
 export async function generateMetadata(
   { params }: ServicePageProps,
   parent: ResolvingMetadata
@@ -190,6 +257,12 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   if (!serviceData) {
     notFound();
   }
+
+  const recommendedServices = await getRecommendedServices(
+    serviceData.id,
+    serviceData.subCategoryId,
+    serviceData.parentCategoryId
+  );
 
   const cityName = seoSettings.structuredDataLocality || "Bangalore";
   const placeholderData = { 
@@ -325,7 +398,12 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
       <JsonLdScript data={productSchema} idSuffix={`product-${serviceData.id}`} />
       <JsonLdScript data={breadcrumbSchema} idSuffix={`breadcrumb-service-${serviceData.id}`} />
       {faqSchema && <JsonLdScript data={faqSchema} idSuffix={`faq-${serviceData.id}`} />}
-      <ServiceDetailPageClient serviceSlug={slug} initialServiceData={serviceData} initialH1Title={h1Title} />
+      <ServiceDetailPageClient 
+        serviceSlug={slug} 
+        initialServiceData={serviceData} 
+        initialH1Title={h1Title} 
+        initialRecommendedServices={recommendedServices}
+      />
     </>
   );
 }

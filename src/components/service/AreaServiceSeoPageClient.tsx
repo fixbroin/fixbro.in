@@ -11,6 +11,7 @@ import AppImage from '@/components/ui/AppImage';
 import { CheckCircle2, XCircle, Star, Phone, ShieldCheck, Clock, MapPin, Sparkles, ArrowRight } from 'lucide-react';
 import type { FirestoreCity, FirestoreArea, FirestoreService, AreaServiceSeoSetting, FaqItem } from '@/types/firestore';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import RecommendedServicesSection from '@/components/service/RecommendedServicesSection';
 
 interface AreaServiceSeoPageClientProps {
   cityData: FirestoreCity;
@@ -248,6 +249,14 @@ export default function AreaServiceSeoPageClient({
             </CardContent>
           </Card>
         )}
+
+        {/* Recommended Services in the same category & subcategory */}
+        <RecommendedServicesSection
+          currentServiceId={serviceData.id}
+          subCategoryId={serviceData.subCategoryId}
+          parentCategoryId={serviceData.parentCategoryId || (serviceData as any).categoryId}
+          parentCategoryName={(serviceData as any).parentCategoryName || (serviceData as any).categoryName}
+        />
 
         {/* Dynamic Nearby Locations Directory */}
         {cityAreas && cityAreas.length > 0 && (
