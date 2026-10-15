@@ -11,6 +11,7 @@ import {
   cleanSeoString,
   truncateSeoString,
   stripBrandSuffix,
+  getCategorySearchTerm,
 } from '@/lib/seoAdvancedUtils';
 
 const GenerateAreaCategorySeoInputSchema =
@@ -25,6 +26,10 @@ const GenerateAreaCategorySeoInputSchema =
 
     categoryName: z.string().describe(
       'Category name. Example: Carpentry'
+    ),
+
+    categoryTrade: z.string().optional().describe(
+      'Specialist trade name. Example: Carpenter'
     ),
   });
 
@@ -115,6 +120,7 @@ TARGET:
 Area: {{areaName}}
 City: {{cityName}}
 Category: {{categoryName}}
+Trade: {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}}
 
 IMPORTANT SEO RULES:
 
@@ -126,8 +132,8 @@ IMPORTANT SEO RULES:
 - painting services near me
 - furniture assembly near me
 
-2. Avoid overusing:
-- handyman
+2. NEVER use the word "handyman" (nobody in India searches for handyman; use "home services", specific trade names like carpenter, plumber, electrician, and service names).
+Avoid overusing:
 - best
 - top-rated
 - professional
@@ -156,7 +162,7 @@ OUTPUT RULES:
 
 1. h1_title
 Format:
-"{{categoryName}} Services in {{areaName}}"
+"{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Services in {{areaName}}"
 
 Examples:
 "Carpenter Services in Whitefield"
@@ -164,27 +170,28 @@ Examples:
 
 2. meta_title
 Rules:
-- Strictly 35 to 48 characters
-- NEVER include brand/company name (e.g. Fixbro, Fixbro). The website template automatically appends it.
-- Format: "{{categoryName}} in {{areaName}} | Near Me" or "{{categoryName}} in {{areaName}}, {{cityName}}"
+- Strictly 35 to 55 characters
+- NEVER include brand/company name (e.g. Fixbro, FixBro). The website template automatically appends it.
+- Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{areaName}}, {{cityName}} | Near Me" or "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{areaName}} | Near Me"
 - Natural, search optimized
 
 Examples:
-"Carpenter in Whitefield | Near Me"
-"Plumber in HSR Layout | Near Me"
+"Carpenter in Whitefield, Bangalore | Near Me"
+"Plumber in HSR Layout, Bangalore | Near Me"
+"Electrician in Koramangala | Near Me"
 
 3. meta_description
 Rules:
 - Strictly under 155 characters
 - Mention:
-  - "{{categoryName}} in {{areaName}}, {{cityName}} near you"
+  - "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{areaName}}, {{cityName}} near you"
   - trusted verified experts
   - upfront pricing & same-day doorstep service
   - call to action: "Book online now!"
 - NEVER include company name (template appends it).
 
 Example:
-"Book trusted carpenter in Whitefield, Bangalore near you. Doorstep furniture repair, assembly & woodwork by verified experts. Book online now!"
+"Book trusted carpenter in Whitefield, Bangalore near you. Doorstep furniture repair, assembly & woodwork by verified experts. Upfront rates. Book online now!"
 
 4. meta_keywords
 Rules:
@@ -252,8 +259,12 @@ const generateAreaCategorySeoFlow =
     },
 
     async (input) => {
+      const categoryTrade = getCategorySearchTerm(input.categoryName);
       const { output } =
-        await prompt(input);
+        await prompt({
+          ...input,
+          categoryTrade,
+        });
 
       if (!output) {
         throw new Error(
@@ -270,7 +281,7 @@ const generateAreaCategorySeoFlow =
 
         meta_title: truncateSeoString(
           cleanTitle,
-          48
+          55
         ),
 
         meta_description:

@@ -16,85 +16,85 @@ export const defaultSeoValues: FirestoreSEOSettings = {
     'carpenter near me, plumber near me, electrician near me, tv installation near me, painting services near me, interior designers near me, furniture assembly near me, home repair services bangalore',
 
   homepageMetaTitle:
-    'Verified Carpenter, Plumber, Electrician & Home Services in Bangalore | Fixbro',
+    'Verified Carpenter, TV Installation, Interior & Home Services in Bangalore | Fixbro',
 
   homepageMetaDescription:
-    'Book verified carpenter, plumber, electrician, painting, appliance repair, and home maintenance services in Bangalore. Same-day service, upfront pricing, and 99.9% satisfaction guaranteed.',
+    'Book verified carpenter, TV installation, interior work, painting, electrical, plumbing, and home maintenance services in Bangalore. Same-day service, upfront pricing, and 99.9% satisfaction guaranteed.',
 
   homepageMetaKeywords:
-    'carpenter near me, plumber near me, electrician near me, tv installation near me, painting services near me, interior designers near me, furniture assembly near me, handyman services bangalore',
+    'carpenter near me, tv installation near me, interior designers near me, electrician near me, plumber near me, painting services near me, furniture assembly near me, home services bangalore, home services near me',
 
   homepageH1:
     'Trusted Home Services Near You in Bangalore',
 
   categoryPageTitlePattern:
-    'Best {{categorySearchTerm}} Near Me in Bangalore | Top-Rated Home Services',
+    'Best {{categorySearchTerm}} & Home Services Near Me in Bangalore',
 
   categoryPageDescriptionPattern:
-    'Book top-rated, background-verified {{categorySearchTerm}} near you in Bangalore. Get professional installation, repair, and handyman services with same-day availability and transparent pricing.',
+    'Book top-rated, background-verified {{categorySearchTerm}} and home services near you in Bangalore. Professional installation, repair, and maintenance with same-day availability and upfront pricing.',
 
   categoryPageKeywordsPattern:
-    '{{categorySearchTerm}} near me, best {{categorySearchTerm}} near me, affordable {{categorySearchTerm}} in bangalore, local {{categorySearchTerm}} services',
+    '{{categorySearchTerm}} near me, best {{categorySearchTerm}} near me, affordable {{categorySearchTerm}} in bangalore, local {{categorySearchTerm}} services, home services bangalore',
 
   categoryPageH1Pattern:
     '{{categorySearchTerm}} Services in Bangalore',
 
   cityCategoryPageTitlePattern:
-    'Best {{categorySearchTerm}} in {{cityName}} Bangalore | Verified Experts Near Me',
+    '{{categorySearchTerm}} in {{cityName}} | {{categorySearchTerm}} Services Near Me',
 
   cityCategoryPageDescriptionPattern:
-    'Hire the best professional {{categorySearchTerm}} in {{cityName}} Bangalore. Background-verified experts, 99.9% satisfaction guarantee, and upfront pricing. Book now!',
+    'Hire the best professional {{categorySearchTerm}} in {{cityName}} for repair, installation, and maintenance services. Background-verified experts, upfront pricing, and same-day doorstep service.',
 
   cityCategoryPageKeywordsPattern:
-    '{{categorySearchTerm}} {{cityName}}, {{categorySearchTerm}} near me, best {{categorySearchTerm}} in {{cityName}}, affordable {{categorySearchTerm}}',
+    '{{categorySearchTerm}} {{cityName}}, {{categorySearchTerm}} near me, best {{categorySearchTerm}} in {{cityName}}, affordable {{categorySearchTerm}}, home services {{cityName}}',
 
   cityCategoryPageH1Pattern:
     '{{categorySearchTerm}} Services in {{cityName}}',
 
   areaCategoryPageTitlePattern:
-    'Best {{categorySearchTerm}} in {{areaName}}, Bangalore | #1 Rated Service',
+    '{{categorySearchTerm}} in {{areaName}}, {{cityName}} | {{categorySearchTerm}} Near Me',
 
   areaCategoryPageDescriptionPattern:
-    'Looking for professional {{categorySearchTerm}} in {{areaName}} Bangalore? Book background-verified local experts for repair, installation, and maintenance with same-day service and upfront pricing.',
+    'Looking for professional {{categorySearchTerm}} in {{areaName}}, {{cityName}}? Book background-verified local experts for repair, installation, and maintenance with same-day doorstep service.',
 
   areaCategoryPageKeywordsPattern:
-    '{{categorySearchTerm}} {{areaName}}, {{categorySearchTerm}} near me {{areaName}}, best {{categorySearchTerm}} {{areaName}}, affordable {{categorySearchTerm}}',
+    '{{categorySearchTerm}} {{areaName}}, {{categorySearchTerm}} near me {{areaName}}, best {{categorySearchTerm}} {{areaName}}, home services {{areaName}}',
 
   areaCategoryPageH1Pattern:
     '{{categorySearchTerm}} Services in {{areaName}}',
 
   servicePageTitlePattern:
-    'Professional {{serviceName}} in Bangalore | Same-Day Service',
+    '{{serviceName}} in Bangalore | {{serviceName}} Near Me',
 
   servicePageDescriptionPattern:
-    'Book professional {{serviceName}} in Bangalore with Fixbro. Verified technicians, transparent rates, and same-day availability. 99.9% satisfaction guaranteed!',
+    'Book professional {{serviceName}} in Bangalore with FixBro. Verified technicians, transparent rates, and same-day availability near you.',
 
   servicePageKeywordsPattern:
-    '{{serviceName}} near me, best {{serviceName}} in bangalore, affordable {{serviceName}}, local {{serviceName}} services',
+    '{{serviceName}} near me, best {{serviceName}} in bangalore, affordable {{serviceName}}, local {{serviceName}} services, book {{serviceName}}',
 
   servicePageH1Pattern:
     '{{serviceName}} in Bangalore',
 
   areaPageTitlePattern:
-    'Best Carpenter, Plumber & Electrician Services in {{areaName}} Bangalore',
+    'Carpenter, TV Installation, Interior & Home Services in {{areaName}} | Near Me',
 
   areaPageDescriptionPattern:
-    'Book verified carpenters, plumbers, electricians, painters, and home repair technicians in {{areaName}} Bangalore. Top-rated local services at transparent rates.',
+    'Book verified carpenters, TV installation, interior experts, electricians, and home services near you in {{areaName}}, {{cityName}}. Top-rated local professionals at upfront rates.',
 
   areaPageKeywordsPattern:
-    'carpenter {{areaName}}, plumber {{areaName}}, electrician {{areaName}}, tv installation {{areaName}}, painting services {{areaName}}, home services {{areaName}}',
+    'home services {{areaName}}, carpenter {{areaName}}, tv installation {{areaName}}, interior designers {{areaName}}, electrician {{areaName}}, home services near me, repair services {{areaName}}',
 
   areaPageH1Pattern:
     'Home Services in {{areaName}}',
 
   cityPageTitlePattern:
-    'Top-Rated Home Repair Services in {{cityName}} | Fixbro',
+    'Carpenter, TV Installation, Interior & Home Services in {{cityName}} | Near Me',
 
   cityPageDescriptionPattern:
-    'Book trusted carpenter, plumber, electrician, painting, furniture assembly, and home repair services in {{cityName}} Bangalore. Professional, verified experts near you.',
+    'Book trusted carpenter, TV installation, interior work, painting, electrical, and home services near you in {{cityName}}. Professional, verified experts, upfront pricing.',
 
   cityPageKeywordsPattern:
-    'carpenter {{cityName}}, plumber {{cityName}}, electrician {{cityName}}, tv installation {{cityName}}, painting services {{cityName}}, home repair services {{cityName}}',
+    'home services {{cityName}}, carpenter {{cityName}}, tv installation {{cityName}}, interior designers {{cityName}}, electrician {{cityName}}, home services near me, repair services {{cityName}}',
 
   cityPageH1Pattern:
     'Home Services in {{cityName}}',
@@ -408,7 +408,13 @@ export function replacePlaceholders(
       ) {
         const value = extendedData[key];
 
-        const replaceVal = value !== undefined && value !== null ? String(value) : '';
+        let replaceVal = '';
+        if (Array.isArray(value)) {
+          replaceVal = value.filter(Boolean).join(', ');
+        } else if (value !== undefined && value !== null) {
+          replaceVal = String(value);
+        }
+
         result = result
           .replace(new RegExp(`{{${key}}}`, 'g'), replaceVal)
           .replace(new RegExp(`{${key}}`, 'g'), replaceVal);
@@ -421,12 +427,9 @@ export function replacePlaceholders(
   // Clean extra spaces and duplicate separators
   result = cleanSeoString(result);
 
-  // Auto append title suffix only once, and ONLY if it's a title
-  if (isTitle) {
-    const titleSuffix = defaultSeoValues.defaultMetaTitleSuffix || '';
-    if (result && titleSuffix && !result.endsWith(titleSuffix)) {
-      result += titleSuffix;
-    }
+  // If it's a page title, ensure no duplicate brand suffix is appended
+  if (isTitle && result) {
+    result = result.replace(/\s*[|\-–]\s*Fixbro\s*$/i, '').trim();
   }
   
   return result;

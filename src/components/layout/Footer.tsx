@@ -18,10 +18,16 @@ import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import type { FirestoreNotification } from '@/types/firestore';
 import LocalSiloLinks from './LocalSiloLinks';
+import type { SiloData } from '@/lib/seoServerUtils';
 
 interface FooterServiceLink {
   name: string;
   slug: string;
+}
+
+interface FooterProps {
+  initialWebSettings?: any;
+  initialSiloData?: SiloData;
 }
 
 const FooterLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
@@ -56,12 +62,18 @@ const FooterLink = ({ href, children }: { href: string; children: React.ReactNod
   );
 };
 
-const Footer = () => {
+const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) => {
   const currentYear = new Date().getFullYear();
   const [isMounted, setIsMounted] = useState(false);
-  const { settings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
-  const [serviceLinks, setServiceLinks] = useState<FooterServiceLink[]>([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const { settings: clientSettings } = useGlobalSettings();
+  const settings = clientSettings || initialWebSettings || {};
+  
+  const initialCategories: FooterServiceLink[] = (initialSiloData?.categories || []).slice(0, 6).map((c) => ({
+    name: c.name,
+    slug: c.slug,
+  }));
+  const [serviceLinks, setServiceLinks] = useState<FooterServiceLink[]>(initialCategories);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(initialCategories.length === 0);
   const [subscribeEmail, setSubscribeEmail] = useState('');
   const [isSubscribing, setIsSubscribing] = useState(false);
   const { toast } = useToast();
@@ -72,6 +84,8 @@ const Footer = () => {
 
   useEffect(() => {
     setIsMounted(true);
+
+    if (serviceLinks.length > 0) return;
 
     const fetchFooterCategories = async () => {
       setIsLoadingCategories(true);
@@ -93,7 +107,7 @@ const Footer = () => {
     };
 
     fetchFooterCategories();
-  }, []);
+  }, [serviceLinks.length]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,7 +169,8 @@ const Footer = () => {
     }
   };
 
-  if (!isMounted || isLoadingGlobalSettings || isLoadingCategories) {
+  const hasContent = !!(initialWebSettings || clientSettings || initialSiloData?.city);
+  if (!hasContent && !isMounted) {
     return (
       <footer className="hidden md:block bg-muted/30 border-t">
         <div className="container mx-auto px-4 py-16">
@@ -180,7 +195,7 @@ const Footer = () => {
 
   return (
     <footer className="hidden md:block bg-muted/30 border-t text-foreground">
-      <LocalSiloLinks />
+      <LocalSiloLinks initialData={initialSiloData} />
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-12">
           {/* Brand Column */}

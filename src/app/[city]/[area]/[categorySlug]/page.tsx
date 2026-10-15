@@ -12,7 +12,7 @@ import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { getCategoryFullData, getAggregateRating } from '@/lib/homepageUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
-import { getCategorySearchTerm, generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { getCategorySearchTerm, generateBreadcrumbSchema, formatAreaCategoryTitle, cleanServiceName } from '@/lib/seoAdvancedUtils';
 import { getSpinnedLocalContent } from '@/lib/seoGenerator';
 
 export const revalidate = false;
@@ -88,24 +88,50 @@ export async function generateMetadata(
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
   const searchTerm = getCategorySearchTerm(categoryData.name);
-  const placeholderData = { cityName: cityData.name, areaName: areaData.name, categoryName: categoryData.name, categorySearchTerm: searchTerm };
 
-  // PRIORITY: 1. Manual Override | 2. Global Pattern (Dynamic) | 3. Generic Category SEO
-  const title = replacePlaceholders(
-    seoOverride?.meta_title || seoSettings.areaCategoryPageTitlePattern || categoryData.metaTitle || categoryData.seo_title, 
-    placeholderData,
-    true
-  ) || `Best ${searchTerm} in ${areaData.name}, ${cityData.name} | Expert ${searchTerm} Near Me`;
+  // Fetch top active services under this category for dynamic keywords and title integration
+  let serviceNamesList: string[] = [];
+  try {
+    const servicesSnapshot = await adminDb.collection('adminServices')
+      .where('parentCategoryId', '==', categoryData.id)
+      .where('isActive', '==', true)
+      .limit(6)
+      .get();
+    serviceNamesList = servicesSnapshot.docs.map(d => cleanServiceName(d.data().name)).filter(Boolean);
+  } catch (err) {
+    // fallback
+  }
+
+  const primaryService = serviceNamesList[0] || '';
+  const serviceNamesText = serviceNamesList.join(', ');
+
+  const placeholderData = {
+    cityName: cityData.name,
+    areaName: areaData.name,
+    categoryName: categoryData.name,
+    categorySearchTerm: searchTerm,
+    serviceNames: serviceNamesText,
+    primaryService: primaryService
+  };
+
+  // High-CTR natural search title (incorporating category + service name)
+  const title = formatAreaCategoryTitle(
+    seoOverride?.meta_title || categoryData.metaTitle || categoryData.seo_title,
+    searchTerm,
+    areaData.name,
+    cityData.name,
+    primaryService
+  );
 
   const description = replacePlaceholders(
     seoOverride?.meta_description || seoSettings.areaCategoryPageDescriptionPattern || categoryData.metaDescription || categoryData.seo_description, 
     placeholderData
-  ) || `Hire top-rated ${searchTerm} experts in ${areaData.name}, ${cityData.name}. Trusted professionals, transparent pricing, and quality home services near you.`;
+  ) || `Hire top-rated ${searchTerm} experts in ${areaData.name}, ${cityData.name} for ${serviceNamesText || 'repair and installation'}. Trusted professionals, transparent pricing, and quality home services near you.`;
 
   const keywords = (replacePlaceholders(
     seoOverride?.meta_keywords || seoSettings.areaCategoryPageKeywordsPattern || categoryData.metaKeywords || categoryData.seo_keywords, 
     placeholderData
-  ) || `${searchTerm} in ${areaData.name}, best ${searchTerm} near me`).split(',').map(k => k.trim()).filter(k => k);
+  ) || `${searchTerm} in ${areaData.name}, ${searchTerm} near me, ${serviceNamesText}`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = categoryData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;

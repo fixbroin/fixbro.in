@@ -69,15 +69,15 @@ const prompt = ai.definePrompt({
   prompt: `
 You are an advanced Local SEO expert for Fixbro.
 
-Fixbro provides:
-- Carpenter services
-- Plumbing services
-- Electrician services
-- TV installation services
-- Painting services
-- Furniture assembly services
-- Interior services
-- Home repair services
+Fixbro provides (strictly prioritize in this order):
+1. Carpenter services (Top Priority #1)
+2. TV installation services (Priority #2)
+3. Interior services (Priority #3)
+4. Electrician services
+5. Plumbing services
+6. Painting services
+7. Furniture assembly services
+8. Home repair services
 
 TARGET LOCATION:
 Area: {{areaName}}
@@ -87,14 +87,15 @@ IMPORTANT SEO RULES:
 
 1. Focus strongly on high-search keywords:
 - carpenter near me
-- plumber near me
-- electrician near me
 - tv installation near me
+- interior designers near me
+- electrician near me
+- plumber near me
 - painting services near me
 - furniture assembly near me
 
-2. Avoid overusing:
-- handyman
+2. NEVER use the word "handyman" (nobody in India searches for handyman; use "home services", specific category names like carpenter, tv installation, interior, and "near me" keywords).
+Avoid overusing:
 - best
 - top-rated
 
@@ -118,13 +119,13 @@ OUTPUT RULES:
 
 1. h1_title
 Format:
-"Carpenter, Plumber & Electrician Services in {{areaName}}"
+"Carpenter, TV Installation & Home Services in {{areaName}}"
 
 2. seo_title
 Rules:
-- Strictly 35 to 48 characters
-- NEVER include brand/company name (e.g. Fixbro, Fixbro). The website template automatically appends it.
-- Format: "Home Services in {{areaName}} | Near Me" or "Home Services in {{areaName}}, {{cityName}}"
+- Strictly 35 to 55 characters
+- NEVER include brand/company name (e.g. Fixbro, FixBro). The website template automatically appends it.
+- Format: "Home Services in {{areaName}}, {{cityName}} | Near Me" or "Carpenter, TV Installation in {{areaName}} | Near Me"
 - Natural, search optimized
 
 3. seo_description
@@ -133,13 +134,13 @@ Rules:
 - Mention:
   - "Home services in {{areaName}}, {{cityName}} near you"
   - trusted verified experts
-  - carpenter, plumber & electrician
+  - carpenter, TV installation & interior
   - upfront pricing & same-day visit
   - call to action: "Book online now!"
 - NEVER include company name (template appends it).
 
 Example:
-"Book trusted home services in Whitefield, Bangalore near you. Verified carpenter, plumber & electrician doorstep visit with upfront rates. Book online now!"
+"Book trusted home services in Whitefield, Bangalore near you. Verified carpenter, TV installation & interior doorstep visit with upfront rates. Book online now!"
 
 4. seo_keywords
 Rules:
@@ -150,14 +151,14 @@ Rules:
 Example:
 carpenter whitefield,
 carpenter near me whitefield,
-plumber whitefield,
-electrician whitefield,
 tv installation whitefield,
-painting services whitefield,
+tv installation near me whitefield,
+interior designers whitefield,
+electrician whitefield,
+plumber whitefield,
 furniture assembly whitefield,
-home repair whitefield,
-electrician near me whitefield,
-plumber near me whitefield
+painting services whitefield,
+home services near me whitefield
 
 Generate highly optimized local SEO now.
 `,
@@ -190,7 +191,7 @@ const generateAreaSeoFlow = ai.defineFlow(
 
       seo_title: truncateSeoString(
         cleanTitle,
-        48
+        55
       ),
 
       seo_description: truncateSeoString(

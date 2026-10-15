@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { Loader2, Edit2, Lock, CheckCircle, Search, MapPin, Building, Tags, Plus, Trash2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateFreeAreaServiceSeoData, getNearbyAreasSorted } from "@/lib/seoGenerator";
+import { cleanServiceName } from "@/lib/seoAdvancedUtils";
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -204,11 +205,11 @@ export default function AreaServiceSeoForm({
       });
 
       // Set fallback titles
-      const cleanServiceName = selectedService.name;
-      form.setValue("h1_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name}`);
-      form.setValue("meta_title", `${cleanServiceName} in ${selectedArea.name}, ${selectedCity.name} | Fixbro`);
-      form.setValue("meta_description", `Professional ${cleanServiceName} services in ${selectedArea.name}, ${selectedCity.name}. Trusted, transparent pricing, verified experts by Fixbro.`);
-      form.setValue("meta_keywords", `${cleanServiceName} in ${selectedArea.name}, ${cleanServiceName} near me, best ${cleanServiceName} in ${selectedCity.name}`);
+      const cleanName = cleanServiceName(selectedService.name);
+      form.setValue("h1_title", `${cleanName} in ${selectedArea.name}`);
+      form.setValue("meta_title", `${cleanName} in ${selectedArea.name}, ${selectedCity.name} | ${cleanName} Near Me`);
+      form.setValue("meta_description", `Professional ${cleanName.toLowerCase()} in ${selectedArea.name}, ${selectedCity.name}. Trusted, transparent pricing, verified experts by FixBro.`);
+      form.setValue("meta_keywords", `${cleanName.toLowerCase()} in ${selectedArea.name}, ${cleanName.toLowerCase()} near me, best ${cleanName.toLowerCase()} in ${selectedCity.name}`);
 
       // Auto-populate SEO Content details from global/default template
       const contentTemplate = globalSeo?.areaServiceSeoContentTemplate || defaultSeoValues.areaServiceSeoContentTemplate || "";

@@ -1660,3 +1660,21 @@ export interface PinCodeAreaMapping {
     createdAt?: Timestamp;
     updatedAt?: Timestamp;
 }
+
+export interface AppUpdateTargetConfig {
+  enabled: boolean;
+  forceUpdate: boolean;
+  minVersionCode: number;
+  latestVersionName: string;
+  playStoreUrl: string;
+  title: string;
+  message: string;
+  updatedAt?: any;
+}
+
+export interface AppUpdateSettings {
+  customer: AppUpdateTargetConfig;
+  provider: AppUpdateTargetConfig;
+  updatedAt?: any;
+}
+

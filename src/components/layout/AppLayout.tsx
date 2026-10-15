@@ -21,14 +21,16 @@ import CookieConsentBanner from '@/components/shared/CookieConsentBanner';
 import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
 import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileDialog';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
+import type { SiloData } from '@/lib/seoServerUtils';
 
 interface AppLayoutProps {
   children: React.ReactNode;
   initialWebSettings?: any;
   initialAppConfig?: any;
+  initialSiloData?: SiloData;
 }
 
-const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, initialAppConfig }) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, initialAppConfig, initialSiloData }) => {
   const pathname = usePathname();
   const [isClientMounted, setIsClientMounted] = useState(false);
   
@@ -326,7 +328,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   
           {children}
         </main>
-        {showFooter && <Footer />}
+        {showFooter && <Footer initialWebSettings={initialWebSettings} initialSiloData={initialSiloData} />}
         {shouldShowBottomNav && <BottomNavigationBar />}
         {shouldShowNewsletterPopupManager && <PopupDisplayManager />}
         {shouldShowGlobalAdminPopup && <GlobalAdminPopup />}

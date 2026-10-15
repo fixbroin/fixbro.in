@@ -15,6 +15,8 @@ import {
   cleanSeoString,
   truncateSeoString,
   stripBrandSuffix,
+  cleanServiceName,
+  getCategorySearchTerm,
 } from '@/lib/seoAdvancedUtils';
 
 const GenerateServiceDetailsInputSchema = z.object({
@@ -24,10 +26,24 @@ const GenerateServiceDetailsInputSchema = z.object({
       "Exact service name entered by the admin, e.g. 'TV Installation – 56 to 65 Inches', 'Carpenter Full Day Service 7 Hours', 'Water Purifier Installation', or 'Business Website'."
     ),
 
+  cleanServiceName: z
+    .string()
+    .optional()
+    .describe(
+      "Cleaned, human search term for the service without specifications or parenthetical units."
+    ),
+
   categoryName: z
     .string()
     .describe(
       "Parent category, e.g. Carpentry, Appliance Installation, Plumbing, Electrical, Cleaning, Web Services."
+    ),
+
+  categoryTrade: z
+    .string()
+    .optional()
+    .describe(
+      "Specialist trade name, e.g. Carpenter, Electrician, Plumber."
     ),
 
   subCategoryName: z
@@ -138,25 +154,25 @@ const GenerateServiceDetailsOutputSchema = z.object({
     h1_title: z
       .string()
       .describe(
-        "An H1 title with the exact format '{{serviceName}} Service Near You'."
+        "An H1 title with the format '{{cleanServiceName}} in {{cityName}}'."
       ),
 
     seo_title: z
       .string()
       .describe(
-        "An SEO-optimized meta title, under 60 characters, with the format '{{serviceName}} Near Me | {{categoryName}} Near Me'."
+        "An SEO-optimized meta title strictly under 60 characters with the format '{{cleanServiceName}} in {{cityName}} | {{cleanServiceName}} Near Me'. NEVER include brand name."
       ),
 
     seo_description: z
       .string()
       .describe(
-        "An SEO-optimized meta description, under 160 characters. Should be a compelling summary that encourages clicks."
+        "An SEO-optimized meta description strictly under 155 characters featuring '{{cleanServiceName}} in {{cityName}} near you', verified experts, upfront pricing, and 'Book online now!'."
       ),
 
     seo_keywords: z
       .string()
       .describe(
-        "A comma-separated string of 10 relevant SEO keywords. Must include variations like '{{serviceName}} near me', '{{serviceName}} near you', '{{categoryName}} near me', '{{categoryName}} near you'."
+        "A comma-separated string of 10 relevant SEO keywords mixing clean service name, city, and near me."
       ),
   }),
 
@@ -226,8 +242,14 @@ INPUT
 Service Name:
 {{serviceName}}
 
+Clean Service Search Term:
+{{cleanServiceName}}
+
 Parent Category:
 {{categoryName}}
+
+Trade Specialist:
+{{categoryTrade}}
 
 Sub-Category:
 {{subCategoryName}}
@@ -904,33 +926,41 @@ Focus on:
 SEO
 ============================================================
 
-Generate high-intent, SEO-optimized metadata following this exact structure:
+Generate high-intent, SEO-optimized metadata following Google's top-performing local query patterns:
 
 1. **h1_title**:
-   Format: "{{serviceName}} Service Near You"
-   (If the service name already includes "Service", do not duplicate it. For example, use "Carpenter Daily Service Near You", NOT "Carpenter Daily Service Service Near You").
+   Format: "{{cleanServiceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}" (or "{{cleanServiceName}} Service in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}").
+   Example: "Wall Drilling in Bangalore" or "TV Installation in Bangalore"
 
 2. **seo_title**:
-   Format: "{{serviceName}} Near Me | {{categoryName}} Near Me"
-   MUST be under 60 characters.
-   Use the natural trade name for the category when applicable (e.g., use "Carpenter Near Me" for Carpentry, "Plumber Near Me" for Plumbing, "Electrician Near Me" for Electrical).
-   Do NOT include Fixbro in the meta title because the website adds the brand name automatically.
+   Format: "{{cleanServiceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} | {{cleanServiceName}} Near Me"
+   MUST be strictly under 60 characters.
+   MUST be a natural, high-intent query that real customers type on Google.
+   NEVER include parenthetical specifications like "(Single Hole)", "(Up to 32 Inches)", leading "Just ", or robotic words.
+   NEVER include brand name "FixBro" as the website template automatically appends it.
+   Examples:
+   - "Wall Drilling in Bangalore | Wall Drilling Near Me"
+   - "Bed Dismantle in Bangalore | Bed Dismantle Near Me"
+   - "TV Installation in Bangalore | TV Installation Near Me"
 
 3. **seo_description**:
-   SEO meta description under 160 characters.
-   A compelling, click-worthy summary that encourages bookings.
-   Pattern: "Book professional {{serviceName}} near me by skilled {{category/trade}}. [Scope/Benefit]. [Key condition/Labour only]."
-   Example: "Book professional digital or electronic lock installation near me by skilled carpenters. Secure fitting on wooden doors for enhanced safety. Labour only, lock provided by customer."
+   SEO meta description strictly under 155 characters.
+   Format: "Book trusted {{cleanServiceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} near you. Doorstep service by verified {{categoryTrade}} experts with upfront pricing & same-day visit. Book online now!"
+   Must be natural, action-oriented, and click-worthy.
 
 4. **seo_keywords**:
-   A comma-separated string of 10 relevant SEO keywords.
-   MUST include variations like:
-   - '{{serviceName}} near me'
-   - '{{serviceName}} near you'
-   - '{{categoryName}} near me'
-   - '{{categoryName}} near you'
-   - natural local search terms and common customer phrasing for this service.
-   Example: "digital lock installation near me, electronic lock fitting near me, carpenter near me, carpenter near you, smart lock installation near me, wooden door lock installation near me"
+   A comma-separated string of 10 high-intent SEO keywords.
+   MUST include:
+   - "{{cleanServiceName}} {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}"
+   - "{{cleanServiceName}} near me"
+   - "best {{cleanServiceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}"
+   - "{{cleanServiceName}} service"
+   - "{{categoryTrade}} near me"
+   - "{{categoryTrade}} {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}"
+   - "doorstep {{cleanServiceName}}"
+   - "same day {{cleanServiceName}}"
+   - "affordable {{cleanServiceName}}"
+   - "{{cleanServiceName}} price"
 
 ============================================================
 QUALITY CONTROL BEFORE OUTPUT
@@ -1010,9 +1040,13 @@ const generateServiceDetailsFlow = ai.defineFlow(
 
   async (input) => {
     const cityName = input.cityName || 'Bangalore';
+    const cleanName = cleanServiceName(input.serviceName);
+    const categoryTrade = getCategorySearchTerm(input.categoryName);
 
     const { output } = await prompt({
       ...input,
+      cleanServiceName: cleanName,
+      categoryTrade,
       cityName,
     });
 
@@ -1035,9 +1069,14 @@ const generateServiceDetailsFlow = ai.defineFlow(
       Math.max(120, Math.round(Number(output.reviewCount) || 250))
     );
 
-    const cleanTitle = stripBrandSuffix(
+    let cleanTitle = stripBrandSuffix(
       cleanSeoString(output.seo.seo_title)
     );
+    // Sanitize any stray parenthesis specs or leading Just
+    cleanTitle = cleanTitle.replace(/\s*\([^)]*\)/g, '').replace(/^Just\s+/i, '').trim();
+    if (!cleanTitle || cleanTitle.length < 15) {
+      cleanTitle = `${cleanName} in ${cityName} | ${cleanName} Near Me`;
+    }
 
     return {
       ...output,

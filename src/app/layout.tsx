@@ -5,7 +5,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LoadingProvider } from '@/contexts/LoadingContext';
 import GlobalActionLoader from '@/components/shared/GlobalActionLoader';
-import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
+import { getGlobalSEOSettings, getLocalSiloData } from '@/lib/seoServerUtils';
 import React, { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { getBaseUrl } from '@/lib/config';
@@ -110,9 +110,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [webSettings, appConfig] = await Promise.all([
+  const [webSettings, appConfig, siloData] = await Promise.all([
     getGlobalWebSettings(),
-    getGlobalAppSettings()
+    getGlobalAppSettings(),
+    getLocalSiloData()
   ]);
   
   // Pre-generate the CSS variables for server injection to eliminate flicker
@@ -174,7 +175,7 @@ export default async function RootLayout({
             <Suspense fallback={null}>
               <PageViewTracker />
             </Suspense>
-            <AppLayout initialWebSettings={webSettings} initialAppConfig={appConfig}>
+            <AppLayout initialWebSettings={webSettings} initialAppConfig={appConfig} initialSiloData={siloData}>
               {children}
             </AppLayout>
             <GlobalActionLoader />

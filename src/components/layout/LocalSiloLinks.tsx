@@ -3,30 +3,48 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from '@/components/shared/TransitionLink';
-import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, ArrowRight, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, limit, orderBy } from '@/lib/mysqlDb';
 import type { FirestoreCity, FirestoreArea, FirestoreCategory } from '@/types/firestore';
 import { getCategorySearchTerm } from '@/lib/seoAdvancedUtils';
+import type { SiloData } from '@/lib/seoServerUtils';
+
+interface LocalSiloLinksProps {
+  initialData?: SiloData;
+}
 
 /**
  * LocalSiloLinks Component
  * 
  * This component creates a "Silo" of links for Local SEO.
- * It dynamically fetches real cities, areas, and categories to prevent 404 errors.
+ * When initialData is provided by the server layout, it renders complete HTML links
+ * immediately on SSR without skeleton delay, maximizing crawlability for Googlebot.
  */
-const LocalSiloLinks = () => {
-  const { settings, isLoading: isGlobalLoading } = useGlobalSettings();
+const LocalSiloLinks: React.FC<LocalSiloLinksProps> = ({ initialData }) => {
   const [data, setData] = useState<{
-    city: FirestoreCity | null;
-    areas: FirestoreArea[];
-    categories: FirestoreCategory[];
-  }>({ city: null, areas: [], categories: [] });
-  const [isLoading, setIsLoading] = useState(true);
+    city: FirestoreCity | { id: string; name: string; slug: string } | null;
+    areas: Array<FirestoreArea | { id: string; name: string; slug: string }>;
+    categories: Array<FirestoreCategory | { id: string; name: string; slug: string }>;
+  }>({
+    city: initialData?.city || null,
+    areas: initialData?.areas || [],
+    categories: initialData?.categories || [],
+  });
+  const [isLoading, setIsLoading] = useState(!initialData?.city || (initialData?.areas?.length ?? 0) === 0);
 
   useEffect(() => {
+    if (initialData?.city && (initialData.areas?.length ?? 0) > 0) {
+      setData({
+        city: initialData.city,
+        areas: initialData.areas,
+        categories: initialData.categories || [],
+      });
+      setIsLoading(false);
+      return;
+    }
+
     const fetchRealSiloData = async () => {
       setIsLoading(true);
       try {
@@ -56,13 +74,20 @@ const LocalSiloLinks = () => {
         const catsSnap = await getDocs(catsQuery);
         let allCategories = catsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirestoreCategory));
         
-        // Move Carpentry/Carpenter to the front for maximum link juice
-        const priorityCats = allCategories.filter(cat => 
-          ['carpentry', 'carpenter'].includes(cat.slug?.toLowerCase() || '') || 
-          ['carpentry', 'carpenter'].includes(cat.name?.toLowerCase() || '')
-        );
-        const otherCats = allCategories.filter(cat => !priorityCats.includes(cat));
-        const categories = [...priorityCats, ...otherCats].slice(0, 12);
+        // Move Carpentry, TV Installation, and Interior to the front for maximum link juice
+        const getCatRank = (cat: FirestoreCategory): number => {
+          const s = (cat.slug || '').toLowerCase();
+          const n = (cat.name || '').toLowerCase();
+          if (s.includes('carpent') || n.includes('carpent')) return 1;
+          if (s.includes('tv') || n.includes('tv') || s.includes('television') || n.includes('television')) return 2;
+          if (s.includes('interior') || n.includes('interior')) return 3;
+          if (s.includes('plumb') || n.includes('plumb')) return 4;
+          if (s.includes('electri') || n.includes('electri')) return 5;
+          return 10;
+        };
+
+        const sortedCategories = [...allCategories].sort((a, b) => getCatRank(a) - getCatRank(b));
+        const categories = sortedCategories.slice(0, 12);
 
         setData({ city, areas, categories });
       } catch (error) {
@@ -75,7 +100,7 @@ const LocalSiloLinks = () => {
     fetchRealSiloData();
   }, []);
 
-  if (isLoading || isGlobalLoading) {
+  if (isLoading) {
     return (
       <div className="py-8 border-t border-border/50">
         <div className="container mx-auto px-4">

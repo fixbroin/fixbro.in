@@ -8,7 +8,7 @@ import { getBaseUrl } from '@/lib/config';
 import { serializeFirestoreData } from '@/lib/serializeUtils';
 import { getAggregateRating } from '@/lib/homepageUtils';
 import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
-import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { generateBreadcrumbSchema, cleanServiceName, formatAreaServiceTitle, formatAreaServiceDescription } from '@/lib/seoAdvancedUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { getSpinnedLocalContent } from '@/lib/seoGenerator';
@@ -91,15 +91,19 @@ export async function generateMetadata(
     serviceName: serviceData.name
   };
 
-  // Build customized metadata with manual config values or localized fallbacks
-  const title = replacePlaceholders(
-    seoOverride?.meta_title || `${serviceData.name} in ${areaData.name}, ${cityData.name} | Fixbro`,
-    placeholderData
+  // Build customized metadata with high-CTR natural search phrasing
+  const title = formatAreaServiceTitle(
+    seoOverride?.meta_title,
+    serviceData.name,
+    areaData.name,
+    cityData.name
   );
 
-  const description = replacePlaceholders(
-    seoOverride?.meta_description || `Professional ${serviceData.name} services in ${areaData.name}, ${cityData.name}. Quality home solutions, transparent pricing, verified experts by Fixbro.`,
-    placeholderData
+  const description = formatAreaServiceDescription(
+    seoOverride?.meta_description,
+    serviceData.name,
+    areaData.name,
+    cityData.name
   );
 
   const keywordsString = replacePlaceholders(

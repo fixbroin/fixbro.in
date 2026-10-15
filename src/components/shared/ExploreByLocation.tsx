@@ -152,9 +152,9 @@ export default function ExploreByLocation({ initialData, categories = [] }: Expl
                                         <div className="flex flex-wrap gap-2">
                                             {allCategories
                                                 .filter(cat => {
-                                                    // Always include Carpentry or high-priority categories
-                                                    const isPriority = ['carpentry', 'carpenter'].includes(cat.slug?.toLowerCase() || '') || 
-                                                                     ['carpentry', 'carpenter'].includes(cat.name?.toLowerCase() || '');
+                                                    // Always include Carpentry, TV Installation, Interior
+                                                    const isPriority = ['carpentry', 'carpenter', 'tv-installation', 'tv installation', 'interior', 'interiors'].includes(cat.slug?.toLowerCase() || '') || 
+                                                                     ['carpentry', 'carpenter', 'tv installation', 'interior', 'interiors'].includes(cat.name?.toLowerCase() || '');
                                                     return isPriority || allCategories.indexOf(cat) < 8;
                                                 })
                                                 .slice(0, 12) // Slightly increased limit but prioritized

@@ -78,11 +78,29 @@ export async function generateMetadata(
 
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const placeholderData = { areaName: areaData.name, cityName: areaData.parentCityData?.name };
+  const placeholderData = {
+    areaName: areaData.name,
+    cityName: areaData.parentCityData?.name,
+    categoryNames: 'Carpenter, TV Installation, Interior, Electrician, Plumber',
+    topCategories: 'Carpenter, TV Installation, Interior',
+    homeServices: 'Home Services'
+  };
 
-  const title = replacePlaceholders(areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, placeholderData) || `${areaData.name}, ${areaData.parentCityData?.name} | Fixbro`;
-  const description = replacePlaceholders(areaData.seo_description || areaData.metaDescription || seoSettings.areaPageDescriptionPattern, placeholderData) || `Trusted home services in ${areaData.name}, ${areaData.parentCityData?.name}.`;
-  const keywords = replacePlaceholders(areaData.seo_keywords || areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
+  const title = replacePlaceholders(
+    areaData.seo_title || areaData.metaTitle || seoSettings.areaPageTitlePattern, 
+    placeholderData,
+    true
+  ) || `Home Services in ${areaData.name}, ${areaData.parentCityData?.name} | Near Me`;
+
+  const description = replacePlaceholders(
+    areaData.seo_description || areaData.metaDescription || seoSettings.areaPageDescriptionPattern, 
+    placeholderData
+  ) || `Book trusted carpenter, TV installation, interior, and home services near you in ${areaData.name}, ${areaData.parentCityData?.name}. Top-rated local professionals at upfront rates.`;
+
+  const keywords = (replacePlaceholders(
+    areaData.seo_keywords || areaData.metaKeywords || seoSettings.areaPageKeywordsPattern, 
+    placeholderData
+  ) || `home services ${areaData.name}, carpenter ${areaData.name}, tv installation ${areaData.name}, interior designers ${areaData.name}, electrician ${areaData.name}, home services near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = areaData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;

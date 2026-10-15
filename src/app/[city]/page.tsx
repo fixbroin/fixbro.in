@@ -60,11 +60,28 @@ export async function generateMetadata(
 
   const seoSettings = await getGlobalSEOSettings();
   const appBaseUrl = getBaseUrl();
-  const placeholderData = { cityName: cityData.name };
+  const placeholderData = {
+    cityName: cityData.name,
+    categoryNames: 'Carpenter, TV Installation, Interior, Electrician, Plumber',
+    topCategories: 'Carpenter, TV Installation, Interior',
+    homeServices: 'Home Services'
+  };
 
-  const title = replacePlaceholders(cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, placeholderData) || `${cityData.name} Home Services | Fixbro`;
-  const description = replacePlaceholders(cityData.seo_description || cityData.metaDescription || seoSettings.cityPageDescriptionPattern, placeholderData) || `Trusted home services in ${cityData.name}.`;
-  const keywords = replacePlaceholders(cityData.seo_keywords || cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, placeholderData).split(',').map(k => k.trim()).filter(k => k);
+  const title = replacePlaceholders(
+    cityData.seo_title || cityData.metaTitle || seoSettings.cityPageTitlePattern, 
+    placeholderData,
+    true
+  ) || `Home Services in ${cityData.name} | Carpenter, TV Installation Near Me`;
+
+  const description = replacePlaceholders(
+    cityData.seo_description || cityData.metaDescription || seoSettings.cityPageDescriptionPattern, 
+    placeholderData
+  ) || `Book trusted carpenter, TV installation, interior, and home services near you in ${cityData.name}. Verified professionals, upfront pricing, and same-day service.`;
+
+  const keywords = (replacePlaceholders(
+    cityData.seo_keywords || cityData.metaKeywords || seoSettings.cityPageKeywordsPattern, 
+    placeholderData
+  ) || `home services ${cityData.name}, carpenter ${cityData.name}, tv installation ${cityData.name}, interior designers ${cityData.name}, electrician ${cityData.name}, home services near me`).split(',').map(k => k.trim()).filter(k => k);
 
   const rawOgImage = cityData.imageUrl || seoSettings.structuredDataImage || `/default-image.png`;
   const ogImage = rawOgImage.startsWith('http') ? rawOgImage : `${appBaseUrl}${rawOgImage.startsWith('/') ? '' : '/'}${rawOgImage}`;

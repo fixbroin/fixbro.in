@@ -11,6 +11,7 @@ import {
   cleanSeoString,
   truncateSeoString,
   stripBrandSuffix,
+  getCategorySearchTerm,
 } from '@/lib/seoAdvancedUtils';
 
 const GenerateCityCategorySeoInputSchema =
@@ -21,6 +22,10 @@ const GenerateCityCategorySeoInputSchema =
 
     categoryName: z.string().describe(
       'Service category name. Example: Carpentry'
+    ),
+
+    categoryTrade: z.string().optional().describe(
+      'Trade / specialist name. Example: Carpenter'
     ),
   });
 
@@ -118,8 +123,8 @@ IMPORTANT SEO RULES:
 - painting services near me
 - furniture assembly near me
 
-2. Avoid overusing:
-- handyman
+2. NEVER use the word "handyman" (nobody in India searches for handyman; use "home services", specific trade names like carpenter, plumber, electrician, and service names).
+Avoid overusing:
 - best
 - top-rated
 - professional
@@ -146,7 +151,7 @@ OUTPUT RULES:
 
 1. h1_title
 Format:
-"{{categoryName}} Services in {{cityName}}"
+"{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Services in {{cityName}}"
 
 Examples:
 "Carpenter Services in Bangalore"
@@ -154,20 +159,21 @@ Examples:
 
 2. meta_title
 Rules:
-- Strictly 35 to 48 characters
-- NEVER include brand/company name (e.g. Fixbro, Fixbro). The website template automatically appends it.
-- Format: "{{categoryName}} in {{cityName}} | Near Me" or "{{categoryName}} Services in {{cityName}}"
+- Strictly 35 to 55 characters
+- NEVER include brand/company name (e.g. Fixbro, FixBro). The website template automatically appends it.
+- Format: "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} | {{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} Near Me" or "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} | Near Me"
 - Natural, search optimized
 
 Examples:
-"Carpenter in Bangalore | Near Me"
+"Carpenter in Bangalore | Carpenter Near Me"
+"TV Installation in Bangalore | TV Installation Near Me"
 "Plumber in Bangalore | Pipe Repair Near Me"
 
 3. meta_description
 Rules:
 - Strictly under 155 characters
 - Mention:
-  - "{{categoryName}} in {{cityName}} near you"
+  - "{{#if categoryTrade}}{{categoryTrade}}{{else}}{{categoryName}}{{/if}} in {{cityName}} near you"
   - trusted verified experts
   - upfront pricing & same-day visit
   - call to action: "Book online now!"
@@ -241,8 +247,12 @@ const generateCityCategorySeoFlow =
     },
 
     async (input) => {
+      const categoryTrade = getCategorySearchTerm(input.categoryName);
       const { output } =
-        await prompt(input);
+        await prompt({
+          ...input,
+          categoryTrade,
+        });
 
       if (!output) {
         throw new Error(
@@ -259,7 +269,7 @@ const generateCityCategorySeoFlow =
 
         meta_title: truncateSeoString(
           cleanTitle,
-          48
+          55
         ),
 
         meta_description:

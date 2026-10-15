@@ -11,10 +11,27 @@ export function getCategorySearchTerm(categoryName: string): string {
   const lowerName = name.toLowerCase();
 
   const mapping: Record<string, string> = {
+    // Top 3 Priority Categories
     'carpentry': 'Carpenter',
+    'carpenter': 'Carpenter',
+    'tv installation': 'TV Installation',
+    'tv-installation': 'TV Installation',
+    'tv mounting': 'TV Installation',
+    'tv-mounting': 'TV Installation',
+    'television installation': 'TV Installation',
+    'interior': 'Interior Designers',
+    'interiors': 'Interior Designers',
+    'interior design': 'Interior Designers',
+    'interior-design': 'Interior Designers',
+    'interior work': 'Interior Work',
+
+    // Other core trades
     'plumbing': 'Plumber',
+    'plumber': 'Plumber',
     'electrical': 'Electrician',
+    'electrician': 'Electrician',
     'painting': 'Painter',
+    'painter': 'Painter',
     'cleaning': 'Cleaning Services',
     'appliance repair': 'Appliance Repair',
     'pest control': 'Pest Control',
@@ -29,12 +46,32 @@ export function getCategorySearchTerm(categoryName: string): string {
 
   if (mapping[lowerName]) return mapping[lowerName];
 
-  // Simple plural to singular or "y" to "er" rules for common cases
-  if (lowerName.endsWith('ing')) {
-    // Plumbing -> Plumber (handled in mapping, but as a backup)
-  }
-  
   return name;
+}
+
+/**
+ * Orders category names by business priority:
+ * 1. Carpentry (Carpenter)
+ * 2. TV Installation
+ * 3. Interior (Interior Designers / Interior Work)
+ * 4. Other trades (Plumbing, Electrical, Painting, etc.)
+ */
+export function prioritizeCategoryNames(categoryNames: string[]): string[] {
+  if (!categoryNames || categoryNames.length === 0) return [];
+
+  const getRank = (name: string): number => {
+    const l = name.toLowerCase().trim();
+    if (l.includes('carpent')) return 1;
+    if (l.includes('tv') || l.includes('television')) return 2;
+    if (l.includes('interior')) return 3;
+    if (l.includes('plumb')) return 4;
+    if (l.includes('electri')) return 5;
+    if (l.includes('paint')) return 6;
+    if (l.includes('appliance')) return 7;
+    return 10;
+  };
+
+  return [...categoryNames].sort((a, b) => getRank(a) - getRank(b));
 }
 
 /**
@@ -160,3 +197,124 @@ export function generateBreadcrumbSchema(items: { name: string; url?: string }[]
     }))
   };
 }
+
+/**
+ * Cleans a service name by removing parentheses specifications, dimensions, and unnecessary prefixes.
+ * Examples:
+ *   "Just Wall Drilling (Single Hole)" -> "Wall Drilling"
+ *   "TV Uninstallation (up to 55 inches.)" -> "TV Uninstallation"
+ *   "TV Installation – Up to 32 Inches" -> "TV Installation"
+ *   "Bed Dismantle (with or without storage)" -> "Bed Dismantle"
+ */
+export function cleanServiceName(rawName: string | undefined | null): string {
+  if (!rawName) return '';
+  let cleaned = rawName.trim();
+
+  // Strip text within parentheses e.g. "(Single Hole)", "(up to 55 inches.)"
+  cleaned = cleaned.replace(/\s*\([^)]*\)/g, '');
+
+  // Strip dash specifications e.g. " – Up to 32 Inches", " - 44 to 55 Inches"
+  cleaned = cleaned.replace(/\s*[\–\—\-]\s*(?:up to|\d+\s*to|\d+).*$/i, '');
+
+  // Strip leading "Just " e.g. "Just Wall Drilling" -> "Wall Drilling"
+  cleaned = cleaned.replace(/^Just\s+/i, '');
+
+  // Clean double spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned || rawName.trim();
+}
+
+/**
+ * Generates a clean, natural, high-CTR SEO title for an area service page.
+ * Avoids awkward/robotic phrases like "Best Just Wall Drilling (Single Hole) Repair & Maintenance in Dollars Colony Near Me".
+ */
+export function formatAreaServiceTitle(
+  rawOverrideTitle: string | undefined | null,
+  serviceName: string,
+  areaName: string,
+  cityName: string
+): string {
+  const cleanName = cleanServiceName(serviceName);
+
+  if (rawOverrideTitle && rawOverrideTitle.trim().length > 0) {
+    let t = rawOverrideTitle.trim();
+    // Remove parentheses specifications
+    t = t.replace(/\s*\([^)]*\)/g, '');
+    // Remove "Just "
+    t = t.replace(/\bJust\s+/gi, '');
+    // Clean "in [Area] near Bangalore" -> "in [Area], Bangalore"
+    t = t.replace(/\s+near\s+Bangalore\b/gi, ', Bangalore');
+    // If the service is drilling, assemble, dismantle, installation, or hanging, strip mismatched "Repair & Maintenance"
+    const nonRepairKeywords = ['drilling', 'dismantle', 'assembly', 'installation', 'hanging', 'uninstallation', 'mount'];
+    if (nonRepairKeywords.some(kw => cleanName.toLowerCase().includes(kw))) {
+      t = t.replace(/\s*Repair\s*&\s*Maintenance\s*/gi, ' ');
+    }
+    // Remove trailing brand name so Next.js layout cleanly appends it
+    t = t.replace(/\s*[|\-–]\s*Fixbro\s*$/i, '');
+    // Clean double spaces and trailing pipes
+    t = t.replace(/\s+/g, ' ').replace(/[\s\|\-\–\—\:]+$/, '').trim();
+
+    if (t.length > 20 && !t.includes('(')) {
+      return t;
+    }
+  }
+
+  // High-CTR natural search title (clean, under 60 chars)
+  return `${cleanName} in ${areaName}, ${cityName} | ${cleanName} Near Me`;
+}
+
+/**
+ * Generates a clean, natural meta description for an area service page.
+ */
+export function formatAreaServiceDescription(
+  rawOverrideDesc: string | undefined | null,
+  serviceName: string,
+  areaName: string,
+  cityName: string
+): string {
+  const cleanName = cleanServiceName(serviceName);
+
+  if (rawOverrideDesc && rawOverrideDesc.trim().length > 30) {
+    let d = rawOverrideDesc.trim();
+    d = d.replace(/\s*\([^)]*\)/g, '');
+    d = d.replace(/\bjust\s+/gi, '');
+    d = d.replace(/\s+near\s+Bangalore\b/gi, ', Bangalore');
+    d = d.replace(/\s+/g, ' ').trim();
+    if (d.length > 50 && !d.includes('(')) {
+      return d;
+    }
+  }
+
+  return `Book professional ${cleanName} services in ${areaName}, ${cityName}. Verified local experts, upfront transparent rates, and same-day doorstep service by FixBro.`;
+}
+
+/**
+ * Generates a clean, natural SEO title for an area category page.
+ * Incorporates category + service names when provided.
+ */
+export function formatAreaCategoryTitle(
+  rawOverrideTitle: string | undefined | null,
+  searchTerm: string,
+  areaName: string,
+  cityName: string,
+  primaryServiceName?: string
+): string {
+  if (rawOverrideTitle && rawOverrideTitle.trim().length > 0) {
+    let t = rawOverrideTitle.trim();
+    t = t.replace(/\s+near\s+Bangalore\b/gi, ', Bangalore');
+    t = t.replace(/\s*[|\-–]\s*Fixbro\s*$/i, '');
+    t = t.replace(/\s+/g, ' ').replace(/[\s\|\-\–\—\:]+$/, '').trim();
+    if (t.length > 15 && !t.includes('near Bangalore')) {
+      return t;
+    }
+  }
+
+  if (primaryServiceName && primaryServiceName.trim()) {
+    const cleanSrv = cleanServiceName(primaryServiceName);
+    return `${searchTerm} in ${areaName}, ${cityName} | ${cleanSrv} Near Me`;
+  }
+
+  return `${searchTerm} in ${areaName}, ${cityName} | ${searchTerm} Near Me`;
+}
+
