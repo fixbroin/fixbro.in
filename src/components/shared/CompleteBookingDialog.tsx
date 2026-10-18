@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, CheckCircle2, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { formatCurrency, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
+import { formatCurrency, isCashPayment, hasOnlinePaymentProof, cn } from '@/lib/utils';
 import type { FirestoreBooking } from '@/types/firestore';
 
 interface AdditionalCharge {
@@ -48,7 +48,19 @@ export default function CompleteBookingDialog({
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
   
   const paymentMethodName = booking?.paymentMethod || currentPaymentMethod || 'Pay After Service';
-  const isPrepaidOnline = !isCashPayment(paymentMethodName) && hasOnlinePaymentProof(booking);
+  const hasOnlineProof = hasOnlinePaymentProof(booking);
+  const isPrepaidOnline = hasOnlineProof || !isCashPayment(paymentMethodName);
+
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>(() => {
+    return isPrepaidOnline ? 'Online' : 'Pay After Service';
+  });
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedPaymentMethod(isPrepaidOnline ? 'Online' : 'Pay After Service');
+      setCharges([]);
+    }
+  }, [isOpen, isPrepaidOnline]);
 
   const addCharge = () => {
     setCharges([...charges, { name: "", amount: 0 }]);
@@ -88,7 +100,8 @@ export default function CompleteBookingDialog({
 
   const handleConfirm = () => {
     const validCharges = charges.filter(c => c.name.trim() !== "" && c.amount > 0);
-    onConfirm(validCharges, isPrepaidOnline ? "Online" : "Pay After Service");
+    const finalMethod = isAdmin ? selectedPaymentMethod : (isPrepaidOnline ? "Online" : "Pay After Service");
+    onConfirm(validCharges, finalMethod);
   };
 
   return (
@@ -100,13 +113,72 @@ export default function CompleteBookingDialog({
             Complete Booking
           </DialogTitle>
           <DialogDescription>
-            {isPrepaidOnline 
-              ? "Review the service details and add any additional charges if applicable."
-              : "Review the service details and collect the payment from the customer."}
+            {isAdmin
+              ? "Review booking charges, select or confirm payment mode, and complete the job."
+              : isPrepaidOnline 
+                ? "Review the service details and add any additional charges if applicable."
+                : "Review the service details and collect the payment from the customer."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* Admin Payment Method Selector */}
+          {isAdmin && (
+            <div className="space-y-2 bg-muted/40 p-3.5 rounded-xl border border-border/70">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Booking Payment Method
+                </Label>
+                {hasOnlineProof ? (
+                  <span className="text-[11px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                    ✓ Verified Online Payment
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Pay After Service
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant={selectedPaymentMethod === 'Online' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    "h-9 font-bold text-xs rounded-lg transition-all",
+                    selectedPaymentMethod === 'Online' 
+                      ? "bg-green-600 hover:bg-green-700 text-white shadow-sm" 
+                      : "hover:bg-muted text-foreground"
+                  )}
+                  onClick={() => setSelectedPaymentMethod('Online')}
+                >
+                  Online (Prepaid)
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedPaymentMethod === 'Pay After Service' ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    "h-9 font-bold text-xs rounded-lg transition-all",
+                    selectedPaymentMethod === 'Pay After Service' 
+                      ? "bg-primary hover:bg-primary/90 text-white shadow-sm" 
+                      : "hover:bg-muted text-foreground"
+                  )}
+                  onClick={() => setSelectedPaymentMethod('Pay After Service')}
+                >
+                  Pay After Service
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground pt-0.5 leading-snug">
+                {selectedPaymentMethod === 'Online'
+                  ? (additionalTotal > 0 
+                      ? "Customer prepaid the base booking online. The additional charges will be marked as Pay After Service."
+                      : "Customer prepaid the full booking online. Status will be marked as Paid (Online).")
+                  : "Customer will pay the full amount (base + additional charges) on-site as Pay After Service."}
+              </p>
+            </div>
+          )}
+
           {/* Charges Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -147,23 +219,39 @@ export default function CompleteBookingDialog({
           <div className="bg-primary/5 p-4 rounded-2xl space-y-2 border border-primary/10">
             {isAdmin ? (
               // Admin View
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Original Booking:</span>
+              <div className="space-y-1.5 text-xs sm:text-sm">
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Base Service Amount:</span>
                   <span className="font-semibold text-foreground">{formatCurrency(originalAmount, symbol, decimals, code)}</span>
                 </div>
+                <div className="flex justify-between items-center text-xs pb-1">
+                  <span className="text-muted-foreground">Base Payment Status:</span>
+                  <span className={cn(
+                    "font-bold px-2 py-0.5 rounded text-[11px]",
+                    selectedPaymentMethod === 'Online' 
+                      ? "bg-green-100 text-green-800 border border-green-200" 
+                      : "bg-amber-100 text-amber-800 border border-amber-200"
+                  )}>
+                    {selectedPaymentMethod === 'Online' ? "Paid Online" : "Pay After Service"}
+                  </span>
+                </div>
                 {additionalTotal > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Extra Charges:</span>
-                    <span className="font-semibold text-green-600">+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
+                  <div className="flex justify-between items-center text-xs sm:text-sm text-green-700 font-bold pt-1 border-t border-dashed">
+                    <span>Additional Charges (Pay After Service):</span>
+                    <span>+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
                   </div>
                 )}
-                <Separator className="my-1 opacity-50" />
-                <div className="flex justify-between text-xl font-black text-primary">
-                  <span>Final Total:</span>
+                <Separator className="my-1.5 opacity-50" />
+                <div className="flex justify-between text-base sm:text-lg font-black text-primary">
+                  <span>Total Booking Bill:</span>
                   <span>{formatCurrency(adminFinalTotal, symbol, decimals, code)}</span>
                 </div>
-              </>
+                {selectedPaymentMethod === 'Online' && additionalTotal > 0 && (
+                  <p className="text-[11px] text-muted-foreground pt-0.5 leading-tight">
+                    * Core booking is settled online. Additional charges ({formatCurrency(additionalTotal, symbol, decimals, code)}) will be collected by provider as Pay After Service.
+                  </p>
+                )}
+              </div>
             ) : isPrepaidOnline ? (
               // Online Paid Provider View (Platform fee & tax are completely hidden from provider)
               <div className="space-y-1.5 text-xs sm:text-sm">

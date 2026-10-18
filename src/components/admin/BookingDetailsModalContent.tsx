@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
-import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone, isCashPayment } from '@/lib/utils';
+import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
@@ -251,14 +251,21 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                 <Badge variant="outline" className={
                     booking.status === 'Completed' 
                     ? "bg-green-50 text-green-700 border-green-200"
-                    : isCashPayment(booking.paymentMethod)
+                    : (isCashPayment(booking.paymentMethod) && !hasOnlinePaymentProof(booking))
                         ? "bg-red-50 text-red-700 border-red-200"
                         : "bg-green-50 text-green-700 border-green-200"
                 }>
-                    {booking.status === 'Completed' 
-                        ? (isCashPayment(booking.paymentMethod) ? "Paid (Pay After Service)" : `Paid (Online)`)
-                        : (isCashPayment(booking.paymentMethod) ? "Pay After Service" : "Online")
-                    }
+                    {(() => {
+                        const hasProof = hasOnlinePaymentProof(booking);
+                        const hasExtra = booking.additionalCharges && booking.additionalCharges.length > 0;
+                        if (hasProof || !isCashPayment(booking.paymentMethod)) {
+                          if (booking.status === 'Completed') {
+                            return hasExtra ? "Paid (Online) + Extra Pay After Service" : "Paid (Online)";
+                          }
+                          return hasExtra ? "Online + Extra Pay After Service" : "Online";
+                        }
+                        return booking.status === 'Completed' ? "Paid (Pay After Service)" : "Pay After Service";
+                    })()}
                 </Badge>
             </div>
             {booking.razorpayPaymentId && (

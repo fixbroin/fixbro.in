@@ -155,7 +155,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
     return feeVal;
   };
 
-  const isCash = isCashPayment(job.paymentMethod) || !hasOnlinePaymentProof(job);
+  const isCash = hasOnlinePaymentProof(job) ? false : isCashPayment(job.paymentMethod);
   const paymentMethod = isCash ? 'Pay After Service' : 'Online';
   const providerGross = (job.subTotal || 0) + (job.visitingCharge || 0) - (job.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0) + (job.taxAmount || 0)) : 0;

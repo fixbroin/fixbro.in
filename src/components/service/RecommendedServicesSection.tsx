@@ -21,6 +21,8 @@ import { formatCurrency } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
+import Autoplay from "embla-carousel-autoplay";
 
 interface RecommendedServiceCardProps {
   service: FirestoreService;
@@ -145,7 +147,7 @@ const RecommendedServiceCard: React.FC<RecommendedServiceCardProps> = ({
   const savingAmount = hasDiscount ? service.price - service.discountedPrice! : 0;
 
   return (
-    <div className="w-[210px] sm:w-[230px] md:w-[250px] shrink-0 snap-start flex flex-col group">
+    <div className="w-full h-full flex flex-col group">
       <Link
         href={`/service/${service.slug}`}
         onClick={(e: React.MouseEvent) => {
@@ -285,7 +287,15 @@ export default function RecommendedServicesSection({
     return [];
   });
   const [isLoading, setIsLoading] = useState(!initialServices || initialServices.length === 0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const autoplayPlugin = useRef(
+    Autoplay({
+      delay: 3000,
+      stopOnInteraction: false,
+      stopOnMouseEnter: false,
+      stopOnLastSnap: false,
+    })
+  );
 
   // Client-side fallback fetch if initialServices wasn't passed via SSR
   useEffect(() => {
@@ -362,16 +372,12 @@ export default function RecommendedServicesSection({
   }, [currentServiceId, subCategoryId, parentCategoryId, initialServices]);
 
   const scrollLeft = useCallback(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -280, behavior: 'smooth' });
-    }
-  }, []);
+    carouselApi?.scrollPrev();
+  }, [carouselApi]);
 
   const scrollRight = useCallback(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 280, behavior: 'smooth' });
-    }
-  }, []);
+    carouselApi?.scrollNext();
+  }, [carouselApi]);
 
   if (!isLoading && services.length === 0) {
     return null;
@@ -448,21 +454,35 @@ export default function RecommendedServicesSection({
               ))}
             </div>
           ) : (
-            <div
-              ref={scrollContainerRef}
-              className="flex gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 px-1 scroll-smooth snap-x snap-mandatory scrollbar-none"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            <Carousel
+              setApi={setCarouselApi}
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              plugins={[autoplayPlugin.current]}
+              className="w-full relative px-1 sm:px-2"
             >
-              {services.map((service) => (
-                <RecommendedServiceCard
-                  key={service.id}
-                  service={service}
-                  symbol={symbol}
-                  decimals={decimals}
-                  code={code}
-                />
-              ))}
-            </div>
+              <CarouselContent className="-ml-3 sm:-ml-4">
+                {services.map((service) => (
+                  <CarouselItem
+                    key={service.id}
+                    className="pl-3 sm:pl-4 basis-[72%] sm:basis-1/2 md:basis-1/3 lg:basis-1/4 xl:basis-1/5"
+                  >
+                    <div className="h-full">
+                      <RecommendedServiceCard
+                        service={service}
+                        symbol={symbol}
+                        decimals={decimals}
+                        code={code}
+                      />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden sm:flex -left-3 shadow-md" />
+              <CarouselNext className="hidden sm:flex -right-3 shadow-md" />
+            </Carousel>
           )}
         </CardContent>
       </Card>

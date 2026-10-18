@@ -438,6 +438,7 @@ export async function updateBookingStatusByProviderAction(
       }
       if (additionalCharges && additionalCharges.length > 0) {
         updateData.additionalCharges = additionalCharges;
+        updateData.additionalChargesPaymentMethod = 'Pay After Service';
         const totalCharges = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
         updateData.totalAmount = (bookingData.totalAmount || 0) + totalCharges;
 
@@ -464,11 +465,11 @@ export async function updateBookingStatusByProviderAction(
           });
         }
       }
-      // Never mark a booking as 'Online' on completion if there is no verified online payment ID
-      if (!hasOnlineProof) {
-        updateData.paymentMethod = 'Pay After Service';
-      } else if (finalizedPaymentMethod) {
-        updateData.paymentMethod = finalizedPaymentMethod;
+      // Core booking remains 'Online' if verified online proof exists
+      if (hasOnlineProof) {
+        updateData.paymentMethod = 'Online';
+      } else {
+        updateData.paymentMethod = finalizedPaymentMethod || bookingData.paymentMethod || 'Pay After Service';
       }
     }
 

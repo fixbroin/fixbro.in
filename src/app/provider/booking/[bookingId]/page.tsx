@@ -89,7 +89,7 @@ export default function ProviderBookingDetailsPage() {
     if (feeType === 'percentage') return (amount * feeVal) / 100;
     return feeVal;
   };
-  const isCash = isCashPayment(booking?.paymentMethod) || !hasOnlinePaymentProof(booking);
+  const isCash = hasOnlinePaymentProof(booking) ? false : isCashPayment(booking?.paymentMethod);
   const paymentMethod = isCash ? 'Pay After Service' : 'Online';
   const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;

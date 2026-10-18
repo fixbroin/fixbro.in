@@ -104,9 +104,13 @@ const getPaymentBadgeClass = (method: string | undefined, status: string, bookin
 const getPaymentLabel = (method: string | undefined, status: string, booking?: any) => {
     const hasVerifiedOnlineProof = !!(booking?.razorpayPaymentId || booking?.stripePaymentIntent || booking?.stripeSessionId);
     const isMarkedOnline = (method || '').toLowerCase().trim() === 'online';
+    const hasExtra = booking?.additionalCharges && booking.additionalCharges.length > 0;
 
     if (hasVerifiedOnlineProof) {
-      return status === 'Completed' ? 'Paid (Online)' : 'Online';
+      if (status === 'Completed') {
+        return hasExtra ? 'Paid (Online + Extra Cash)' : 'Paid (Online)';
+      }
+      return hasExtra ? 'Online + Extra Cash' : 'Online';
     }
     if (isMarkedOnline && !hasVerifiedOnlineProof) {
       return status === 'Completed' ? 'Pay After Service (No Online TXN)' : 'Unpaid (Online Abandoned)';
@@ -478,6 +482,7 @@ export default function AdminBookingsPage() {
             updateData.additionalCharges = additionalCharges;
             const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
             updateData.totalAmount = (booking.totalAmount || 0) + extraTotal;
+            updateData.additionalChargesPaymentMethod = 'Pay After Service';
         }
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
@@ -1060,7 +1065,7 @@ export default function AdminBookingsPage() {
 
       {selectedBooking && (<Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}><DialogContent aria-describedby={undefined} className="max-w-3xl w-[90vw] max-h-[90vh] flex flex-col p-0"><DialogHeader className="p-3 pb-4 border-b"><DialogTitle>Details: {selectedBooking.bookingId}</DialogTitle></DialogHeader><div className="overflow-y-auto flex-grow p-3"><BookingDetailsModalContent booking={selectedBooking} /></div><div className="p-3 border-t flex justify-end"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></div></DialogContent></Dialog>)}
       {bookingToAssign && (<AssignProviderModal isOpen={isAssignModalOpen} onClose={() => { setIsAssignModalOpen(false); setBookingToAssign(null); }} booking={bookingToAssign} onAssignConfirm={handleConfirmAssignment} />)}
-      {bookingToComplete && (<CompleteBookingDialog isOpen={isCompleteDialogOpen} onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }} onConfirm={(charges, pMethod) => handleStatusChange(bookingToComplete, 'Completed', charges, pMethod)} originalAmount={bookingToComplete.totalAmount} currentPaymentMethod={bookingToComplete.paymentMethod || "Pay After Service"} isProcessing={isUpdatingStatus === bookingToComplete.id} isAdmin={true} />)}
+      {bookingToComplete && (<CompleteBookingDialog isOpen={isCompleteDialogOpen} onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }} onConfirm={(charges, pMethod) => handleStatusChange(bookingToComplete, 'Completed', charges, pMethod)} booking={bookingToComplete} originalAmount={bookingToComplete.totalAmount} currentPaymentMethod={bookingToComplete.paymentMethod || "Pay After Service"} isProcessing={isUpdatingStatus === bookingToComplete.id} isAdmin={true} />)}
       {bookingToReschedule && (<RescheduleBookingDialog isOpen={isRescheduleDialogOpen} onClose={() => { setIsRescheduleDialogOpen(false); setBookingToReschedule(null); }} booking={bookingToReschedule} onRescheduleComplete={(newDate, newSlot, newEndTime) => handleRescheduleConfirm(newDate, newSlot, newEndTime)} />)}
       {bookingToChangeStatus && (
         <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
