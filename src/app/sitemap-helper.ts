@@ -30,7 +30,7 @@ export async function getSitemapEntries() {
   const currentDate = new Date().toISOString();
 
   const staticPages = [
-    '', '/about-us', '/contact-us', '/careers', '/terms-and-conditions',
+    '', '/about-us', '/contact-us', '/careers', '/join-provider', '/terms-and-conditions',
     '/privacy-policy', '/faq', '/service-disclaimer', '/cancellation-policy', '/damage-and-claims-policy', '/categories', 
     '/blog', '/sitemap', '/near-me',
   ];

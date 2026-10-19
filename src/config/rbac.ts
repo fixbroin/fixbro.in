@@ -23,6 +23,7 @@ export const PERMISSION_MODULES = [
   { id: 'provider_applications', label: 'Provider Applications', paths: ['/admin/provider-applications'] },
   { id: 'provider_withdrawals', label: 'Provider Withdrawals', paths: ['/admin/provider-withdrawals'] },
   { id: 'provider_controls', label: 'Provider Controls', paths: ['/admin/provider-controls'] },
+  { id: 'join_provider_settings', label: 'Join Provider Page', paths: ['/admin/join-provider-settings'] },
   { id: 'categories', label: 'Categories', paths: ['/admin/categories'] },
   { id: 'sub_categories', label: 'Sub-Categories', paths: ['/admin/sub-categories'] },
   { id: 'services', label: 'Services', paths: ['/admin/services'] },

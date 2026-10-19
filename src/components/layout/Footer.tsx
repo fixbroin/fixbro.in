@@ -249,6 +249,7 @@ const Footer: React.FC<FooterProps> = ({ initialWebSettings, initialSiloData }) 
             <div className="flex flex-wrap gap-2">
               <FooterLink href="/about-us">About Us</FooterLink>
               <FooterLink href="/contact-us">Contact Us</FooterLink>
+              <FooterLink href="/join-provider">Join as Provider</FooterLink>
               <FooterLink href="/careers">Careers</FooterLink>
               <FooterLink href="/blog">Our Blog</FooterLink>
               <FooterLink href="/faq">FAQ</FooterLink>
