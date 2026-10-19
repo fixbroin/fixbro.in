@@ -47,12 +47,8 @@ export default function AppImage({
 
   const imgRef = useRef<HTMLImageElement>(null)
   
-  // 1. Memory Check: Have we seen this URL in this session?
-  const isSeenBefore = !!src && globalSeenImages.has(src);
-  
-  // 2. Initialize 'loaded' based on session memory. 
-  // If we've seen it, start as TRUE to skip the placeholder/pulse immediately.
-  const [loaded, setLoaded] = useState(isSeenBefore)
+  // 1. Initialize loaded consistently across SSR and client to prevent hydration mismatch
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
 
   const isDefaultImage = !src || error
@@ -70,21 +66,23 @@ export default function AppImage({
     if (onError) onError(e);
   };
 
-  // 3. Sync state with src changes (important for carousel/lists)
+  // 2. Sync state with src changes and session cache after mount
   useEffect(() => {
     const seenBefore = !!src && globalSeenImages.has(src);
-    setLoaded(seenBefore);
+    if (seenBefore) {
+      setLoaded(true);
+    }
     setError(false);
   }, [src]);
 
-  // 4. Synchronous Cache Check: If browser has it, show it INSTANTLY before paint.
+  // 3. Synchronous Cache Check: If browser has it, show it INSTANTLY before paint.
   useLayoutEffect(() => {
     if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
         handleLoad();
     }
   }, [src]);
 
-  const shouldBypassPlaceholder = priority || isSeenBefore;
+  const shouldBypassPlaceholder = priority;
   const isLoaded = loaded || shouldBypassPlaceholder;
 
   return (
@@ -107,7 +105,7 @@ export default function AppImage({
               alt="loading..."
               className={cn(
                   "w-full h-full object-contain p-4",
-                  !isSeenBefore && "animate-pulse"
+                  !loaded && "animate-pulse"
               )}
             />
         </div>
@@ -127,9 +125,8 @@ export default function AppImage({
             ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             : undefined)
         }
-        // Use priority for images we've seen before or critical images
-        priority={priority || isSeenBefore}
-        loading={(priority || isSeenBefore) ? undefined : (loading || "lazy")}
+        priority={priority}
+        loading={priority ? undefined : (loading || "lazy")}
         onLoad={handleLoad}
         onError={handleOnError}
         data-ai-hint={aiHint || aiHintData}

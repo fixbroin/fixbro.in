@@ -85,7 +85,11 @@ const TABLES = [
   'adminCoupons',
   'services',
   'adminTaxes',
-  'adminCustomImages'
+  'adminCustomImages',
+  'marketplaceFurniture',
+  'marketplaceRentals',
+  'marketplaceCallLogs',
+  'marketplaceSettings'
 ];
 
 /**

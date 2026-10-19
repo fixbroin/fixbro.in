@@ -37,6 +37,7 @@ import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
 import CategoryCard from './CategoryCard';
 import HomeCategoriesSection from '@/components/home/HomeCategoriesSection';
+import MarketplaceHeaderTabs from '@/components/marketplace/MarketplaceHeaderTabs';
 
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
@@ -775,6 +776,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
     <>
       {structuredData && <JsonLdScript data={structuredData} idSuffix={citySlug || areaSlug || 'homepage'} />}
       <div className="flex flex-col">
+        <MarketplaceHeaderTabs />
         {breadcrumbItems && breadcrumbItems.length > 0 && (
             <div className="container mx-auto px-4 pt-4 md:pt-6">
                <Breadcrumbs items={breadcrumbItems} />

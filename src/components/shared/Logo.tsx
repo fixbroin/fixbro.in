@@ -44,6 +44,7 @@ const Logo = ({ className = "", size = "normal", logoUrl, websiteName, href }: L
           src={displayLogoUrl}
           alt={`${finalWebsiteName} Logo`}
           fill
+          priority
           sizes={size === "large" ? "32px" : "24px"}
           className="object-contain"
         />

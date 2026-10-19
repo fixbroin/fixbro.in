@@ -42,7 +42,11 @@ const TABLES = [
   'areas',
   'searchAnalytics',
   'leaves',
-  'seoSettings'
+  'seoSettings',
+  'marketplaceFurniture',
+  'marketplaceRentals',
+  'marketplaceCallLogs',
+  'marketplaceSettings'
 ];
 
 import { NextRequest } from 'next/server';

@@ -34,7 +34,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   const pathname = usePathname();
   const [isClientMounted, setIsClientMounted] = useState(false);
   
-  const [showFooter, setShowFooter] = useState(true);
+  const hideFooterPrefixes = [
+    '/custom-service',
+    '/furniture',
+    '/rent-home',
+    '/marketplace',
+    '/admin',
+    '/provider',
+    '/auth/',
+    '/checkout',
+  ];
+  const isHiddenRoute = hideFooterPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const [showFooter, setShowFooter] = useState(!isHiddenRoute);
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -229,6 +240,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
       const hideFooterPaths: string[] = [];
       const hideFooterPrefixes = [
         '/custom-service',
+        '/furniture',
+        '/rent-home',
+        '/marketplace',
       ];
 
       const shouldHideFooterForSpecificPaths = 
@@ -296,10 +310,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     fetchPendingReview(); 
   }, [fetchPendingReview]);
 
-  const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/');
-  const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
-  const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
-  const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/');
+  const isMarketplaceRoute = pathname.startsWith('/furniture') || pathname.startsWith('/rent-home') || pathname.startsWith('/marketplace');
+  const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/') && !isMarketplaceRoute;
+  const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
+  const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
+  const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
 
   const bottomNavActivePaths = ['/', '/chat', '/notifications', '/my-bookings', '/profile', '/referral','/checkout/schedule', '/custom-service',
     '/checkout/address', '/checkout/payment', '/checkout/thank-you', '/cart', '/categories', '/my-address', '/about-us', '/contact-us', '/terms-and-conditions', 
@@ -328,7 +343,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   
           {children}
         </main>
-        {showFooter && <Footer initialWebSettings={initialWebSettings} initialSiloData={initialSiloData} />}
+        {showFooter && !isHiddenRoute && <Footer initialWebSettings={initialWebSettings} initialSiloData={initialSiloData} />}
         {shouldShowBottomNav && <BottomNavigationBar />}
         {shouldShowNewsletterPopupManager && <PopupDisplayManager />}
         {shouldShowGlobalAdminPopup && <GlobalAdminPopup />}
