@@ -10,8 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ShieldAlert, PhoneCall, AlertTriangle, Lock, User } from 'lucide-react';
+import { ShieldAlert, PhoneCall, AlertTriangle, Lock } from 'lucide-react';
 import type { MarketplaceSettings } from '@/types/marketplace';
 
 interface CallSafetyModalProps {
@@ -42,34 +41,19 @@ export default function CallSafetyModal({
   settings,
 }: CallSafetyModalProps) {
   const [agreed, setAgreed] = useState(false);
-  const [callerNameInput, setCallerNameInput] = useState(callerName);
-  const [callerPhoneInput, setCallerPhoneInput] = useState(callerPhone);
-  const [phoneError, setPhoneError] = useState('');
 
-  // Sync caller details when modal opens
   useEffect(() => {
     if (isOpen) {
-      setCallerNameInput(callerName || '');
-      setCallerPhoneInput(callerPhone || '');
-      setPhoneError('');
       setAgreed(false);
     }
-  }, [isOpen, callerName, callerPhone]);
+  }, [isOpen]);
 
   const handleCall = () => {
-    const cleanPhone = callerPhoneInput.trim().replace(/\s+/g, '');
-    const digitsOnly = cleanPhone.replace(/\D/g, '');
-
-    if (!cleanPhone || digitsOnly.length < 10) {
-      setPhoneError('Please enter a valid 10-digit phone number so the seller can recognize your call.');
-      return;
-    }
-
     if (onCallConfirmed) {
       onCallConfirmed({
-        name: callerNameInput.trim() || 'FixBro User',
-        phone: cleanPhone,
-        email: callerEmail || '',
+        name: callerName?.trim() || 'FixBro User',
+        phone: callerPhone?.trim() || '',
+        email: callerEmail?.trim() || '',
       });
     }
 
@@ -139,46 +123,6 @@ export default function CallSafetyModal({
                   )}
                 </div>
               </div>
-
-              {/* Caller Identity Confirmation */}
-              <div className="bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 p-3 rounded-xl text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-blue-950 dark:text-blue-200 text-xs flex items-center gap-1">
-                    <User className="h-3.5 w-3.5 text-blue-600" />
-                    Your Calling Details (Shared with Seller):
-                  </span>
-                  <span className="text-[10px] text-blue-700 dark:text-blue-300">So seller knows who called</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 block mb-0.5">Your Name</label>
-                    <Input
-                      type="text"
-                      value={callerNameInput}
-                      onChange={(e) => setCallerNameInput(e.target.value)}
-                      placeholder="Your Full Name"
-                      className="h-8 text-xs rounded-lg bg-white dark:bg-card"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-gray-600 dark:text-gray-300 block mb-0.5">Your Phone Number *</label>
-                    <Input
-                      type="tel"
-                      value={callerPhoneInput}
-                      onChange={(e) => {
-                        setCallerPhoneInput(e.target.value);
-                        if (phoneError) setPhoneError('');
-                      }}
-                      placeholder="10-digit mobile number"
-                      className={`h-8 text-xs rounded-lg bg-white dark:bg-card ${phoneError ? 'border-red-500' : ''}`}
-                    />
-                  </div>
-                </div>
-                {phoneError && (
-                  <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">{phoneError}</p>
-                )}
-              </div>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -232,4 +176,3 @@ export default function CallSafetyModal({
     </Dialog>
   );
 }
-

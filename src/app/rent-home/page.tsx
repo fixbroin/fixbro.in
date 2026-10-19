@@ -46,6 +46,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { saveUserMarketplaceLocationAction } from '@/app/actions/marketplaceLocationActions';
 import { getRentalPublicUrl } from '@/lib/marketplaceSlug';
+import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 
 const MarketplaceMapSelector = dynamic(
@@ -55,6 +56,7 @@ const MarketplaceMapSelector = dynamic(
 
 export default function RentHomeMarketplacePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const { user, firestoreUser, isLoading: isLoadingAuth } = useAuth();
   const { config: appConfig } = useApplicationConfig();
 
@@ -167,6 +169,13 @@ export default function RentHomeMarketplacePage() {
     const publicUrl = getRentalPublicUrl(item);
     if (!user) {
       router.push(`/auth/login?redirect=${encodeURIComponent(publicUrl)}`);
+      return;
+    }
+    if (user.uid === item.userId) {
+      toast({
+        title: "Your Listing",
+        description: "You posted this property, so you cannot call yourself.",
+      });
       return;
     }
     setSelectedCallListing(item);
@@ -422,10 +431,14 @@ export default function RentHomeMarketplacePage() {
                       <Button
                         type="button"
                         onClick={(e) => handleCallClick(item, e)}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs h-9 shadow-sm flex items-center justify-center gap-1.5"
+                        className={`w-full font-bold rounded-xl text-xs h-9 shadow-sm flex items-center justify-center gap-1.5 ${
+                          user?.uid === item.userId
+                            ? 'bg-gray-100 dark:bg-muted text-gray-500 hover:bg-gray-200'
+                            : 'bg-green-600 hover:bg-green-700 text-white'
+                        }`}
                       >
                         <PhoneCall className="h-3.5 w-3.5" />
-                        Direct Call Landlord
+                        {user?.uid === item.userId ? 'Your Listing' : 'Direct Call Landlord'}
                       </Button>
                     </div>
                   </div>

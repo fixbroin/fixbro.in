@@ -307,15 +307,29 @@ export default function FurnitureDetailsPage() {
                     router.push(`/auth/login?redirect=/furniture/${id}`);
                     return;
                   }
+                  if (user.uid === listing.userId) {
+                    toast({
+                      title: "Your Listing",
+                      description: "You posted this ad, so you cannot call yourself.",
+                    });
+                    return;
+                  }
                   setIsCallModalOpen(true);
                 }}
-                className="w-full h-12 rounded-2xl text-base font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg flex items-center justify-center gap-2"
+                disabled={user?.uid === listing.userId}
+                className={`w-full h-12 rounded-2xl text-base font-bold shadow-lg flex items-center justify-center gap-2 ${
+                  user?.uid === listing.userId
+                    ? 'bg-gray-100 dark:bg-muted text-gray-500 cursor-not-allowed border'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
               >
                 <PhoneCall className="h-5 w-5" />
-                Call Seller Directly
+                {user?.uid === listing.userId ? 'Your Listing' : 'Call Seller Directly'}
               </Button>
               <p className="text-[11px] text-center text-muted-foreground">
-                No chat waiting. Call the seller directly on phone.
+                {user?.uid === listing.userId
+                  ? 'This is your own listing.'
+                  : 'No chat waiting. Call the seller directly on phone.'}
               </p>
             </div>
 

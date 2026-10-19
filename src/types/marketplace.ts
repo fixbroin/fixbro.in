@@ -226,6 +226,8 @@ export interface MarketplaceCallLog {
   callerName: string;
   callerPhone: string;
   callerEmail?: string;
+  callCount?: number;
+  lastCalledAt?: string;
   createdAt: string;
 }
 

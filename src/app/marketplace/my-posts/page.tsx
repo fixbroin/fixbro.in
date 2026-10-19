@@ -593,9 +593,15 @@ export default function MyMarketplacePostsPage() {
                       ) : (
                         <span className="text-xs text-muted-foreground">(Phone not provided)</span>
                       )}
-                      <span className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-semibold px-2 py-0.5 rounded-full">
-                        Dialed Call
-                      </span>
+                      {log.callCount && log.callCount > 1 ? (
+                        <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                          Called {log.callCount} times
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 font-semibold px-2 py-0.5 rounded-full">
+                          Dialed Call
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5">

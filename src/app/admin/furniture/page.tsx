@@ -421,9 +421,14 @@ export default function AdminFurniturePage() {
                           : '—'}
                       </td>
                       <td className="p-3.5">
-                        <p className="font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                        <p className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                           <PhoneCall className="h-3 w-3 text-green-600" />
-                          {log.callerName || 'FixBro User'}
+                          <span>{log.callerName || 'FixBro User'}</span>
+                          {log.callCount && log.callCount > 1 && (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-300">
+                              {log.callCount} calls
+                            </span>
+                          )}
                         </p>
                         {log.callerPhone ? (
                           <a href={`tel:${log.callerPhone}`} className="text-[12px] font-bold text-green-700 dark:text-green-400 hover:underline">
