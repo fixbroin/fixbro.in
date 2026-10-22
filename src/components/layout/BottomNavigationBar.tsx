@@ -6,6 +6,7 @@ import { Home, Layers, Briefcase, UserCircle as UserIcon, Plus } from 'lucide-re
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
+import { useMarketplaceSettings } from '@/hooks/useMarketplaceSettings';
 import type { ElementType } from 'react';
 
 interface NavItem {
@@ -20,6 +21,9 @@ const BottomNavigationBar = () => {
   const router = useRouter();
   const { user, triggerAuthRedirect } = useAuth();
   const { showLoading } = useLoading();
+  const { settings } = useMarketplaceSettings();
+
+  const showSellButton = settings.showMarketplaceOnHomeServices !== false;
 
   const handleNav = (e: React.MouseEvent<HTMLAnchorElement>, item: NavItem) => {
     e.preventDefault();
@@ -81,20 +85,22 @@ const BottomNavigationBar = () => {
         </Link>
 
         {/* 3. Central Elevated SELL Button (Replaces Referral, Navigates to Buy & Sell Page) */}
-        <Link
-          href="/furniture"
-          onClick={() => {
-            if (pathname !== '/furniture') showLoading();
-          }}
-          className="flex flex-col items-center justify-center min-w-[56px] -mt-5 transition-all group"
-        >
-          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center border-4 border-background focus:outline-none">
-            <Plus className="h-6 w-6 stroke-[3]" />
-          </div>
-          <span className="text-[10px] font-bold text-primary mt-0.5 tracking-tight uppercase">
-            Sell
-          </span>
-        </Link>
+        {showSellButton && (
+          <Link
+            href="/furniture"
+            onClick={() => {
+              if (pathname !== '/furniture') showLoading();
+            }}
+            className="flex flex-col items-center justify-center min-w-[56px] -mt-5 transition-all group"
+          >
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center border-4 border-background focus:outline-none">
+              <Plus className="h-6 w-6 stroke-[3]" />
+            </div>
+            <span className="text-[10px] font-bold text-primary mt-0.5 tracking-tight uppercase">
+              Sell
+            </span>
+          </Link>
+        )}
 
         {/* 4. Bookings */}
         <Link

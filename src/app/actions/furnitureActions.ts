@@ -226,15 +226,28 @@ export async function getFurnitureListingByIdAction(
       item.distanceKm = Math.round(getHaversineDistance(userLat, userLng, item.latitude, item.longitude) * 10) / 10;
     }
 
-    // Increment view count
-    updateDoc(doc(db, COLLECTION_NAME, item.id), {
-      viewCount: (item.viewCount || 0) + 1,
-    }).catch(console.error);
-
     return item;
   } catch (error) {
     console.error('Error getting furniture listing by ID:', error);
     return null;
+  }
+}
+
+/**
+ * Increment view count for a furniture listing once per unique visitor session.
+ */
+export async function incrementFurnitureViewCountAction(id: string): Promise<boolean> {
+  try {
+    const realId = extractMarketplaceId(id);
+    const docRef = doc(db, COLLECTION_NAME, realId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return false;
+    const current = snap.data()?.viewCount || 0;
+    await updateDoc(docRef, { viewCount: current + 1 });
+    return true;
+  } catch (error) {
+    console.error('Error incrementing furniture view count:', error);
+    return false;
   }
 }
 

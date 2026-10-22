@@ -118,7 +118,7 @@ export default function SellFurniturePage() {
       }
     } else if (typeof window !== 'undefined') {
       try {
-        const cached = sessionStorage.getItem('fixbroMarketplaceLocation');
+        const cached = localStorage.getItem('fixbroMarketplaceLocation') || sessionStorage.getItem('fixbroMarketplaceLocation');
         if (cached && !location) {
           setLocation(JSON.parse(cached));
         }
@@ -236,13 +236,14 @@ export default function SellFurniturePage() {
     setLocation(loc);
     setIsMapOpen(false);
 
+    try {
+      localStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+      sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+    } catch {}
+
     if (user?.uid && user.uid !== 'guest') {
       try {
         await saveUserMarketplaceLocationAction(user.uid, loc);
-      } catch {}
-    } else {
-      try {
-        sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
       } catch {}
     }
   };

@@ -48,6 +48,8 @@ import { getFurniturePublicUrl } from '@/lib/marketplaceSlug';
 import { useToast } from '@/hooks/use-toast';
 import dynamic from 'next/dynamic';
 
+import { useMarketplaceUserLocation } from '@/hooks/useMarketplaceUserLocation';
+
 const MarketplaceMapSelector = dynamic(
   () => import('@/components/marketplace/MarketplaceMapSelector'),
   { ssr: false }
@@ -56,13 +58,18 @@ const MarketplaceMapSelector = dynamic(
 export default function FurnitureMarketplacePage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { user, firestoreUser, isLoading: isLoadingAuth } = useAuth();
+  const { user, firestoreUser } = useAuth();
   const { config: appConfig } = useApplicationConfig();
 
-  // Location state
-  const [location, setLocation] = useState<MarketplaceLocation | null>(null);
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const hasCheckedAutoLocation = useRef(false);
+  // Unified Location Hook (Checks DB for logged in, localStorage for guests, syncs guest to DB upon login)
+  const {
+    location,
+    isLoaded: isLocationLoaded,
+    hasLocation,
+    isLocationModalOpen,
+    setIsLocationModalOpen,
+    setLocationAndSave,
+  } = useMarketplaceUserLocation();
 
   // Filter state
   const [filters, setFilters] = useState<FurnitureFilterState>({
@@ -84,36 +91,23 @@ export default function FurnitureMarketplacePage() {
   const [selectedCallListing, setSelectedCallListing] = useState<FurnitureListing | null>(null);
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
 
-  // 1. Location Initialization & Auto-trigger if not saved
-  useEffect(() => {
-    if (isLoadingAuth) return;
-
-    let savedLoc: MarketplaceLocation | null = null;
-    if (firestoreUser?.marketplaceLocation?.latitude) {
-      savedLoc = firestoreUser.marketplaceLocation;
-    } else if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('fixbroMarketplaceLocation') || localStorage.getItem('fixbroMarketplaceLocation');
-        if (cached) savedLoc = JSON.parse(cached);
-      } catch {}
-    }
-
-    if (savedLoc) {
-      setLocation(savedLoc);
-    } else if (!hasCheckedAutoLocation.current) {
-      // Auto-trigger location selector immediately if location is NOT saved
-      hasCheckedAutoLocation.current = true;
-      setIsLocationModalOpen(true);
-    }
-  }, [firestoreUser, isLoadingAuth]);
-
-  // 2. Fetch Listings
+  // Fetch Listings: Only executes once location coordinates are checked
   const loadListings = useCallback(async () => {
+    // Wait until location check has resolved
+    if (!isLocationLoaded) return;
+
+    // If there are no coordinates, do not load unlocated listings; prompt location modal
+    if (!location?.latitude || !location?.longitude) {
+      setListings([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const data = await getFurnitureListingsAction({
-        lat: location?.latitude,
-        lng: location?.longitude,
+        lat: location.latitude,
+        lng: location.longitude,
         radiusKm: filters.radiusKm > 0 ? filters.radiusKm : undefined,
         condition: filters.condition,
         category: filters.category,
@@ -128,25 +122,14 @@ export default function FurnitureMarketplacePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [location, filters, searchQuery]);
+  }, [isLocationLoaded, location, filters, searchQuery]);
 
   useEffect(() => {
     loadListings();
   }, [loadListings]);
 
-  const handleLocationChange = async (newLoc: MarketplaceLocation) => {
-    setLocation(newLoc);
-    setIsLocationModalOpen(false);
-    if (user?.uid && user.uid !== 'guest') {
-      try {
-        await saveUserMarketplaceLocationAction(user.uid, newLoc);
-      } catch {}
-    } else {
-      try {
-        sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(newLoc));
-        localStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(newLoc));
-      } catch {}
-    }
+  const handleLocationChange = (newLoc: MarketplaceLocation) => {
+    setLocationAndSave(newLoc);
   };
 
   // Card click requires login
@@ -308,6 +291,29 @@ export default function FurnitureMarketplacePage() {
           <div className="py-20 flex flex-col items-center justify-center space-y-3">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Finding furniture near you...</p>
+          </div>
+        ) : !hasLocation ? (
+          <div className="bg-white dark:bg-card border rounded-3xl p-10 text-center space-y-4 shadow-sm">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+              <MapPin className="h-8 w-8" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Select Your Location to See Deals Near You
+              </h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                FixBro connects you with verified local furniture sellers. Pick your area to discover items nearby.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Button
+                onClick={() => setIsLocationModalOpen(true)}
+                className="bg-primary text-white rounded-xl text-xs font-bold gap-1.5 px-6 shadow-sm"
+              >
+                <MapPin className="h-4 w-4" />
+                Select Location
+              </Button>
+            </div>
           </div>
         ) : listings.length === 0 ? (
           <div className="bg-white dark:bg-card border rounded-3xl p-10 text-center space-y-4 shadow-sm">

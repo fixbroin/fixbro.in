@@ -192,6 +192,23 @@ export default function AdminMarketplaceSettingsPage() {
                   />
                   <span className="text-sm font-semibold">Enable Rent a Home Section</span>
                 </label>
+
+                <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-2xl bg-muted/40 border border-border/60 hover:bg-muted/60 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={settings.showMarketplaceOnHomeServices !== false}
+                    onChange={(e) => setSettings({ ...settings, showMarketplaceOnHomeServices: e.target.checked })}
+                    className="h-4 w-4 rounded text-primary focus:ring-primary mt-0.5 shrink-0"
+                  />
+                  <div>
+                    <span className="text-sm font-semibold block text-foreground">
+                      Show Marketplace Entry on Home Services Page
+                    </span>
+                    <span className="text-xs text-muted-foreground block mt-0.5">
+                      Controls visibility of both the top switcher tabs (Home Services | Buy &amp; Sell | Rent a Home) and the bottom navigation bar &quot;Sell&quot; button on the main home services page. When disabled, both sections are hidden.
+                    </span>
+                  </div>
+                </label>
               </div>
             </div>
           </CardContent>

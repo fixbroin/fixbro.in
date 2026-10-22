@@ -188,6 +188,7 @@ export interface MarketplaceSettings {
   rentalsOgImage?: string;
   isFurnitureEnabled: boolean;
   isRentalsEnabled: boolean;
+  showMarketplaceOnHomeServices?: boolean;
 }
 
 export const DEFAULT_MARKETPLACE_SETTINGS: MarketplaceSettings = {
@@ -212,6 +213,7 @@ export const DEFAULT_MARKETPLACE_SETTINGS: MarketplaceSettings = {
   rentalsOgImage: '/default-image.png',
   isFurnitureEnabled: true,
   isRentalsEnabled: true,
+  showMarketplaceOnHomeServices: true,
 };
 
 export interface MarketplaceCallLog {

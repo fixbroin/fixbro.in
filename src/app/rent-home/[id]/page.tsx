@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import MarketplaceNavHeader from '@/components/marketplace/MarketplaceNavHeader';
@@ -39,6 +39,7 @@ import {
 import {
   getRentalListingByIdAction,
   recordRentalCallAction,
+  incrementRentalViewCountAction,
 } from '@/app/actions/rentalActions';
 import { recordMarketplaceCallAction } from '@/app/actions/marketplaceCallActions';
 import { extractMarketplaceId } from '@/lib/marketplaceSlug';
@@ -54,23 +55,27 @@ export default function RentalDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [isCallModalOpen, setIsCallModalOpen] = useState(false);
-  const [viewerLocation, setViewerLocation] = useState<MarketplaceLocation | null>(null);
+  const [viewerLocation, setViewerLocation] = useState<MarketplaceLocation | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('fixbroMarketplaceLocation') || sessionStorage.getItem('fixbroMarketplaceLocation');
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return null;
+  });
+  const hasTrackedView = useRef(false);
 
   useEffect(() => {
-    if (firestoreUser?.marketplaceLocation) {
+    if (firestoreUser?.marketplaceLocation?.latitude) {
       setViewerLocation(firestoreUser.marketplaceLocation);
-    } else if (typeof window !== 'undefined') {
-      try {
-        const cached = sessionStorage.getItem('fixbroMarketplaceLocation');
-        if (cached) setViewerLocation(JSON.parse(cached));
-      } catch {}
     }
   }, [firestoreUser]);
 
   useEffect(() => {
     async function loadItem() {
       if (!id) return;
-      setIsLoading(true);
+      if (!listing) setIsLoading(true);
       try {
         const item = await getRentalListingByIdAction(
           id,
@@ -86,6 +91,30 @@ export default function RentalDetailsPage() {
     }
     loadItem();
   }, [id, viewerLocation]);
+
+  // Track unique view (once per session, excluding owner themselves)
+  useEffect(() => {
+    if (!listing?.id || hasTrackedView.current) return;
+
+    // Do not count owner's own views
+    if (user?.uid && listing.userId && user.uid === listing.userId) {
+      return;
+    }
+
+    // Check sessionStorage deduplication: 1 view per session
+    const storageKey = `fixbro_viewed_rental_${listing.id}`;
+    if (typeof window !== 'undefined') {
+      try {
+        if (sessionStorage.getItem(storageKey)) {
+          return;
+        }
+        sessionStorage.setItem(storageKey, 'true');
+      } catch {}
+    }
+
+    hasTrackedView.current = true;
+    incrementRentalViewCountAction(listing.id).catch(console.error);
+  }, [listing?.id, listing?.userId, user?.uid]);
 
   const handleShare = async () => {
     if (typeof window === 'undefined') return;

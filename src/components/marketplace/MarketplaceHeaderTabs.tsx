@@ -4,9 +4,16 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Wrench, Armchair, Home } from 'lucide-react';
+import { useMarketplaceSettings } from '@/hooks/useMarketplaceSettings';
 
 export default function MarketplaceHeaderTabs() {
   const pathname = usePathname();
+  const { settings } = useMarketplaceSettings();
+
+  // If disabled in admin panel, do not render tabs section on the home page
+  if (settings.showMarketplaceOnHomeServices === false) {
+    return null;
+  }
 
   const isServices = pathname === '/' || pathname.startsWith('/categories') || pathname.startsWith('/category');
   const isFurniture = pathname.startsWith('/furniture');

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from '@/components/shared/Logo';
@@ -71,20 +71,43 @@ export default function MarketplaceNavHeader({
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isPostChooserOpen, setIsPostChooserOpen] = useState(false);
 
+  const [internalLocation, setInternalLocation] = useState<MarketplaceLocation | null>(() => {
+    if (currentLocation) return currentLocation;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('fixbroMarketplaceLocation') || sessionStorage.getItem('fixbroMarketplaceLocation');
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (currentLocation) {
+      setInternalLocation(currentLocation);
+    } else if (firestoreUser?.marketplaceLocation?.latitude) {
+      setInternalLocation(firestoreUser.marketplaceLocation);
+    }
+  }, [currentLocation, firestoreUser]);
+
+  const activeLoc = currentLocation || internalLocation;
+
   const handleLocationSelected = async (loc: MarketplaceLocation) => {
+    setInternalLocation(loc);
     if (onLocationChange) {
       onLocationChange(loc);
     }
+    try {
+      localStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+      sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+    } catch {}
+
     if (user?.uid && user.uid !== 'guest') {
       try {
         await saveUserMarketplaceLocationAction(user.uid, loc);
       } catch (e) {
         console.warn('Could not save location to DB:', e);
       }
-    } else {
-      try {
-        sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
-      } catch {}
     }
     setIsMapOpen(false);
   };
@@ -145,7 +168,7 @@ export default function MarketplaceNavHeader({
             >
               <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="truncate">
-                {currentLocation?.area || currentLocation?.city || 'Select Location'}
+                {activeLoc?.area || activeLoc?.city || 'Select Location'}
               </span>
               <ChevronDown className="h-3 w-3 text-gray-400 shrink-0 hidden sm:block" />
             </button>

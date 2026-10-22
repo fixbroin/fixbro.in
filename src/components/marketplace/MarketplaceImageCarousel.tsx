@@ -9,7 +9,6 @@ import {
   Armchair,
   Home,
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface MarketplaceImageCarouselProps {
   photos: string[];
@@ -43,91 +42,181 @@ export default function MarketplaceImageCarousel({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Sync if initialIndex changes
+  // In-page carousel drag states
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Fullscreen carousel drag states
+  const [fsDragOffset, setFsDragOffset] = useState(0);
+  const [fsIsDragging, setFsIsDragging] = useState(false);
+
+  // Tracking refs for in-page carousel
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const dragOffsetRef = useRef(0);
+  const wasDraggedRef = useRef(false);
+
+  // Tracking refs for fullscreen carousel
+  const fsIsDraggingRef = useRef(false);
+  const fsDragStartXRef = useRef(0);
+  const fsDragStartYRef = useRef(0);
+  const fsDragOffsetRef = useRef(0);
+  const fsWasDraggedRef = useRef(false);
+
+  // Sync if initialIndex changes from parent
   useEffect(() => {
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
 
-  const updateIndex = (newIndex: number) => {
+  const updateIndex = useCallback((newIndex: number) => {
     setCurrentIndex(newIndex);
     if (onIndexChange) {
       onIndexChange(newIndex);
     }
-  };
+  }, [onIndexChange]);
 
   const validPhotos = Array.isArray(photos) ? photos.filter((p) => Boolean(p && typeof p === 'string')) : [];
   const total = validPhotos.length;
   const currentPhoto = total > 0 ? validPhotos[currentIndex] || validPhotos[0] : null;
 
-  // Touch swipe support (Mobile)
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const isDragging = useRef(false);
-  const wasDragged = useRef(false);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    wasDragged.current = false;
-    touchStartX.current = e.targetTouches[0].clientX;
-    touchStartY.current = e.targetTouches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const diffX = touchStartX.current - e.changedTouches[0].clientX;
-    const diffY = touchStartY.current - e.changedTouches[0].clientY;
-    // Only swipe if mostly horizontal
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 25) {
-      wasDragged.current = true;
-      if (diffX > 0 && currentIndex < total - 1) {
-        goToNext();
-      } else if (diffX < 0 && currentIndex > 0) {
-        goToPrev();
-      }
+  // Navigation handlers
+  const goToPrev = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
     }
-  };
+    if (currentIndex > 0) {
+      updateIndex(currentIndex - 1);
+    }
+  }, [currentIndex, updateIndex]);
 
-  // Mouse drag support (Desktop)
-  const mouseStartX = useRef(0);
+  const goToNext = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    if (currentIndex < total - 1) {
+      updateIndex(currentIndex + 1);
+    }
+  }, [currentIndex, total, updateIndex]);
 
+  // ==========================================
+  // IN-PAGE CAROUSEL: TOUCH & MOUSE DRAG LOGIC
+  // ==========================================
+
+  // Desktop Mouse Drag
   const handleMouseDown = (e: React.MouseEvent) => {
-    wasDragged.current = false;
-    mouseStartX.current = e.clientX;
-    isDragging.current = true;
+    if (total <= 1 || e.button !== 0) return;
+    isDraggingRef.current = true;
+    wasDraggedRef.current = false;
+    dragStartXRef.current = e.clientX;
+    dragOffsetRef.current = 0;
+    setIsDragging(true);
+    setDragOffset(0);
   };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    const diff = mouseStartX.current - e.clientX;
-    if (Math.abs(diff) > 20) {
-      wasDragged.current = true;
-    }
-    if (Math.abs(diff) > 35) {
-      if (diff > 0 && currentIndex < total - 1) {
-        goToNext();
-      } else if (diff < 0 && currentIndex > 0) {
-        goToPrev();
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const diff = e.clientX - dragStartXRef.current;
+      if (Math.abs(diff) > 4) {
+        wasDraggedRef.current = true;
       }
+      // Damping at start / end boundaries
+      let dampedDiff = diff;
+      if ((currentIndex === 0 && diff > 0) || (currentIndex === total - 1 && diff < 0)) {
+        dampedDiff = diff * 0.25;
+      }
+      dragOffsetRef.current = dampedDiff;
+      setDragOffset(dampedDiff);
+    };
+
+    const handleMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      setIsDragging(false);
+
+      const offset = dragOffsetRef.current;
+      const threshold = 35;
+
+      if (offset < -threshold && currentIndex < total - 1) {
+        updateIndex(currentIndex + 1);
+      } else if (offset > threshold && currentIndex > 0) {
+        updateIndex(currentIndex - 1);
+      }
+      setDragOffset(0);
+      dragOffsetRef.current = 0;
+      setTimeout(() => {
+        wasDraggedRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [currentIndex, total, updateIndex]);
+
+  // Mobile Touch Slide
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (total <= 1) return;
+    isDraggingRef.current = true;
+    wasDraggedRef.current = false;
+    dragStartXRef.current = e.touches[0].clientX;
+    dragStartYRef.current = e.touches[0].clientY;
+    dragOffsetRef.current = 0;
+    setIsDragging(true);
+    setDragOffset(0);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingRef.current) return;
+    const diffX = e.touches[0].clientX - dragStartXRef.current;
+    const diffY = e.touches[0].clientY - dragStartYRef.current;
+
+    // If vertical scroll gesture dominates early, don't hijack
+    if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffX) < 10) {
+      return;
     }
+
+    if (Math.abs(diffX) > 4) {
+      wasDraggedRef.current = true;
+    }
+
+    let dampedDiff = diffX;
+    if ((currentIndex === 0 && diffX > 0) || (currentIndex === total - 1 && diffX < 0)) {
+      dampedDiff = diffX * 0.25;
+    }
+    dragOffsetRef.current = dampedDiff;
+    setDragOffset(dampedDiff);
   };
 
-  const goToPrev = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    updateIndex(Math.max(0, currentIndex - 1));
-  };
+  const handleTouchEnd = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setIsDragging(false);
 
-  const goToNext = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    updateIndex(Math.min(total - 1, currentIndex + 1));
-  };
+    const offset = dragOffsetRef.current;
+    const threshold = 35;
 
-  const openFullscreen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsFullscreen(true);
+    if (offset < -threshold && currentIndex < total - 1) {
+      updateIndex(currentIndex + 1);
+    } else if (offset > threshold && currentIndex > 0) {
+      updateIndex(currentIndex - 1);
+    }
+    setDragOffset(0);
+    dragOffsetRef.current = 0;
+    setTimeout(() => {
+      wasDraggedRef.current = false;
+    }, 50);
   };
 
   const handleContainerClick = (e: React.MouseEvent) => {
-    if (wasDragged.current) {
-      wasDragged.current = false;
+    if (wasDraggedRef.current) {
+      wasDraggedRef.current = false;
       return;
     }
     if (onImageClick) {
@@ -137,40 +226,173 @@ export default function MarketplaceImageCarousel({
     }
   };
 
+  const openFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFullscreen(true);
+  };
+
+  // ==========================================
+  // FULLSCREEN LIGHTBOX: TOUCH & MOUSE DRAG
+  // ==========================================
+
+  const handleFsMouseDown = (e: React.MouseEvent) => {
+    if (total <= 1 || e.button !== 0) return;
+    fsIsDraggingRef.current = true;
+    fsWasDraggedRef.current = false;
+    fsDragStartXRef.current = e.clientX;
+    fsDragOffsetRef.current = 0;
+    setFsIsDragging(true);
+    setFsDragOffset(0);
+  };
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleFsMouseMove = (e: MouseEvent) => {
+      if (!fsIsDraggingRef.current) return;
+      const diff = e.clientX - fsDragStartXRef.current;
+      if (Math.abs(diff) > 4) {
+        fsWasDraggedRef.current = true;
+      }
+      let dampedDiff = diff;
+      if ((currentIndex === 0 && diff > 0) || (currentIndex === total - 1 && diff < 0)) {
+        dampedDiff = diff * 0.25;
+      }
+      fsDragOffsetRef.current = dampedDiff;
+      setFsDragOffset(dampedDiff);
+    };
+
+    const handleFsMouseUp = () => {
+      if (!fsIsDraggingRef.current) return;
+      fsIsDraggingRef.current = false;
+      setFsIsDragging(false);
+
+      const offset = fsDragOffsetRef.current;
+      const threshold = 40;
+
+      if (offset < -threshold && currentIndex < total - 1) {
+        updateIndex(currentIndex + 1);
+      } else if (offset > threshold && currentIndex > 0) {
+        updateIndex(currentIndex - 1);
+      }
+      setFsDragOffset(0);
+      fsDragOffsetRef.current = 0;
+      setTimeout(() => {
+        fsWasDraggedRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('mousemove', handleFsMouseMove);
+    window.addEventListener('mouseup', handleFsMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleFsMouseMove);
+      window.removeEventListener('mouseup', handleFsMouseUp);
+    };
+  }, [isFullscreen, currentIndex, total, updateIndex]);
+
+  const handleFsTouchStart = (e: React.TouchEvent) => {
+    if (total <= 1) return;
+    fsIsDraggingRef.current = true;
+    fsWasDraggedRef.current = false;
+    fsDragStartXRef.current = e.touches[0].clientX;
+    fsDragStartYRef.current = e.touches[0].clientY;
+    fsDragOffsetRef.current = 0;
+    setFsIsDragging(true);
+    setFsDragOffset(0);
+  };
+
+  const handleFsTouchMove = (e: React.TouchEvent) => {
+    if (!fsIsDraggingRef.current) return;
+    const diffX = e.touches[0].clientX - fsDragStartXRef.current;
+    const diffY = e.touches[0].clientY - fsDragStartYRef.current;
+
+    if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffX) < 10) {
+      return;
+    }
+
+    if (Math.abs(diffX) > 4) {
+      fsWasDraggedRef.current = true;
+    }
+
+    let dampedDiff = diffX;
+    if ((currentIndex === 0 && diffX > 0) || (currentIndex === total - 1 && diffX < 0)) {
+      dampedDiff = diffX * 0.25;
+    }
+    fsDragOffsetRef.current = dampedDiff;
+    setFsDragOffset(dampedDiff);
+  };
+
+  const handleFsTouchEnd = () => {
+    if (!fsIsDraggingRef.current) return;
+    fsIsDraggingRef.current = false;
+    setFsIsDragging(false);
+
+    const offset = fsDragOffsetRef.current;
+    const threshold = 40;
+
+    if (offset < -threshold && currentIndex < total - 1) {
+      updateIndex(currentIndex + 1);
+    } else if (offset > threshold && currentIndex > 0) {
+      updateIndex(currentIndex - 1);
+    }
+    setFsDragOffset(0);
+    fsDragOffsetRef.current = 0;
+    setTimeout(() => {
+      fsWasDraggedRef.current = false;
+    }, 50);
+  };
+
   // Keyboard navigation for fullscreen lightbox
   useEffect(() => {
     if (!isFullscreen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' && currentIndex < total - 1) {
-        updateIndex(Math.min(total - 1, currentIndex + 1));
+        updateIndex(currentIndex + 1);
       } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
-        updateIndex(Math.max(0, currentIndex - 1));
+        updateIndex(currentIndex - 1);
       } else if (e.key === 'Escape') {
         setIsFullscreen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isFullscreen, currentIndex, total]);
+  }, [isFullscreen, currentIndex, total, updateIndex]);
 
   return (
     <>
       <div
-        className={`relative overflow-hidden bg-gray-100 dark:bg-muted select-none group ${aspectRatio} ${className}`}
+        className={`relative overflow-hidden bg-gray-100 dark:bg-muted select-none group ${aspectRatio} ${className} ${
+          total > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+        }`}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
         onClick={handleContainerClick}
+        style={{ touchAction: total > 1 ? 'pan-y' : 'auto' }}
       >
-        {/* Main Photo Display */}
-        {currentPhoto ? (
-          <img
-            src={currentPhoto}
-            alt={`${alt} - photo ${currentIndex + 1}`}
-            className="w-full h-full object-cover transition-transform duration-300 pointer-events-none"
-            loading="lazy"
-          />
+        {/* Continuous Horizontal Sliding Track */}
+        {total > 0 ? (
+          <div
+            className="flex w-full h-full will-change-transform"
+            style={{
+              transform: `translateX(calc(-${currentIndex * 100}% + ${dragOffset}px))`,
+              transition: isDragging ? 'none' : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {validPhotos.map((photo, idx) => (
+              <div key={idx} className="w-full h-full shrink-0 relative flex items-center justify-center">
+                <img
+                  src={photo}
+                  alt={`${alt} - photo ${idx + 1}`}
+                  draggable={false}
+                  className="w-full h-full object-cover select-none pointer-events-none"
+                  loading={idx === 0 ? 'eager' : 'lazy'}
+                />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
             {type === 'furniture' ? (
@@ -195,7 +417,7 @@ export default function MarketplaceImageCarousel({
             type="button"
             aria-label="Previous image"
             onClick={goToPrev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center backdrop-blur-sm shadow-md transition-all active:scale-95 cursor-pointer"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center backdrop-blur-sm shadow-md transition-all active:scale-95 cursor-pointer pointer-events-auto"
           >
             <ChevronLeft className="h-5 w-5 stroke-[2.5]" />
           </button>
@@ -206,7 +428,7 @@ export default function MarketplaceImageCarousel({
             type="button"
             aria-label="Next image"
             onClick={goToNext}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center backdrop-blur-sm shadow-md transition-all active:scale-95 cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center backdrop-blur-sm shadow-md transition-all active:scale-95 cursor-pointer pointer-events-auto"
           >
             <ChevronRight className="h-5 w-5 stroke-[2.5]" />
           </button>
@@ -216,7 +438,7 @@ export default function MarketplaceImageCarousel({
         <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-20 pointer-events-none">
           {/* Photos Counter / Dots */}
           {total > 1 ? (
-            <div className="flex items-center gap-1.5 bg-black/65 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full backdrop-blur-sm pointer-events-auto">
+            <div className="flex items-center gap-1.5 bg-black/65 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full backdrop-blur-sm pointer-events-auto shadow-sm">
               <span>{currentIndex + 1}</span>
               <span className="opacity-60">/</span>
               <span>{total}</span>
@@ -245,7 +467,7 @@ export default function MarketplaceImageCarousel({
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[100] bg-black/95 flex flex-col justify-between p-3 sm:p-6 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] bg-black/95 flex flex-col justify-between p-3 sm:p-6 backdrop-blur-md animate-in fade-in duration-200 select-none"
           onClick={() => setIsFullscreen(false)}
         >
           {/* Top Bar with Title, Counter and Close Button */}
@@ -274,10 +496,15 @@ export default function MarketplaceImageCarousel({
             </button>
           </div>
 
-          {/* Center Image Container with Directional Arrows */}
+          {/* Center Image Container with Sliding Track & Directional Arrows */}
           <div
-            className="relative flex-1 flex items-center justify-center min-h-0 my-3"
+            className="relative flex-1 flex items-center justify-center min-h-0 my-3 overflow-hidden w-full select-none"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={handleFsTouchStart}
+            onTouchMove={handleFsTouchMove}
+            onTouchEnd={handleFsTouchEnd}
+            onMouseDown={handleFsMouseDown}
+            style={{ touchAction: total > 1 ? 'pan-y' : 'auto' }}
           >
             {/* Left arrow if previous image is available */}
             {total > 1 && currentIndex > 0 && (
@@ -285,17 +512,33 @@ export default function MarketplaceImageCarousel({
                 type="button"
                 onClick={goToPrev}
                 aria-label="Previous photo"
-                className="absolute left-2 sm:left-4 z-20 w-11 h-11 rounded-full bg-black/70 hover:bg-white/30 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer"
+                className="absolute left-2 sm:left-4 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-white/30 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer shadow-lg"
               >
                 <ChevronLeft className="h-6 w-6 stroke-[3]" />
               </button>
             )}
 
-            <img
-              src={currentPhoto}
-              alt={`${alt} - Fullscreen ${currentIndex + 1}`}
-              className="max-h-full max-w-full object-contain rounded-xl shadow-2xl select-none"
-            />
+            {/* Sliding Track in Fullscreen */}
+            <div
+              className={`flex h-full w-full items-center will-change-transform ${
+                total > 1 ? (fsIsDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
+              }`}
+              style={{
+                transform: `translateX(calc(-${currentIndex * 100}% + ${fsDragOffset}px))`,
+                transition: fsIsDragging ? 'none' : 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              {validPhotos.map((photo, idx) => (
+                <div key={idx} className="w-full h-full shrink-0 flex items-center justify-center p-2">
+                  <img
+                    src={photo}
+                    alt={`${alt} - Fullscreen ${idx + 1}`}
+                    draggable={false}
+                    className="max-h-full max-w-full object-contain rounded-xl shadow-2xl select-none pointer-events-none"
+                  />
+                </div>
+              ))}
+            </div>
 
             {/* Right arrow if next image is available */}
             {total > 1 && currentIndex < total - 1 && (
@@ -303,7 +546,7 @@ export default function MarketplaceImageCarousel({
                 type="button"
                 onClick={goToNext}
                 aria-label="Next photo"
-                className="absolute right-2 sm:right-4 z-20 w-11 h-11 rounded-full bg-black/70 hover:bg-white/30 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer"
+                className="absolute right-2 sm:right-4 z-30 w-11 h-11 rounded-full bg-black/70 hover:bg-white/30 text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer shadow-lg"
               >
                 <ChevronRight className="h-6 w-6 stroke-[3]" />
               </button>
@@ -327,7 +570,7 @@ export default function MarketplaceImageCarousel({
                       : 'border-transparent opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={p} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img src={p} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover select-none pointer-events-none" draggable={false} />
                 </button>
               ))}
             </div>

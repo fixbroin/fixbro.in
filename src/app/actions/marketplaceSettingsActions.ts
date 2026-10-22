@@ -21,6 +21,9 @@ export async function getMarketplaceSettingsAction(): Promise<MarketplaceSetting
       return {
         ...DEFAULT_MARKETPLACE_SETTINGS,
         ...data,
+        showMarketplaceOnHomeServices: data.showMarketplaceOnHomeServices !== undefined
+          ? data.showMarketplaceOnHomeServices
+          : true,
         safetyWarningPoints: Array.isArray(data.safetyWarningPoints) && data.safetyWarningPoints.length > 0
           ? data.safetyWarningPoints
           : DEFAULT_MARKETPLACE_SETTINGS.safetyWarningPoints,
@@ -41,6 +44,7 @@ export async function saveMarketplaceSettingsAction(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await setDoc(SETTINGS_REF(), settings, { merge: true });
+    revalidatePath('/');
     revalidatePath('/furniture');
     revalidatePath('/rent-home');
     revalidatePath('/admin/marketplace-settings');

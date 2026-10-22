@@ -115,7 +115,7 @@ export default function PostRentalPropertyPage() {
       if (firestoreUser.marketplaceLocation && !location) setLocation(firestoreUser.marketplaceLocation);
     } else if (typeof window !== 'undefined') {
       try {
-        const cached = sessionStorage.getItem('fixbroMarketplaceLocation');
+        const cached = localStorage.getItem('fixbroMarketplaceLocation') || sessionStorage.getItem('fixbroMarketplaceLocation');
         if (cached && !location) setLocation(JSON.parse(cached));
       } catch {}
     }
@@ -225,13 +225,14 @@ export default function PostRentalPropertyPage() {
     setLocation(loc);
     setIsMapOpen(false);
 
+    try {
+      localStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+      sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
+    } catch {}
+
     if (user?.uid && user.uid !== 'guest') {
       try {
         await saveUserMarketplaceLocationAction(user.uid, loc);
-      } catch {}
-    } else {
-      try {
-        sessionStorage.setItem('fixbroMarketplaceLocation', JSON.stringify(loc));
       } catch {}
     }
   };
