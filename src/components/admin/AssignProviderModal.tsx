@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Loader2, UserCheck2, UserCircle, PackageSearch, MapPin, CalendarOff } from "lucide-react";
@@ -212,20 +211,20 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-md md:max-w-lg max-h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 sm:p-3 pb-2">
+      <DialogContent className="w-[calc(100%-24px)] sm:max-w-md md:max-w-lg max-h-[85vh] sm:max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-2xl shadow-2xl">
+        <DialogHeader className="p-4 sm:p-5 pb-3 border-b border-border/60 shrink-0 bg-background/95 backdrop-blur-sm z-10">
           <DialogTitle className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
             <div className="flex items-center">
               <UserCheck2 className="mr-2 h-5 w-5 text-primary"/> Assign Provider
             </div>
             <span className="text-xs sm:text-sm text-muted-foreground font-normal">#{booking.bookingId}</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs text-muted-foreground">
             Showing nearest approved providers. Matching category shown first.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-grow overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:hsl(var(--muted-foreground)/0.3)_transparent]">
           {isLoadingCategory || isLoadingProviders ? (
             <div className="flex flex-col items-center justify-center h-60">
               <Loader2 className="h-10 w-10 animate-spin text-primary mb-2" />
@@ -240,39 +239,37 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-full max-h-[500px]">
-              <RadioGroup value={selectedProviderId} onValueChange={setSelectedProviderId} className="p-4 pt-2 gap-4">
-                {matchingProviders.length > 0 && (
-                  <div className="space-y-3">
-                    <div className="text-xs font-bold text-primary uppercase tracking-wider pl-1 flex items-center gap-1.5">
-                      <UserCheck2 className="h-4 w-4" /> Matching Category Providers ({matchingProviders.length})
-                    </div>
-                    <div className="grid gap-3">
-                      {matchingProviders.map((provider) => renderProviderItem(provider))}
-                    </div>
+            <RadioGroup value={selectedProviderId} onValueChange={setSelectedProviderId} className="p-4 sm:p-5 space-y-4">
+              {matchingProviders.length > 0 && (
+                <div className="space-y-3">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wider pl-1 flex items-center gap-1.5 sticky top-0 bg-background/95 backdrop-blur-sm py-1 z-10">
+                    <UserCheck2 className="h-4 w-4" /> Matching Category Providers ({matchingProviders.length})
                   </div>
-                )}
+                  <div className="grid gap-2.5 sm:gap-3">
+                    {matchingProviders.map((provider) => renderProviderItem(provider))}
+                  </div>
+                </div>
+              )}
 
-                {otherProviders.length > 0 && (
-                  <div className="space-y-3 mt-4">
-                    <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1 flex items-center gap-1.5">
-                      <UserCircle className="h-4 w-4" /> Other Category Providers ({otherProviders.length})
-                    </div>
-                    <div className="grid gap-3">
-                      {otherProviders.map((provider) => renderProviderItem(provider))}
-                    </div>
+              {otherProviders.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1 flex items-center gap-1.5 sticky top-0 bg-background/95 backdrop-blur-sm py-1 z-10">
+                    <UserCircle className="h-4 w-4" /> Other Category Providers ({otherProviders.length})
                   </div>
-                )}
-              </RadioGroup>
-            </ScrollArea>
+                  <div className="grid gap-2.5 sm:gap-3">
+                    {otherProviders.map((provider) => renderProviderItem(provider))}
+                  </div>
+                </div>
+              )}
+            </RadioGroup>
           )}
         </div>
 
-        <DialogFooter className="p-4 sm:p-3 border-t bg-muted/30 gap-2 sm:gap-0">
-          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onClose} disabled={isAssigning}>
+        <DialogFooter className="p-3 sm:p-4 border-t border-border/60 bg-muted/40 shrink-0 gap-2 sm:gap-3 flex flex-col-reverse sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" className="w-full sm:w-auto rounded-xl font-medium" onClick={onClose} disabled={isAssigning}>
             Cancel
           </Button>
-          <Button type="button" className="w-full sm:w-auto" onClick={handleConfirm} disabled={!selectedProviderId || isAssigning || isLoadingProviders}>
+          <Button type="button" className="w-full sm:w-auto rounded-xl font-bold bg-primary text-primary-foreground shadow-sm hover:bg-primary/90" onClick={handleConfirm} disabled={!selectedProviderId || isAssigning || isLoadingProviders}>
             {isAssigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Assign to Provider
           </Button>
