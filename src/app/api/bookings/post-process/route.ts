@@ -460,7 +460,7 @@ export async function POST(request: Request) {
     // B. User Dashboard Notification (Dispatched below with full idempotency lock and human-friendly messages)
 
     // D. Trigger Actual Push Notifications
-    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string, pType?: string) => {
+    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string, pType?: string, pSound?: string) => {
         try {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
@@ -471,6 +471,7 @@ export async function POST(request: Request) {
                     body: pBody, 
                     href: pHref,
                     type: pType,
+                    sound: pSound,
                     variables: {
                         bookingId: booking.bookingId || "",
                         customerName: booking.customerName || "Customer",
@@ -493,8 +494,19 @@ export async function POST(request: Request) {
     if (!(isCancelled && cancelledBy === 'user')) {
       try {
           const currencySymbol = appConfig?.currencySymbol || "₹";
+          
+          // Gather all active admin UIDs (Staff admins + Master admin)
+          const adminUids = new Set<string>();
           const adminsSnapshot = await adminDb.collection('admins').where('status', '==', 'active').get();
-          if (!adminsSnapshot.empty) {
+          adminsSnapshot.forEach(doc => adminUids.add(doc.id));
+
+          // Also ensure primary master admin gets notified even if not in staff collection
+          if (ADMIN_EMAIL) {
+              const primaryAdminSnap = await adminDb.collection('users').where('email', '==', ADMIN_EMAIL).limit(1).get();
+              primaryAdminSnap.forEach(doc => adminUids.add(doc.id));
+          }
+
+          if (adminUids.size > 0) {
               const isInitialNewBooking = emailType === 'booking_confirmation';
               const alreadyNotifiedAdmin = isInitialNewBooking
                   ? !!booking.isAdminNotifiedForNewBooking
@@ -515,35 +527,50 @@ export async function POST(request: Request) {
                       console.error("Error setting admin idempotency flag:", e);
                   }
 
+                  const readableStatus = String(currentStatus).replace(/([A-Z])/g, ' $1').trim();
                   let adminTitle = "Booking Update";
-                  let adminMessage = `ID: ${booking.bookingId} by ${booking.customerName} is ${booking.status}.`;
+                  let adminMessage = `Booking #${booking.bookingId} by ${booking.customerName} status updated to ${readableStatus}.`;
                   let notificationType: 'info' | 'admin_alert' = 'info';
 
                   if (isCompleted) {
                       adminTitle = "Job Completed!";
-                      adminMessage = `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
+                      adminMessage = `Booking #${booking.bookingId} for ${booking.customerName} has been completed by ${providerName || 'technician'}. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
+                      notificationType = 'info';
                   } else if (isCancelled) {
                       adminTitle = "Booking Cancelled";
-                      adminMessage = `Booking ${booking.bookingId} by ${booking.customerName} has been cancelled.`;
+                      adminMessage = `Booking #${booking.bookingId} by ${booking.customerName} has been cancelled.`;
                       notificationType = 'admin_alert';
                   } else if (isRescheduled) {
                       adminTitle = "Booking Rescheduled";
-                      adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+                      adminMessage = `Booking #${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+                      notificationType = 'info';
                   } else if (isInitialNewBooking) {
                       adminTitle = "New Booking Received!";
                       if (booking.providerId) {
-                          adminMessage = `A new booking ${booking.bookingId} by ${booking.customerName} has been placed and auto-assigned to ${providerName || 'a provider'}.`;
+                          adminMessage = `New booking #${booking.bookingId} by ${booking.customerName} placed (Assigned to: ${providerName || 'Provider'}).`;
                       } else {
-                          adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
+                          adminMessage = `New booking #${booking.bookingId} by ${booking.customerName} placed. Requires assignment.`;
                       }
                       notificationType = 'admin_alert';
                   } else if (currentStatus === 'AssignedToProvider') {
-                      adminTitle = "Provider Assigned";
-                      adminMessage = `Booking ${booking.bookingId} has been assigned to provider ${providerName || 'N/A'}.`;
+                      adminTitle = "Technician Assigned";
+                      adminMessage = `Booking #${booking.bookingId} assigned to technician ${providerName || 'Provider'}.`;
+                      notificationType = 'info';
+                  } else if (currentStatus === 'ProviderAccepted') {
+                      adminTitle = "Technician Accepted Job";
+                      adminMessage = `Technician ${providerName || 'Provider'} has accepted booking #${booking.bookingId} for ${booking.customerName}.`;
+                      notificationType = 'info';
+                  } else if (currentStatus === 'ProviderRejected') {
+                      adminTitle = "Technician Rejected Booking!";
+                      adminMessage = `Technician ${providerName || 'Provider'} rejected booking #${booking.bookingId}. Action required: please reassign.`;
+                      notificationType = 'admin_alert';
+                  } else if (currentStatus === 'InProgressByProvider') {
+                      adminTitle = "Service In Progress";
+                      adminMessage = `Technician ${providerName || 'Provider'} started work on booking #${booking.bookingId} for ${booking.customerName}.`;
+                      notificationType = 'info';
                   }
 
-                  adminsSnapshot.forEach(adminDoc => {
-                      const adminUid = adminDoc.id;
+                  adminUids.forEach(adminUid => {
                       tasks.push(adminDb.collection('userNotifications').add({
                           userId: adminUid,
                           title: adminTitle,
@@ -554,12 +581,14 @@ export async function POST(request: Request) {
                           createdAt: Timestamp.now()
                       }));
 
-                      // Trigger Push for each admin
+                      // Trigger Push for each admin (Play order ringing sound for new bookings!)
                       tasks.push(triggerPush(
                           adminUid, 
-                          isInitialNewBooking ? "New Booking" : adminTitle, 
+                          isInitialNewBooking ? "New Booking Received!" : adminTitle, 
                           adminMessage, 
-                          `/admin/bookings`
+                          `/admin/bookings`,
+                          isInitialNewBooking ? 'new_order' : undefined,
+                          isInitialNewBooking ? 'order' : undefined
                       ));
                   });
               }
