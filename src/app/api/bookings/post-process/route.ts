@@ -360,6 +360,53 @@ export async function POST(request: Request) {
         tasks.push(notifyProviderTask);
     }
 
+    // --- NEW: Notify Assigned Provider on Cancellation or Rescheduling (With Idempotency Lock) ---
+    if (booking.providerId && (isCancelled || isRescheduled)) {
+        const providerStatusKey = isCancelled ? 'lastProviderNotifiedCancelled' : 'lastProviderNotifiedRescheduled';
+        if (!booking[providerStatusKey]) {
+            booking[providerStatusKey] = true;
+            try {
+                await adminDb.collection('bookings').doc(bookingDocId).update({ [providerStatusKey]: true });
+            } catch (e) {
+                console.error("Error setting provider status notification flag:", e);
+            }
+
+            const pTitle = isCancelled ? "Booking Cancelled" : "Job Rescheduled";
+            const pMessage = isCancelled
+                ? `Booking #${booking.bookingId} for ${booking.customerName} has been cancelled.`
+                : `Booking #${booking.bookingId} for ${booking.customerName} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+
+            tasks.push(adminDb.collection('userNotifications').add({
+                userId: booking.providerId,
+                title: pTitle,
+                message: pMessage,
+                type: isCancelled ? 'warning' : 'info',
+                href: '/provider',
+                read: false,
+                createdAt: Timestamp.now()
+            }));
+
+            tasks.push(fetch(`${getBaseUrl()}/api/send-push`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_API_SECRET || '' },
+                body: JSON.stringify({ 
+                    userId: booking.providerId, 
+                    title: pTitle, 
+                    body: pMessage, 
+                    href: '/provider',
+                    type: isCancelled ? 'booking_cancelled' : 'other',
+                    variables: {
+                        bookingId: booking.bookingId || "",
+                        providerName: providerName || "Service Provider",
+                        customerName: booking.customerName || "Customer",
+                        serviceName: booking.services ? booking.services.map((s: any) => `${s.name} (x${s.quantity})`).join(', ') : '',
+                        siteName: seoSettings?.websiteName || "Fixbro"
+                    }
+                }),
+            }).catch(err => console.error("Error sending provider status push:", err)));
+        }
+    }
+
     // A. Update User "hasBooking" status
     if (userId) {
         tasks.push(adminDb.collection('users').doc(userId).set({ hasBooking: true }, { merge: true }));
