@@ -849,14 +849,23 @@ export async function sendServerPushNotification(params: {
     // Send push
     const messaging = admin.messaging();
     const messagePayload = {
-      notification: {
+      data: {
         title: finalTitle,
         body: finalBody,
-      },
-      data: {
         click_action: href || '/',
+        url: href || '/',
+        targetUrl: href || '/',
         icon: icon || '/android-chrome-192x192.png',
         sound: sound || 'default',
+        channelKey: sound === 'order' ? 'fixbro_new_bookings_channel_v3' : 'fixbro_general_channel_v3',
+        channel_id: sound === 'order' ? 'fixbro_new_bookings_channel_v3' : 'fixbro_general_channel_v3',
+        priority: 'high',
+        wakeUpScreen: 'true',
+        fullScreenIntent: sound === 'order' ? 'true' : 'false',
+      },
+      android: {
+        priority: 'high' as const,
+        ttl: 60 * 60 * 24 * 1000,
       },
       webpush: {
         headers: {

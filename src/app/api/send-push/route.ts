@@ -151,11 +151,10 @@ export async function POST(request: Request) {
       : `${channelPrefix}_general_channel_v3`;
 
     // 2. Prepare the message
+    // High-priority DATA message for Android ensures FirebaseMessaging.onBackgroundMessage
+    // is reliably invoked in background, closed, and locked-screen states so AwesomeNotifications
+    // can wake the screen, play custom sounds, and display heads-up alerts.
     const messagePayload = {
-      notification: {
-        title: finalTitle,
-        body: finalBody,
-      },
       data: {
         title: finalTitle,
         body: finalBody,
@@ -168,45 +167,25 @@ export async function POST(request: Request) {
         channelKey: targetChannelId,
         channel_id: targetChannelId,
         priority: 'high',
+        wakeUpScreen: 'true',
+        fullScreenIntent: isOrderSound ? 'true' : 'false',
       },
       android: {
         priority: 'high' as const,
-        notification: {
-          title: finalTitle,
-          body: finalBody,
-          channelId: targetChannelId,
-          icon: 'ic_notification',
-          color: '#2563EB',
-          sound: isOrderSound ? 'order_sound' : 'default',
-          priority: 'max' as const,
-          defaultVibrateTimings: true,
-          defaultSound: !isOrderSound,
-          visibility: 'public' as const,
-          clickAction: href || '/',
-          ticker: finalTitle,
-        },
-        data: {
-          title: finalTitle,
-          body: finalBody,
-          url: href || '/',
-          targetUrl: href || '/',
-          click_action: href || '/',
-          sound: isOrderSound ? 'order' : 'default',
-          type: customType || pushType || 'order_status',
-          channelKey: targetChannelId,
-          channel_id: targetChannelId,
-          priority: 'high',
-        }
+        ttl: 60 * 60 * 24 * 1000, // 24 hours
       },
       // Essential for background handling in modern browsers
       webpush: {
+        headers: {
+          Urgency: 'high',
+        },
         notification: {
           title: finalTitle,
           body: finalBody,
           icon: icon || '/android-chrome-192x192.png',
           data: {
             url: href || '/',
-            sound: sound || 'default',
+            sound: isOrderSound ? 'order' : 'default',
           }
         }
       }

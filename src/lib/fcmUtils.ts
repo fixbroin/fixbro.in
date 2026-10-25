@@ -1,11 +1,10 @@
-
 "use client";
 
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
-import { app, db, auth } from "./firebase"; // Ensure your firebase.ts exports 'app'
+import { app, db, auth } from "./firebase";
 import { doc, setDoc, Timestamp, getDoc } from '@/lib/mysqlDb';
 import type { MarketingSettings } from "@/types/firestore";
-import { isWebView, sendPushNotificationData, postToFlutter } from './webview-bridge'; // Import WebView bridge functions
+import { isWebView, sendPushNotificationData, postToFlutter } from './webview-bridge';
 
 let marketingSettingsCache: MarketingSettings | null = null;
 
@@ -29,19 +28,54 @@ const getMarketingSettings = async (): Promise<MarketingSettings | null> => {
 
 export const syncNativeFcmToken = async (token: string, explicitUserId?: string | null): Promise<boolean> => {
   if (typeof window === 'undefined' || !token) return false;
-  const targetUid = explicitUserId || auth?.currentUser?.uid || localStorage.getItem('fixbro_user_uid');
+
+  // Cache token locally so it is never lost across redirects or page reloads
+  (window as any).fcmDeviceToken = token;
+  try {
+    localStorage.setItem('fixbro_native_fcm_token', token);
+  } catch (_) {}
+
+  const targetUid = explicitUserId || auth?.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null);
   if (!targetUid) {
-    (window as any).fcmDeviceToken = token;
+    console.log("FCM Utils: Token cached locally, waiting for user session to sync.");
     return false;
   }
+
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth?.currentUser) {
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        headers['Authorization'] = `Bearer ${idToken}`;
+      } catch (_) {}
+    }
+
+    const appVariant = (window as any).flutterAppVariant || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('flutter_app_variant') : null) || 'customer';
+
+    const res = await fetch('/api/sync-fcm-token', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        token,
+        userId: targetUid,
+        platform: 'android',
+        appVariant
+      })
+    });
+
+    if (res.ok) {
+      console.log("FCM Utils: Successfully synced native FCM token for user via API:", targetUid);
+      return true;
+    }
+
+    // Fallback directly to client setDoc if API route returned error
     const userDocRef = doc(db, "users", targetUid);
     await setDoc(userDocRef, {
       fcmTokens: {
         [token]: Timestamp.now()
       }
     }, { merge: true });
-    console.log("FCM Utils: Successfully synced native FCM token for user:", targetUid);
+    console.log("FCM Utils: Successfully synced native FCM token for user via DB fallback:", targetUid);
     return true;
   } catch (e) {
     console.error("FCM Utils: Error syncing native FCM token:", e);
@@ -52,11 +86,23 @@ export const syncNativeFcmToken = async (token: string, explicitUserId?: string 
 if (typeof window !== 'undefined') {
   (window as any).syncNativeFcmToken = syncNativeFcmToken;
   window.addEventListener('flutterNativeReady', (e: any) => {
-    const token = e.detail?.deviceToken || (window as any).fcmDeviceToken;
+    const token = e.detail?.deviceToken || (window as any).fcmDeviceToken || localStorage.getItem('fixbro_native_fcm_token');
     if (token) {
       syncNativeFcmToken(token);
     }
   });
+
+  // Automatically sync cached token whenever user logs in or auth state resolves
+  if (auth && typeof auth.onAuthStateChanged === 'function') {
+    auth.onAuthStateChanged((user) => {
+      if (user?.uid) {
+        const cached = (window as any).fcmDeviceToken || localStorage.getItem('fixbro_native_fcm_token');
+        if (cached) {
+          syncNativeFcmToken(cached, user.uid);
+        }
+      }
+    });
+  }
 }
 
 // Function to initialize Firebase Cloud Messaging and request permission
@@ -68,13 +114,13 @@ export const initializeFCM = async (userId?: string | null): Promise<string | nu
 
   // If in Flutter WebView, sync native FCM token provided by Flutter App
   if (isWebView()) {
-    const nativeToken = (window as any).fcmDeviceToken;
+    const nativeToken = (window as any).fcmDeviceToken || localStorage.getItem('fixbro_native_fcm_token');
     if (nativeToken && typeof nativeToken === 'string' && nativeToken.length > 0) {
       await syncNativeFcmToken(nativeToken, userId);
       return nativeToken;
     }
     // Proactively request token from Flutter bridge if not yet set
-    postToFlutter({ action: 'syncFcmToken' });
+    postToFlutter({ action: 'syncFcmToken', userId });
   }
 
   const supported = await isSupported();
@@ -104,15 +150,8 @@ export const initializeFCM = async (userId?: string | null): Promise<string | nu
 
       if (fcmToken) {
         console.log("FCM Utils: Token received:", fcmToken);
-        // Save token to Firestore
-        const userDocRef = doc(db, "users", userId);
-        // Store token in a subcollection or a map field. Using a map for simplicity here.
-        await setDoc(userDocRef, {
-          fcmTokens: {
-            [fcmToken]: Timestamp.now()
-          }
-        }, { merge: true });
-        console.log("FCM Utils: Token saved to Firestore for user:", userId);
+        // Save token to Firestore/MySQL via sync-fcm-token
+        await syncNativeFcmToken(fcmToken, userId);
         return fcmToken;
       } else {
         console.log("FCM Utils: No registration token available. Request permission to generate one.");
@@ -140,39 +179,39 @@ export const onForegroundMessage = async () => {
     }
     const messaging = getMessaging(app);
     onMessage(messaging, (payload) => {
-    console.log("FCM Utils: Message received in foreground: ", payload);
-    
-    // Play custom sound based on notification type/data
-    try {
-      const soundFile = payload.data?.sound === 'order' ? '/sounds/order_sound.wav' : '/sounds/default-notification.mp3';
-      const audio = new Audio(soundFile);
-      audio.play().catch(e => console.warn("FCM Utils: Could not play notification sound:", e));
-    } catch (soundErr) {
-      console.error("FCM Utils: Sound play error:", soundErr);
-    }
+      console.log("FCM Utils: Message received in foreground: ", payload);
+      
+      // Play custom sound based on notification type/data
+      try {
+        const soundFile = payload.data?.sound === 'order' ? '/sounds/order_sound.wav' : '/sounds/default-notification.mp3';
+        const audio = new Audio(soundFile);
+        audio.play().catch(e => console.warn("FCM Utils: Could not play notification sound:", e));
+      } catch (soundErr) {
+        console.error("FCM Utils: Sound play error:", soundErr);
+      }
 
-    // If in a WebView, send the data to the native app
-    if (isWebView()) {
-      sendPushNotificationData(payload);
-      return; // Prevent showing the browser notification
-    }
+      // If in a WebView, send the data to the native app
+      if (isWebView()) {
+        sendPushNotificationData(payload);
+        return; // Prevent showing the browser notification
+      }
 
-    // For regular browsers, show a standard notification
-    if (payload.notification && typeof window !== 'undefined' && 'Notification' in window) {
-      const notification = new Notification(payload.notification.title || "New Message", {
-        body: payload.notification.body || "",
-        icon: payload.notification.icon || "/android-chrome-192x192.png",
-      });
+      // For regular browsers, show a standard notification
+      if (payload.notification && typeof window !== 'undefined' && 'Notification' in window) {
+        const notification = new Notification(payload.notification.title || "New Message", {
+          body: payload.notification.body || "",
+          icon: payload.notification.icon || "/android-chrome-192x192.png",
+        });
 
-      notification.onclick = (event) => {
-        event.preventDefault(); // prevent the browser from focusing the Notification's tab
-        const url = payload.data?.click_action || payload.data?.url || '/';
-        window.focus();
-        window.location.href = url;
-        notification.close();
-      };
-    }
-  });
+        notification.onclick = (event) => {
+          event.preventDefault();
+          const url = payload.data?.click_action || payload.data?.url || '/';
+          window.focus();
+          window.location.href = url;
+          notification.close();
+        };
+      }
+    });
   } catch (e) {
     console.warn("FCM Utils: Could not attach foreground message listener:", e);
   }

@@ -233,6 +233,12 @@ export const syncNativeFcmToken = (userId: string) => {
   if (isWebView()) {
     postToFlutter({ action: 'syncFcmToken', userId });
   }
+  if (typeof window !== 'undefined') {
+    const cached = (window as any).fcmDeviceToken || localStorage.getItem('fixbro_native_fcm_token');
+    if (cached && typeof (window as any).syncNativeFcmToken === 'function') {
+      (window as any).syncNativeFcmToken(cached, userId);
+    }
+  }
 };
 
 /**

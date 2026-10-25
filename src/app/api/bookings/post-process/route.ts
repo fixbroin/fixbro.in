@@ -286,7 +286,7 @@ export async function POST(request: Request) {
                 try {
                     await fetch(`${getBaseUrl()}/api/send-push`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_API_SECRET || '' },
                         body: JSON.stringify({ 
                             userId: booking.providerId, 
                             title: "New Job Assigned!", 
@@ -465,7 +465,7 @@ export async function POST(request: Request) {
         try {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_API_SECRET || '' },
                 body: JSON.stringify({ 
                     userId: pUserId, 
                     title: pTitle, 
@@ -796,7 +796,7 @@ export async function POST(request: Request) {
                 const baseUrl = getBaseUrl();
                 fetch(`${baseUrl}/api/send-push`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_API_SECRET || '' },
                     body: JSON.stringify(pushParams)
                 }).catch(e => console.error("Error triggering referral completed push:", e));
             }

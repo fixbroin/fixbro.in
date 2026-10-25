@@ -361,16 +361,28 @@ export async function sendBulkPushNotificationAction(params: {
 
     // 3. Construct Message Payload
     const messagePayload = {
-      notification: {
+      data: {
         title,
         body,
-        image: imageUrl || undefined
-      },
-      data: {
         click_action: href || '/',
+        url: href || '/',
+        targetUrl: href || '/',
         icon: '/android-chrome-192x192.png',
+        image: imageUrl || '',
+        channelKey: 'fixbro_general_channel_v3',
+        channel_id: 'fixbro_general_channel_v3',
+        sound: 'default',
+        priority: 'high',
+        wakeUpScreen: 'true',
+      },
+      android: {
+        priority: 'high' as const,
+        ttl: 60 * 60 * 24 * 1000,
       },
       webpush: {
+        headers: {
+          Urgency: 'high',
+        },
         notification: {
           title,
           body,
@@ -468,6 +480,7 @@ export async function sendTestPushAction(id: string, adminUid: string): Promise<
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-internal-token': process.env.INTERNAL_API_SECRET || '',
       },
       body: JSON.stringify({
         userId: adminUid,

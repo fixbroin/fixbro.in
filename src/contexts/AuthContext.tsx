@@ -16,7 +16,7 @@ import {
   verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { initializeFCM, onForegroundMessage } from '@/lib/fcmUtils';
+import { initializeFCM, onForegroundMessage, syncNativeFcmToken } from '@/lib/fcmUtils';
 import { doc, setDoc, Timestamp, getDoc, onSnapshot, collection, query, where, getDocs, limit, runTransaction, or } from '@/lib/mysqlDb';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -839,6 +839,12 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     if (user?.uid) { 
       const setupFCM = async () => {
         try {
+          const cachedNativeToken = (typeof window !== 'undefined') 
+            ? ((window as any).fcmDeviceToken || localStorage.getItem('fixbro_native_fcm_token')) 
+            : null;
+          if (cachedNativeToken) {
+            await syncNativeFcmToken(cachedNativeToken, user.uid);
+          }
           await initializeFCM(user.uid);
           onForegroundMessage();
         } catch (error) {
