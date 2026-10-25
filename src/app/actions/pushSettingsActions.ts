@@ -17,6 +17,14 @@ export interface PushTemplate {
 }
 
 const DEFAULT_PUSH_TEMPLATES: Record<string, Omit<PushTemplate, 'id'>> = {
+  new_order: {
+    title: "New Job / Order Assigned",
+    description: "New booking assigned notification dispatched to service provider with order ringtone.",
+    subject: "New Booking Received! (ID: {bookingId})",
+    body: "New booking #{bookingId} assigned for {serviceName}. Tap to view details.",
+    isEnabled: true,
+    placeholders: ["bookingId", "serviceName", "customerName", "providerName", "siteName"]
+  },
   booking_created: {
     title: "Booking Created",
     description: "New booking alerts triggered when a service is scheduled (User & Admin).",

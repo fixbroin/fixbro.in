@@ -292,18 +292,22 @@ export async function POST(request: Request) {
 
                 // 3. Trigger Push
                 try {
+                    const servicesSummary = booking.services.map((s: any) => `${s.name} (x${s.quantity})`).join(', ');
                     await fetch(`${getBaseUrl()}/api/send-push`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_API_SECRET || '' },
                         body: JSON.stringify({ 
                             userId: booking.providerId, 
-                            title: "New Job Assigned!", 
-                            body: `Booking ${booking.bookingId} is assigned to you. Check details now.`, 
+                            title: "New Booking Received!", 
+                            body: `New booking #${booking.bookingId} assigned for ${servicesSummary}. Tap to view details.`, 
                             href: `/provider/booking/${bookingDocId}`,
+                            sound: 'order',
+                            type: 'new_order',
                             variables: {
                                 bookingId: booking.bookingId || "",
                                 providerName: pData.fullName || "Service Provider",
                                 customerName: booking.customerName || "Customer",
+                                serviceName: servicesSummary,
                                 siteName: seoSettings?.websiteName || "Fixbro"
                             }
                         }),

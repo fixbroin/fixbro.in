@@ -35,26 +35,17 @@ export function useUnreadNotificationsCount(userIdOverride?: string): UseUnreadN
     setIsLoading(true);
     const notificationsCollectionRef = collection(db, "userNotifications");
     
-    // Simple, reliable query for all unread notifications (filtered in memory for absolute safety)
+    // Query notifications specifically addressed to this user/admin
     const newQuery = query(
       notificationsCollectionRef,
+      where("userId", "==", effectiveUserId),
       where("read", "==", false),
       limit(50)
     );
 
     const unsubscribe = onSnapshot(newQuery, (querySnapshot) => {
       try {
-        const docs = querySnapshot.docs.map(docSnap => docSnap.data());
-        const unreadCount = docs.filter((data: any) => {
-          if (data.read === true) return false;
-          if (isSuperAdmin) return true;
-          if (isAdmin) {
-            return data.userId === effectiveUserId || data.type === 'admin_alert';
-          }
-          return data.userId === effectiveUserId;
-        }).length;
-
-        setCount(unreadCount);
+        setCount(querySnapshot.docs.length);
       } catch (e) {
         setCount(0);
       } finally {
@@ -67,7 +58,7 @@ export function useUnreadNotificationsCount(userIdOverride?: string): UseUnreadN
     });
 
     return () => unsubscribe();
-  }, [effectiveUserId, isSuperAdmin, isAdmin, authLoading]);
+  }, [effectiveUserId, authLoading]);
 
   return { count, isLoading };
 }
