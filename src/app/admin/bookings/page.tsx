@@ -409,15 +409,6 @@ export default function AdminBookingsPage() {
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
     
-    // 0. By default in "All", hide abandoned unpaid online checkout attempts (bookingNumber === 0 without payment ID)
-    if (filterStatus === "All") {
-      filtered = filtered.filter(b => {
-        const isOnline = (b.paymentMethod || '').toLowerCase().trim() === 'online';
-        const isUnpaidAttempt = b.status === 'Pending Payment' && isOnline && !b.razorpayPaymentId && (Number(b.bookingNumber) === 0 || !b.bookingNumber);
-        return !isUnpaidAttempt;
-      });
-    }
-
     // 1. Status Filter
     if (filterStatus !== "All") {
       filtered = filtered.filter(b => b.status === filterStatus);

@@ -88,8 +88,6 @@ const clearLocalStorageItems = async (uid?: string) => {
         localStorage.removeItem('fixbroPaymentMethod');
         localStorage.removeItem('fixbroFinalBookingTotal');
         localStorage.removeItem('pendingBookingDocId');
-        localStorage.removeItem('pendingRazorpayOrderId');
-        localStorage.removeItem('pendingRazorpayTotal');
     }
 };
 
@@ -416,54 +414,32 @@ export default function ThankYouPage() {
       const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
 
       if (isRazorpayBooking && urlBookingId) {
+        if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+            toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
+            router.push('/cart'); setIsLoadingPage(false); return;
+        }
         try {
-            const bookingRef = doc(db, 'bookings', urlBookingId);
-            let bookingSnap = await getDoc(bookingRef);
-
-            // 1. If not yet confirmed, try authoritative server-side verification
-            if (bookingSnap.exists() && (bookingSnap.data() as any).status === 'Pending Payment') {
-                const orderIdToVerify = razorpayOrderId || 
-                  (typeof window !== 'undefined' ? localStorage.getItem('pendingRazorpayOrderId') : null) || 
-                  (bookingSnap.data() as any).razorpayOrderId;
-
-                if (orderIdToVerify) {
-                    const verificationResponse = await fetch('/api/razorpay/verify-order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            orderId: orderIdToVerify,
-                            bookingDocId: urlBookingId
-                        }),
-                    });
-                    const verificationResult = await verificationResponse.json();
-                    if (verificationResult.success && verificationResult.paid) {
-                        toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
-                        bookingSnap = await getDoc(bookingRef);
-                    }
-                }
-
-                // 2. Fallback to client-signature verification if signature was passed
-                if (bookingSnap.exists() && (bookingSnap.data() as any).status === 'Pending Payment' && razorpayPaymentId && razorpayOrderId && razorpaySignature) {
-                    const legacyVerifyRes = await fetch('/api/razorpay/verify-payment', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            razorpay_payment_id: razorpayPaymentId, 
-                            razorpay_order_id: razorpayOrderId, 
-                            razorpay_signature: razorpaySignature,
-                            bookingId: urlBookingId
-                        }),
-                    });
-                    const legacyResult = await legacyVerifyRes.json();
-                    if (legacyResult.success && legacyResult.status === 'captured') {
-                        toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
-                        bookingSnap = await getDoc(bookingRef);
-                    }
-                }
+            const verificationResponse = await fetch('/api/razorpay/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    razorpay_payment_id: razorpayPaymentId, 
+                    razorpay_order_id: razorpayOrderId, 
+                    razorpay_signature: razorpaySignature,
+                    bookingId: urlBookingId
+                }),
+            });
+            const verificationResult = await verificationResponse.json();
+            if (!verificationResult.success || verificationResult.status !== 'captured') {
+                throw new Error(verificationResult.error || "Payment verification failed. Please contact support.");
             }
+            toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
 
-            if (bookingSnap.exists() && ((bookingSnap.data() as any).status === 'Confirmed' || (bookingSnap.data() as any).status === 'Completed')) {
-                const bookingData = bookingSnap.data() as FirestoreBooking;
+            const bookingRef = doc(db, 'bookings', urlBookingId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            if (bookingSnap.exists() || verificationResult.booking) {
+                const bookingData = (verificationResult.booking || (bookingSnap.exists() ? bookingSnap.data() : {})) as FirestoreBooking;
                 const finalBookingNum = bookingData.bookingNumber;
                 const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
 
@@ -503,12 +479,12 @@ export default function ThankYouPage() {
                     status: 'Confirmed',
                 });
             } else {
-                throw new Error("Payment is not yet confirmed or completed. If your money was debited, your booking will be confirmed shortly via SMS/email.");
+                throw new Error("Booking record not found.");
             }
 
         } catch (error: any) {
             console.error("Error during Razorpay payment confirmation:", error);
-            toast({ title: "Payment Status", description: error.message, variant: "destructive", duration: 7000 });
+            toast({ title: "Payment Error", description: error.message, variant: "destructive", duration: 7000 });
             router.push('/checkout/payment'); 
             setIsLoadingPage(false); 
             return;

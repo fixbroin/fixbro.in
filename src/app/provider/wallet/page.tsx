@@ -45,7 +45,7 @@ export default function ProviderWalletPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const symbol = appConfig?.currencySymbol || "₹";
+  const symbol = appConfig?.currencySymbol || "â‚¹";
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
 
@@ -478,7 +478,7 @@ export default function ProviderWalletPage() {
                     </div>
                     {walletSettings.depositBonusPercentage > 0 && (
                       <p className="text-[11px] text-emerald-600 font-bold">
-                        🎁 Special Offer: Get a {walletSettings.depositBonusPercentage}% bonus credited automatically!
+                        ðŸŽ Special Offer: Get a {walletSettings.depositBonusPercentage}% bonus credited automatically!
                       </p>
                     )}
                   </div>
@@ -703,7 +703,7 @@ export default function ProviderWalletPage() {
             <Card className="mt-6 border border-slate-100 shadow-sm rounded-2xl overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4 px-6">
                 <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600">⚠️</span>
+                  <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600">âš ï¸</span>
                   Raised Disputes & Complaints
                 </CardTitle>
                 <CardDescription className="text-xs">
