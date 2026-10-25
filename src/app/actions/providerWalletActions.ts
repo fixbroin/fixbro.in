@@ -848,7 +848,14 @@ export async function sendServerPushNotification(params: {
 
     // Send push
     const messaging = admin.messaging();
+    const targetChannelId = sound === 'order' ? 'fixbro_new_bookings_channel_v3' : 'fixbro_general_channel_v3';
+    const isOrderSound = sound === 'order';
+
     const messagePayload = {
+      notification: {
+        title: finalTitle,
+        body: finalBody,
+      },
       data: {
         title: finalTitle,
         body: finalBody,
@@ -857,15 +864,28 @@ export async function sendServerPushNotification(params: {
         targetUrl: href || '/',
         icon: icon || '/android-chrome-192x192.png',
         sound: sound || 'default',
-        channelKey: sound === 'order' ? 'fixbro_new_bookings_channel_v3' : 'fixbro_general_channel_v3',
-        channel_id: sound === 'order' ? 'fixbro_new_bookings_channel_v3' : 'fixbro_general_channel_v3',
+        channelKey: targetChannelId,
+        channel_id: targetChannelId,
         priority: 'high',
         wakeUpScreen: 'true',
-        fullScreenIntent: sound === 'order' ? 'true' : 'false',
+        fullScreenIntent: isOrderSound ? 'true' : 'false',
       },
       android: {
         priority: 'high' as const,
         ttl: 60 * 60 * 24 * 1000,
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          channelId: targetChannelId,
+          icon: 'ic_notification',
+          color: '#059669',
+          sound: isOrderSound ? 'order_sound' : 'default',
+          defaultSound: !isOrderSound,
+          defaultVibrateTimings: true,
+          priority: isOrderSound ? ('max' as const) : ('high' as const),
+          visibility: 'public' as const,
+          clickAction: href || '/',
+        }
       },
       webpush: {
         headers: {

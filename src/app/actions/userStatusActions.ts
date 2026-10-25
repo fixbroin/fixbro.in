@@ -75,9 +75,32 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
               body: notificationMessage,
             },
             data: {
+              title: notificationTitle,
+              body: notificationMessage,
               click_action: '/auth/login',
+              url: '/auth/login',
+              targetUrl: '/auth/login',
               icon: logoUrl || '/android-chrome-192x192.png',
               sound: 'default',
+              channelKey: 'fixbro_general_channel_v3',
+              channel_id: 'fixbro_general_channel_v3',
+            },
+            android: {
+              priority: 'high' as const,
+              ttl: 60 * 60 * 24 * 1000,
+              notification: {
+                title: notificationTitle,
+                body: notificationMessage,
+                channelId: 'fixbro_general_channel_v3',
+                icon: 'ic_notification',
+                color: '#2563EB',
+                sound: 'default',
+                defaultSound: true,
+                defaultVibrateTimings: true,
+                priority: 'high' as const,
+                visibility: 'public' as const,
+                clickAction: '/auth/login',
+              }
             },
             webpush: {
               notification: {

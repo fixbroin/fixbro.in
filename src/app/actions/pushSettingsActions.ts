@@ -361,6 +361,10 @@ export async function sendBulkPushNotificationAction(params: {
 
     // 3. Construct Message Payload
     const messagePayload = {
+      notification: {
+        title,
+        body,
+      },
       data: {
         title,
         body,
@@ -378,6 +382,19 @@ export async function sendBulkPushNotificationAction(params: {
       android: {
         priority: 'high' as const,
         ttl: 60 * 60 * 24 * 1000,
+        notification: {
+          title,
+          body,
+          channelId: 'fixbro_general_channel_v3',
+          icon: 'ic_notification',
+          color: '#2563EB',
+          sound: 'default',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          priority: 'high' as const,
+          visibility: 'public' as const,
+          clickAction: href || '/',
+        }
       },
       webpush: {
         headers: {

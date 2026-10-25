@@ -154,7 +154,16 @@ export async function POST(request: Request) {
     // High-priority DATA message for Android ensures FirebaseMessaging.onBackgroundMessage
     // is reliably invoked in background, closed, and locked-screen states so AwesomeNotifications
     // can wake the screen, play custom sounds, and display heads-up alerts.
+    // Combined Notification + Data payload:
+    // - On background/locked/terminated devices: Google Play Services natively displays the notification
+    //   tray banner using android.notification settings (channel, icon, order sound, max priority)
+    // - On foreground devices: FirebaseMessaging.onMessage receives the payload and AwesomeNotifications
+    //   creates a rich heads-up alert with custom sound and full-screen intent.
     const messagePayload = {
+      notification: {
+        title: finalTitle,
+        body: finalBody,
+      },
       data: {
         title: finalTitle,
         body: finalBody,
@@ -173,6 +182,19 @@ export async function POST(request: Request) {
       android: {
         priority: 'high' as const,
         ttl: 60 * 60 * 24 * 1000, // 24 hours
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          channelId: targetChannelId,
+          icon: 'ic_notification',
+          color: '#2563EB',
+          sound: isOrderSound ? 'order_sound' : 'default',
+          defaultSound: !isOrderSound,
+          defaultVibrateTimings: true,
+          priority: isOrderSound ? ('max' as const) : ('high' as const),
+          visibility: 'public' as const,
+          clickAction: href || '/',
+        }
       },
       // Essential for background handling in modern browsers
       webpush: {
