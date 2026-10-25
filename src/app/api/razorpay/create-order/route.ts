@@ -4,6 +4,10 @@ import { nanoid } from 'nanoid';
 
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
+import { generateBookingId } from '@/lib/bookingUtils';
+import { Timestamp } from '@/lib/mysqlDbAdmin';
+import { verifyRequest } from '@/lib/dbSecurity';
+import { getPool, getDocsInternal } from '@/lib/mysql';
 
 function calculateServerCancellationFee(bookingData: any, appConfig: any) {
   if (!appConfig?.enableCancellationPolicy) {
@@ -69,7 +73,17 @@ function calculateServerCancellationFee(bookingData: any, appConfig: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { amount, currency = 'INR', notes, cartEntries: bodyCartEntries, promoCode: bodyPromoCode, categoryId: bodyCategoryId } = body;
+    const {
+      amount,
+      currency = 'INR',
+      notes,
+      cartEntries: bodyCartEntries,
+      promoCode: bodyPromoCode,
+      categoryId: bodyCategoryId,
+      customerInfo,
+      schedule,
+      userId,
+    } = body;
 
     if (!amount || typeof amount !== 'number' || amount < 100) { // Razorpay minimum is 1 INR (100 paise)
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
@@ -78,21 +92,26 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
-    const type = notes?.type;
-    const bookingId = notes?.bookingId;
+    const type = notes?.type || 'booking';
+    const existingBookingId = notes?.bookingId;
     const providerId = notes?.providerId;
     const rawCartEntries = bodyCartEntries || notes?.cartEntries;
     const rawPromoCode = bodyPromoCode ?? notes?.promoCode;
     const rawCategoryId = bodyCategoryId ?? notes?.categoryId;
 
     let reconciledBaseAmount = amount / 100;
+    let resolvedBookingDocId: string | null = existingBookingId || null;
+    let createdBookingHumanId: string | null = null;
 
-    if (bookingId && (type === 'booking' || type === 'cancellation_fee')) {
-      const bookingDoc = await adminDb.collection('bookings').doc(bookingId).get();
+    // 1. Existing Booking / Cancellation Fee Handling
+    if (existingBookingId && (type === 'booking' || type === 'cancellation_fee')) {
+      const bookingDoc = await adminDb.collection('bookings').doc(existingBookingId).get();
       if (!bookingDoc.exists) {
         return NextResponse.json({ success: false, error: 'Booking not found.' }, { status: 404 });
       }
       const bookingData = bookingDoc.data() as any;
+      createdBookingHumanId = bookingData.bookingId || null;
+
       if (type === 'booking') {
         const cartEntries = (bookingData.services || []).map((s: any) => ({
           serviceId: s.serviceId || s.id,
@@ -108,7 +127,7 @@ export async function POST(req: NextRequest) {
           reconciledBaseAmount = calculation.totalAmount;
 
           // Sync pending booking document with authoritative calculated figures
-          await adminDb.collection('bookings').doc(bookingId).update({
+          await adminDb.collection('bookings').doc(existingBookingId).update({
             subTotal: calculation.subTotal,
             visitingCharge: calculation.visitingCharge,
             taxAmount: calculation.taxAmount,
@@ -117,7 +136,7 @@ export async function POST(req: NextRequest) {
             appliedPlatformFees: calculation.appliedPlatformFees,
             discountAmount: calculation.discountAmount,
             services: calculation.services,
-            updatedAt: new Date(),
+            updatedAt: Timestamp.now(),
           });
         } else {
           reconciledBaseAmount = bookingData.totalAmount;
@@ -125,17 +144,91 @@ export async function POST(req: NextRequest) {
       } else if (type === 'cancellation_fee') {
         reconciledBaseAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
-    } else if (type === 'booking' && rawCartEntries) {
+    }
+    // 2. Safeguard 1: Pre-create Pending Booking on Server before Razorpay Order Initiation
+    else if (type === 'booking' && rawCartEntries) {
       try {
         const parsedCart = typeof rawCartEntries === 'string' ? JSON.parse(rawCartEntries) : rawCartEntries;
-        const calculation = await calculateServerBookingTotal({
-          cartEntries: parsedCart,
-          promoCode: rawPromoCode,
-          categoryId: rawCategoryId,
-        });
-        reconciledBaseAmount = calculation.totalAmount;
+        if (Array.isArray(parsedCart) && parsedCart.length > 0) {
+          const calculation = await calculateServerBookingTotal({
+            cartEntries: parsedCart,
+            promoCode: rawPromoCode,
+            categoryId: rawCategoryId,
+          });
+          reconciledBaseAmount = calculation.totalAmount;
+
+          // User Resolution:
+          let resolvedUserId: string | undefined = typeof userId === 'string' && userId.trim() ? userId.trim() : undefined;
+          if (!resolvedUserId) {
+            try {
+              const caller = await verifyRequest(req);
+              if (caller && caller.uid && caller.uid !== 'guest' && caller.uid !== 'server') {
+                resolvedUserId = caller.uid;
+              }
+            } catch (authErr) {
+              // ignore guest tokens
+            }
+          }
+
+          const emailToMatch = (customerInfo?.email || '').toLowerCase().trim();
+          if (!resolvedUserId && emailToMatch) {
+            try {
+              const pool = await getPool();
+              const matchingUsers = await getDocsInternal(pool, 'users', [
+                { type: 'where', field: 'email', op: '==', value: emailToMatch },
+                { type: 'limit', value: 1 }
+              ]);
+              if (matchingUsers && matchingUsers.length > 0) {
+                resolvedUserId = matchingUsers[0].id;
+              }
+            } catch (dbErr) {
+              console.warn("Could not match user by email in create-order:", dbErr);
+            }
+          }
+
+          const newBookingId = generateBookingId();
+          createdBookingHumanId = newBookingId;
+
+          const newBookingData = {
+            bookingId: newBookingId,
+            bookingNumber: 0,
+            ...(resolvedUserId && { userId: resolvedUserId }),
+            customerName: customerInfo?.fullName || customerInfo?.name || 'Guest User',
+            customerEmail: customerInfo?.email || '',
+            customerPhone: customerInfo?.phone || 'N/A',
+            addressLine1: customerInfo?.addressLine1 || 'N/A',
+            ...(customerInfo?.addressLine2 && { addressLine2: customerInfo?.addressLine2 }),
+            city: customerInfo?.city || 'N/A',
+            state: customerInfo?.state || 'N/A',
+            pincode: customerInfo?.pincode || 'N/A',
+            ...(customerInfo?.latitude !== undefined && customerInfo?.latitude !== null && { latitude: customerInfo.latitude }),
+            ...(customerInfo?.longitude !== undefined && customerInfo?.longitude !== null && { longitude: customerInfo.longitude }),
+            scheduledDate: schedule?.scheduledDate || new Date().toISOString().split('T')[0],
+            scheduledTimeSlot: schedule?.scheduledTimeSlot || '10:00 AM',
+            ...(schedule?.estimatedEndTime && { estimatedEndTime: schedule.estimatedEndTime }),
+            interveningBreaks: schedule?.interveningBreaks || [],
+            dailyTimeline: schedule?.dailyTimeline || [],
+            services: calculation.services,
+            subTotal: calculation.subTotal,
+            ...(calculation.visitingCharge > 0 && { visitingCharge: calculation.visitingCharge }),
+            taxAmount: calculation.taxAmount,
+            totalAmount: calculation.totalAmount,
+            platformFeeTotal: calculation.platformFeeTotal,
+            ...(calculation.appliedPlatformFees?.length > 0 && { appliedPlatformFees: calculation.appliedPlatformFees }),
+            ...(calculation.discountCode && { discountCode: calculation.discountCode }),
+            ...(calculation.discountAmount > 0 && { discountAmount: calculation.discountAmount }),
+            paymentMethod: 'Online',
+            status: 'Pending Payment',
+            createdAt: Timestamp.now(),
+            isReviewedByCustomer: false,
+            ...(rawCategoryId && { workCategoryId: rawCategoryId }),
+          };
+
+          const docRef = await adminDb.collection('bookings').add(newBookingData);
+          resolvedBookingDocId = docRef.id;
+        }
       } catch (err) {
-        console.error('Error calculating direct cart entries in Razorpay order:', err);
+        console.error('Error pre-creating pending booking in Razorpay order creation:', err);
       }
     } else if (type === 'wallet_topup' && providerId) {
       const minDeposit = appConfig?.minDepositAmount || 500;
@@ -167,7 +260,14 @@ export async function POST(req: NextRequest) {
         sanitizedNotes[k] = String(v).slice(0, 250);
       }
     }
+    sanitizedNotes.type = type;
     sanitizedNotes.amount = reconciledBaseAmount.toString();
+    if (resolvedBookingDocId) {
+      sanitizedNotes.bookingId = resolvedBookingDocId;
+    }
+    if (createdBookingHumanId) {
+      sanitizedNotes.humanReadableBookingId = createdBookingHumanId;
+    }
 
     const options = {
       amount: reconciledAmountPaise, // amount in the smallest currency unit (paise)
@@ -181,8 +281,21 @@ export async function POST(req: NextRequest) {
     if (!order) {
       return NextResponse.json({ success: false, error: 'Failed to create order with Razorpay.' }, { status: 500 });
     }
+
+    // Attach order ID to the pending booking document so it is bound both ways
+    if (resolvedBookingDocId) {
+      await adminDb.collection('bookings').doc(resolvedBookingDocId).update({
+        razorpayOrderId: order.id,
+        updatedAt: Timestamp.now(),
+      }).catch((updateErr) => console.error("Error attaching razorpayOrderId to pending booking:", updateErr));
+    }
     
-    return NextResponse.json({ success: true, ...order });
+    return NextResponse.json({
+      success: true,
+      ...order,
+      ...(resolvedBookingDocId && { bookingDocId: resolvedBookingDocId }),
+      ...(createdBookingHumanId && { bookingId: createdBookingHumanId }),
+    });
 
   } catch (error) {
     console.error('Error creating Razorpay order:', error);

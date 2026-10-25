@@ -44,6 +44,7 @@ const generateBookingId = (): string => {
 declare global {
   interface Window {
     Razorpay: any;
+    checkPendingRazorpayPayment?: () => void;
   }
 }
 
@@ -111,7 +112,7 @@ export default function PaymentPage() {
 
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
-  const symbol = appConfig?.currencySymbol || '₹';
+  const symbol = appConfig?.currencySymbol || 'â‚¹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
 
   const freeDays = appConfig?.freeCancellationDays || 0;
@@ -145,6 +146,108 @@ export default function PaymentPage() {
   const [policyMessage, setPolicyMessage] = useState<string | null>(null);
   const [isLoadingCartDetails, setIsLoadingCartDetails] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [pendingRecoveryInfo, setPendingRecoveryInfo] = useState<{ orderId: string; bookingDocId?: string } | null>(null);
+  const [isVerifyingPendingPayment, setIsVerifyingPendingPayment] = useState(false);
+
+  const verifyPendingPayment = useCallback(async (isManualTrigger = false) => {
+    if (typeof window === 'undefined') return;
+    const pendingOrderId = localStorage.getItem('pendingRazorpayOrderId');
+    const pendingBookingDoc = localStorage.getItem('pendingBookingDocId');
+
+    if (!pendingOrderId) {
+      if (isManualTrigger) {
+        toast({ title: "No Pending Payment", description: "No pending payment found to verify.", variant: "default" });
+      }
+      return;
+    }
+
+    try {
+      setIsVerifyingPendingPayment(true);
+      if (isManualTrigger) {
+        showLoading();
+      }
+      const res = await fetch('/api/razorpay/verify-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: pendingOrderId,
+          bookingDocId: pendingBookingDoc || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.paid) {
+        toast({
+          title: "Payment Confirmed!",
+          description: "Your payment was received. Redirecting to confirmation...",
+        });
+        localStorage.removeItem('pendingRazorpayOrderId');
+        localStorage.removeItem('pendingRazorpayTotal');
+        setPendingRecoveryInfo(null);
+        const targetId = data.bookingDocId || pendingBookingDoc;
+        router.push(`/checkout/thank-you?payment_method=razorpay${targetId ? `&bookingId=${targetId}` : ''}`);
+      } else {
+        setPendingRecoveryInfo({ orderId: pendingOrderId, bookingDocId: pendingBookingDoc || undefined });
+        if (isManualTrigger) {
+          toast({
+            title: "Payment Not Completed",
+            description: data.message || "Payment is not yet confirmed by the bank or gateway. Please try again after completing UPI payment.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error("Error verifying pending payment:", err);
+      if (isManualTrigger) {
+        toast({
+          title: "Verification Failed",
+          description: "Could not reach server to verify payment. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsVerifyingPendingPayment(false);
+      if (isManualTrigger) {
+        hideLoading();
+      }
+    }
+  }, [router, showLoading, hideLoading, toast]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedOrderId = localStorage.getItem('pendingRazorpayOrderId');
+    const savedBookingDoc = localStorage.getItem('pendingBookingDocId') || undefined;
+    if (savedOrderId) {
+      setPendingRecoveryInfo({ orderId: savedOrderId, bookingDocId: savedBookingDoc });
+      verifyPendingPayment(false);
+    }
+
+    (window as any).checkPendingRazorpayPayment = () => {
+      verifyPendingPayment(false);
+    };
+
+    const handleAppResumed = () => {
+      verifyPendingPayment(false);
+    };
+    window.addEventListener('appResumedFromPayment', handleAppResumed);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        verifyPendingPayment(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleAppResumed);
+
+    return () => {
+      window.removeEventListener('appResumedFromPayment', handleAppResumed);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleAppResumed);
+      delete (window as any).checkPendingRazorpayPayment;
+    };
+  }, [verifyPendingPayment]);
 
   const [calculatedPlatformFees, setCalculatedPlatformFees] = useState<AppliedPlatformFeeItem[]>([]);
   const [totalPlatformFeeBaseAmount, setTotalPlatformFeeBaseAmount] = useState(0);
@@ -332,9 +435,9 @@ export default function PaymentPage() {
         displayedVisitingChargeAmount = vcAmount;
         calculatedBaseVisitingCharge = getBasePrice(displayedVisitingChargeAmount, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent);
         if (policyDesc) {
-          const escapedSymbol = (symbol || "₹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-          const patternVc = new RegExp(`(?:₹|\\$|${escapedSymbol})?{VISITING_CHARGE}`, 'g');
-          const patternMin = new RegExp(`(?:₹|\\$|${escapedSymbol})?{MINIMUM_BOOKING_AMOUNT}`, 'g');
+          const escapedSymbol = (symbol || "â‚¹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const patternVc = new RegExp(`(?:â‚¹|\\$|${escapedSymbol})?{VISITING_CHARGE}`, 'g');
+          const patternMin = new RegExp(`(?:â‚¹|\\$|${escapedSymbol})?{MINIMUM_BOOKING_AMOUNT}`, 'g');
           const normalizedPolicy = policyDesc
             .replace(patternMin, "{MINIMUM_BOOKING_AMOUNT}")
             .replace(patternVc, "{VISITING_CHARGE}");
@@ -617,13 +720,14 @@ export default function PaymentPage() {
         }
       }
 
-      const customerAddressDataString = localStorage.getItem('fixbroCustomerAddress');
+      const customerAddressDataString = typeof window !== 'undefined' ? localStorage.getItem('fixbroCustomerAddress') : null;
+      let parsedAddress: any = null;
       if (customerAddressDataString) { 
         try { 
-          const addr = JSON.parse(customerAddressDataString); 
-          customerNameForPrefill = addr.fullName || currentUser?.displayName || customerNameForPrefill; 
-          customerEmailForPrefill = addr.email || currentUser?.email || customerEmailForPrefill; 
-          customerContactForPrefill = addr.phone || (currentUser as any)?.phoneNumber || undefined; 
+          parsedAddress = JSON.parse(customerAddressDataString); 
+          customerNameForPrefill = parsedAddress.fullName || currentUser?.displayName || customerNameForPrefill; 
+          customerEmailForPrefill = parsedAddress.email || currentUser?.email || customerEmailForPrefill; 
+          customerContactForPrefill = parsedAddress.phone || (currentUser as any)?.phoneNumber || undefined; 
         } catch (e) { 
           console.error("Error parsing address for Razorpay:", e); 
         } 
@@ -633,6 +737,16 @@ export default function PaymentPage() {
         customerEmailForPrefill = u?.email || customerEmailForPrefill; 
         customerContactForPrefill = (u as any)?.phoneNumber || undefined;
       }
+
+      const effectiveUserId = currentUser?.uid || auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null);
+
+      const breaksStr = typeof window !== 'undefined' ? localStorage.getItem('fixbroInterveningBreaks') : null;
+      let storedInterveningBreaks: any[] = [];
+      if (breaksStr) { try { storedInterveningBreaks = JSON.parse(breaksStr); } catch (e) {} }
+
+      const dailyTimelineStr = typeof window !== 'undefined' ? localStorage.getItem('fixbroDailyTimeline') : null;
+      let storedDailyTimeline: any[] = [];
+      if (dailyTimelineStr) { try { storedDailyTimeline = JSON.parse(dailyTimelineStr); } catch (e) {} }
 
       const orderCreationResponse = await fetch('/api/razorpay/create-order', {
           method: 'POST',
@@ -644,6 +758,26 @@ export default function PaymentPage() {
                 cartEntries,
                 promoCode: appliedPromoCode?.code || undefined,
                 categoryId: currentCategoryId || undefined,
+                customerInfo: {
+                  fullName: customerNameForPrefill,
+                  email: customerEmailForPrefill,
+                  phone: customerContactForPrefill,
+                  addressLine1: parsedAddress?.addressLine1,
+                  addressLine2: parsedAddress?.addressLine2,
+                  city: parsedAddress?.city,
+                  state: parsedAddress?.state,
+                  pincode: parsedAddress?.pincode,
+                  latitude: parsedAddress?.latitude,
+                  longitude: parsedAddress?.longitude,
+                },
+                schedule: {
+                  scheduledDate: localStorage.getItem('fixbroScheduledDate') || "",
+                  scheduledTimeSlot: localStorage.getItem('fixbroScheduledTimeSlot') || "",
+                  estimatedEndTime: localStorage.getItem('fixbroEstimatedEndTime') || null,
+                  interveningBreaks: storedInterveningBreaks,
+                  dailyTimeline: storedDailyTimeline,
+                },
+                userId: effectiveUserId || undefined,
               }),
               notes: isCancellationFeeMode && cancellationFeeDetails ? {
                 type: 'cancellation_fee',
@@ -661,6 +795,16 @@ export default function PaymentPage() {
         throw new Error(errorResult.error || 'Failed to create Razorpay order.');
       }
       const orderDetails = await orderCreationResponse.json();
+      const bookingDocId = orderDetails.bookingDocId;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pendingRazorpayOrderId', orderDetails.id);
+        if (bookingDocId) {
+          localStorage.setItem('pendingBookingDocId', bookingDocId);
+        }
+        localStorage.setItem('pendingRazorpayTotal', totalAmountDue.toString());
+        setPendingRecoveryInfo({ orderId: orderDetails.id, bookingDocId });
+      }
 
       const paymentDescription = isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment";
 
@@ -671,13 +815,12 @@ export default function PaymentPage() {
         name: globalSettings?.websiteName || "Fixbro Services",
         description: paymentDescription, 
         order_id: orderDetails.id,
-        handler: (response: any) => {
+        handler: async (response: any) => {
           localStorage.setItem('razorpayPaymentId', response.razorpay_payment_id);
           localStorage.setItem('razorpayOrderId', response.razorpay_order_id);
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
-          localStorage.removeItem('pendingBookingDocId');
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
@@ -686,17 +829,40 @@ export default function PaymentPage() {
             localStorage.removeItem('fixbroBookingDiscountCode');
             localStorage.removeItem('fixbroBookingDiscountAmount');
             localStorage.removeItem('fixbroAppliedPromoCodeId');
+            localStorage.removeItem('pendingRazorpayOrderId');
             router.push('/checkout/thank-you');
-          } else {
-             localStorage.removeItem('isProcessingCancellationFee');
-             if (appliedPromoCode) {
-              localStorage.setItem('fixbroBookingDiscountCode', appliedPromoCode.code);
-              localStorage.setItem('fixbroBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
-              localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromoCode.id);
-            }
-            if (calculatedPlatformFees.length > 0) localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('fixbroAppliedPlatformFees');
-            router.push(`/checkout/thank-you?payment_method=razorpay`);
+            return;
           }
+
+          localStorage.removeItem('isProcessingCancellationFee');
+          if (appliedPromoCode) {
+            localStorage.setItem('fixbroBookingDiscountCode', appliedPromoCode.code);
+            localStorage.setItem('fixbroBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
+            localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromoCode.id);
+          }
+          if (calculatedPlatformFees.length > 0) {
+            localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
+          } else {
+            localStorage.removeItem('fixbroAppliedPlatformFees');
+          }
+
+          const targetDocId = bookingDocId || localStorage.getItem('pendingBookingDocId');
+
+          // Trigger authoritative server-side order verification
+          try {
+            await fetch('/api/razorpay/verify-order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: response.razorpay_order_id,
+                bookingDocId: targetDocId,
+              }),
+            });
+          } catch (e) {
+            console.warn('Handler verify-order fallback warning:', e);
+          }
+
+          router.push(`/checkout/thank-you?payment_method=razorpay${targetDocId ? `&bookingId=${targetDocId}` : ''}`);
         },
         prefill: { name: customerNameForPrefill, email: customerEmailForPrefill, contact: customerContactForPrefill },
         notes: { 
@@ -709,6 +875,8 @@ export default function PaymentPage() {
           ondismiss: async () => { 
             setIsProcessingPayment(false); 
             hideLoading(); 
+            // In case user completed UPI payment externally and returned
+            verifyPendingPayment(false);
           }
         }
       };
@@ -906,6 +1074,34 @@ export default function PaymentPage() {
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {pendingRecoveryInfo && (
+            <div className="p-4 rounded-xl border border-teal-200 bg-teal-50 dark:bg-teal-950/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300">
+                  <Clock className="h-5 w-5 animate-pulse" />
+                </div>
+                <div>
+                  <p className="font-semibold text-teal-900 dark:text-teal-200 text-sm">
+                    UPI / Online Payment in Progress
+                  </p>
+                  <p className="text-xs text-teal-700 dark:text-teal-300">
+                    Already approved payment in your UPI app (Google Pay / PhonePe / Paytm)?
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isVerifyingPendingPayment}
+                className="bg-white hover:bg-teal-100 border-teal-300 text-teal-800 font-medium shrink-0 self-end sm:self-center"
+                onClick={() => verifyPendingPayment(true)}
+              >
+                {isVerifyingPendingPayment ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+                Verify Payment
+              </Button>
+            </div>
+          )}
           {onlinePaymentEnabled && paymentMethod !== 'Pay After Service' && !isCancellationFeeMode && cartEntries.length > 0 && (
             <Alert className="bg-primary/10 border-primary/30"><Info className="h-5 w-5 text-primary" /><AlertTitle className="font-semibold text-primary">Online Payment via Razorpay</AlertTitle><AlertDescription className="text-primary/80">You will be redirected to Razorpay's secure gateway.</AlertDescription></Alert>
           )}
@@ -929,7 +1125,7 @@ export default function PaymentPage() {
                   {appliedPromoCode && (<p className="text-xs text-green-600 flex items-center mt-1.5"><CheckCircle className="h-3.5 w-3.5 mr-1" />Code "{appliedPromoCode.code}" applied! Discount: {symbol}{appliedPromoCode.calculatedDiscount.toFixed(decimals)}</p>)}
                 </div>
                 <div className="mt-3 pt-3 border-t"><Label className="text-sm font-medium block mb-2 flex items-center"><ListFilter className="h-4 w-4 mr-1.5 text-muted-foreground"/>Available Offers:</Label>
-                  {isLoadingPromos ? (<div className="flex items-center text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /><span>Checking for offers...</span></div>) : availablePromoCodesToDisplay.length > 0 ? (<div className="flex flex-wrap gap-2">{availablePromoCodesToDisplay.map(promo => (<Badge key={promo.id} variant="outline" className="cursor-pointer hover:bg-accent/20" onClick={() => handleSelectAvailablePromo(promo.code)} title={`Min. booking: ${symbol}${promo.minBookingAmount || 0}. Uses: ${promo.usesCount}/${promo.maxUses || '∞'}`}>{promo.code} - {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `${symbol}${promo.discountValue} OFF`}</Badge>))}</div>) : (<p className="text-xs text-muted-foreground">{allFetchedPromoCodes.length > 0 ? "No offers currently applicable." : "No active promo codes."}</p>)}
+                  {isLoadingPromos ? (<div className="flex items-center text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /><span>Checking for offers...</span></div>) : availablePromoCodesToDisplay.length > 0 ? (<div className="flex flex-wrap gap-2">{availablePromoCodesToDisplay.map(promo => (<Badge key={promo.id} variant="outline" className="cursor-pointer hover:bg-accent/20" onClick={() => handleSelectAvailablePromo(promo.code)} title={`Min. booking: ${symbol}${promo.minBookingAmount || 0}. Uses: ${promo.usesCount}/${promo.maxUses || 'âˆž'}`}>{promo.code} - {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `${symbol}${promo.discountValue} OFF`}</Badge>))}</div>) : (<p className="text-xs text-muted-foreground">{allFetchedPromoCodes.length > 0 ? "No offers currently applicable." : "No active promo codes."}</p>)}
                 </div>
               </>)}
               {currentAvailablePaymentOptions.length > 0 ? (
@@ -1083,7 +1279,7 @@ export default function PaymentPage() {
                           <strong>
                             {appConfig.cancellationFeeType === 'percentage' 
                               ? `${appConfig.cancellationFeeValue}%` 
-                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                              : `${appConfig.currencySymbol || 'â‚¹'}${appConfig.cancellationFeeValue}`}
                           </strong>.
                         </>
                       ) : (
@@ -1092,7 +1288,7 @@ export default function PaymentPage() {
                           <strong>
                             {appConfig.cancellationFeeType === 'percentage' 
                               ? `${appConfig.cancellationFeeValue}%` 
-                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                              : `${appConfig.currencySymbol || 'â‚¹'}${appConfig.cancellationFeeValue}`}
                           </strong>.
                         </>
                       )}
@@ -1117,7 +1313,7 @@ export default function PaymentPage() {
 
                 {/* 4. Pay After Service / COD Note */}
                 <div className="flex gap-3 items-start border-t pt-3">
-                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">ℹ</div>
+                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">â„¹</div>
                   <div>
                     <h4 className="font-semibold text-foreground text-sm">Pay After Service / Cash on Delivery</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">

@@ -2,8 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { depositProviderWalletAction } from '@/app/actions/providerWalletActions';
-import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { Timestamp } from '@/lib/mysqlDbAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
@@ -19,7 +18,6 @@ export async function POST(req: NextRequest) {
     const event: string = payload?.event || '';
 
     // Silently acknowledge global Razorpay bank/UPI downtime status broadcasts
-    // so they don't spam PM2 logs or trigger unnecessary database reads every few seconds
     if (event.startsWith('payment.downtime.')) {
       return NextResponse.json({ success: true, ignored: true });
     }
@@ -27,13 +25,14 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
-    const razorpayWebhookSecret = appConfig?.razorpayWebhookSecret;
+    const razorpayWebhookSecret = appConfig?.razorpayWebhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET;
 
     if (!razorpayWebhookSecret) {
-      console.error("Razorpay Webhook Secret is not configured in database config.");
+      console.error("Razorpay Webhook Secret is not configured in database config or env.");
       return NextResponse.json({ success: false, error: 'Razorpay webhook secret missing.' }, { status: 500 });
     }
 
+    // Safeguard 4: Authoritative signature verification with raw request body
     const expectedSignature = crypto
       .createHmac('sha256', razorpayWebhookSecret)
       .update(rawBody)
@@ -44,7 +43,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid webhook signature.' }, { status: 400 });
     }
 
-    console.log(`Received Razorpay Webhook Event: ${event}`);
+    console.log(`[Razorpay Webhook] Verified event: ${event}`);
+
+    // Safeguard 5: For payment.failed, preserve pending booking for possible retry or reconciliation
+    if (event === 'payment.failed') {
+      const failedPayment = payload.payload?.payment?.entity;
+      console.warn(`[Razorpay Webhook] Payment failed for order: ${failedPayment?.order_id || 'unknown'}. Preserving booking.`);
+      return NextResponse.json({ success: true, preserved: true });
+    }
 
     if (event === 'order.paid' || event === 'payment.captured') {
       const order = payload.payload.payment?.entity?.order_id 
@@ -55,31 +61,58 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, message: 'No order or payment entity found.' });
       }
 
-      // Retrieve notes
       const notes = order.notes || {};
-      const { type, bookingId, providerId, amount: amountStr } = notes;
+      let { type, bookingId, providerId, amount: amountStr } = notes;
+      const orderId = order.order_id || order.id;
+      const paymentId = (order.id && order.id.startsWith('pay_')) ? order.id : (payload.payload.payment?.entity?.id || null);
 
-      if (type === 'booking' && bookingId) {
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const bookingSnap = await getDoc(bookingRef);
+      // Fallback: If bookingId is missing from notes, query booking by razorpayOrderId
+      if (!bookingId && orderId) {
+        const snap = await adminDb
+          .collection('bookings')
+          .where('razorpayOrderId', '==', orderId)
+          .limit(1)
+          .get();
+        if (!snap.empty) {
+          bookingId = snap.docs[0].id;
+          type = type || 'booking';
+        }
+      }
 
-        if (bookingSnap.exists()) {
+      if ((type === 'booking' || !type) && bookingId) {
+        const bookingRef = adminDb.collection('bookings').doc(bookingId);
+        const bookingSnap = await bookingRef.get();
+
+        if (bookingSnap.exists) {
           const bookingData = bookingSnap.data() as any;
+
+          // Safeguard 3: Idempotency Check - prevent duplicate confirmations & duplicate booking numbers
+          if (bookingData.status === 'Confirmed' || bookingData.status === 'Completed') {
+            console.log(`[Razorpay Webhook] Booking ${bookingId} already confirmed/completed. Idempotent return.`);
+            return NextResponse.json({ success: true, alreadyHandled: true });
+          }
+
           if (bookingData.status === 'Pending Payment') {
-            const orderId = order.order_id || order.id;
-            const paymentId = order.id;
             const nextBookingNumber = await assignNewBookingNumber();
 
-            await updateDoc(bookingRef, {
+            await bookingRef.update({
               status: 'Confirmed',
               bookingNumber: nextBookingNumber,
               paymentMethod: 'Online',
-              razorpayPaymentId: paymentId,
+              razorpayPaymentId: paymentId || orderId,
               razorpayOrderId: orderId,
+              paymentDetails: {
+                method: order.method || 'webhook',
+                bank: order.bank || null,
+                wallet: order.wallet || null,
+                vpa: order.vpa || null,
+                capturedAt: order.created_at || null,
+              },
+              confirmedAt: Timestamp.now(),
               updatedAt: Timestamp.now(),
             });
 
-            // Trigger post-processing (emails, stats, auto-dispatch, WhatsApp)
+            // Safeguard 6: Trigger post-processing independently
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fixbro.in';
             fetch(`${appUrl}/api/bookings/post-process`, {
               method: 'POST',
@@ -87,31 +120,34 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify({ bookingDocId: bookingId, triggerSource: 'razorpay_webhook' })
             }).catch(err => console.error("Error triggering post-process from Razorpay webhook:", err));
 
-            // Create and send notification to customer
+            // Customer in-app notification
             if (bookingData.userId) {
-              const userNotificationData: Omit<FirestoreNotification, 'id'> = {
-                userId: bookingData.userId,
-                title: "Booking Confirmed!",
-                message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
-                type: 'success',
-                href: '/my-bookings',
-                read: false,
-                createdAt: Timestamp.now(),
-              };
-              await addDoc(collection(db, "userNotifications"), userNotificationData);
-              triggerPushNotification({
-                userId: bookingData.userId,
-                title: userNotificationData.title,
-                body: userNotificationData.message,
-                href: userNotificationData.href
-              });
+              try {
+                const userNotificationData: Omit<FirestoreNotification, 'id'> = {
+                  userId: bookingData.userId,
+                  title: "Booking Confirmed!",
+                  message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
+                  type: 'success',
+                  href: '/my-bookings',
+                  read: false,
+                  createdAt: Timestamp.now(),
+                };
+                await adminDb.collection("userNotifications").add(userNotificationData);
+                triggerPushNotification({
+                  userId: bookingData.userId,
+                  title: userNotificationData.title,
+                  body: userNotificationData.message,
+                  href: userNotificationData.href
+                });
+              } catch (notifyErr) {
+                console.error("Error sending user push notification in webhook:", notifyErr);
+              }
             }
 
-            // Create and send alert to Admin
+            // Admin in-app notification
             try {
-              const usersRef = collection(db, "users");
-              const adminQuery = query(usersRef, where("email", "==", ADMIN_EMAIL), limit(1));
-              const adminSnapshot = await getDocs(adminQuery);
+              const usersRef = adminDb.collection("users");
+              const adminSnapshot = await usersRef.where("email", "==", ADMIN_EMAIL).limit(1).get();
               if (!adminSnapshot.empty) {
                 const adminUid = adminSnapshot.docs[0].id;
                 const adminNotificationData: Omit<FirestoreNotification, 'id'> = {
@@ -123,7 +159,7 @@ export async function POST(req: NextRequest) {
                   read: false,
                   createdAt: Timestamp.now(),
                 };
-                await addDoc(collection(db, "userNotifications"), adminNotificationData);
+                await adminDb.collection("userNotifications").add(adminNotificationData);
                 triggerPushNotification({
                   userId: adminUid,
                   title: adminNotificationData.title,
@@ -138,33 +174,33 @@ export async function POST(req: NextRequest) {
         }
       } else if (type === 'wallet_topup' && providerId && amountStr) {
         const parsedAmount = parseFloat(amountStr);
-        const orderId = order.order_id || order.id;
-        const paymentId = order.id;
-
-        // Perform deposit using our depositProviderWalletAction server action
         await depositProviderWalletAction(providerId, parsedAmount, {
           razorpay_order_id: orderId,
-          razorpay_payment_id: paymentId,
+          razorpay_payment_id: paymentId || orderId,
           payment_method: 'Razorpay'
         });
       } else if (type === 'cancellation_fee' && bookingId && amountStr) {
         const parsedAmount = parseFloat(amountStr);
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const bookingSnap = await getDoc(bookingRef);
+        const bookingRef = adminDb.collection('bookings').doc(bookingId);
+        const bookingSnap = await bookingRef.get();
 
-        if (bookingSnap.exists()) {
-          const bookingData = bookingSnap.data();
+        if (bookingSnap.exists) {
+          const bookingData = bookingSnap.data() as any;
           if (bookingData.status !== 'Cancelled') {
-            const orderId = order.order_id || order.id;
-            const paymentId = order.id;
-
-            await updateDoc(bookingRef, {
+            await bookingRef.update({
               status: 'Cancelled',
               cancellationPaymentId: paymentId || orderId,
               cancellationPaymentMethod: 'Razorpay',
               updatedAt: Timestamp.now(),
               cancellationFeePaid: parsedAmount
             });
+
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fixbro.in';
+            fetch(`${appUrl}/api/bookings/post-process`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingDocId: bookingId, cancelledBy: 'user' }),
+            }).catch(err => console.error("Error triggering post-process for cancellation in webhook:", err));
           }
         }
       }
