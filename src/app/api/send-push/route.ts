@@ -23,10 +23,14 @@ function determinePushType(title: string): string {
     return 'chat_message';
   } else if (lowerTitle.includes('completed')) {
     return 'booking_completed';
-  } else if (lowerTitle.includes('confirmed') || lowerTitle.includes('received') || lowerTitle.includes('booking placed') || lowerTitle.includes('new order') || lowerTitle.includes('new job')) {
+  } else if (lowerTitle.includes('new order') || lowerTitle.includes('new job') || (lowerTitle.includes('new booking') && lowerTitle.includes('received'))) {
     return 'new_order';
+  } else if (lowerTitle.includes('technician confirmed') || lowerTitle.includes('technician accepted') || lowerTitle.includes('provider accepted')) {
+    return 'provider_accepted';
   } else if (lowerTitle.includes('technician assigned') || lowerTitle.includes('provider assigned')) {
     return 'provider_assigned';
+  } else if (lowerTitle.includes('confirmed') || lowerTitle.includes('booking placed') || lowerTitle.includes('booking created')) {
+    return 'booking_created';
   } else if (lowerTitle.includes('cancelled')) {
     return 'booking_cancelled';
   } else if (lowerTitle.includes('withdrawal')) {

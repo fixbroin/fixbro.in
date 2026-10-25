@@ -177,6 +177,14 @@ export async function POST(request: Request) {
                 providerName = pData.fullName || "";
                 providerPhone = pData.phone || pData.mobileNumber || "";
             }
+            if (!providerName) {
+                const userDoc = await adminDb.collection('users').doc(booking.providerId).get();
+                if (userDoc.exists) {
+                    const uData = userDoc.data() as any;
+                    providerName = uData.name || uData.displayName || uData.fullName || "";
+                    providerPhone = providerPhone || uData.phone || uData.phoneNumber || "";
+                }
+            }
         } catch (err) {
             console.error("Error fetching provider details in post-process:", err);
         }
@@ -449,31 +457,10 @@ export async function POST(request: Request) {
         }));
     }
 
-    // B. User Dashboard Notification
-    if (userId) {
-        let notificationTitle = isCompleted ? "Service Completed!" : "Booking Update";
-        let notificationMessage = isCompleted 
-            ? `Your booking ${booking.bookingId} has been successfully completed. Thank you!`
-            : `Your booking ${booking.bookingId} is ${booking.status}.`;
-        
-        if (isRescheduled) {
-            notificationTitle = "Booking Rescheduled!";
-            notificationMessage = `Your booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
-        }
-
-        tasks.push(adminDb.collection('userNotifications').add({
-            userId,
-            title: notificationTitle,
-            message: notificationMessage,
-            type: isCompleted ? 'success' : 'info',
-            href: `/my-bookings`,
-            read: false,
-            createdAt: Timestamp.now()
-        }));
-    }
+    // B. User Dashboard Notification (Dispatched below with full idempotency lock and human-friendly messages)
 
     // D. Trigger Actual Push Notifications
-    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string) => {
+    const triggerPush = async (pUserId: string, pTitle: string, pBody: string, pHref: string, pType?: string) => {
         try {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
@@ -483,13 +470,16 @@ export async function POST(request: Request) {
                     title: pTitle, 
                     body: pBody, 
                     href: pHref,
+                    type: pType,
                     variables: {
                         bookingId: booking.bookingId || "",
                         customerName: booking.customerName || "Customer",
-                        providerName: providerName || "Provider",
+                        providerName: providerName || "Service Provider",
+                        serviceName: servicesSummary,
                         scheduledDate: booking.scheduledDate ? formatScheduledDate(booking.scheduledDate) : "",
                         scheduledTimeSlot: booking.scheduledTimeSlot || "",
-                        totalAmount: String(booking.totalAmount || 0)
+                        totalAmount: String(booking.totalAmount || 0),
+                        siteName: seoSettings?.websiteName || "Fixbro"
                     }
                 }),
             });
@@ -600,27 +590,65 @@ export async function POST(request: Request) {
             }
 
             let customerTitle = "Booking Confirmed!";
-            let customerMessage = `Your booking ${booking.bookingId} is confirmed.`;
+            let customerMessage = `Your booking #${booking.bookingId} has been successfully placed. We're assigning a technician shortly.`;
+            let customerType = 'booking_created';
+            let notificationType: 'info' | 'success' | 'warning' | 'destructive' = 'success';
 
             if (isCompleted) {
                 customerTitle = "Service Completed!";
-                customerMessage = `Your service ${booking.bookingId} is now complete.`;
+                customerMessage = `Your service #${booking.bookingId} has been successfully completed. Thank you for choosing ${seoSettings?.websiteName || 'Fixbro'}!`;
+                customerType = 'booking_completed';
+                notificationType = 'success';
             } else if (isCancelled) {
                 customerTitle = "Booking Cancelled";
-                customerMessage = `Your booking ${booking.bookingId} has been cancelled.`;
+                customerMessage = `Your booking #${booking.bookingId} has been cancelled.`;
+                customerType = 'booking_cancelled';
+                notificationType = 'destructive';
             } else if (isRescheduled) {
                 customerTitle = "Booking Rescheduled!";
-                customerMessage = `Your booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+                customerMessage = `Your booking #${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+                customerType = 'other';
+                notificationType = 'info';
             } else if (currentStatus === 'AssignedToProvider') {
                 customerTitle = "Technician Assigned!";
-                customerMessage = `Technician ${providerName || 'Professional'} has been assigned to your booking ${booking.bookingId}.`;
+                customerMessage = `Technician ${providerName || 'a verified professional'} has been assigned to your booking #${booking.bookingId}.`;
+                customerType = 'provider_assigned';
+                notificationType = 'info';
+            } else if (currentStatus === 'ProviderAccepted') {
+                customerTitle = "Technician Confirmed!";
+                customerMessage = `Technician ${providerName || 'Your technician'} has confirmed your booking #${booking.bookingId} and is scheduled to arrive.`;
+                customerType = 'provider_accepted';
+                notificationType = 'success';
+            } else if (currentStatus === 'InProgressByProvider') {
+                customerTitle = "Service In Progress";
+                customerMessage = `Technician ${providerName || 'Your technician'} has started working on your service #${booking.bookingId}.`;
+                customerType = 'other';
+                notificationType = 'info';
+            } else if (currentStatus === 'ProviderRejected') {
+                customerTitle = "Finding Another Technician";
+                customerMessage = `We are reassigning another qualified technician to your booking #${booking.bookingId}.`;
+                customerType = 'other';
+                notificationType = 'warning';
             }
 
+            // 1. Add In-App Notification (User Dashboard)
+            tasks.push(adminDb.collection('userNotifications').add({
+                userId,
+                title: customerTitle,
+                message: customerMessage,
+                type: notificationType,
+                href: `/my-bookings`,
+                read: false,
+                createdAt: Timestamp.now()
+            }));
+
+            // 2. Dispatch Push Notification
             tasks.push(triggerPush(
                 userId, 
                 customerTitle, 
                 customerMessage, 
-                "/my-bookings"
+                "/my-bookings",
+                customerType
             ));
         }
     }

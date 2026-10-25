@@ -17,6 +17,14 @@ export interface PushTemplate {
 }
 
 const DEFAULT_PUSH_TEMPLATES: Record<string, Omit<PushTemplate, 'id'>> = {
+  provider_accepted: {
+    title: "Technician Accepted",
+    description: "Notification sent to customer when the assigned technician confirms and accepts the booking.",
+    subject: "Technician Confirmed! (ID: {bookingId})",
+    body: "Technician {providerName} has accepted your booking and is scheduled to arrive.",
+    isEnabled: true,
+    placeholders: ["bookingId", "providerName", "customerName", "serviceName", "siteName"]
+  },
   new_order: {
     title: "New Job / Order Assigned",
     description: "New booking assigned notification dispatched to service provider with order ringtone.",
