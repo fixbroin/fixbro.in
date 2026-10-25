@@ -647,15 +647,8 @@ export default function ThankYouPage() {
         setIsLoadingPage(false);
         toast({ title: "Booking Placed!", description: `Your booking ID is ${newBookingId}.`});
 
-        // --- FIRE AND FORGET: Server handles everything else safely ---
-        if (!isOnlinePayment) {
-          fetch('/api/bookings/post-process', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ bookingDocId: bookingDocId }),
-          }).catch(err => console.error("Error triggering server post-process:", err));
-        }
-
+        // Server (create-cash route) already triggered /api/bookings/post-process on booking creation.
+        // Client-side duplicate trigger removed to prevent duplicate notifications.
         await clearLocalStorageItems(currentUser?.uid);
         return;
 
