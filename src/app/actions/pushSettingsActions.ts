@@ -482,6 +482,7 @@ export async function sendTestPushAction(id: string, adminUid: string): Promise<
       bookingId: "FB-TEST12345",
       customerName: "Test Customer Name",
       providerName: "Test Provider Name",
+      serviceName: "AC Deep Cleaning (x1)",
       scheduledDate: "24/08/2026",
       scheduledTimeSlot: "10:00 AM",
       totalAmount: "100.00",
