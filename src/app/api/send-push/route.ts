@@ -21,8 +21,16 @@ function determinePushType(title: string): string {
   const lowerTitle = (title || "").toLowerCase();
   if (lowerTitle.includes('message') || lowerTitle.includes('chat')) {
     return 'chat_message';
-  } else if (lowerTitle.includes('completed')) {
-    return 'booking_completed';
+  } else if (lowerTitle.includes('withdrawal')) {
+    return 'withdrawal_status';
+  } else if (lowerTitle.includes('deposit') || lowerTitle.includes('top-up')) {
+    return 'provider_wallet_deposit';
+  } else if (lowerTitle.includes('refund') || lowerTitle.includes('adjusted')) {
+    return 'provider_wallet_refund';
+  } else if (lowerTitle.includes('dispute') || lowerTitle.includes('complaint')) {
+    return 'admin_wallet_complaint_alert';
+  } else if (lowerTitle.includes('referral') || lowerTitle.includes('welcome reward')) {
+    return 'referral_reward_completed';
   } else if (lowerTitle.includes('new order') || lowerTitle.includes('new job') || (lowerTitle.includes('new booking') && lowerTitle.includes('received'))) {
     return 'new_order';
   } else if (lowerTitle.includes('technician confirmed') || lowerTitle.includes('technician accepted') || lowerTitle.includes('provider accepted')) {
@@ -33,22 +41,14 @@ function determinePushType(title: string): string {
     return 'booking_created';
   } else if (lowerTitle.includes('cancelled')) {
     return 'booking_cancelled';
-  } else if (lowerTitle.includes('withdrawal')) {
-    return 'withdrawal_status';
+  } else if (lowerTitle.includes('completed')) {
+    return 'booking_completed';
   } else if (lowerTitle.includes('review')) {
     return 'new_review';
   } else if (lowerTitle.includes('inquiry') || lowerTitle.includes('contact')) {
     return 'new_inquiry';
   } else if (lowerTitle.includes('custom')) {
     return 'custom_request';
-  } else if (lowerTitle.includes('referral') || lowerTitle.includes('welcome reward')) {
-    return 'referral_reward_completed';
-  } else if (lowerTitle.includes('deposit') || lowerTitle.includes('top-up')) {
-    return 'provider_wallet_deposit';
-  } else if (lowerTitle.includes('refund') || lowerTitle.includes('adjusted')) {
-    return 'provider_wallet_refund';
-  } else if (lowerTitle.includes('dispute') || lowerTitle.includes('complaint')) {
-    return 'admin_wallet_complaint_alert';
   }
   return 'other';
 }
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
       data: {
         title: finalTitle,
         body: finalBody,
-        click_action: href || '/',
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
         url: href || '/',
         targetUrl: href || '/',
         icon: icon || '/android-chrome-192x192.png',
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
           defaultVibrateTimings: true,
           priority: isOrderSound ? ('max' as const) : ('high' as const),
           visibility: 'public' as const,
-          clickAction: href || '/',
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         }
       },
       // Essential for background handling in modern browsers

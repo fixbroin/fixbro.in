@@ -364,7 +364,13 @@ export default function ProviderWithdrawalsPage() {
         userId: request.providerId,
         title: `Withdrawal Request ${newStatus.replace(/_/g, ' ')}`,
         body: `Your withdrawal of ${formatCurrency(request.amount, symbol, decimals, code)} has been ${newStatus.replace(/_/g, ' ')}.`,
-        href: '/provider/withdrawal'
+        href: '/provider/withdrawal',
+        type: 'withdrawal_status',
+        variables: {
+          amount: formatCurrency(request.amount, symbol, decimals, code),
+          status: newStatus.replace(/_/g, ' '),
+          providerName: request.providerName || 'Provider'
+        }
       });
 
       toast({ title: "Success", description: `Request status updated to ${newStatus}.` });
