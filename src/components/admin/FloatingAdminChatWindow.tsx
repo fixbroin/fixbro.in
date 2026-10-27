@@ -12,6 +12,12 @@ import type { FirestoreUser } from '@/types/firestore';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import UserDetailsModal from './UserDetailsModal';
+import { doc, updateDoc, query, collection, where, limit, getDocs } from '@/lib/mysqlDb';
+import { db } from '@/lib/firebase';
+import { triggerRefresh } from '@/lib/revalidateUtils';
+import { useToast } from '@/hooks/use-toast';
 
 interface FloatingAdminChatWindowProps {
   isOpen: boolean;
@@ -22,9 +28,42 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   const [selectedChatUser, setSelectedChatUser] = useState<FirestoreUser | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isUserDetailsOpen, setIsUserDetailsOpen] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [viewportOffset, setViewportOffset] = useState<number>(0);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+
+  const handleUpdateUserFromModal = async (updatedUserData: Partial<FirestoreUser>) => {
+    if (!selectedChatUser?.id) return false;
+    try {
+      if (updatedUserData.email) {
+        const emailQuery = query(collection(db, "users"), where("email", "==", updatedUserData.email.toLowerCase()), limit(1));
+        const emailSnap = await getDocs(emailQuery);
+        if (!emailSnap.empty && emailSnap.docs[0].id !== selectedChatUser.id) {
+          toast({ title: "Update Failed", description: "This email address is already linked to another account.", variant: "destructive" });
+          return false;
+        }
+      }
+      if (updatedUserData.mobileNumber) {
+        const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", updatedUserData.mobileNumber), limit(1));
+        const phoneSnap = await getDocs(phoneQuery);
+        if (!phoneSnap.empty && phoneSnap.docs[0].id !== selectedChatUser.id) {
+          toast({ title: "Update Failed", description: "This mobile number is already linked to another account.", variant: "destructive" });
+          return false;
+        }
+      }
+      await updateDoc(doc(db, "users", selectedChatUser.id), updatedUserData);
+      await triggerRefresh('users');
+      setSelectedChatUser(prev => prev ? ({ ...prev, ...updatedUserData }) : null);
+      toast({ title: "Updated", description: "User details synchronized." });
+      setIsUserDetailsOpen(false);
+      return true;
+    } catch (error) {
+      toast({ title: "Update Failed", variant: "destructive" });
+      return false;
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -53,6 +92,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   useEffect(() => {
     if (!isOpen) {
       setSelectedChatUser(null);
+      setIsUserDetailsOpen(false);
     }
   }, [isOpen]);
 
@@ -117,25 +157,31 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                       <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-8 w-8 rounded-full shrink-0 -ml-1">
                         <ChevronLeft className="h-5 w-5" />
                       </Button>
-                      <div className="relative shrink-0">
-                        <Avatar className="h-8 w-8 border border-primary/20">
-                          <AvatarImage src={selectedChatUser.photoURL || undefined} alt={selectedChatUser.displayName || selectedChatUser.email || ""} />
-                          <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
-                            {selectedChatUser.displayName ? selectedChatUser.displayName.charAt(0).toUpperCase() : <UserCircle size={16}/>}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 border border-background rounded-full" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1">
-                          <h2 className="text-sm font-bold truncate max-w-[150px]">
-                            {selectedChatUser.displayName || selectedChatUser.email || 'Chat'}
-                          </h2>
-                          <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <div 
+                        className="flex items-center space-x-2 min-w-0 flex-1 cursor-pointer hover:opacity-80 active:scale-[0.98] transition-all select-none"
+                        onClick={() => setIsUserDetailsOpen(true)}
+                        title="Click to view user details"
+                      >
+                        <div className="relative shrink-0">
+                          <Avatar className="h-8 w-8 border border-primary/20">
+                            <AvatarImage src={selectedChatUser.photoURL || undefined} alt={selectedChatUser.displayName || selectedChatUser.email || ""} />
+                            <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                              {selectedChatUser.displayName ? selectedChatUser.displayName.charAt(0).toUpperCase() : <UserCircle size={16}/>}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 border border-background rounded-full" />
                         </div>
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">
-                          {selectedChatUser.email}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1">
+                            <h2 className="text-sm font-bold truncate max-w-[150px] hover:text-primary transition-colors">
+                              {selectedChatUser.displayName || selectedChatUser.email || 'Chat'}
+                            </h2>
+                            <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                            {selectedChatUser.email}
+                          </p>
+                        </div>
                       </div>
                     </>
                   ) : (
@@ -165,7 +211,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                   </div>
                 ) : (
                   <div className="absolute inset-0">
-                    <AdminChatMessageArea selectedUser={selectedChatUser} />
+                    <AdminChatMessageArea selectedUser={selectedChatUser} onViewUserDetails={() => setIsUserDetailsOpen(true)} />
                   </div>
                 )}
               </div>
@@ -174,12 +220,21 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
             /* Desktop View Layout */
             <Card className="h-full flex flex-col border-0 shadow-none rounded-none">
               <CardHeader className="p-4 border-b flex flex-row items-center justify-between bg-card shrink-0">
-                <div className="flex items-center space-x-3">
+                <div 
+                  className={cn(
+                    "flex items-center space-x-3",
+                    selectedChatUser && "cursor-pointer hover:opacity-85 transition-opacity"
+                  )}
+                  onClick={() => {
+                    if (selectedChatUser) setIsUserDetailsOpen(true);
+                  }}
+                  title={selectedChatUser ? "Click to view user details" : undefined}
+                >
                   <div className="bg-primary/10 p-2 rounded-xl">
                     <Users className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-bold">
+                    <CardTitle className="text-lg font-bold hover:text-primary transition-colors">
                       {selectedChatUser ? `Chat with ${selectedChatUser.displayName || selectedChatUser.email}` : "Customer Support Chat"}
                     </CardTitle>
                     {!selectedChatUser && <p className="text-xs text-muted-foreground">Manage your conversations with users</p>}
@@ -214,12 +269,24 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                   />
                 </div>
                 <div className="flex-grow flex flex-col bg-background">
-                  <AdminChatMessageArea selectedUser={selectedChatUser} />
+                  <AdminChatMessageArea selectedUser={selectedChatUser} onViewUserDetails={() => setIsUserDetailsOpen(true)} />
                 </div>
               </CardContent>
             </Card>
           )}
         </motion.div>
+      )}
+
+      {selectedChatUser && (
+        <Dialog open={isUserDetailsOpen} onOpenChange={setIsUserDetailsOpen}>
+          <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card z-[60]">
+            <UserDetailsModal 
+              user={selectedChatUser} 
+              onClose={() => setIsUserDetailsOpen(false)} 
+              onUpdateUser={handleUpdateUserFromModal} 
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </AnimatePresence>
   );

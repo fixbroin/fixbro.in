@@ -36,6 +36,7 @@ import { CANONICAL_SUPPORT_ADMIN_UID } from './AdminUserListForChat';
 interface AdminChatMessageAreaProps {
   selectedUser: FirestoreUser | null;
   selectedSessionId?: string | null;
+  onViewUserDetails?: () => void;
 }
 
 const ADMIN_FALLBACK_AVATAR_INITIAL_CHAT_AREA = "S";
@@ -45,7 +46,7 @@ import { safeFormatChatMessage } from '@/lib/chatSanitizer';
 // Safe chat message formatter preventing stored/DOM-based XSS
 const formatChatMessage = safeFormatChatMessage;
 
-export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageAreaProps) {
+export default function AdminChatMessageArea({ selectedUser, onViewUserDetails }: AdminChatMessageAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -420,9 +421,20 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       <header className="px-3 py-2 md:p-4 border-b bg-card/50 backdrop-blur-md sticky top-0 z-20 shrink-0 cursor-pointer" onClick={() => inputRef.current?.blur()}>
         <div className="flex items-center justify-between gap-2">
             {/* Desktop header: Avatar + Name + Email */}
-            <div className="hidden md:flex items-center space-x-3">
+            <div 
+              className={cn(
+                "hidden md:flex items-center space-x-3 select-none",
+                onViewUserDetails && "cursor-pointer group"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                inputRef.current?.blur();
+                onViewUserDetails?.();
+              }}
+              title={onViewUserDetails ? "Click to view user details" : undefined}
+            >
               <div className="relative">
-                <Avatar className="h-10 w-10 border-2 border-primary/20">
+                <Avatar className="h-10 w-10 border-2 border-primary/20 group-hover:border-primary group-hover:scale-105 transition-all">
                     <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email || ""} />
                     <AvatarFallback className="bg-primary/5 text-primary font-bold">
                         {selectedUser.displayName ? selectedUser.displayName.charAt(0).toUpperCase() : <UserCircle size={20}/>}
@@ -432,7 +444,9 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
               </div>
               <div className="min-w-0">
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-sm font-bold truncate max-w-[150px]">{selectedUser.displayName || selectedUser.email}</h3>
+                    <h3 className="text-sm font-bold truncate max-w-[150px] group-hover:text-primary transition-colors">
+                      {selectedUser.displayName || selectedUser.email}
+                    </h3>
                     <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
                   </div>
                   {isUserTyping ? (
@@ -447,14 +461,21 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
             </div>
 
             {/* Mobile toolbar left side: Live typing indicator or status */}
-            <div className="flex md:hidden items-center min-w-0 flex-1">
+            <div 
+              className={cn(
+                "flex md:hidden items-center min-w-0 flex-1",
+                onViewUserDetails && "cursor-pointer active:opacity-70 transition-opacity"
+              )}
+              onClick={onViewUserDetails}
+              title={onViewUserDetails ? "Click to view user details" : undefined}
+            >
               {isUserTyping ? (
                 <p className="text-[11px] text-primary font-bold tracking-wider flex items-center animate-pulse">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary mr-1.5 animate-ping" />
                   typing...
                 </p>
               ) : (
-                <span className="text-[11px] text-muted-foreground font-medium truncate flex items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground font-medium truncate flex items-center gap-1.5 hover:text-foreground">
                   <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
                   Live Chat
                 </span>
@@ -534,7 +555,20 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
                     )}
                   >
                     {!isMe && showAvatar && (
-                      <Avatar className="h-8 w-8 shrink-0 mb-1 shadow-sm border border-background">
+                      <Avatar 
+                        className={cn(
+                          "h-8 w-8 shrink-0 mb-1 shadow-sm border border-background",
+                          !isAi && onViewUserDetails && "cursor-pointer hover:scale-110 hover:ring-2 hover:ring-primary/40 transition-all"
+                        )}
+                        onClick={!isAi && onViewUserDetails ? (e) => {
+                          e.stopPropagation();
+                          onViewUserDetails();
+                        } : undefined}
+                        title={!isAi && onViewUserDetails ? "Click to view user details" : undefined}
+                      >
+                        {selectedUser.photoURL ? (
+                          <AvatarImage src={selectedUser.photoURL} alt={selectedUser.displayName || selectedUser.email || "User"} />
+                        ) : null}
                         <AvatarFallback className={cn("text-[10px] font-bold", isAi ? "bg-zinc-900 text-white" : "bg-primary/10 text-primary")}>
                           {isAi ? <Bot className="h-4 w-4" /> : (selectedUser.displayName?.charAt(0) || 'U')}
                         </AvatarFallback>
