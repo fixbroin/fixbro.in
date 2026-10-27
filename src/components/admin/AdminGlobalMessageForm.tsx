@@ -130,7 +130,7 @@ export default function AdminGlobalMessageForm() {
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="p-8 space-y-6">
+          <CardContent className="p-4 space-y-6">
             <FormField
               control={form.control}
               name="message"

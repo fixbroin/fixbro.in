@@ -347,7 +347,7 @@ export default function ChatSettingsForm() {
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="p-8 space-y-5">
+          <CardContent className="p-4 space-y-5">
             <FormField
               control={form.control}
               name="isChatEnabled"

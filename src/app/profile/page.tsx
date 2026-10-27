@@ -308,7 +308,7 @@ export default function ProfilePage() {
   return (
     <ProtectedRoute>
       <div id="recaptcha-container-profile" className="fixed bottom-0 right-0"></div>
-      <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+      <div className="container mx-auto px- 2py-8 max-w-2xl space-y-6">
         <ProviderProfileDetails
           user={user}
           firestoreUser={firestoreUser}

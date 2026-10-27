@@ -380,7 +380,7 @@ function WithdrawalPageContent() {
   };
 
   return (
-    <div className="space-y-3 container mx-auto py-2">
+    <div className="p-2 md:p-8 space-y-6 max-w-7xl mx-auto">
       <Card id="withdrawal-form-card">
         <CardHeader>
             <CardTitle>{editingRequest ? "Re-submit Withdrawal Request" : "Request a Withdrawal"}</CardTitle>             <CardDescription>{editingRequest ? "Please correct your details and re-submit the request." : `Transfer your available earnings. Minimum withdrawal is ${symbol}${withdrawalSettings?.minWithdrawalAmount || 0}.`}</CardDescription>
