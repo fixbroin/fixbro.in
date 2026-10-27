@@ -629,45 +629,45 @@ export default function ProviderWithdrawalsPage() {
                             <span className="font-medium">{formatDate(req.requestedAt, appConfig)}</span>
                           </div>
 
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)} className="h-8">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2.5">
+                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)} className="h-8 text-xs px-2.5 shrink-0">
                               <Eye className="mr-1 h-3.5 w-3.5" /> Details
                             </Button>
                             
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5 flex-1 min-w-0">
                               {req.status === 'pending' && (
                                 <>
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
                                       Complete
                                     </Button>
                                   </PermissionGuard>
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'approved')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'approved')} disabled={isUpdating === req.id}>
                                       Approve
                                     </Button>
                                   </PermissionGuard>
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8 text-yellow-600" onClick={() => openRejectionDialog(req, 're_submit')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => openRejectionDialog(req, 're_submit')} disabled={isUpdating === req.id}>
                                       Re-submit
                                     </Button>
                                   </PermissionGuard>
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8 text-destructive" onClick={() => openRejectionDialog(req, 'rejected')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-destructive hover:bg-destructive/10" onClick={() => openRejectionDialog(req, 'rejected')} disabled={isUpdating === req.id}>
                                       Reject
                                     </Button>
                                   </PermissionGuard>
                                 </>
                               )}
                               {req.status === 'approved' && (
-                                <div className="flex gap-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
                                       Complete
                                     </Button>
                                   </PermissionGuard>
                                   <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                    <Button variant="outline" size="sm" className="h-8" onClick={() => handleUpdateStatus(req, 'processing')} disabled={isUpdating === req.id}>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs px-2.5" onClick={() => handleUpdateStatus(req, 'processing')} disabled={isUpdating === req.id}>
                                       Process
                                     </Button>
                                   </PermissionGuard>
@@ -675,7 +675,7 @@ export default function ProviderWithdrawalsPage() {
                               )}
                               {req.status === 'processing' && (
                                 <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                  <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                  <Button variant="outline" size="sm" className="h-8 text-xs px-2.5 text-green-600 font-bold" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
                                     Complete
                                   </Button>
                                 </PermissionGuard>
@@ -684,7 +684,7 @@ export default function ProviderWithdrawalsPage() {
                               <PermissionGuard moduleId="provider_withdrawals" action="delete">
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive" disabled={isUpdating === req.id}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive shrink-0" disabled={isUpdating === req.id}>
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   </AlertDialogTrigger>
