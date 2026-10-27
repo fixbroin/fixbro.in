@@ -346,7 +346,7 @@ export default function AdminNotificationsPage() {
               {notification.title}
             </h3>
           )}
-          <p className="text-xs text-muted-foreground mt-0.5">{notification.message}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 break-words">{notification.message}</p>
           
           {showRecipient && (
             <div className="flex items-center gap-1.5 mt-2 bg-secondary/50 py-1 px-2.5 rounded-md w-fit">
@@ -376,25 +376,25 @@ export default function AdminNotificationsPage() {
 
   return (
     <Card className="border-primary/10 shadow-lg">
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div>
-            <CardTitle className="text-2xl font-black tracking-tight flex items-center">
-              <History className="mr-2.5 h-6 w-6 text-primary animate-pulse" /> Notification Center
+            <CardTitle className="text-xl sm:text-2xl font-black tracking-tight flex items-center">
+              <History className="mr-2.5 h-5 w-5 sm:h-6 sm:w-6 text-primary animate-pulse" /> Notification Center
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               View system updates, service bookings, and platform logs.
             </CardDescription>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             {!isAllTab && adminNotifications.length > 0 && unreadCount > 0 && (
-              <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={isClearing} className="w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={isClearing} className="flex-1 sm:flex-initial text-xs sm:text-sm">
                 Mark all as read
               </Button>
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isClearing || !hasNotificationsToClear} className="w-full sm:w-auto">
+                <Button variant="destructive" size="sm" disabled={isClearing || !hasNotificationsToClear} className="flex-1 sm:flex-initial text-xs sm:text-sm">
                   {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TrashIcon className="mr-2 h-4 w-4" />}
                   {isAllTab ? "Clear All" : "Clear Alerts"}
                 </Button>
@@ -428,13 +428,30 @@ export default function AdminNotificationsPage() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 bg-muted/50 p-1 rounded-xl">
-            <TabsTrigger value="admin" className="rounded-lg font-bold">Admin Alerts ({adminNotifications.length})</TabsTrigger>
-            <TabsTrigger value="unread" className="rounded-lg font-bold">Admin Unread ({unreadCount})</TabsTrigger>
-            <TabsTrigger value="all" className="rounded-lg font-bold">All ({systemNotifications.length})</TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto pb-2 mb-6 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="inline-flex min-w-full sm:w-full sm:grid sm:grid-cols-3 gap-1.5 bg-muted/60 p-1.5 rounded-xl h-auto">
+              <TabsTrigger 
+                value="admin" 
+                className="rounded-lg font-bold text-xs sm:text-sm px-3.5 py-2.5 whitespace-nowrap shrink-0 flex-1 sm:flex-none text-center"
+              >
+                Admin Alerts ({adminNotifications.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="unread" 
+                className="rounded-lg font-bold text-xs sm:text-sm px-3.5 py-2.5 whitespace-nowrap shrink-0 flex-1 sm:flex-none text-center"
+              >
+                Admin Unread ({unreadCount})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="all" 
+                className="rounded-lg font-bold text-xs sm:text-sm px-3.5 py-2.5 whitespace-nowrap shrink-0 flex-1 sm:flex-none text-center"
+              >
+                All ({systemNotifications.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="admin" className="space-y-3">
             {adminNotifications.length === 0 ? (
