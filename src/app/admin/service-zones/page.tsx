@@ -77,8 +77,7 @@ export default function AdminServiceZonesPage() {
     setIsLoadingRequests(true);
     const q = query(
       collection(db, "outOfZoneRequests"),
-      orderBy("timestamp", "desc"),
-      limit(150)
+      orderBy("timestamp", "desc")
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items = snapshot.docs

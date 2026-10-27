@@ -7,8 +7,9 @@ import {
   Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
   Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
   Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Map as MapIcon, PackageSearch,
-  CheckCircle, XCircle, PlayCircle, Smartphone, Globe
+  CheckCircle, XCircle, PlayCircle, Smartphone, Globe, MapPin, Building2, Search, X
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import type { UserActivity, FirestoreUser } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, Timestamp, limit, getDocs, writeBatch, where, documentId, startAfter, getDoc, doc, type DocumentSnapshot, deleteDoc, onSnapshot } from '@/lib/mysqlDb';
@@ -137,6 +138,37 @@ const formatTimestamp = (timestamp?: any): string => {
   return formatDistanceToNow(new Date(millis), { addSuffix: true });
 };
 
+const getRequestPincode = (request: UserActivity): string => {
+  if (request.eventData?.pincode) return String(request.eventData.pincode).trim();
+  const addr = `${request.eventData?.addressLine1 || ''} ${request.eventData?.addressLine2 || ''}`;
+  const match = addr.match(/\b[1-9][0-9]{5}\b/);
+  return match ? match[0] : '';
+};
+
+const getRequestCity = (request: UserActivity): string => {
+  if (request.eventData?.city && String(request.eventData.city).trim()) {
+    return String(request.eventData.city).trim();
+  }
+  if (request.eventData?.state && String(request.eventData.state).trim()) {
+    return String(request.eventData.state).trim();
+  }
+  const pin = getRequestPincode(request);
+  if (pin) {
+    if (pin.startsWith('110')) return 'Delhi';
+    if (pin.startsWith('2013')) return 'Noida';
+    if (pin.startsWith('2010')) return 'Ghaziabad';
+    if (pin.startsWith('121')) return 'Faridabad';
+    if (pin.startsWith('122')) return 'Gurugram';
+    if (pin.startsWith('500')) return 'Hyderabad';
+    if (pin.startsWith('560')) return 'Bengaluru';
+    if (pin.startsWith('400')) return 'Mumbai';
+    if (pin.startsWith('600')) return 'Chennai';
+    if (pin.startsWith('700')) return 'Kolkata';
+    if (pin.startsWith('302')) return 'Jaipur';
+  }
+  return 'Unspecified';
+};
+
 export default function AdminActivityFeedPage() {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
@@ -153,13 +185,16 @@ export default function AdminActivityFeedPage() {
   const [outOfZoneRequests, setOutOfZoneRequests] = useState<UserActivity[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(true);
   const [isDeletingRequest, setIsDeletingRequest] = useState<string | null>(null);
+  const [visibleRequestsCount, setVisibleRequestsCount] = useState<number>(50);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
+  const [selectedPincodeFilter, setSelectedPincodeFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     setIsLoadingRequests(true);
     const q = query(
       collection(db, "outOfZoneRequests"),
-      orderBy("timestamp", "desc"),
-      limit(150)
+      orderBy("timestamp", "desc")
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items = snapshot.docs
@@ -172,6 +207,63 @@ export default function AdminActivityFeedPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  const { cityGroups, pincodeGroups, totalRequestsCount } = useMemo(() => {
+    const cityMap: Record<string, { city: string; count: number; pincodes: Set<string> }> = {};
+    const pincodeMap: Record<string, { pincode: string; city: string; count: number }> = {};
+
+    outOfZoneRequests.forEach(req => {
+      const pin = getRequestPincode(req);
+      const city = getRequestCity(req);
+
+      if (!cityMap[city]) {
+        cityMap[city] = { city, count: 0, pincodes: new Set() };
+      }
+      cityMap[city].count++;
+      if (pin) cityMap[city].pincodes.add(pin);
+
+      if (pin) {
+        if (!pincodeMap[pin]) {
+          pincodeMap[pin] = { pincode: pin, city, count: 0 };
+        }
+        pincodeMap[pin].count++;
+      }
+    });
+
+    const sortedCities = Object.values(cityMap).sort((a, b) => b.count - a.count);
+    const sortedPincodes = Object.values(pincodeMap).sort((a, b) => b.count - a.count);
+
+    return {
+      cityGroups: sortedCities,
+      pincodeGroups: sortedPincodes,
+      totalRequestsCount: outOfZoneRequests.length
+    };
+  }, [outOfZoneRequests]);
+
+  const filteredOutOfZoneRequests = useMemo(() => {
+    return outOfZoneRequests.filter(req => {
+      const city = getRequestCity(req).toLowerCase();
+      const pincode = getRequestPincode(req);
+      const address = (req.eventData?.addressLine1 || '').toLowerCase();
+      const name = (req.userDisplayName || '').toLowerCase();
+
+      if (selectedCityFilter && city !== selectedCityFilter.toLowerCase()) {
+        return false;
+      }
+      if (selectedPincodeFilter && pincode !== selectedPincodeFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        return city.includes(q) || pincode.includes(q) || address.includes(q) || name.includes(q);
+      }
+      return true;
+    });
+  }, [outOfZoneRequests, selectedCityFilter, selectedPincodeFilter, searchQuery]);
+
+  const displayedOutOfZoneRequests = useMemo(() => {
+    return filteredOutOfZoneRequests.slice(0, visibleRequestsCount);
+  }, [filteredOutOfZoneRequests, visibleRequestsCount]);
 
   const handleDeleteRequest = async (id: string) => {
     setIsDeletingRequest(id);
@@ -843,10 +935,25 @@ export default function AdminActivityFeedPage() {
 
         <TabsContent value="out-of-coverage">
           <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
-            <CardHeader className="p-8 pb-4">
-              <CardTitle className="text-2xl flex items-center"><AlertTriangle className="mr-2 h-6 w-6 text-amber-500" />Out-of-Coverage Requests</CardTitle>
-              <CardDescription>Locations outside active service zones where users tried to request bookings.</CardDescription>
+            <CardHeader className="p-6 md:p-8 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle className="text-2xl flex items-center">
+                    <AlertTriangle className="mr-2 h-6 w-6 text-amber-500" />
+                    Out-of-Coverage Requests
+                  </CardTitle>
+                  <CardDescription>
+                    Unserved customer demand locations outside active service zones.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                    Total Demand: {totalRequestsCount}
+                  </span>
+                </div>
+              </div>
             </CardHeader>
+
             <CardContent className="p-0">
               {isLoadingRequests ? (
                 <div className="flex flex-col justify-center items-center h-[300px] space-y-4">
@@ -861,132 +968,417 @@ export default function AdminActivityFeedPage() {
                 </div>
               ) : (
                 <>
-                  {/* Desktop Table View */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-muted/30">
-                        <TableRow className="hover:bg-transparent border-none">
-                          <TableHead className="pl-8 py-5 text-[10px] font-black uppercase tracking-widest">User Name</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase tracking-widest">Address Details</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase tracking-widest">Coordinates</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
-                          <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <AnimatePresence initial={false}>
-                          {outOfZoneRequests.map((request) => (
-                            <TableRow key={request.id} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
-                              <TableCell className="pl-8 py-4 font-bold text-foreground">{request.userDisplayName || 'Guest User'}</TableCell>
-                              <TableCell className="text-xs font-medium">
-                                {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
-                                {request.eventData?.pincode ? ` - ${request.eventData.pincode}` : ''}
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground font-mono">
-                                {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground font-semibold">
-                                {formatActivityTimestamp(request.timestamp)}
-                              </TableCell>
-                              <TableCell className="pr-8 text-right">
-                                <div className="flex justify-end gap-2">
-                                  {request.eventData?.latitude && request.eventData?.longitude ? (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-9 w-9 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm border border-primary/10"
-                                      onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
-                                      title="Open Map"
-                                    >
-                                      <MapIcon className="h-4 w-4" />
-                                    </Button>
-                                  ) : null}
-                                  <PermissionGuard moduleId="activity_feed" action="delete">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      className="h-9 w-9 rounded-xl hover:bg-destructive hover:text-destructive-foreground transition-all duration-300 shadow-sm border border-destructive/10"
-                                      disabled={!request.id || isDeletingRequest === request.id} 
-                                      onClick={() => request.id && handleDeleteRequest(request.id)}
-                                      title="Delete"
-                                    >
-                                      {isDeletingRequest === request.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <TrashIcon className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </PermissionGuard>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </AnimatePresence>
-                      </TableBody>
-                    </Table>
+                  {/* City & Pincode Demand Analytics Section */}
+                  <div className="p-6 md:p-8 border-b bg-gradient-to-br from-amber-500/[0.04] via-muted/10 to-background space-y-6">
+                    {/* Stat KPI Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          Total Requests
+                        </span>
+                        <p className="text-2xl font-black text-foreground">{totalRequestsCount}</p>
+                        <p className="text-[11px] text-muted-foreground">All unserved locations</p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Building2 className="h-3.5 w-3.5 text-blue-500" />
+                          Unique Cities
+                        </span>
+                        <p className="text-2xl font-black text-foreground">{cityGroups.length}</p>
+                        <p className="text-[11px] text-muted-foreground">High-demand regions</p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-purple-500" />
+                          Top City
+                        </span>
+                        <p className="text-lg font-black text-foreground truncate">
+                          {cityGroups[0]?.city || 'N/A'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {cityGroups[0] ? `${cityGroups[0].count} requests (${Math.round((cityGroups[0].count / (totalRequestsCount || 1)) * 100)}%)` : 'No data'}
+                        </p>
+                      </div>
+
+                      <div className="bg-card p-4 rounded-2xl border shadow-xs space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-emerald-500" />
+                          Top Pincode
+                        </span>
+                        <p className="text-lg font-black text-foreground truncate font-mono">
+                          {pincodeGroups[0]?.pincode || 'N/A'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {pincodeGroups[0] ? `${pincodeGroups[0].count} req (${pincodeGroups[0].city})` : 'No data'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Grouped Breakdown: Cities & Pincodes */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* City Groups */}
+                      <div className="bg-card p-4 md:p-5 rounded-2xl border shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-primary" />
+                            Demand by City ({cityGroups.length})
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground">Click to filter</span>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1">
+                          {cityGroups.map(c => {
+                            const isSelected = selectedCityFilter?.toLowerCase() === c.city.toLowerCase();
+                            return (
+                              <button
+                                key={c.city}
+                                onClick={() => {
+                                  setSelectedCityFilter(isSelected ? null : c.city);
+                                  setVisibleRequestsCount(50);
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 flex items-center gap-2",
+                                  isSelected 
+                                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                    : "bg-muted/30 hover:bg-muted text-foreground border-border/60 hover:border-primary/40"
+                                )}
+                              >
+                                <span>{c.city}</span>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-md text-[10px] font-black",
+                                  isSelected ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
+                                )}>
+                                  {c.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Pincode Hotspots */}
+                      <div className="bg-card p-4 md:p-5 rounded-2xl border shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-emerald-500" />
+                            Demand by Pincode ({pincodeGroups.length})
+                          </h4>
+                          <span className="text-[10px] text-muted-foreground">Click to filter</span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto pr-1">
+                          {pincodeGroups.map(p => {
+                            const isSelected = selectedPincodeFilter === p.pincode;
+                            return (
+                              <button
+                                key={p.pincode}
+                                onClick={() => {
+                                  setSelectedPincodeFilter(isSelected ? null : p.pincode);
+                                  setVisibleRequestsCount(50);
+                                }}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all duration-200 flex items-center gap-2",
+                                  isSelected 
+                                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                                    : "bg-muted/30 hover:bg-muted text-foreground border-border/60 hover:border-emerald-500/40"
+                                )}
+                              >
+                                <span className="font-mono">{p.pincode}</span>
+                                <span className={cn(
+                                  "px-1.5 py-0.5 rounded-md text-[10px] font-black",
+                                  isSelected ? "bg-white/20 text-white" : "bg-emerald-500/10 text-emerald-600"
+                                )}>
+                                  {p.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Active Filter Bar and Search Input */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                      <div className="flex items-center gap-2 flex-wrap min-h-[32px]">
+                        {(selectedCityFilter || selectedPincodeFilter || searchQuery) ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-muted-foreground">Active Filter:</span>
+                            {selectedCityFilter && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold border border-primary/20">
+                                City: {selectedCityFilter}
+                                <button onClick={() => setSelectedCityFilter(null)} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            {selectedPincodeFilter && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 text-xs font-bold border border-emerald-500/20">
+                                Pincode: {selectedPincodeFilter}
+                                <button onClick={() => setSelectedPincodeFilter(null)} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            {searchQuery && (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-foreground text-xs font-bold border">
+                                &quot;{searchQuery}&quot;
+                                <button onClick={() => setSearchQuery('')} className="hover:text-destructive">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => {
+                                setSelectedCityFilter(null);
+                                setSelectedPincodeFilter(null);
+                                setSearchQuery('');
+                                setVisibleRequestsCount(50);
+                              }}
+                              className="h-7 text-xs text-muted-foreground hover:text-foreground font-semibold px-2"
+                            >
+                              Clear All
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Showing recent out-of-coverage requests</span>
+                        )}
+                      </div>
+
+                      {/* Search input */}
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input 
+                          placeholder="Search city, pin, user..." 
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setVisibleRequestsCount(50);
+                          }}
+                          className="pl-8 h-9 text-xs rounded-xl bg-card"
+                        />
+                        {searchQuery && (
+                          <button 
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Mobile Card View */}
-                  <div className="block md:hidden">
-                    <AnimatePresence initial={false}>
-                      {outOfZoneRequests.map((request) => (
-                        <div key={request.id} className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="space-y-1">
-                              <p className="font-bold text-base text-foreground leading-none">
-                                {request.userDisplayName || 'Guest User'}
-                              </p>
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">
-                                {formatActivityTimestamp(request.timestamp)}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              {request.eventData?.latitude && request.eventData?.longitude ? (
-                                <Button 
-                                  variant="outline" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
-                                >
-                                  <MapIcon className="h-4 w-4 text-primary" />
-                                </Button>
-                              ) : null}
-                              <PermissionGuard moduleId="activity_feed" action="delete">
-                                <Button 
-                                  variant="destructive" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  disabled={!request.id || isDeletingRequest === request.id} 
-                                  onClick={() => request.id && handleDeleteRequest(request.id)}
-                                >
-                                  {isDeletingRequest === request.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <TrashIcon className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </PermissionGuard>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="p-3 rounded-2xl bg-primary/[0.03] border border-primary/5 text-xs">
-                              <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Address Details</p>
-                              <p className="font-bold text-foreground">
-                                {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
-                                {request.eventData?.pincode ? ` - ${request.eventData.pincode}` : ''}
-                              </p>
-                            </div>
-                            <div className="p-3 rounded-2xl bg-muted/20 border border-dashed border-muted-foreground/20 text-xs">
-                              <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Coordinates</p>
-                              <p className="font-mono text-foreground">
-                                {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
-                              </p>
-                            </div>
+                  {/* Empty state for filtered results */}
+                  {filteredOutOfZoneRequests.length === 0 ? (
+                    <div className="text-center py-16 bg-muted/5 space-y-2">
+                      <PackageSearch className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                      <p className="font-bold text-base">No matching requests found</p>
+                      <p className="text-muted-foreground text-xs">Try clearing your filters or changing your search keywords.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedCityFilter(null);
+                          setSelectedPincodeFilter(null);
+                          setSearchQuery('');
+                          setVisibleRequestsCount(50);
+                        }}
+                        className="mt-2 rounded-xl text-xs"
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-muted/30">
+                            <TableRow className="hover:bg-transparent border-none">
+                              <TableHead className="pl-8 py-5 text-[10px] font-black uppercase tracking-widest">User Name</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Address Details</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">City & Pincode</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Coordinates</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
+                              <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <AnimatePresence initial={false}>
+                              {displayedOutOfZoneRequests.map((request) => {
+                                const city = getRequestCity(request);
+                                const pincode = getRequestPincode(request);
+                                return (
+                                  <TableRow key={request.id} className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]">
+                                    <TableCell className="pl-8 py-4 font-bold text-foreground">{request.userDisplayName || 'Guest User'}</TableCell>
+                                    <TableCell className="text-xs font-medium max-w-xs truncate">
+                                      {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-semibold text-foreground">{city}</span>
+                                        {pincode && (
+                                          <span className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px] text-muted-foreground font-bold">
+                                            {pincode}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground font-mono">
+                                      {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground font-semibold">
+                                      {formatActivityTimestamp(request.timestamp)}
+                                    </TableCell>
+                                    <TableCell className="pr-8 text-right">
+                                      <div className="flex justify-end gap-2">
+                                        {request.eventData?.latitude && request.eventData?.longitude ? (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-9 w-9 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-300 shadow-sm border border-primary/10"
+                                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
+                                            title="Open Map"
+                                          >
+                                            <MapIcon className="h-4 w-4" />
+                                          </Button>
+                                        ) : null}
+                                        <PermissionGuard moduleId="activity_feed" action="delete">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon"
+                                            className="h-9 w-9 rounded-xl hover:bg-destructive hover:text-destructive-foreground transition-all duration-300 shadow-sm border border-destructive/10"
+                                            disabled={!request.id || isDeletingRequest === request.id} 
+                                            onClick={() => request.id && handleDeleteRequest(request.id)}
+                                            title="Delete"
+                                          >
+                                            {isDeletingRequest === request.id ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <TrashIcon className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        </PermissionGuard>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </AnimatePresence>
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile Card View */}
+                      <div className="block md:hidden">
+                        <AnimatePresence initial={false}>
+                          {displayedOutOfZoneRequests.map((request) => {
+                            const city = getRequestCity(request);
+                            const pincode = getRequestPincode(request);
+                            return (
+                              <div key={request.id} className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors">
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-base text-foreground leading-none">
+                                      {request.userDisplayName || 'Guest User'}
+                                    </p>
+                                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter mt-1">
+                                      {formatActivityTimestamp(request.timestamp)}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {request.eventData?.latitude && request.eventData?.longitude ? (
+                                      <Button 
+                                        variant="outline" 
+                                        size="icon" 
+                                        className="h-8 w-8"
+                                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${request.eventData.latitude},${request.eventData.longitude}`, '_blank')}
+                                      >
+                                        <MapIcon className="h-4 w-4 text-primary" />
+                                      </Button>
+                                    ) : null}
+                                    <PermissionGuard moduleId="activity_feed" action="delete">
+                                      <Button 
+                                        variant="destructive" 
+                                        size="icon" 
+                                        className="h-8 w-8"
+                                        disabled={!request.id || isDeletingRequest === request.id} 
+                                        onClick={() => request.id && handleDeleteRequest(request.id)}
+                                      >
+                                        {isDeletingRequest === request.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <TrashIcon className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </PermissionGuard>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="p-3 rounded-2xl bg-primary/[0.03] border border-primary/5 text-xs">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider">Address Details</p>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-bold text-foreground text-[11px]">{city}</span>
+                                        {pincode && (
+                                          <span className="px-1.5 py-0.2 rounded bg-muted font-mono text-[9px] text-muted-foreground font-bold">
+                                            {pincode}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="font-bold text-foreground">
+                                      {request.eventData?.addressLine1 || request.eventData?.city || 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div className="p-3 rounded-2xl bg-muted/20 border border-dashed border-muted-foreground/20 text-xs">
+                                    <p className="font-semibold text-muted-foreground text-[10px] uppercase tracking-wider mb-1">Coordinates</p>
+                                    <p className="font-mono text-foreground">
+                                      {request.eventData?.latitude?.toFixed(5) || 'N/A'}, {request.eventData?.longitude?.toFixed(5) || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Pagination: Load More */}
+                      {filteredOutOfZoneRequests.length > visibleRequestsCount && (
+                        <div className="p-6 border-t bg-muted/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-muted-foreground">
+                            Showing <span className="font-bold text-foreground">{displayedOutOfZoneRequests.length}</span> of <span className="font-bold text-foreground">{filteredOutOfZoneRequests.length}</span> requests
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setVisibleRequestsCount(prev => prev + 50)}
+                              className="rounded-xl px-5 h-9 font-bold border-primary/20 text-primary hover:bg-primary hover:text-primary-foreground shadow-sm transition-all"
+                            >
+                              Load 50 More
+                            </Button>
+                            {filteredOutOfZoneRequests.length > visibleRequestsCount + 50 && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setVisibleRequestsCount(prev => prev + 100)}
+                                className="rounded-xl px-4 h-9 font-bold text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                Load 100 More
+                              </Button>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </CardContent>
