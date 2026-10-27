@@ -1,55 +1,6 @@
 // src/app/api/admin/database/export/route.ts
-import { NextResponse } from 'next/server';
-import { getPool } from '@/lib/mysql';
-
-const TABLES = [
-  'adminCategories',
-  'adminSubCategories',
-  'adminServices',
-  'userCarts',
-  'bookings',
-  'users',
-  'adminSlideshows',
-  'webSettings',
-  'appConfiguration',
-  'contentPages',
-  'adminFAQs',
-  'adminReviews',
-  'timeSlotCategoryLimits',
-  'adminPromoCodes',
-  'taxes',
-  'visitorInfoLogs',
-  'userActivities',
-  'chats',
-  'chats_messages',
-  'userNotifications',
-  'adminPopups',
-  'admins',
-  'providerApplications',
-  'withdrawalRequests',
-  'blogPosts',
-  'contactUsSubmissions',
-  'popupSubmissions',
-  'cityCategorySeoSettings',
-  'areaCategorySeoSettings',
-  'areaServiceSeoSettings',
-  'quotations',
-  'invoices',
-  'serviceZones',
-  'referrals',
-  'pinCodeAreaMappings',
-  'cities',
-  'areas',
-  'searchAnalytics',
-  'leaves',
-  'seoSettings',
-  'marketplaceFurniture',
-  'marketplaceRentals',
-  'marketplaceCallLogs',
-  'marketplaceSettings'
-];
-
-import { NextRequest } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
+import { getPool, TABLES } from '@/lib/mysql';
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 
 export async function GET(request: NextRequest) {
@@ -63,15 +14,19 @@ export async function GET(request: NextRequest) {
     const exportData: Record<string, any[]> = {};
 
     for (const table of TABLES) {
-      const [rows]: any = await pool.query(`SELECT \`id\`, \`parent_id\`, \`data\` FROM \`${table}\``);
-      exportData[table] = (rows || []).map((row: any) => {
-        const rawData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-        return {
-          _id: row.id,
-          _parentId: row.parent_id || null,
-          ...rawData
-        };
-      });
+      try {
+        const [rows]: any = await pool.query(`SELECT \`id\`, \`parent_id\`, \`data\` FROM \`${table}\``);
+        exportData[table] = (rows || []).map((row: any) => {
+          const rawData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+          return {
+            _id: row.id,
+            _parentId: row.parent_id || null,
+            ...rawData
+          };
+        });
+      } catch (err: any) {
+        console.warn(`[DB Export] Skipping table "${table}":`, err.message);
+      }
     }
 
     return new NextResponse(JSON.stringify(exportData, null, 2), {

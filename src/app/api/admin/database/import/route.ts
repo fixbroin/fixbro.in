@@ -1,6 +1,6 @@
 // src/app/api/admin/database/import/route.ts
 import { NextResponse } from 'next/server';
-import { getPool } from '@/lib/mysql';
+import { getPool, TABLES } from '@/lib/mysql';
 
 import { NextRequest } from 'next/server';
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
 
       let totalCount = 0;
       for (const table of Object.keys(importData)) {
+        if (!TABLES.includes(table)) {
+          console.warn(`[DB Import] Skipping unrecognized table: ${table}`);
+          continue;
+        }
         const rows = importData[table];
         if (!Array.isArray(rows)) continue;
 

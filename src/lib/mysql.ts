@@ -32,7 +32,7 @@ const { host, user, password, databaseName, port } = getMySqlConfig();
 let poolPromise: Promise<mysql.Pool> | null = null;
 let isInitialized = false;
 
-const TABLES = [
+export const TABLES = [
   'adminCategories',
   'adminSubCategories',
   'adminServices',

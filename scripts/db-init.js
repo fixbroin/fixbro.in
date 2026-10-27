@@ -75,7 +75,20 @@ const TABLES = [
   'outOfZoneRequests',
   'customServiceRequests',
   'push_templates',
-  'email_templates'
+  'email_templates',
+  'indexingProgress',
+  'promoCodeUsage',
+  'providerWalletTransactions',
+  'providerComplaints',
+  'providerControlOptions',
+  'adminCoupons',
+  'services',
+  'adminTaxes',
+  'adminCustomImages',
+  'marketplaceFurniture',
+  'marketplaceRentals',
+  'marketplaceCallLogs',
+  'marketplaceSettings'
 ];
 
 async function main() {
