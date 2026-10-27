@@ -120,12 +120,14 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          exit="exit"
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="admin-floating-chat-window"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
           variants={windowVariants}
           className={cn(
             "fixed z-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out no-keyboard-scroll",
@@ -276,18 +278,19 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
           )}
         </motion.div>
       )}
-
-      {selectedChatUser && (
-        <Dialog open={isUserDetailsOpen} onOpenChange={setIsUserDetailsOpen}>
-          <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card z-[60]">
-            <UserDetailsModal 
-              user={selectedChatUser} 
-              onClose={() => setIsUserDetailsOpen(false)} 
-              onUpdateUser={handleUpdateUserFromModal} 
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </AnimatePresence>
-  );
+
+    {selectedChatUser && (
+      <Dialog open={isUserDetailsOpen} onOpenChange={setIsUserDetailsOpen}>
+        <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card z-[60]">
+          <UserDetailsModal 
+            user={selectedChatUser} 
+            onClose={() => setIsUserDetailsOpen(false)} 
+            onUpdateUser={handleUpdateUserFromModal} 
+          />
+        </DialogContent>
+      </Dialog>
+    )}
+  </>
+);
 }
