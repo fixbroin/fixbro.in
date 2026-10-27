@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,13 +40,24 @@ export default function AdminTimeSlotLimitsPage() {
       setIsLoading(false);
     });
 
-    // Fetch categories for the dropdown
+    // Fetch categories ordered by display order
     const fetchCategories = async () => {
       try {
-        const data = await getDocs(categoriesCollectionRef);
-        setCategories(data.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreCategory)));
+        const qCategories = query(categoriesCollectionRef, orderBy("order", "asc"));
+        const data = await getDocs(qCategories);
+        const fetched = data.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
+        fetched.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+        setCategories(fetched);
       } catch (error) {
-        console.error("Error fetching categories: ", error);
+        console.error("Error fetching categories with order, falling back:", error);
+        try {
+          const fallbackData = await getDocs(categoriesCollectionRef);
+          const fallbackFetched = fallbackData.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreCategory));
+          fallbackFetched.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+          setCategories(fallbackFetched);
+        } catch (fallbackError) {
+          console.error("Fallback fetching categories failed:", fallbackError);
+        }
       }
     };
 
@@ -55,6 +66,20 @@ export default function AdminTimeSlotLimitsPage() {
     return () => unsubscribeLimits();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const sortedLimits = useMemo(() => {
+    const categoryOrderMap = new Map<string, number>();
+    categories.forEach((cat, index) => {
+      categoryOrderMap.set(cat.id, cat.order !== undefined && cat.order !== null ? cat.order : index + 1000);
+    });
+
+    return [...limits].sort((a, b) => {
+      const orderA = categoryOrderMap.get(a.categoryId) ?? 9999;
+      const orderB = categoryOrderMap.get(b.categoryId) ?? 9999;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.categoryName || '').localeCompare(b.categoryName || '');
+    });
+  }, [limits, categories]);
 
   const handleAddLimit = () => {
     setEditingLimit(null);
@@ -119,9 +144,20 @@ export default function AdminTimeSlotLimitsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {limits.map((limit) => (
-                    <TableRow key={limit.id}>
-                      <TableCell className="font-medium">{limit.categoryName}</TableCell>
+                  {sortedLimits.map((limit) => {
+                    const matchedCategory = categories.find(c => c.id === limit.categoryId);
+                    return (
+                      <TableRow key={limit.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {matchedCategory?.order !== undefined && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground font-mono" title={`Display Order: ${matchedCategory.order}`}>
+                                #{matchedCategory.order}
+                              </span>
+                            )}
+                            <span>{limit.categoryName}</span>
+                          </div>
+                        </TableCell>
                       <TableCell className="text-center">
                         <span className="px-3 py-1 bg-primary/10 text-primary rounded-full font-bold">
                           {limit.maxConcurrentBookings}
@@ -163,7 +199,8 @@ export default function AdminTimeSlotLimitsPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

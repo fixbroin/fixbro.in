@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { FirestoreCategory, TimeSlotCategoryLimit } from '@/types/firestore';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Loader2, Check, ChevronsUpDown, Search } from "lucide-react";
 import { db } from '@/lib/firebase';
 import { doc, setDoc, Timestamp } from '@/lib/mysqlDb';
@@ -116,14 +116,19 @@ export default function TimeSlotCategoryLimitForm({
     }
   };
   
-  // Filter categories for "Add New Limit" mode: show only those without an existing limit
-  const availableCategoriesForNewLimit = initialData 
-    ? categories // If editing, show all categories (dropdown will be disabled for categoryId)
-    : categories.filter(cat => !existingLimitCategoryIds.includes(cat.id));
+  // Filter and sort categories according to display order
+  const availableCategoriesForNewLimit = useMemo(() => {
+    const list = initialData 
+      ? categories 
+      : categories.filter(cat => !existingLimitCategoryIds.includes(cat.id));
+    return [...list].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+  }, [categories, existingLimitCategoryIds, initialData]);
 
-  const filteredCategories = availableCategoriesForNewLimit.filter(cat =>
-    cat.name.toLowerCase().includes(categorySearch.toLowerCase())
-  );
+  const filteredCategories = useMemo(() => {
+    return availableCategoriesForNewLimit.filter(cat =>
+      cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+  }, [availableCategoriesForNewLimit, categorySearch]);
 
   const effectiveIsSubmitting = isParentSubmitting || isFormBusy;
 
@@ -187,7 +192,14 @@ export default function TimeSlotCategoryLimitForm({
                               }}
                               type="button"
                             >
-                              <span className="text-sm font-medium">{cat.name}</span>
+                              <span className="text-sm font-medium flex items-center gap-2">
+                                {cat.order !== undefined && (
+                                  <span className="text-[10px] font-mono font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                    #{cat.order}
+                                  </span>
+                                )}
+                                {cat.name}
+                              </span>
                               {field.value === cat.id && (
                                 <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
                               )}
