@@ -183,46 +183,50 @@ export default function AdminJoinProviderSettingsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link href="/join-provider" target="_blank">
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full sm:w-auto">
+          {/* Above on Mobile: Preview Button */}
+          <Link href="/join-provider" target="_blank" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 text-xs font-semibold h-9">
               <ExternalLink className="h-4 w-4" />
               <span>Preview Live Page</span>
             </Button>
           </Link>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-destructive hover:bg-destructive/10">
-                <RotateCcw className="h-4 w-4" />
-                <span>Reset Defaults</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reset Page to Factory Defaults?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will overwrite all custom headlines, descriptions, and FAQs on the /join-provider page with the default SEO copy.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleReset} className="bg-destructive hover:bg-destructive/90 text-white">
-                  {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Reset Everything"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {/* Below on Mobile: Reset Defaults & Save Changes side by side */}
+          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 text-xs text-destructive hover:bg-destructive/10 border-destructive/20 h-9">
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Reset Defaults</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset Page to Factory Defaults?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will overwrite all custom headlines, descriptions, and FAQs on the /join-provider page with the default SEO copy.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleReset} className="bg-destructive hover:bg-destructive/90 text-white">
+                    {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, Reset Everything"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving} 
-            size="sm"
-            className="gap-1.5 text-xs font-bold bg-primary text-white shadow-md"
-          >
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            <span>Save Changes</span>
-          </Button>
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving} 
+              size="sm"
+              className="w-full sm:w-auto gap-1.5 text-xs font-bold bg-primary text-white shadow-md h-9"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <span>Save Changes</span>
+            </Button>
+          </div>
         </div>
       </div>
 
