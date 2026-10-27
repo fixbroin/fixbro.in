@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { XIcon, Users, ChevronLeft, Minimize2, Maximize2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { XIcon, Users, ChevronLeft, Minimize2, Maximize2, ShieldCheck, UserCircle } from 'lucide-react';
 import AdminUserListForChat from './AdminUserListForChat';
 import AdminChatMessageArea from './AdminChatMessageArea';
 import type { FirestoreUser } from '@/types/firestore';
@@ -109,22 +110,46 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
           {isMobile ? (
             /* Mobile View Layout */
             <div className="flex flex-col h-full w-full">
-              <header className="p-3 border-b flex-shrink-0 flex items-center justify-between bg-card">
-                <div className="flex items-center space-x-2">
+              <header className="px-3 py-2.5 border-b flex-shrink-0 flex items-center justify-between bg-card gap-2">
+                <div className="flex items-center space-x-2 min-w-0 flex-1">
                   {selectedChatUser ? (
-                    <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-8 w-8 rounded-full">
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => setSelectedChatUser(null)} className="h-8 w-8 rounded-full shrink-0 -ml-1">
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      <div className="relative shrink-0">
+                        <Avatar className="h-8 w-8 border border-primary/20">
+                          <AvatarImage src={selectedChatUser.photoURL || undefined} alt={selectedChatUser.displayName || selectedChatUser.email || ""} />
+                          <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                            {selectedChatUser.displayName ? selectedChatUser.displayName.charAt(0).toUpperCase() : <UserCircle size={16}/>}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-green-500 border border-background rounded-full" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1">
+                          <h2 className="text-sm font-bold truncate max-w-[150px]">
+                            {selectedChatUser.displayName || selectedChatUser.email || 'Chat'}
+                          </h2>
+                          <ShieldCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                          {selectedChatUser.email}
+                        </p>
+                      </div>
+                    </>
                   ) : (
-                    <div className="bg-primary/10 p-1.5 rounded-lg">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
+                    <>
+                      <div className="bg-primary/10 p-1.5 rounded-lg shrink-0">
+                        <Users className="h-5 w-5 text-primary" />
+                      </div>
+                      <h2 className="text-base font-semibold truncate">
+                        Admin Messages
+                      </h2>
+                    </>
                   )}
-                  <h2 className="text-base font-semibold truncate max-w-[200px]">
-                    {selectedChatUser ? (selectedChatUser.displayName || 'Chat') : "Admin Messages"}
-                  </h2>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
+                <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full shrink-0">
                   <XIcon className="h-5 w-5" />
                 </Button>
               </header>

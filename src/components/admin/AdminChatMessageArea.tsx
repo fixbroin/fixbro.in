@@ -417,9 +417,10 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
   return (
     <div className="h-full flex flex-col bg-background relative">
-      <header className="p-4 border-b bg-card/50 backdrop-blur-md sticky top-0 z-20 shrink-0 cursor-pointer" onClick={() => inputRef.current?.blur()}>
-        <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+      <header className="px-3 py-2 md:p-4 border-b bg-card/50 backdrop-blur-md sticky top-0 z-20 shrink-0 cursor-pointer" onClick={() => inputRef.current?.blur()}>
+        <div className="flex items-center justify-between gap-2">
+            {/* Desktop header: Avatar + Name + Email */}
+            <div className="hidden md:flex items-center space-x-3">
               <div className="relative">
                 <Avatar className="h-10 w-10 border-2 border-primary/20">
                     <AvatarImage src={selectedUser.photoURL || undefined} alt={selectedUser.displayName || selectedUser.email || ""} />
@@ -445,13 +446,29 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
               </div>
             </div>
 
-            <div className="flex items-center space-x-2 md:space-x-4">
+            {/* Mobile toolbar left side: Live typing indicator or status */}
+            <div className="flex md:hidden items-center min-w-0 flex-1">
+              {isUserTyping ? (
+                <p className="text-[11px] text-primary font-bold tracking-wider flex items-center animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary mr-1.5 animate-ping" />
+                  typing...
+                </p>
+              ) : (
+                <span className="text-[11px] text-muted-foreground font-medium truncate flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                  Live Chat
+                </span>
+              )}
+            </div>
+
+            {/* Controls: AI Support Toggle + Delete Button (Neatly spaced, zero overflow!) */}
+            <div className="flex items-center space-x-1.5 md:space-x-4 shrink-0">
               <div className={cn(
-                "flex items-center space-x-2 px-3 py-1.5 rounded-full border transition-all duration-300",
+                "flex items-center space-x-1.5 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border transition-all duration-300",
                 isAiActive ? "bg-primary/10 border-primary/30" : "bg-muted/50 border-muted-foreground/20"
               )}>
-                <Bot className={cn("h-4 w-4", isAiActive ? "text-primary animate-bounce" : "text-muted-foreground")} />
-                <Label htmlFor="ai-toggle" className="text-[10px] font-bold cursor-pointer select-none uppercase tracking-wider">AI Support</Label>
+                <Bot className={cn("h-3.5 w-3.5", isAiActive ? "text-primary animate-bounce" : "text-muted-foreground")} />
+                <Label htmlFor="ai-toggle" className="text-[10px] font-bold cursor-pointer select-none uppercase tracking-wider whitespace-nowrap">AI Support</Label>
                 <Switch 
                   id="ai-toggle" 
                   checked={isAiActive} 
@@ -463,7 +480,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
               <AlertDialog>
               <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full shrink-0" disabled={isClearingChat || messages.length === 0}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full shrink-0" disabled={isClearingChat || messages.length === 0} title="Clear Chat">
                     {isClearingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
                   </Button>
               </AlertDialogTrigger>
