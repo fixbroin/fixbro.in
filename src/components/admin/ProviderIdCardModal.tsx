@@ -42,6 +42,8 @@ interface ProviderIdCardModalProps {
   signatoryName?: string;
   helplinePhone?: string;
   disclaimerText?: string;
+  validityYears?: number;
+  validityMonths?: number;
 }
 
 export default function ProviderIdCardModal({
@@ -52,6 +54,8 @@ export default function ProviderIdCardModal({
   signatoryName = "Authorized Signatory - FixBro",
   helplinePhone = "+91 8000 123 456",
   disclaimerText = "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.",
+  validityYears = 2,
+  validityMonths = 0,
 }: ProviderIdCardModalProps) {
   const { toast } = useToast();
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
@@ -70,12 +74,16 @@ export default function ProviderIdCardModal({
   const issueDate = provider.idCardUnlockedAt || provider.idCardGeneratedAt ? new Date(provider.idCardUnlockedAt || provider.idCardGeneratedAt!) : new Date();
   const issueDateStr = `${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
   
+  const vYears = Number(validityYears ?? 0);
+  const vMonths = Number(validityMonths ?? 0);
+  const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+
   let validThruDate: Date;
   if (provider.idCardExpiresAt) {
     validThruDate = new Date(provider.idCardExpiresAt);
   } else {
-    validThruDate = new Date(issueDate);
-    validThruDate.setFullYear(validThruDate.getFullYear() + 2);
+    validThruDate = new Date(issueDate.getTime());
+    validThruDate.setMonth(validThruDate.getMonth() + totalMonths);
   }
   const validThruStr = `${String(validThruDate.getMonth() + 1).padStart(2, '0')}/${validThruDate.getFullYear()}`;
 
@@ -94,6 +102,7 @@ export default function ProviderIdCardModal({
     dob: provider.dob,
     idCardNumber: idNumber,
     profilePhotoUrl: provider.profilePhotoUrl,
+    signatureUrl: provider.signatureUrl,
     residentialAddress: provider.residentialAddress || provider.workAreaAddress || 'Address on record',
     mobileNumber: provider.mobileNumber || '',
     email: provider.email || '',

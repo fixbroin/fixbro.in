@@ -27,8 +27,8 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
       return {
         isIdCardEnabled: data.isIdCardEnabled !== false,
         downloadFee: Number(data.downloadFee ?? DEFAULT_ID_CARD_SETTINGS.downloadFee),
-        validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
-        validityMonths: Number(data.validityMonths ?? DEFAULT_ID_CARD_SETTINGS.validityMonths),
+        validityYears: typeof data.validityYears === 'number' ? data.validityYears : DEFAULT_ID_CARD_SETTINGS.validityYears,
+        validityMonths: typeof data.validityMonths === 'number' ? data.validityMonths : DEFAULT_ID_CARD_SETTINGS.validityMonths,
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
@@ -48,8 +48,8 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
       return {
         isIdCardEnabled: data.isIdCardEnabled !== false,
         downloadFee: Number(data.downloadFee ?? DEFAULT_ID_CARD_SETTINGS.downloadFee),
-        validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
-        validityMonths: Number(data.validityMonths ?? DEFAULT_ID_CARD_SETTINGS.validityMonths),
+        validityYears: typeof data.validityYears === 'number' ? data.validityYears : DEFAULT_ID_CARD_SETTINGS.validityYears,
+        validityMonths: typeof data.validityMonths === 'number' ? data.validityMonths : DEFAULT_ID_CARD_SETTINGS.validityMonths,
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
@@ -77,12 +77,12 @@ export async function saveProviderIdCardSettingsAction(
   settings: ProviderIdCardSettings
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const vYears = Math.max(0, Number(settings.validityYears ?? 2));
-    const vMonths = Math.min(11, Math.max(0, Number(settings.validityMonths ?? 0)));
+    const vYears = typeof settings.validityYears === 'number' ? Math.max(0, settings.validityYears) : 2;
+    const vMonths = typeof settings.validityMonths === 'number' ? Math.min(11, Math.max(0, settings.validityMonths)) : 0;
     const cleanData: Record<string, any> = {
       isIdCardEnabled: Boolean(settings.isIdCardEnabled),
       downloadFee: Math.max(0, Number(settings.downloadFee || 0)),
-      validityYears: (vYears === 0 && vMonths === 0) ? 1 : vYears,
+      validityYears: (vYears === 0 && vMonths === 0) ? 2 : vYears,
       validityMonths: vMonths,
       signatoryName: String(settings.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName).trim(),
       helplineNumber: String(settings.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber).trim(),
@@ -185,11 +185,19 @@ export async function recordIdCardGenerationAction(
     if (!snap.exists) return { success: false, message: "Application not found" };
 
     const data = snap.data() as ProviderApplication;
+    const settings = await getProviderIdCardSettingsAction();
     const { idCardNumber, idCardSeq } = await assignSequentialIdCardNumber(providerId);
+
+    const vYears = Number(settings.validityYears || 0);
+    const vMonths = Number(settings.validityMonths || 0);
+    const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+    const expDate = new Date();
+    expDate.setMonth(expDate.getMonth() + totalMonths);
 
     const updatePayload: Record<string, any> = {
       idCardGenerated: true,
       idCardGeneratedAt: data.idCardGeneratedAt || Timestamp.now(),
+      idCardExpiresAt: data.idCardExpiresAt || Timestamp.fromDate(expDate),
       idCardNumber,
       idCardSeq,
       updatedAt: Timestamp.now(),
@@ -421,6 +429,7 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
           mobileNumber: data.mobileNumber ? String(data.mobileNumber) : undefined,
           email: data.email ? String(data.email) : undefined,
           profilePhotoUrl: data.profilePhotoUrl ? String(data.profilePhotoUrl) : undefined,
+          signatureUrl: data.signatureUrl ? String(data.signatureUrl) : undefined,
           workCategoryName: data.workCategoryName ? String(data.workCategoryName) : undefined,
           skillLevelLabel: data.skillLevelLabel ? String(data.skillLevelLabel) : undefined,
           workAreaAddress: data.workAreaAddress ? String(data.workAreaAddress) : undefined,
@@ -528,16 +537,13 @@ export async function getPublicProviderVerificationAction(idOrNumber: string): P
     const issueDate = new Date(issueMillis);
     const issueDateStr = `${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
 
-    // Calculate expiry date
-    let expiryMillis = getTimestampMillis(targetDoc.idCardExpiresAt);
-    if (!expiryMillis) {
-      const vYears = Number(settings.validityYears || 0);
-      const vMonths = Number(settings.validityMonths || 0);
-      const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
-      const expDate = new Date(issueMillis);
-      expDate.setMonth(expDate.getMonth() + totalMonths);
-      expiryMillis = expDate.getTime();
-    }
+    // Calculate expiry date based on current admin validity setting (months & years)
+    const vYears = Number(settings.validityYears || 0);
+    const vMonths = Number(settings.validityMonths || 0);
+    const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+    const expDate = new Date(issueMillis);
+    expDate.setMonth(expDate.getMonth() + totalMonths);
+    const expiryMillis = expDate.getTime();
     const expiryDate = new Date(expiryMillis);
     const validThruStr = `${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 

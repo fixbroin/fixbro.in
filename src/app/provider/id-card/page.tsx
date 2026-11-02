@@ -169,8 +169,8 @@ export default function ProviderIdCardPage() {
   const profilePhotoUrl = providerApp?.profilePhotoUrl || userProfile?.photoURL || '';
 
   // Dates & Validity Period (Years & Months)
-  const vYears = Number(idCardSettings.validityYears || 0);
-  const vMonths = Number(idCardSettings.validityMonths || 0);
+  const vYears = Number(idCardSettings.validityYears ?? 0);
+  const vMonths = Number(idCardSettings.validityMonths ?? 0);
   const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
 
   const issueDateMillis = (providerApp as any)?.idCardUnlockedAt || (providerApp as any)?.idCardGeneratedAt
@@ -179,17 +179,9 @@ export default function ProviderIdCardPage() {
   const issueDateObj = new Date(issueDateMillis);
   const issueDateStr = `${String(issueDateObj.getMonth() + 1).padStart(2, '0')}/${issueDateObj.getFullYear()}`;
 
-  let expiryDateObj: Date;
-  if ((providerApp as any)?.idCardExpiresAt) {
-    const expMillis = getTimestampMillis((providerApp as any).idCardExpiresAt);
-    expiryDateObj = expMillis ? new Date(expMillis) : new Date(issueDateObj.getTime());
-    if (!expMillis) {
-      expiryDateObj.setMonth(expiryDateObj.getMonth() + totalMonths);
-    }
-  } else {
-    expiryDateObj = new Date(issueDateObj.getTime());
-    expiryDateObj.setMonth(expiryDateObj.getMonth() + totalMonths);
-  }
+  // Dynamically calculate validThru based on current admin validity setting (months & years)
+  const expiryDateObj = new Date(issueDateObj.getTime());
+  expiryDateObj.setMonth(expiryDateObj.getMonth() + totalMonths);
   const validThruStr = `${String(expiryDateObj.getMonth() + 1).padStart(2, '0')}/${expiryDateObj.getFullYear()}`;
 
   const isCardExpired = Boolean((providerApp as any)?.idCardExpiresAt && Date.now() > (getTimestampMillis((providerApp as any).idCardExpiresAt) || 0));
@@ -217,6 +209,7 @@ export default function ProviderIdCardPage() {
     dob: providerApp?.dob,
     idCardNumber: uniqueIdNumber,
     profilePhotoUrl,
+    signatureUrl: providerApp?.signatureUrl || (providerApp as any)?.signatureImage || null,
     residentialAddress: providerApp?.address || providerApp?.workAreaAddress || 'Address on record',
     mobileNumber: providerApp?.mobileNumber || userProfile?.mobileNumber || providerUser?.phoneNumber || '',
     email: providerApp?.email || userProfile?.email || providerUser?.email || '',

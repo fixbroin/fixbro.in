@@ -8,6 +8,7 @@ export interface IdCardRenderOptions {
   dob?: string;
   idCardNumber: string;
   profilePhotoUrl?: string | null;
+  signatureUrl?: string | null;
   residentialAddress?: string;
   mobileNumber?: string;
   email?: string;
@@ -30,6 +31,88 @@ export const loadCanvasImage = (src: string): Promise<HTMLImageElement> => {
     img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
     img.src = src;
   });
+};
+
+/**
+ * Automatically remove paper background and extract clean signature ink from an uploaded image.
+ * Uses adaptive thresholding and alpha mapping.
+ */
+export const extractSignatureCanvas = async (
+  src: string
+): Promise<HTMLCanvasElement | null> => {
+  try {
+    const img = await loadCanvasImage(src);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, img.width, img.height);
+    const data = imgData.data;
+
+    let minX = img.width;
+    let minY = img.height;
+    let maxX = 0;
+    let maxY = 0;
+    let hasInk = false;
+
+    // Dark Navy ink color (#1E3A8A)
+    const inkR = 30;
+    const inkG = 58;
+    const inkB = 138;
+    const threshold = 195;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      const x = (i / 4) % img.width;
+      const y = Math.floor((i / 4) / img.width);
+
+      if (brightness > threshold) {
+        // Transparent paper background
+        data[i + 3] = 0;
+      } else {
+        // Pen ink pixel
+        hasInk = true;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+
+        const alpha = Math.min(255, Math.max(0, Math.round(((threshold - brightness) / threshold) * 255 * 1.6)));
+        data[i] = inkR;
+        data[i + 1] = inkG;
+        data[i + 2] = inkB;
+        data[i + 3] = alpha;
+      }
+    }
+
+    if (!hasInk || maxX <= minX || maxY <= minY) {
+      return null;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // Crop tightly to bounding box of signature ink
+    const cropW = maxX - minX + 1;
+    const cropH = maxY - minY + 1;
+    const cropped = document.createElement('canvas');
+    cropped.width = cropW;
+    cropped.height = cropH;
+    const cropCtx = cropped.getContext('2d');
+    if (!cropCtx) return canvas;
+
+    cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+    return cropped;
+  } catch (err) {
+    console.warn("Could not process signature image:", err);
+    return null;
+  }
 };
 
 /**
@@ -340,67 +423,68 @@ export const renderFrontCardCanvas = async (
   ctx.font = 'bold 21px "Segoe UI", Roboto, sans-serif';
   ctx.fillText(`VALID THRU: ${validThruStr}`, textX + 270, 355);
 
-  // 6. RED BOXED DISCLAIMER (Generalized, no FixBro mention)
-  let cleanDisclaimer = options.disclaimerText || 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
-  if (cleanDisclaimer.includes('FixBro') || cleanDisclaimer.includes('Fixbro') || cleanDisclaimer.includes('private platform')) {
-    cleanDisclaimer = 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
-  }
-
-  const boxX = textX;
-  const boxY = 376;
-  const boxW = detailsWidth;
-  const boxH = 64;
-
-  ctx.strokeStyle = '#EF4444';
-  ctx.lineWidth = 1.5;
-  ctx.fillStyle = '#FEF2F2';
-  ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-  ctx.fill();
-  ctx.stroke();
-
+  // 6. Simple Government Disclaimer (Clean, no red box, like back side)
+  const noticeY = 392;
   ctx.fillStyle = '#991B1B';
-  ctx.font = 'bold 13.5px "Segoe UI", Roboto, sans-serif';
-  wrapCanvasText(ctx, `NOTICE: ${cleanDisclaimer}`, boxX + 12, boxY + 22, boxW - 24, 20, 2);
+  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("This ID is not issued by Government.", textX, noticeY);
+  ctx.fillStyle = '#DC2626';
+  ctx.font = 'bold 14.5px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।", textX, noticeY + 24);
 
-  // 7. CARDHOLDER SIGNATURE & SECURITY NOTE (Below Notice)
-  const sigY = 448;
+  // 7. CARDHOLDER SIGNATURE (Moved downside with real signature extraction)
   const titleCaseName = providerName
     .toLowerCase()
     .split(' ')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
-  // Left side under notice: Partner verification assurance
-  ctx.fillStyle = '#0284C7';
-  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("Certified Skilled Partner", boxX, sigY + 22);
-  ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("Verified Work Credential • Non-Transferable", boxX, sigY + 44);
+  const sigRightX = textX + detailsWidth - 8;
+  const lineW = 230;
 
-  // Right side: Signature in cursive script font
-  const sigRightX = boxX + boxW - 8;
-  ctx.textAlign = 'right';
+  // Real Uploaded Signature with automatic paper-background removal
+  let hasDrawnSignature = false;
+  if (options.signatureUrl) {
+    try {
+      const sigCanvas = await extractSignatureCanvas(options.signatureUrl);
+      if (sigCanvas) {
+        const maxSigW = 210;
+        const maxSigH = 58;
+        const sigRatio = Math.min(maxSigW / sigCanvas.width, maxSigH / sigCanvas.height);
+        const drawSigW = sigCanvas.width * sigRatio;
+        const drawSigH = sigCanvas.height * sigRatio;
+        const drawSigX = sigRightX - drawSigW - (lineW - drawSigW) / 2;
+        const drawSigY = 502 - drawSigH;
+        ctx.drawImage(sigCanvas, drawSigX, drawSigY, drawSigW, drawSigH);
+        hasDrawnSignature = true;
+      }
+    } catch (e) {
+      console.warn("Signature extraction fallback:", e);
+    }
+  }
 
-  ctx.fillStyle = '#1E3A8A';
-  ctx.font = 'italic 32px "Brush Script MT", "Caveat", "Segoe Script", cursive, Georgia, serif';
-  ctx.fillText(titleCaseName, sigRightX, sigY + 22);
+  // Fallback to cursive digital script if no uploaded signature
+  if (!hasDrawnSignature) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#1E3A8A';
+    ctx.font = 'italic 32px "Brush Script MT", "Caveat", "Segoe Script", cursive, Georgia, serif';
+    ctx.fillText(titleCaseName, sigRightX - 10, 495);
+    ctx.textAlign = 'start';
+  }
 
   // Signature line
-  const nameMetrics = ctx.measureText(titleCaseName);
-  const lineW = Math.max(200, nameMetrics.width + 20);
   ctx.strokeStyle = '#94A3B8';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(sigRightX - lineW, sigY + 30);
-  ctx.lineTo(sigRightX, sigY + 30);
+  ctx.moveTo(sigRightX - lineW, 506);
+  ctx.lineTo(sigRightX, 506);
   ctx.stroke();
 
   // Signature label
+  ctx.textAlign = 'right';
   ctx.fillStyle = '#64748B';
   ctx.font = 'bold 12.5px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("हस्ताक्षर / Cardholder Signature", sigRightX, sigY + 48);
+  ctx.fillText("हस्ताक्षर / Cardholder Signature", sigRightX, 524);
   ctx.textAlign = 'start';
 
   // 8. BOTTOM: UNIQUE ID NUMBER (Clean divider and large monospace number)
@@ -482,20 +566,20 @@ export const renderBackCardCanvas = async (
   ctx.fillText(cardTitle, w / 2, 73);
   ctx.textAlign = 'start';
 
-  // RIGHT COLUMN: Large Verification QR Code (Positioned first to define left column width)
-  const qrSize = 320;
-  const qrX = w - 35 - qrSize; // 657
-  const qrY = 110;
+  // RIGHT COLUMN: Large Verification QR Code (Vertically centered, no text below)
+  const qrSize = 350;
+  const qrX = w - 35 - qrSize; // 627
+  const qrY = 143; // Vertically centered between header (98) and bottom divider (538)
 
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#0F172A';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.roundRect(qrX, qrY, qrSize, qrSize, 12);
+  ctx.roundRect(qrX, qrY, qrSize, qrSize, 14);
   ctx.fill();
   ctx.stroke();
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=330x330&data=${encodeURIComponent(verifyUrl)}`;
   try {
     const qrImg = await loadCanvasImage(qrApiUrl);
     ctx.drawImage(qrImg, qrX + 12, qrY + 12, qrSize - 24, qrSize - 24);
@@ -508,23 +592,9 @@ export const renderBackCardCanvas = async (
     ctx.fillText("SCAN TO VERIFY", qrX + 65, qrY + qrSize / 2);
   }
 
-  // QR Instructions below QR box
-  const qrCenterX = qrX + qrSize / 2;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("SCAN WITH SMARTPHONE TO VERIFY", qrCenterX, qrY + qrSize + 28);
-  ctx.fillStyle = '#475569';
-  ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("क्यूआर कोड स्कैन करके सत्यापन करें", qrCenterX, qrY + qrSize + 50);
-  ctx.fillStyle = '#0284C7';
-  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("Official Digital Verification Portal", qrCenterX, qrY + qrSize + 72);
-  ctx.textAlign = 'start';
-
   // LEFT COLUMN: Residential Address, Mobile, Email & Flag
   const addrX = 35;
-  const maxAddrWidth = qrX - addrX - 25; // ~597px
+  const maxAddrWidth = qrX - addrX - 25; // ~567px
   let curY = 136;
 
   ctx.fillStyle = '#0F172A';
@@ -585,13 +655,10 @@ export const renderBackCardCanvas = async (
   ctx.fillText("This ID is not issued by Government.", discX, flagY + 28);
   ctx.fillStyle = '#DC2626';
   ctx.font = 'bold 14.5px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।", discX, flagY + 52);
+  ctx.fillText("यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।", discX, flagY + 54);
   ctx.fillStyle = '#475569';
-  ctx.font = 'bold 13.5px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("Private Skilled Professional Work ID Card", discX, flagY + 74);
-  ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("FixBro Platform Partner Identification", discX, flagY + 92);
+  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("Private Skilled Professional Work ID Card", discX, flagY + 80);
 
   // BOTTOM: UNIQUE ID NUMBER (Clean divider and large monospace number)
   ctx.strokeStyle = '#CBD5E1';

@@ -103,6 +103,7 @@ export interface ProviderIdCardRecord {
   mobileNumber?: string;
   email?: string;
   profilePhotoUrl?: string;
+  signatureUrl?: string;
   workCategoryName?: string;
   skillLevelLabel?: string;
   workAreaAddress?: string;

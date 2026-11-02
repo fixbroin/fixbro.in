@@ -113,27 +113,29 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                 <span>VALID THRU: <strong className="text-emerald-700">{validThruStr}</strong></span>
               </div>
 
-              {/* Notice Disclaimer Box (Generalized, multiline 2-line wrap) */}
-              <div className="p-1 rounded border border-red-300 bg-red-50 text-[7px] text-red-900 leading-snug break-words">
-                <span className="font-bold">NOTICE: </span>
-                {disclaimer}
+              {/* Simple Government Disclaimer (Clean, no red box) */}
+              <div className="text-[7.5px] text-red-800 font-bold leading-tight">
+                This ID is not issued by Government.
+                <div className="text-[6.5px] text-red-600 font-normal">यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।</div>
               </div>
 
-              {/* Assurance note on left & Cardholder Signature on right */}
-              <div className="flex items-end justify-between pt-0.5">
-                <div className="text-[7.5px] font-bold text-sky-700 leading-tight">
-                  Certified Skilled Partner
-                  <div className="text-[6.5px] text-slate-500 font-normal">Work Credential • Non-Transferable</div>
-                </div>
-                <div className="flex flex-col items-end pr-1">
+              {/* Cardholder Signature (Moved downside with uploaded signature support) */}
+              <div className="flex flex-col items-end pt-1 pr-1">
+                {data.signatureUrl ? (
+                  <img 
+                    src={data.signatureUrl} 
+                    alt="Signature" 
+                    className="h-7 max-w-[120px] object-contain mix-blend-multiply" 
+                  />
+                ) : (
                   <span className="font-serif italic font-bold text-[12px] text-blue-900 tracking-wider leading-none">
                     {titleCaseName}
                   </span>
-                  <div className="w-24 h-[1px] bg-slate-400 mt-0.5" />
-                  <span className="text-[5.5px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
-                    हस्ताक्षर / Cardholder Signature
-                  </span>
-                </div>
+                )}
+                <div className="w-24 h-[1px] bg-slate-400 mt-0.5" />
+                <span className="text-[5.5px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
+                  हस्ताक्षर / Cardholder Signature
+                </span>
               </div>
             </div>
           </div>
@@ -203,8 +205,8 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
               </div>
             </div>
 
-            {/* Right Column: Prominent QR Code */}
-            <div className="flex flex-col items-center justify-center shrink-0 w-32">
+            {/* Right Column: Prominent QR Code (Vertically centered, no text below) */}
+            <div className="flex flex-col items-center justify-center shrink-0 w-32 my-auto">
               <div className="w-28 h-28 p-1.5 bg-white border-2 border-slate-700 rounded-xl shadow-xs flex items-center justify-center">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`}
@@ -215,12 +217,6 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                   }}
                 />
               </div>
-              <span className="text-[7px] text-slate-700 font-bold mt-1 text-center leading-tight">
-                SCAN WITH SMARTPHONE TO VERIFY
-              </span>
-              <span className="text-[6px] text-slate-500 text-center leading-none">
-                क्यूआर कोड स्कैन करके सत्यापन करें
-              </span>
             </div>
           </div>
 

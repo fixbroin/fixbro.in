@@ -598,6 +598,8 @@ export default function AdminProviderIdCardsPage() {
           signatoryName={settings.signatoryName}
           helplinePhone={settings.helplineNumber}
           disclaimerText={settings.disclaimerText}
+          validityYears={settings.validityYears}
+          validityMonths={settings.validityMonths}
         />
 
         {/* Delete / Reset ID Card Alert Dialog */}
