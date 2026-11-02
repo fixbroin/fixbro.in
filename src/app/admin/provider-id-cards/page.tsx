@@ -37,6 +37,7 @@ import {
   getProvidersWithIdCardsAction, 
   getProviderIdCardSettingsAction,
   deleteOrResetProviderIdCardAction,
+  recordIdCardGenerationAction,
 } from "@/app/actions/providerIdCardActions";
 import {
   AlertDialog,
@@ -125,9 +126,22 @@ export default function AdminProviderIdCardsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Open modal
-  const handleViewCard = (provider: ProviderIdCardRecord) => {
-    setSelectedProvider(provider);
+  // Open modal & auto-assign next sequential number if viewing an ungenerated provider
+  const handleViewCard = async (provider: ProviderIdCardRecord) => {
+    let currentProvider = { ...provider };
+    if (!currentProvider.idCardGenerated || !currentProvider.idCardNumber) {
+      try {
+        const res = await recordIdCardGenerationAction(currentProvider.providerId);
+        if (res.success && res.idCardNumber) {
+          currentProvider.idCardNumber = res.idCardNumber;
+          currentProvider.idCardGenerated = true;
+          await loadData();
+        }
+      } catch (err) {
+        console.error("Auto-assign sequential ID failed:", err);
+      }
+    }
+    setSelectedProvider(currentProvider);
     setIsModalOpen(true);
   };
 
@@ -447,22 +461,28 @@ export default function AdminProviderIdCardsPage() {
                         {/* Unique ID Number */}
                         <TableCell className="py-3">
                           <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs font-bold text-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                                {r.idCardNumber}
-                              </span>
-                              <button
-                                onClick={() => handleCopy(r.idCardNumber, 'ID Card Number')}
-                                className="text-muted-foreground hover:text-foreground transition-colors p-1"
-                                title="Copy Unique ID Number"
-                              >
-                                {copiedId === r.idCardNumber ? (
-                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                                ) : (
-                                  <Copy className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                            </div>
+                            {r.idCardGenerated && r.idCardNumber ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-xs font-bold text-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                                  {r.idCardNumber}
+                                </span>
+                                <button
+                                  onClick={() => handleCopy(r.idCardNumber!, 'ID Card Number')}
+                                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                                  title="Copy Unique ID Number"
+                                >
+                                  {copiedId === r.idCardNumber ? (
+                                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px] text-muted-foreground font-medium border-dashed bg-slate-50 dark:bg-slate-900">
+                                Not Generated Yet
+                              </Badge>
+                            )}
                             <div className="text-[10px] text-muted-foreground">
                               {r.gender || 'Male'} • {r.skillLevelLabel || 'Skilled'}
                             </div>

@@ -420,8 +420,8 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
             }))
           : [];
 
-        // Use assigned ID number if already generated, otherwise preview starting sequence
-        const idCardNumber = data.idCardNumber || formatIdNumber(settings.idNumberStartingSeq, settings.idNumberStartingSeq, settings.idNumberPrefix);
+        // Only set assigned ID number if already generated in database
+        const idCardNumber = data.idCardNumber ? String(data.idCardNumber) : undefined;
 
         records.push({
           providerId: docSnap.id,

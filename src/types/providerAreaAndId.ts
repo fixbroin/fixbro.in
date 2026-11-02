@@ -111,7 +111,7 @@ export interface ProviderIdCardRecord {
   gender?: string;
   dob?: string;
   age?: number;
-  idCardNumber: string;
+  idCardNumber?: string;
   idCardSeq?: number;
   technicianId: string;
   status: string;
