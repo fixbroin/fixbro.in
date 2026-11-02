@@ -9,6 +9,7 @@ export interface ProviderIdCardSettings {
   helplineNumber: string;
   idNumberPrefix: string;
   idNumberStartingSeq: number;
+  lastAssignedSeq?: number;
   disclaimerText: string;
 }
 
@@ -47,40 +48,48 @@ export interface PendingLocationChangeItem {
 }
 
 /**
- * Format a unique ID card number respecting custom starting sequence and prefix.
- * e.g., if startingSeq is 1001 and prefix is FIX -> "FIX 1001"
- * e.g., if startingSeq is 361707601001 -> "3617 0760 1001"
+ * Format a sequential ID card number respecting custom starting sequence length and prefix.
+ * e.g., if startingSeq is 1001, seq is 1001, prefix is FIX -> "FIX 1001"
+ * e.g., if seq is 1002, prefix is FIX -> "FIX 1002"
+ * e.g., if startingSeq is 361707601001 and seq is 361707601001 -> "3617 0760 1001"
+ * e.g., if seq is 361707601002 -> "3617 0760 1002"
  */
-export function generateUniqueIdCardNumber(
-  uid: string,
+export function formatIdNumber(
+  seq: number,
   startingSeq: number = 1001,
   prefix?: string
 ): string {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i++) {
-    hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
-  }
-
   const seqStr = String(startingSeq || 1001);
-  const len = seqStr.length;
+  const targetLen = Math.max(seqStr.length, String(seq).length);
   const cleanPrefix = (prefix || '').trim();
-
-  const maxOffset = Math.min(500, Math.max(10, Math.floor(startingSeq * 0.1)));
-  const offset = hash % maxOffset;
-  const rawNum = startingSeq + offset;
-  const numStr = String(rawNum).padStart(len, '0');
+  const numStr = String(seq).padStart(targetLen, '0');
 
   let formattedNum = numStr;
-  if (len >= 12) {
+  if (targetLen >= 12) {
     const d12 = numStr.slice(-12);
     formattedNum = `${d12.slice(0, 4)} ${d12.slice(4, 8)} ${d12.slice(8, 12)}`;
-  } else if (len === 6) {
+  } else if (targetLen === 6) {
     formattedNum = `${numStr.slice(0, 3)} ${numStr.slice(3, 6)}`;
-  } else if (len === 8) {
+  } else if (targetLen === 8) {
     formattedNum = `${numStr.slice(0, 4)} ${numStr.slice(4, 8)}`;
   }
 
   return cleanPrefix ? `${cleanPrefix} ${formattedNum}` : formattedNum;
+}
+
+export function generateUniqueIdCardNumber(
+  seqOrUid: number | string,
+  startingSeq: number = 1001,
+  prefix?: string
+): string {
+  if (typeof seqOrUid === 'number') {
+    return formatIdNumber(seqOrUid, startingSeq, prefix);
+  }
+  const parsed = parseInt(seqOrUid, 10);
+  if (!isNaN(parsed) && parsed >= startingSeq) {
+    return formatIdNumber(parsed, startingSeq, prefix);
+  }
+  return formatIdNumber(startingSeq, startingSeq, prefix);
 }
 
 export function formatTechnicianId(uid: string): string {
@@ -102,6 +111,7 @@ export interface ProviderIdCardRecord {
   dob?: string;
   age?: number;
   idCardNumber: string;
+  idCardSeq?: number;
   technicianId: string;
   status: string;
 

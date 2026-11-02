@@ -16,7 +16,7 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
   const categoryName = (data.categoryName || 'General').toUpperCase();
-  const cardTitle = `INDIAN ${categoryName} ID CARD`;
+  const cardTitle = `INDIAN ${categoryName} WORKER ID CARD`;
   const gender = (data.gender || 'Male').toUpperCase();
   const skillLevel = (data.skillLevelLabel || 'Skilled Professional').toUpperCase();
   const idNumber = data.idCardNumber || '1001';

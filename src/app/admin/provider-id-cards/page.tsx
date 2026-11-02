@@ -607,13 +607,15 @@ export default function AdminProviderIdCardsPage() {
               <AlertDialogTitle className="flex items-center gap-2 text-rose-600">
                 <RotateCcw className="h-5 w-5" /> Reset & Delete Provider ID Card?
               </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2 text-xs">
-                <p>
-                  Are you sure you want to reset the generated ID card for <strong>{providerToReset?.fullName}</strong>?
-                </p>
-                <p>
-                  This will clear their assigned ID card number, purchase status, and download records. The provider will then be able to generate a fresh ID card with your latest sequence and prefix settings.
-                </p>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div>
+                    Are you sure you want to reset the generated ID card for <strong>{providerToReset?.fullName}</strong>?
+                  </div>
+                  <div>
+                    This will clear their assigned ID card number, purchase status, and download records. The provider will then be able to generate a fresh ID card with your latest sequence and prefix settings.
+                  </div>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

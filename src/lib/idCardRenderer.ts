@@ -438,7 +438,7 @@ export const renderBackCardCanvas = async (
   const h = 638;
 
   const categoryName = (options.categoryName || 'General').toUpperCase();
-  const cardTitle = `INDIAN ${categoryName} ID CARD`;
+  const cardTitle = `INDIAN ${categoryName} WORKER ID CARD`;
   const address = options.residentialAddress || 'Address on record with FixBro';
   const idNumber = options.idCardNumber || '1001';
   const verifyUrl = options.verifyUrl || `https://fixbro.in/verify/provider/${idNumber.replace(/\s+/g, '')}`;

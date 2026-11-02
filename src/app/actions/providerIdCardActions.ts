@@ -11,6 +11,7 @@ import {
   DEFAULT_ID_CARD_SETTINGS,
   type ProviderIdCardRecord,
   formatTechnicianId,
+  formatIdNumber,
   generateUniqueIdCardNumber
 } from '@/types/providerAreaAndId';
 import type { ProviderApplication } from '@/types/firestore';
@@ -32,6 +33,7 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
         idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
+        lastAssignedSeq: typeof data.lastAssignedSeq === 'number' ? data.lastAssignedSeq : undefined,
         disclaimerText: String(
           data.disclaimerText && !data.disclaimerText.includes('FixBro') && !data.disclaimerText.includes('Fixbro')
             ? data.disclaimerText
@@ -52,6 +54,7 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
         idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
+        lastAssignedSeq: typeof data.lastAssignedSeq === 'number' ? data.lastAssignedSeq : undefined,
         disclaimerText: String(
           data.disclaimerText && !data.disclaimerText.includes('FixBro') && !data.disclaimerText.includes('Fixbro')
             ? data.disclaimerText
@@ -76,7 +79,7 @@ export async function saveProviderIdCardSettingsAction(
   try {
     const vYears = Math.max(0, Number(settings.validityYears ?? 2));
     const vMonths = Math.min(11, Math.max(0, Number(settings.validityMonths ?? 0)));
-    const cleanData = {
+    const cleanData: Record<string, any> = {
       isIdCardEnabled: Boolean(settings.isIdCardEnabled),
       downloadFee: Math.max(0, Number(settings.downloadFee || 0)),
       validityYears: (vYears === 0 && vMonths === 0) ? 1 : vYears,
@@ -115,8 +118,61 @@ export async function saveProviderIdCardSettingsAction(
 }
 
 /**
+ * Assign the next sequential ID card number (increases 1 by 1 from starting sequence).
+ */
+export async function assignSequentialIdCardNumber(
+  providerId: string
+): Promise<{ idCardNumber: string; idCardSeq: number }> {
+  const docRef = adminDb.collection('providerApplications').doc(providerId);
+  const snap = await docRef.get();
+  const data = snap.exists ? (snap.data() as ProviderApplication) : null;
+
+  const settings = await getProviderIdCardSettingsAction();
+  const startSeq = Number(settings.idNumberStartingSeq || 1001);
+  const prefix = settings.idNumberPrefix || '';
+
+  // 1. If provider already has an assigned sequence >= startSeq, preserve it
+  if (data?.idCardNumber && typeof data?.idCardSeq === 'number' && data.idCardSeq >= startSeq) {
+    return {
+      idCardNumber: data.idCardNumber,
+      idCardSeq: data.idCardSeq,
+    };
+  }
+
+  // 2. Scan all existing applications to find current highest assigned sequence
+  const allAppsSnap = await adminDb.collection('providerApplications').get();
+  let maxSeq = startSeq - 1;
+
+  allAppsSnap.forEach((docSnap) => {
+    if (docSnap.id === providerId) return;
+    const appData = docSnap.data();
+    if (typeof appData.idCardSeq === 'number' && appData.idCardSeq > maxSeq) {
+      maxSeq = appData.idCardSeq;
+    }
+  });
+
+  if (typeof settings.lastAssignedSeq === 'number' && settings.lastAssignedSeq > maxSeq) {
+    maxSeq = settings.lastAssignedSeq;
+  }
+
+  const nextSeq = Math.max(startSeq, maxSeq + 1);
+  const assignedNumber = formatIdNumber(nextSeq, startSeq, prefix);
+
+  // Update lastAssignedSeq in settings
+  await adminDb.collection('appConfiguration').doc('provider_id_card').set({
+    lastAssignedSeq: nextSeq,
+    updatedAt: Timestamp.now(),
+  }, { merge: true });
+
+  return {
+    idCardNumber: assignedNumber,
+    idCardSeq: nextSeq,
+  };
+}
+
+/**
  * Record when a verified provider views/generates their ID card for the first time.
- * Also assigns or updates a unique ID card number according to current admin settings.
+ * Also assigns or updates a unique ID card number sequentially.
  */
 export async function recordIdCardGenerationAction(
   providerId: string
@@ -129,13 +185,13 @@ export async function recordIdCardGenerationAction(
     if (!snap.exists) return { success: false, message: "Application not found" };
 
     const data = snap.data() as ProviderApplication;
-    const settings = await getProviderIdCardSettingsAction();
-    const assignedNumber = generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+    const { idCardNumber, idCardSeq } = await assignSequentialIdCardNumber(providerId);
 
     const updatePayload: Record<string, any> = {
       idCardGenerated: true,
       idCardGeneratedAt: data.idCardGeneratedAt || Timestamp.now(),
-      idCardNumber: assignedNumber,
+      idCardNumber,
+      idCardSeq,
       updatedAt: Timestamp.now(),
     };
 
@@ -147,7 +203,7 @@ export async function recordIdCardGenerationAction(
     }
 
     revalidatePath('/admin/provider-id-cards');
-    return { success: true, message: "ID card generation recorded", idCardNumber: assignedNumber };
+    return { success: true, message: "ID card generation recorded", idCardNumber };
   } catch (error: any) {
     console.error("Error recording ID card generation:", error);
     return { success: false, message: error.message || "Failed to record generation" };
@@ -165,6 +221,7 @@ export async function deleteOrResetProviderIdCardAction(
 
     const clearPayload: Record<string, any> = {
       idCardNumber: null,
+      idCardSeq: null,
       idCardGenerated: false,
       idCardGeneratedAt: null,
       idCardUnlocked: false,
@@ -213,7 +270,7 @@ export async function unlockProviderIdCardAction(
     const docRef = adminDb.collection('providerApplications').doc(providerId);
     const snap = await docRef.get();
     const data = snap.exists ? (snap.data() as ProviderApplication) : null;
-    const assignedNumber = generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+    const { idCardNumber, idCardSeq } = await assignSequentialIdCardNumber(providerId);
 
     const vYears = Number(settings.validityYears || 0);
     const vMonths = Number(settings.validityMonths || 0);
@@ -227,7 +284,8 @@ export async function unlockProviderIdCardAction(
       idCardExpiresAt: Timestamp.fromDate(expiryDate),
       idCardGenerated: true,
       idCardGeneratedAt: data?.idCardGeneratedAt || Timestamp.now(),
-      idCardNumber: assignedNumber,
+      idCardNumber,
+      idCardSeq,
     };
 
     if (paymentDetails?.razorpay_payment_id) {
@@ -354,8 +412,8 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
             }))
           : [];
 
-        // Format unique ID number according to current settings
-        const idCardNumber = generateUniqueIdCardNumber(docSnap.id, settings.idNumberStartingSeq, settings.idNumberPrefix);
+        // Use assigned ID number if already generated, otherwise preview starting sequence
+        const idCardNumber = data.idCardNumber || formatIdNumber(settings.idNumberStartingSeq, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
         records.push({
           providerId: docSnap.id,
@@ -371,6 +429,7 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
           dob: data.dob ? String(data.dob) : undefined,
           age: data.age ? Number(data.age) : undefined,
           idCardNumber,
+          idCardSeq: typeof data.idCardSeq === 'number' ? data.idCardSeq : undefined,
           technicianId: formatTechnicianId(docSnap.id),
           status: data.status,
           idCardGenerated: isGenerated,
@@ -463,7 +522,7 @@ export async function getPublicProviderVerificationAction(idOrNumber: string): P
     }
 
     const settings = await getProviderIdCardSettingsAction();
-    const assignedNumber = targetDoc.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+    const assignedNumber = targetDoc.idCardNumber || formatIdNumber(settings.idNumberStartingSeq, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
     const issueMillis = getTimestampMillis(targetDoc.idCardUnlockedAt || targetDoc.idCardGeneratedAt || targetDoc.submittedAt || targetDoc.createdAt) || Date.now();
     const issueDate = new Date(issueMillis);

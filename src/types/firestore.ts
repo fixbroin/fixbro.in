@@ -1485,6 +1485,7 @@ export interface ProviderApplication {
 
   // Provider ID Card Generation, Purchase & Download Tracking
   idCardNumber?: string;
+  idCardSeq?: number;
   idCardGenerated?: boolean;
   idCardGeneratedAt?: Timestamp | any;
   idCardUnlocked?: boolean;

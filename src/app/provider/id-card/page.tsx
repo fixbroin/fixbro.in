@@ -48,6 +48,7 @@ import {
 import { 
   type ProviderIdCardSettings, 
   DEFAULT_ID_CARD_SETTINGS,
+  formatIdNumber,
   generateUniqueIdCardNumber 
 } from '@/types/providerAreaAndId';
 import OfficialIdCardView from '@/components/shared/OfficialIdCardView';
@@ -101,7 +102,11 @@ export default function ProviderIdCardPage() {
         const appData = appSnap.data() as ProviderApplication;
         setProviderApp(appData);
         if (appData.status === 'approved' && providerUser?.uid) {
-          recordIdCardGenerationAction(providerUser.uid).catch(console.error);
+          recordIdCardGenerationAction(providerUser.uid).then((res) => {
+            if (res.success && res.idCardNumber) {
+              setProviderApp(prev => prev ? { ...prev, idCardNumber: res.idCardNumber, idCardGenerated: true } : prev);
+            }
+          }).catch(console.error);
         }
       }
       if (userSnap.exists()) {
@@ -196,9 +201,9 @@ export default function ProviderIdCardPage() {
     )
   );
 
-  // Generate unique ID number formatted according to admin settings (e.g. prefix + starting sequence)
-  const uniqueIdNumber = generateUniqueIdCardNumber(
-    providerUser?.uid || '',
+  // Sequential unique ID number formatted according to admin settings (e.g. prefix + sequential number)
+  const uniqueIdNumber = providerApp?.idCardNumber || formatIdNumber(
+    idCardSettings.idNumberStartingSeq,
     idCardSettings.idNumberStartingSeq,
     idCardSettings.idNumberPrefix
   );
