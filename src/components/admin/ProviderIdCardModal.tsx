@@ -51,7 +51,7 @@ export default function ProviderIdCardModal({
   currencySymbol = "₹",
   signatoryName = "Authorized Signatory - FixBro",
   helplinePhone = "+91 8000 123 456",
-  disclaimerText = "This ID card is issued by FixBro Private Platform for verified partner identification. Not a Government of India document.",
+  disclaimerText = "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.",
 }: ProviderIdCardModalProps) {
   const { toast } = useToast();
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
@@ -87,7 +87,9 @@ export default function ProviderIdCardModal({
     gender: provider.gender || 'Male',
     idCardNumber: idNumber,
     profilePhotoUrl: provider.profilePhotoUrl,
-    residentialAddress: provider.residentialAddress || provider.workAreaAddress || 'Address on FixBro file',
+    residentialAddress: provider.residentialAddress || provider.workAreaAddress || 'Address on record',
+    mobileNumber: provider.mobileNumber || '',
+    email: provider.email || '',
     helplinePhone,
     signatoryName,
     issueDateStr,

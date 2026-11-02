@@ -10,6 +10,11 @@ interface OfficialIdCardViewProps {
 
 export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardViewProps) {
   const providerName = (data.providerName || 'AUTHORIZED PARTNER').toUpperCase();
+  const titleCaseName = (data.providerName || 'Authorized Partner')
+    .toLowerCase()
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
   const categoryName = (data.categoryName || 'General').toUpperCase();
   const cardTitle = `INDIAN ${categoryName} ID CARD`;
   const gender = (data.gender || 'Male').toUpperCase();
@@ -17,8 +22,15 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
   const idNumber = data.idCardNumber || '1001';
   const issueDateStr = data.issueDateStr || '11/2026';
   const validThruStr = data.validThruStr || '11/2028';
-  const address = data.residentialAddress || 'Address on record with FixBro';
-  const disclaimer = data.disclaimerText || 'This ID card is issued by FixBro Private Platform for verified partner identification. Not a Government of India document.';
+  const address = data.residentialAddress || 'Address on record';
+  const mobile = data.mobileNumber || '+91 73531 45565';
+  const email = data.email || 'provider@fixbro.in';
+
+  let rawDisclaimer = data.disclaimerText || 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
+  if (rawDisclaimer.includes('FixBro') || rawDisclaimer.includes('Fixbro') || rawDisclaimer.includes('private platform')) {
+    rawDisclaimer = 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
+  }
+  const disclaimer = rawDisclaimer;
   const verifyUrl = data.verifyUrl || `https://fixbro.in/verify/provider/${idNumber.replace(/\s+/g, '')}`;
 
   return (
@@ -93,10 +105,21 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                 <span>VALID THRU: <strong className="text-emerald-700">{validThruStr}</strong></span>
               </div>
 
-              {/* Notice Disclaimer Box (Multiline 2-line wrap, no cutoff!) */}
+              {/* Notice Disclaimer Box (Generalized, multiline 2-line wrap) */}
               <div className="p-1 rounded border border-red-300 bg-red-50/90 text-[6.5px] text-red-900 leading-tight mt-0.5 whitespace-normal break-words">
                 <span className="font-bold">NOTICE: </span>
                 {disclaimer}
+              </div>
+
+              {/* Cardholder Signature under Notice */}
+              <div className="flex flex-col items-end pt-0.5 pr-1">
+                <span className="font-serif italic font-bold text-[11px] text-blue-900 tracking-wider leading-none">
+                  {titleCaseName}
+                </span>
+                <div className="w-24 h-[1px] bg-slate-400 mt-0.5" />
+                <span className="text-[5.5px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
+                  हस्ताक्षर / Cardholder Signature
+                </span>
               </div>
             </div>
           </div>
@@ -133,23 +156,34 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
 
           {/* Body Content */}
           <div className="px-3.5 py-1.5 flex gap-3 flex-grow items-center overflow-hidden">
-            {/* Left Column: Multiline Address (Bigger) & Indian Flag Below */}
-            <div className="flex flex-col justify-center space-y-1.5 overflow-hidden flex-grow text-slate-900">
+            {/* Left Column: Multiline Address, Mobile, Email, Flag & Notice */}
+            <div className="flex flex-col justify-center space-y-1 overflow-hidden flex-grow text-slate-900">
               <div>
-                <span className="text-[9px] font-black text-slate-900 block">पता / ADDRESS:</span>
-                <p className="text-[8.5px] text-slate-800 leading-tight font-medium line-clamp-3">
+                <span className="text-[8.5px] font-black text-slate-900 block">पता / ADDRESS:</span>
+                <p className="text-[8px] text-slate-800 leading-tight font-medium line-clamp-2">
                   {address}
                 </p>
               </div>
 
-              {/* Indian Flag added below the address in the gap! */}
-              <div className="flex items-center gap-3 pt-1">
-                <div className="w-14 h-9 rounded border border-slate-300 shadow-xs overflow-hidden shrink-0">
+              {/* Mobile Number below Address */}
+              <div className="text-[7.5px] font-bold text-slate-800 leading-tight">
+                <span className="text-slate-500">मोबाईल / MOBILE:</span> {mobile}
+              </div>
+
+              {/* Email below Mobile */}
+              <div className="text-[7.5px] font-bold text-slate-800 leading-tight truncate">
+                <span className="text-slate-500">ईमेल / EMAIL:</span> {email}
+              </div>
+
+              {/* Indian Flag added below the email */}
+              <div className="flex flex-col gap-0.5 pt-0.5">
+                <div className="w-12 h-8 rounded border border-slate-300 shadow-xs overflow-hidden shrink-0">
                   <img src="/images/indian-flag.svg" alt="Indian Flag" className="w-full h-full object-cover" />
                 </div>
-                <div className="text-[6.5px] text-slate-500 font-semibold leading-tight">
-                  <div className="font-bold text-slate-800 italic">FixBro Platform</div>
-                  Official Partner Verification
+                {/* Notice text below flag */}
+                <div className="text-[6.5px] text-red-800 font-bold leading-tight mt-0.5">
+                  This ID is not issued by Government.
+                  <div className="text-[5.5px] text-red-600 font-normal">यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।</div>
                 </div>
               </div>
             </div>
@@ -172,14 +206,11 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
             </div>
           </div>
 
-          {/* Bottom Bar: Unique ID Number & Legal Disclaimer */}
+          {/* Bottom Bar: Unique ID Number (Notice below removed as requested) */}
           <div className="w-full shrink-0">
             <div className="border-t border-slate-200 bg-slate-50/95 py-1 text-center">
               <div className="font-mono text-sm font-black tracking-widest text-slate-900">
                 {idNumber}
-              </div>
-              <div className="text-[6.5px] text-slate-500 font-medium leading-none mt-0.5">
-                This ID card is issued by a private platform (FixBro), not issued by government.
               </div>
             </div>
             {/* Bottom Tricolor Stripe */}

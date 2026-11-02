@@ -31,7 +31,11 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
         idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
-        disclaimerText: String(data.disclaimerText || DEFAULT_ID_CARD_SETTINGS.disclaimerText),
+        disclaimerText: String(
+          data.disclaimerText && !data.disclaimerText.includes('FixBro') && !data.disclaimerText.includes('Fixbro')
+            ? data.disclaimerText
+            : DEFAULT_ID_CARD_SETTINGS.disclaimerText
+        ),
       };
     }
 
@@ -46,7 +50,11 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
         idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
-        disclaimerText: String(data.disclaimerText || DEFAULT_ID_CARD_SETTINGS.disclaimerText),
+        disclaimerText: String(
+          data.disclaimerText && !data.disclaimerText.includes('FixBro') && !data.disclaimerText.includes('Fixbro')
+            ? data.disclaimerText
+            : DEFAULT_ID_CARD_SETTINGS.disclaimerText
+        ),
       };
     }
 
