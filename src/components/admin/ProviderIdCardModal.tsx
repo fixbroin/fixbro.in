@@ -69,8 +69,14 @@ export default function ProviderIdCardModal({
 
   const issueDate = provider.idCardUnlockedAt || provider.idCardGeneratedAt ? new Date(provider.idCardUnlockedAt || provider.idCardGeneratedAt!) : new Date();
   const issueDateStr = `${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
-  const validThruDate = new Date(issueDate);
-  validThruDate.setFullYear(validThruDate.getFullYear() + 2);
+  
+  let validThruDate: Date;
+  if (provider.idCardExpiresAt) {
+    validThruDate = new Date(provider.idCardExpiresAt);
+  } else {
+    validThruDate = new Date(issueDate);
+    validThruDate.setFullYear(validThruDate.getFullYear() + 2);
+  }
   const validThruStr = `${String(validThruDate.getMonth() + 1).padStart(2, '0')}/${validThruDate.getFullYear()}`;
 
   const copyToClipboard = (text: string, fieldKey: string) => {
@@ -85,6 +91,7 @@ export default function ProviderIdCardModal({
     categoryName: categoryLabel,
     skillLevelLabel: provider.skillLevelLabel || 'Skilled Professional',
     gender: provider.gender || 'Male',
+    dob: provider.dob,
     idCardNumber: idNumber,
     profilePhotoUrl: provider.profilePhotoUrl,
     residentialAddress: provider.residentialAddress || provider.workAreaAddress || 'Address on record',

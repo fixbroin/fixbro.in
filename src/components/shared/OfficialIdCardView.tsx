@@ -74,11 +74,19 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                   <h3 className="text-[13.5px] font-black text-slate-900 truncate tracking-tight leading-tight mt-0.5">
                     {providerName}
                   </h3>
-                  <div className="text-[8.5px] text-slate-700 font-bold flex items-center gap-1 mt-0.5">
-                    <span className="text-slate-500 uppercase">GENDER / लिंग:</span>
-                    <span className="text-slate-900">
-                      {gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender}
-                    </span>
+                  <div className="text-[8.5px] text-slate-700 font-bold flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">
+                    <div>
+                      <span className="text-slate-500 uppercase">GENDER / लिंग: </span>
+                      <span className="text-slate-900">
+                        {gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender}
+                      </span>
+                    </div>
+                    {data.dob && (
+                      <div>
+                        <span className="text-slate-500 uppercase">DOB / जन्म तिथि: </span>
+                        <span className="text-slate-900">{data.dob}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

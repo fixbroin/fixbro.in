@@ -34,6 +34,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { getTimestampMillis } from '@/lib/utils';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -162,15 +163,37 @@ export default function ProviderIdCardPage() {
   const categoryLabel = providerApp?.workCategoryName || 'Certified Technician';
   const profilePhotoUrl = providerApp?.profilePhotoUrl || userProfile?.photoURL || '';
 
-  // Dates
-  const issueDateObj = new Date();
+  // Dates & Validity Period (Years & Months)
+  const vYears = Number(idCardSettings.validityYears || 0);
+  const vMonths = Number(idCardSettings.validityMonths || 0);
+  const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+
+  const issueDateMillis = (providerApp as any)?.idCardUnlockedAt || (providerApp as any)?.idCardGeneratedAt
+    ? (getTimestampMillis((providerApp as any).idCardUnlockedAt || (providerApp as any).idCardGeneratedAt) || Date.now())
+    : Date.now();
+  const issueDateObj = new Date(issueDateMillis);
   const issueDateStr = `${String(issueDateObj.getMonth() + 1).padStart(2, '0')}/${issueDateObj.getFullYear()}`;
-  const expiryYear = issueDateObj.getFullYear() + (idCardSettings.validityYears || 2);
-  const validThruStr = `${String(issueDateObj.getMonth() + 1).padStart(2, '0')}/${expiryYear}`;
+
+  let expiryDateObj: Date;
+  if ((providerApp as any)?.idCardExpiresAt) {
+    const expMillis = getTimestampMillis((providerApp as any).idCardExpiresAt);
+    expiryDateObj = expMillis ? new Date(expMillis) : new Date(issueDateObj.getTime());
+    if (!expMillis) {
+      expiryDateObj.setMonth(expiryDateObj.getMonth() + totalMonths);
+    }
+  } else {
+    expiryDateObj = new Date(issueDateObj.getTime());
+    expiryDateObj.setMonth(expiryDateObj.getMonth() + totalMonths);
+  }
+  const validThruStr = `${String(expiryDateObj.getMonth() + 1).padStart(2, '0')}/${expiryDateObj.getFullYear()}`;
+
+  const isCardExpired = Boolean((providerApp as any)?.idCardExpiresAt && Date.now() > (getTimestampMillis((providerApp as any).idCardExpiresAt) || 0));
 
   const isUnlocked = Boolean(
-    idCardSettings.downloadFee === 0 || 
-    (providerApp as any)?.idCardUnlocked
+    !isCardExpired && (
+      idCardSettings.downloadFee === 0 || 
+      (providerApp as any)?.idCardUnlocked
+    )
   );
 
   // Generate unique ID number formatted according to admin settings (e.g. prefix + starting sequence)
@@ -186,6 +209,7 @@ export default function ProviderIdCardPage() {
     categoryName: categoryLabel,
     skillLevelLabel: providerApp?.skillLevelLabel || 'Skilled Professional',
     gender: providerApp?.gender || 'Male',
+    dob: providerApp?.dob,
     idCardNumber: uniqueIdNumber,
     profilePhotoUrl,
     residentialAddress: providerApp?.address || providerApp?.workAreaAddress || 'Address on record',
@@ -563,12 +587,16 @@ export default function ProviderIdCardPage() {
               </div>
 
               <div>
-                {isUnlocked ? (
-                  <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 px-3 py-1 flex items-center gap-1 text-xs">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Permanently Unlocked
+                {isCardExpired ? (
+                  <Badge variant="destructive" className="px-3 py-1 flex items-center gap-1 text-xs font-semibold">
+                    <AlertCircle className="h-3.5 w-3.5" /> Expired ({validThruStr})
+                  </Badge>
+                ) : isUnlocked ? (
+                  <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 px-3 py-1 flex items-center gap-1 text-xs font-semibold">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Valid & Active
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-amber-600 border-amber-500/40 px-3 py-1 flex items-center gap-1 text-xs">
+                  <Badge variant="outline" className="text-amber-600 border-amber-500/40 px-3 py-1 flex items-center gap-1 text-xs font-semibold">
                     <Lock className="h-3.5 w-3.5" /> Locked ({symbol}{idCardSettings.downloadFee})
                   </Badge>
                 )}
@@ -577,7 +605,39 @@ export default function ProviderIdCardPage() {
           </CardHeader>
 
           <CardContent className="p-6 space-y-6">
-            {!isUnlocked ? (
+            {isCardExpired ? (
+              // Expired State - Requires Renewal
+              <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/60 dark:bg-rose-950/20 p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-400 shrink-0">
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-foreground text-sm">
+                      ID Card Expired on {validThruStr}
+                    </h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Your official service partner ID card has completed its validity period. Please renew your card ({symbol}{idCardSettings.downloadFee}) to re-activate your validity and enable official high-res downloads.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={handlePaymentClick}
+                    disabled={isPaying}
+                    className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2 shadow-md"
+                  >
+                    {isPaying ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Pay {symbol}{idCardSettings.downloadFee} & Renew ID Card
+                  </Button>
+                </div>
+              </div>
+            ) : !isUnlocked ? (
               // Locked State - Requires Payment
               <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 p-5 space-y-4">
                 <div className="flex items-start gap-3">

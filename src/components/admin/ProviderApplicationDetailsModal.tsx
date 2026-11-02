@@ -740,7 +740,8 @@ export default function ProviderApplicationDetailsModal({
                 />
                 <DetailRow label="Address" value={application.address || 'N/A'} />
                 <DetailRow label="Gender" value={application.gender || 'N/A'} />
-                <DetailRow label="Age" value={application.age || 'N/A'} />
+                <DetailRow label="Date of Birth" value={application.dob || 'N/A'} />
+                <DetailRow label="Calculated Age" value={application.age ? `${application.age} years old` : 'N/A'} />
                 <DetailRow label="Qualification" value={application.qualificationLabel || 'N/A'} />
                 <DetailRow label="Languages Spoken" value={application.languagesSpokenLabels?.join(', ') || 'N/A'} />
                 <DetailRow label="Submitted" value={formatTimestampToReadable(application.submittedAt || application.createdAt)} />

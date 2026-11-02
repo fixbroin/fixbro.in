@@ -21,12 +21,16 @@ import { type ProviderIdCardSettings, DEFAULT_ID_CARD_SETTINGS } from '@/types/p
 const idCardSettingsSchema = z.object({
   isIdCardEnabled: z.boolean().default(true),
   downloadFee: z.coerce.number().min(0, "Download fee must be 0 or more."),
-  validityYears: z.coerce.number().min(1, "Validity must be at least 1 year.").max(10, "Maximum validity is 10 years."),
+  validityYears: z.coerce.number().min(0, "Years cannot be negative.").max(10, "Maximum validity is 10 years.").default(2),
+  validityMonths: z.coerce.number().min(0, "Months cannot be negative.").max(11, "Months must be between 0 and 11.").default(0),
   signatoryName: z.string().min(2, "Signatory name is required."),
   helplineNumber: z.string().min(5, "Helpline number is required."),
   idNumberPrefix: z.string().optional().default(""),
   idNumberStartingSeq: z.coerce.number().min(1, "Starting sequence must be at least 1.").default(361707601001),
   disclaimerText: z.string().min(10, "Disclaimer text is required."),
+}).refine(data => data.validityYears > 0 || data.validityMonths > 0, {
+  message: "Validity period must be at least 1 month or 1 year.",
+  path: ["validityMonths"],
 });
 
 type IdCardSettingsFormData = z.infer<typeof idCardSettingsSchema>;
@@ -153,26 +157,48 @@ export default function ProviderIdCardSettingsTab() {
                 )}
               />
 
-              {/* Validity Years */}
-              <FormField
-                control={form.control}
-                name="validityYears"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      <Clock className="h-4 w-4 text-primary" />
-                      Card Validity Period (Years)
-                    </FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={10} step={1} {...field} disabled={isSaving} />
-                    </FormControl>
-                    <FormDescription>
-                      Number of years the generated ID card is valid from the issuance date (e.g. 2 years).
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Validity Period: Years & Months */}
+              <div className="space-y-2">
+                <FormLabel className="flex items-center gap-1.5 font-medium">
+                  <Clock className="h-4 w-4 text-primary" />
+                  Card Validity Period (Years & Months)
+                </FormLabel>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="validityYears"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input type="number" min={0} max={10} step={1} {...field} disabled={isSaving} />
+                          </FormControl>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap font-medium">Years</span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="validityMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input type="number" min={0} max={11} step={1} {...field} disabled={isSaving} />
+                          </FormControl>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap font-medium">Months</span>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormDescription>
+                  Set expiry in months only (e.g., 0 Years, 6 Months), years only (e.g., 2 Years, 0 Months), or both (e.g., 1 Year, 6 Months).
+                </FormDescription>
+              </div>
 
               {/* Authorized Signatory */}
               <FormField

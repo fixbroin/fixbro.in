@@ -4,6 +4,7 @@ export interface ProviderIdCardSettings {
   isIdCardEnabled: boolean;
   downloadFee: number;
   validityYears: number;
+  validityMonths: number;
   signatoryName: string;
   helplineNumber: string;
   idNumberPrefix: string;
@@ -15,6 +16,7 @@ export const DEFAULT_ID_CARD_SETTINGS: ProviderIdCardSettings = {
   isIdCardEnabled: true,
   downloadFee: 0,
   validityYears: 2,
+  validityMonths: 0,
   signatoryName: "Authorized Signatory - FixBro",
   helplineNumber: "+91 8000 123 456",
   idNumberPrefix: "",
@@ -97,6 +99,7 @@ export interface ProviderIdCardRecord {
   workAreaAddress?: string;
   residentialAddress?: string;
   gender?: string;
+  dob?: string;
   age?: number;
   idCardNumber: string;
   technicianId: string;
@@ -107,6 +110,7 @@ export interface ProviderIdCardRecord {
   idCardGeneratedAt?: number | null;
   idCardUnlocked: boolean;
   idCardUnlockedAt?: number | null;
+  idCardExpiresAt?: number | null;
   idCardPaymentId?: string | null;
   idCardOrderId?: string | null;
   idCardPaidAmount?: number;

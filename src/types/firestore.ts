@@ -1443,6 +1443,7 @@ export interface ProviderApplication {
   email?: string;
   mobileNumber?: string;
   address?: string;
+  dob?: string;
   age?: number;
   gender?: 'Male' | 'Female' | 'Other' | string;
   qualificationId?: string;
@@ -1488,6 +1489,7 @@ export interface ProviderApplication {
   idCardGeneratedAt?: Timestamp | any;
   idCardUnlocked?: boolean;
   idCardUnlockedAt?: Timestamp | any;
+  idCardExpiresAt?: Timestamp | any;
   idCardPaymentId?: string | null;
   idCardOrderId?: string | null;
   idCardPaidAmount?: number;

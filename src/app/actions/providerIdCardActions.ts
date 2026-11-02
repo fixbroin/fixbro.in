@@ -27,6 +27,7 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         isIdCardEnabled: data.isIdCardEnabled !== false,
         downloadFee: Number(data.downloadFee ?? DEFAULT_ID_CARD_SETTINGS.downloadFee),
         validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
+        validityMonths: Number(data.validityMonths ?? DEFAULT_ID_CARD_SETTINGS.validityMonths),
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
@@ -46,6 +47,7 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         isIdCardEnabled: data.isIdCardEnabled !== false,
         downloadFee: Number(data.downloadFee ?? DEFAULT_ID_CARD_SETTINGS.downloadFee),
         validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
+        validityMonths: Number(data.validityMonths ?? DEFAULT_ID_CARD_SETTINGS.validityMonths),
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
         idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
@@ -72,10 +74,13 @@ export async function saveProviderIdCardSettingsAction(
   settings: ProviderIdCardSettings
 ): Promise<{ success: boolean; message: string }> {
   try {
+    const vYears = Math.max(0, Number(settings.validityYears ?? 2));
+    const vMonths = Math.min(11, Math.max(0, Number(settings.validityMonths ?? 0)));
     const cleanData = {
       isIdCardEnabled: Boolean(settings.isIdCardEnabled),
       downloadFee: Math.max(0, Number(settings.downloadFee || 0)),
-      validityYears: Math.max(1, Number(settings.validityYears || 2)),
+      validityYears: (vYears === 0 && vMonths === 0) ? 1 : vYears,
+      validityMonths: vMonths,
       signatoryName: String(settings.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName).trim(),
       helplineNumber: String(settings.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber).trim(),
       idNumberPrefix: String(settings.idNumberPrefix || '').trim(),
@@ -164,6 +169,7 @@ export async function deleteOrResetProviderIdCardAction(
       idCardGeneratedAt: null,
       idCardUnlocked: false,
       idCardUnlockedAt: null,
+      idCardExpiresAt: null,
       idCardPaymentId: null,
       idCardOrderId: null,
       idCardPaidAmount: 0,
@@ -209,9 +215,16 @@ export async function unlockProviderIdCardAction(
     const data = snap.exists ? (snap.data() as ProviderApplication) : null;
     const assignedNumber = generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
+    const vYears = Number(settings.validityYears || 0);
+    const vMonths = Number(settings.validityMonths || 0);
+    const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+    const expiryDate = new Date();
+    expiryDate.setMonth(expiryDate.getMonth() + totalMonths);
+
     const updatePayload: Record<string, any> = {
       idCardUnlocked: true,
       idCardUnlockedAt: Timestamp.now(),
+      idCardExpiresAt: Timestamp.fromDate(expiryDate),
       idCardGenerated: true,
       idCardGeneratedAt: data?.idCardGeneratedAt || Timestamp.now(),
       idCardNumber: assignedNumber,
@@ -355,6 +368,7 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
           workAreaAddress: data.workAreaAddress ? String(data.workAreaAddress) : undefined,
           residentialAddress: data.address ? String(data.address) : undefined,
           gender: data.gender ? String(data.gender) : 'Male',
+          dob: data.dob ? String(data.dob) : undefined,
           age: data.age ? Number(data.age) : undefined,
           idCardNumber,
           technicianId: formatTechnicianId(docSnap.id),
@@ -363,6 +377,7 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
           idCardGeneratedAt: generatedAtMillis,
           idCardUnlocked: Boolean(data.idCardUnlocked),
           idCardUnlockedAt: unlockedAtMillis,
+          idCardExpiresAt: getTimestampMillis(data.idCardExpiresAt),
           idCardPaymentId: data.idCardPaymentId ? String(data.idCardPaymentId) : null,
           idCardOrderId: data.idCardOrderId ? String(data.idCardOrderId) : null,
           idCardPaidAmount: Number(data.idCardPaidAmount || 0),
@@ -389,5 +404,110 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
   } catch (error) {
     console.error("Error fetching providers with ID cards:", error);
     return [];
+  }
+}
+
+/**
+ * Public provider ID card verification action.
+ * Looks up provider details cleanly without exposing sensitive private data.
+ */
+export async function getPublicProviderVerificationAction(idOrNumber: string): Promise<{
+  found: boolean;
+  provider?: {
+    id: string;
+    fullName: string;
+    workCategoryName: string;
+    skillLevelLabel?: string;
+    idCardNumber: string;
+    profilePhotoUrl?: string;
+    gender?: string;
+    dob?: string;
+    age?: number;
+    issueDateStr: string;
+    validThruStr: string;
+    isExpired: boolean;
+    isActive: boolean;
+    status: string;
+    city?: string;
+  };
+  message?: string;
+}> {
+  try {
+    if (!idOrNumber) return { found: false, message: "Invalid ID card request" };
+
+    const cleanQuery = decodeURIComponent(idOrNumber).trim();
+    let targetDoc: any = null;
+    let providerId = cleanQuery;
+
+    // 1. Direct document lookup by providerId
+    const directSnap = await adminDb.collection('providerApplications').doc(cleanQuery).get();
+    if (directSnap.exists) {
+      targetDoc = directSnap.data();
+      providerId = directSnap.id;
+    } else {
+      // 2. Try searching by idCardNumber or unspaced idCardNumber
+      const normalizedQuery = cleanQuery.replace(/\s+/g, '').toLowerCase();
+      const allAppsSnap = await adminDb.collection('providerApplications').get();
+      allAppsSnap.forEach((docSnap) => {
+        const d = docSnap.data();
+        const storedNum = String(d.idCardNumber || '').replace(/\s+/g, '').toLowerCase();
+        if (storedNum && storedNum === normalizedQuery) {
+          targetDoc = d;
+          providerId = docSnap.id;
+        }
+      });
+    }
+
+    if (!targetDoc) {
+      return { found: false, message: "No official service partner record found for this ID." };
+    }
+
+    const settings = await getProviderIdCardSettingsAction();
+    const assignedNumber = targetDoc.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+
+    const issueMillis = getTimestampMillis(targetDoc.idCardUnlockedAt || targetDoc.idCardGeneratedAt || targetDoc.submittedAt || targetDoc.createdAt) || Date.now();
+    const issueDate = new Date(issueMillis);
+    const issueDateStr = `${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
+
+    // Calculate expiry date
+    let expiryMillis = getTimestampMillis(targetDoc.idCardExpiresAt);
+    if (!expiryMillis) {
+      const vYears = Number(settings.validityYears || 0);
+      const vMonths = Number(settings.validityMonths || 0);
+      const totalMonths = (vYears === 0 && vMonths === 0) ? 24 : (vYears * 12 + vMonths);
+      const expDate = new Date(issueMillis);
+      expDate.setMonth(expDate.getMonth() + totalMonths);
+      expiryMillis = expDate.getTime();
+    }
+    const expiryDate = new Date(expiryMillis);
+    const validThruStr = `${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+    const isExpired = Date.now() > expiryMillis;
+    const isApproved = targetDoc.status === 'approved';
+    const isActive = isApproved && !isExpired;
+
+    return {
+      found: true,
+      provider: {
+        id: providerId,
+        fullName: targetDoc.fullName || 'Service Professional',
+        workCategoryName: targetDoc.workCategoryName || 'Certified Technician',
+        skillLevelLabel: targetDoc.skillLevelLabel || 'Skilled Professional',
+        idCardNumber: assignedNumber,
+        profilePhotoUrl: targetDoc.profilePhotoUrl || '',
+        gender: targetDoc.gender || 'Male',
+        dob: targetDoc.dob || undefined,
+        age: targetDoc.age || undefined,
+        issueDateStr,
+        validThruStr,
+        isExpired,
+        isActive,
+        status: !isApproved ? (targetDoc.status || 'inactive') : isExpired ? 'expired' : 'active',
+        city: targetDoc.workAreaAddress || targetDoc.address || '',
+      }
+    };
+  } catch (error: any) {
+    console.error("Error in public provider verification:", error);
+    return { found: false, message: error.message || "Failed to retrieve verification details." };
   }
 }

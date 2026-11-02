@@ -5,6 +5,7 @@ export interface IdCardRenderOptions {
   categoryName: string;
   skillLevelLabel?: string;
   gender?: string;
+  dob?: string;
   idCardNumber: string;
   profilePhotoUrl?: string | null;
   residentialAddress?: string;
@@ -301,11 +302,13 @@ export const renderFrontCardCanvas = async (
   // Indian Flag on the Right Side (Empty Space beside Name)
   drawIndianFlagCanvas(ctx, w - 170, 150, 120, 80);
 
-  // Gender / लिंग
+  // Gender / लिंग & DOB
   textY += 38;
   ctx.fillStyle = '#334155';
   ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`लिंग / GENDER:  ${gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender}`, textX, textY);
+  const genderLabel = gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender;
+  const dobLabel = options.dob ? `   DOB: ${options.dob}` : '';
+  ctx.fillText(`लिंग / GENDER:  ${genderLabel}${dobLabel}`, textX, textY);
 
   // Trade / व्यवसाय Badge (Bigger as requested)
   textY += 38;

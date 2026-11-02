@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 interface BookingEditPageProps {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }
 
 /**
