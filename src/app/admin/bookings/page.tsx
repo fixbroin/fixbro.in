@@ -206,7 +206,9 @@ export default function AdminBookingsPage() {
   }, [urlSearch, urlOpenBookingId]);
 
   useEffect(() => {
-    if (urlOpenBookingId && bookings.length > 0) {
+    if (!urlOpenBookingId) return;
+
+    if (bookings.length > 0) {
       const target = bookings.find(b => 
         b.bookingId === urlOpenBookingId || 
         b.id === urlOpenBookingId || 
@@ -221,9 +223,35 @@ export default function AdminBookingsPage() {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }, 300);
+        return;
       }
     }
-  }, [urlOpenBookingId, bookings]);
+
+    // Fallback: direct fetch if booking is not in current in-memory list
+    if (!isLoading) {
+      (async () => {
+        try {
+          const directDoc = await getDoc(doc(db, "bookings", urlOpenBookingId));
+          if (directDoc.exists()) {
+            const data = { ...directDoc.data(), id: directDoc.id } as FirestoreBooking;
+            setSelectedBooking(data);
+            setIsDetailsModalOpen(true);
+            return;
+          }
+
+          const q = query(collection(db, "bookings"), where("bookingId", "==", urlOpenBookingId), limit(1));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            const data = { ...qSnap.docs[0].data(), id: qSnap.docs[0].id } as FirestoreBooking;
+            setSelectedBooking(data);
+            setIsDetailsModalOpen(true);
+          }
+        } catch (e) {
+          console.error("Error fetching single booking for modal:", e);
+        }
+      })();
+    }
+  }, [urlOpenBookingId, bookings, isLoading]);
   const symbol = appConfig?.currencySymbol || 'â‚¹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
