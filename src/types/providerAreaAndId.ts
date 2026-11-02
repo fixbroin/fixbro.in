@@ -19,7 +19,7 @@ export const DEFAULT_ID_CARD_SETTINGS: ProviderIdCardSettings = {
   helplineNumber: "+91 8000 123 456",
   idNumberPrefix: "",
   idNumberStartingSeq: 361707601001,
-  disclaimerText: "This ID card NOT issued by the Government.",
+  disclaimerText: "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by the Government",
 };
 
 export interface SerializedLocationChangeRequest {
@@ -45,36 +45,40 @@ export interface PendingLocationChangeItem {
 }
 
 /**
- * Format a 12-digit number into Aadhaar style (4-4-4): "3617 0760 6355"
+ * Format a unique ID card number respecting custom starting sequence and prefix.
+ * e.g., if startingSeq is 1001 and prefix is FIX -> "FIX 1001"
+ * e.g., if startingSeq is 361707601001 -> "3617 0760 1001"
  */
-export function formatAadhaarStyleNumber(numStr: string, prefix?: string): string {
-  const digits = String(numStr).replace(/\D/g, '');
-  const cleanPrefix = (prefix || '').trim();
-  
-  if (digits.length >= 12) {
-    const d12 = digits.slice(-12);
-    const spaced = `${d12.slice(0, 4)} ${d12.slice(4, 8)} ${d12.slice(8, 12)}`;
-    return cleanPrefix ? `${cleanPrefix} ${spaced}` : spaced;
-  }
-  
-  // Pad to 12 digits if shorter
-  const padded = digits.padStart(12, '0');
-  const spaced = `${padded.slice(0, 4)} ${padded.slice(4, 8)} ${padded.slice(8, 12)}`;
-  return cleanPrefix ? `${cleanPrefix} ${spaced}` : spaced;
-}
-
-/**
- * Deterministically compute a unique 12-digit ID card number for a provider
- * using the admin's configured starting sequence.
- */
-export function generateUniqueIdCardNumber(uid: string, startingSeq: number = 361707601001, prefix?: string): string {
+export function generateUniqueIdCardNumber(
+  uid: string,
+  startingSeq: number = 1001,
+  prefix?: string
+): string {
   let hash = 0;
   for (let i = 0; i < uid.length; i++) {
     hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
   }
-  const offset = hash % 900000;
+
+  const seqStr = String(startingSeq || 1001);
+  const len = seqStr.length;
+  const cleanPrefix = (prefix || '').trim();
+
+  const maxOffset = Math.min(500, Math.max(10, Math.floor(startingSeq * 0.1)));
+  const offset = hash % maxOffset;
   const rawNum = startingSeq + offset;
-  return formatAadhaarStyleNumber(String(rawNum), prefix);
+  const numStr = String(rawNum).padStart(len, '0');
+
+  let formattedNum = numStr;
+  if (len >= 12) {
+    const d12 = numStr.slice(-12);
+    formattedNum = `${d12.slice(0, 4)} ${d12.slice(4, 8)} ${d12.slice(8, 12)}`;
+  } else if (len === 6) {
+    formattedNum = `${numStr.slice(0, 3)} ${numStr.slice(3, 6)}`;
+  } else if (len === 8) {
+    formattedNum = `${numStr.slice(0, 4)} ${numStr.slice(4, 8)}`;
+  }
+
+  return cleanPrefix ? `${cleanPrefix} ${formattedNum}` : formattedNum;
 }
 
 export function formatTechnicianId(uid: string): string {
@@ -94,7 +98,7 @@ export interface ProviderIdCardRecord {
   residentialAddress?: string;
   gender?: string;
   age?: number;
-  idCardNumber: string; // The official unique 12-digit / configured ID number
+  idCardNumber: string;
   technicianId: string;
   status: string;
 

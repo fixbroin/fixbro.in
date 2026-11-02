@@ -98,6 +98,8 @@ export async function saveProviderWalletSettingsAction(settings: WalletProviderS
     revalidatePath('/provider/wallet');
     triggerRefresh('/admin/provider-withdrawals');
     triggerRefresh('/provider/wallet');
+    triggerRefresh('wallet-provider-config');
+    triggerRefresh('global-cache');
 
     return { success: true, message: "Wallet settings saved successfully." };
   } catch (error: any) {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +21,16 @@ import {
   Sparkles,
   Phone,
   Calendar,
-  CreditCard
+  CreditCard,
+  Plus
 } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
@@ -57,6 +66,8 @@ declare global {
 export default function ProviderIdCardPage() {
   const { user: providerUser } = useAuth();
   const { config: appConfig } = useApplicationConfig();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const symbol = appConfig?.currencySymbol || "₹";
 
@@ -67,6 +78,7 @@ export default function ProviderIdCardPage() {
   const [isPaying, setIsPaying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
+  const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
 
   // Canvas refs for 300 DPI exports
   const frontCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -110,6 +122,40 @@ export default function ProviderIdCardPage() {
     loadData();
   }, [loadData]);
 
+  // Handle return from Stripe checkout
+  useEffect(() => {
+    const paymentParam = searchParams?.get('payment');
+    const sessionId = searchParams?.get('session_id');
+    const amountParam = searchParams?.get('amount');
+
+    if (paymentParam === 'success' && sessionId && providerUser?.uid) {
+      const verifyStripePayment = async () => {
+        setIsPaying(true);
+        try {
+          const res = await fetch(`/api/stripe/verify-session?session_id=${sessionId}`);
+          const data = await res.json();
+          if (res.ok && data.success && (data.status === 'paid' || data.status === 'complete')) {
+            const paidAmount = parseFloat(amountParam || '0');
+            const unlockRes = await unlockProviderIdCardAction(providerUser.uid, {
+              razorpay_payment_id: sessionId,
+              amount: paidAmount,
+            });
+            if (unlockRes.success) {
+              toast({ title: "Card Unlocked!", description: "Official PVC ID Card is now permanently unlocked." });
+            }
+          }
+        } catch (e: any) {
+          console.error("Stripe verify error:", e);
+        } finally {
+          setIsPaying(false);
+          router.replace('/provider/id-card');
+          loadData();
+        }
+      };
+      verifyStripePayment();
+    }
+  }, [searchParams, providerUser?.uid, router, loadData]);
+
   // Provider Data formatting
   const isApproved = providerApp?.status === 'approved';
   const providerName = (providerApp?.fullName || userProfile?.displayName || providerUser?.displayName || 'Authorized Partner').toUpperCase();
@@ -127,8 +173,8 @@ export default function ProviderIdCardPage() {
     (providerApp as any)?.idCardUnlocked
   );
 
-  // Generate unique 12-digit Aadhaar style ID number
-  const uniqueIdNumber = (providerApp as any)?.idCardNumber || generateUniqueIdCardNumber(
+  // Generate unique ID number formatted according to admin settings (e.g. prefix + starting sequence)
+  const uniqueIdNumber = generateUniqueIdCardNumber(
     providerUser?.uid || '',
     idCardSettings.idNumberStartingSeq,
     idCardSettings.idNumberPrefix
@@ -143,7 +189,6 @@ export default function ProviderIdCardPage() {
     idCardNumber: uniqueIdNumber,
     profilePhotoUrl,
     residentialAddress: providerApp?.address || providerApp?.workAreaAddress || 'Address on FixBro file',
-    helplinePhone: idCardSettings.helplineNumber,
     signatoryName: idCardSettings.signatoryName,
     issueDateStr,
     validThruStr,
@@ -161,8 +206,8 @@ export default function ProviderIdCardPage() {
     document.body.appendChild(script);
   });
 
-  // Handle Payment Unlock
-  const handlePayAndUnlock = async () => {
+  // 1. Razorpay Unlock Flow
+  const handleRazorpayUnlock = async () => {
     if (!providerUser?.uid) return;
     setIsPaying(true);
     try {
@@ -173,12 +218,24 @@ export default function ProviderIdCardPage() {
         return;
       }
 
-      // Create order
+      // Calculate subunit (paise for INR so ₹1 = 100 paise)
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const getCurrencySubunitDecimals = (cc: string): number => {
+        const c = cc.toUpperCase();
+        if (['JPY', 'KRW', 'CLP', 'VND', 'UGX'].includes(c)) return 0;
+        if (['BHD', 'JOD', 'KWD', 'OMR', 'TND'].includes(c)) return 3;
+        return 2;
+      };
+      const currencyDecimals = getCurrencySubunitDecimals(currencyCode);
+      const feeAmount = Number(idCardSettings.downloadFee || 0);
+      const amountInSubunit = Math.round(feeAmount * Math.pow(10, currencyDecimals));
+
       const orderRes = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: idCardSettings.downloadFee,
+          amount: amountInSubunit,
+          currency: currencyCode,
           receipt: `idcard_${providerUser.uid.substring(0, 10)}_${Date.now()}`,
           notes: {
             purpose: 'provider_id_card_unlock',
@@ -216,7 +273,7 @@ export default function ProviderIdCardPage() {
               const unlockResult = await unlockProviderIdCardAction(providerUser.uid, {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                amount: idCardSettings.downloadFee,
+                amount: feeAmount,
               });
               if (unlockResult.success) {
                 toast({ title: "Unlocked!", description: "Official PVC ID Card is now permanently unlocked." });
@@ -254,6 +311,74 @@ export default function ProviderIdCardPage() {
       console.error("Payment unlock error:", err);
       toast({ title: "Payment Error", description: err.message || "Could not launch checkout.", variant: "destructive" });
       setIsPaying(false);
+    }
+  };
+
+  // 2. Stripe Unlock Flow
+  const handleStripeUnlock = async () => {
+    if (!providerUser?.uid) return;
+    setIsPaying(true);
+    const amount = Number(idCardSettings.downloadFee || 0);
+    try {
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'id_card_unlock',
+          providerId: providerUser?.uid,
+          amount: amount,
+          currency: currencyCode,
+          successUrl: `${origin}/provider/id-card?payment=success&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
+          cancelUrl: `${origin}/provider/id-card?payment=cancelled`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to initiate Stripe session.');
+      }
+
+      const data = await res.json();
+      router.push(data.url);
+    } catch (err: any) {
+      toast({ title: "Checkout Error", description: err.message || "Could not launch Stripe gateway.", variant: "destructive" });
+      setIsPaying(false);
+    }
+  };
+
+  // Primary payment button trigger: handles multiple gateways or direct selection
+  const handlePaymentClick = async () => {
+    if (!providerUser?.uid) return;
+    const fee = Number(idCardSettings.downloadFee || 0);
+    if (fee <= 0) {
+      const res = await unlockProviderIdCardAction(providerUser.uid);
+      if (res.success) {
+        toast({ title: "Unlocked!", description: "ID card unlocked successfully." });
+        await loadData();
+      }
+      return;
+    }
+
+    const razorpayEnabled = appConfig?.enableRazorpay !== false && !!appConfig?.razorpayKeyId;
+    const stripeEnabled = appConfig?.enableStripe === true && !!appConfig?.stripePublishableKey;
+
+    if (!razorpayEnabled && !stripeEnabled) {
+      toast({ title: "Gateways Disabled", description: "Online payments are currently not available.", variant: "destructive" });
+      return;
+    }
+
+    if (razorpayEnabled && stripeEnabled) {
+      setIsGatewayDialogOpen(true);
+      return;
+    }
+
+    if (stripeEnabled) {
+      await handleStripeUnlock();
+    } else {
+      await handleRazorpayUnlock();
     }
   };
 
@@ -469,7 +594,7 @@ export default function ProviderIdCardPage() {
 
                 <div className="flex justify-end pt-2">
                   <Button
-                    onClick={handlePayAndUnlock}
+                    onClick={handlePaymentClick}
                     disabled={isPaying}
                     className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2 shadow-md"
                   >
@@ -563,6 +688,49 @@ export default function ProviderIdCardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gateway Selection Dialog (Matches Wallet Dialog) */}
+      <Dialog open={isGatewayDialogOpen} onOpenChange={setIsGatewayDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center text-teal-800">Select Payment Method</DialogTitle>
+            <DialogDescription className="text-center text-xs text-muted-foreground">
+              Choose your payment gateway to unlock your ID card ({symbol}{idCardSettings.downloadFee})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <Button 
+              className="py-5 flex items-center justify-between text-left font-semibold text-sm border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleRazorpayUnlock();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-slate-800">Cards, UPI, NetBanking</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">Instant checkout via Razorpay</span>
+              </span>
+              <CreditCard className="h-5 w-5 text-teal-600 ml-4 shrink-0" />
+            </Button>
+
+            <Button 
+              className="py-5 flex items-center justify-between text-left font-semibold text-sm border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleStripeUnlock();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-slate-800">Stripe Checkout</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">International cards, Link & Google Pay</span>
+              </span>
+              <CreditCard className="h-5 w-5 text-teal-600 ml-4 shrink-0" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }

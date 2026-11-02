@@ -103,7 +103,7 @@ export async function saveProviderIdCardSettingsAction(
 
 /**
  * Record when a verified provider views/generates their ID card for the first time.
- * Also assigns a unique ID card number if not already present.
+ * Also assigns or updates a unique ID card number according to current admin settings.
  */
 export async function recordIdCardGenerationAction(
   providerId: string
@@ -117,7 +117,7 @@ export async function recordIdCardGenerationAction(
 
     const data = snap.data() as ProviderApplication;
     const settings = await getProviderIdCardSettingsAction();
-    const assignedNumber = data.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+    const assignedNumber = generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
     const updatePayload: Record<string, any> = {
       idCardGenerated: true,
@@ -142,6 +142,52 @@ export async function recordIdCardGenerationAction(
 }
 
 /**
+ * Delete / reset a generated provider ID card so they can regenerate afresh with current settings.
+ */
+export async function deleteOrResetProviderIdCardAction(
+  providerId: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!providerId) return { success: false, message: "Missing provider ID" };
+
+    const clearPayload: Record<string, any> = {
+      idCardNumber: null,
+      idCardGenerated: false,
+      idCardGeneratedAt: null,
+      idCardUnlocked: false,
+      idCardUnlockedAt: null,
+      idCardPaymentId: null,
+      idCardOrderId: null,
+      idCardPaidAmount: 0,
+      idCardDownloadCount: 0,
+      idCardPdfDownloadCount: 0,
+      idCardFrontPngDownloadCount: 0,
+      idCardBackPngDownloadCount: 0,
+      idCardLastDownloadedAt: null,
+      idCardDownloads: [],
+      updatedAt: Timestamp.now(),
+    };
+
+    await adminDb.collection('providerApplications').doc(providerId).set(clearPayload, { merge: true });
+    try {
+      await setDoc(doc(db, 'providerApplications', providerId), clearPayload, { merge: true });
+    } catch {
+      // adminDb committed
+    }
+
+    revalidatePath('/admin/provider-id-cards');
+    revalidatePath('/provider/id-card');
+    triggerRefresh('/admin/provider-id-cards');
+    triggerRefresh('/provider/id-card');
+
+    return { success: true, message: "Provider ID card reset successfully. Provider can now regenerate." };
+  } catch (error: any) {
+    console.error("Error resetting ID card:", error);
+    return { success: false, message: error.message || "Failed to reset card" };
+  }
+}
+
+/**
  * Unlock ID card download for an approved provider (e.g. after payment or if free).
  */
 export async function unlockProviderIdCardAction(
@@ -153,7 +199,7 @@ export async function unlockProviderIdCardAction(
     const docRef = adminDb.collection('providerApplications').doc(providerId);
     const snap = await docRef.get();
     const data = snap.exists ? (snap.data() as ProviderApplication) : null;
-    const assignedNumber = data?.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+    const assignedNumber = generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
     const updatePayload: Record<string, any> = {
       idCardUnlocked: true,
@@ -287,8 +333,8 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
             }))
           : [];
 
-        // Format unique ID number (Aadhaar style: e.g. 3617 0760 6355)
-        const idCardNumber = data.idCardNumber || generateUniqueIdCardNumber(docSnap.id, settings.idNumberStartingSeq, settings.idNumberPrefix);
+        // Format unique ID number according to current settings
+        const idCardNumber = generateUniqueIdCardNumber(docSnap.id, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
         records.push({
           providerId: docSnap.id,

@@ -66,6 +66,63 @@ export const drawAshokaChakra = (
 };
 
 /**
+ * Draw Indian Flag (Tiranga) with Ashoka Chakra on Canvas
+ */
+export const drawIndianFlagCanvas = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) => {
+  ctx.save();
+  const stripeH = h / 3;
+
+  // Saffron
+  ctx.fillStyle = '#FF9933';
+  ctx.fillRect(x, y, w, stripeH);
+
+  // White
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(x, y + stripeH, w, stripeH);
+
+  // Green
+  ctx.fillStyle = '#138808';
+  ctx.fillRect(x, y + stripeH * 2, w, stripeH);
+
+  // Outer border for flag
+  ctx.strokeStyle = '#94A3B8';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w, h);
+
+  // Ashoka Chakra in center
+  const cx = x + w / 2;
+  const cy = y + stripeH * 1.5;
+  const radius = stripeH * 0.42;
+
+  ctx.strokeStyle = '#000080';
+  ctx.fillStyle = '#000080';
+  ctx.lineWidth = Math.max(1, radius * 0.12);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius * 0.2, 0, 2 * Math.PI);
+  ctx.fill();
+
+  for (let i = 0; i < 24; i++) {
+    const angle = (i * 2 * Math.PI) / 24;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
+/**
  * Draw Guilloche anti-counterfeit security patterns
  */
 export const drawGuillochePattern = (
@@ -90,32 +147,38 @@ export const drawGuillochePattern = (
 };
 
 /**
- * Draw the Ashoka Lion Capital (Three Lions) emblem on Canvas
+ * Clean multi-line text wrapping helper for Canvas
  */
-export const drawAshokaLion = async (
+export const wrapCanvasText = (
   ctx: CanvasRenderingContext2D,
+  text: string,
   x: number,
   y: number,
-  w: number,
-  h: number
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number = 3
 ) => {
-  try {
-    const lionImg = await loadCanvasImage('/images/ashoka-emblem.svg');
-    ctx.drawImage(lionImg, x, y, w, h);
-  } catch {
-    // Fallback vector representation if SVG load fails
-    ctx.save();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h * 0.35, w * 0.35, 0, 2 * Math.PI);
-    ctx.fill();
-    drawAshokaChakra(ctx, x + w / 2, y + h * 0.65, w * 0.25, 0.9);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText("सत्यमेव जयते", x + w / 2, y + h - 2);
-    ctx.restore();
+  const words = text.split(' ');
+  let line = '';
+  let lineCount = 0;
+
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && n > 0) {
+      ctx.fillText(line.trim(), x, y);
+      line = words[n] + ' ';
+      y += lineHeight;
+      lineCount++;
+      if (lineCount >= maxLines - 1) {
+        ctx.fillText(words.slice(n).join(' '), x, y);
+        return;
+      }
+    } else {
+      line = testLine;
+    }
   }
+  ctx.fillText(line.trim(), x, y);
 };
 
 /**
@@ -140,10 +203,10 @@ export const renderFrontCardCanvas = async (
   const cardTitle = `INDIAN ${categoryName} ID CARD`;
   const gender = (options.gender || 'Male').toUpperCase();
   const skillLevel = (options.skillLevelLabel || 'Skilled Professional').toUpperCase();
-  const idNumber = options.idCardNumber || '3617 0760 1001';
+  const idNumber = options.idCardNumber || '1001';
   const issueDateStr = options.issueDateStr || '11/2026';
   const validThruStr = options.validThruStr || '11/2028';
-  const disclaimer = options.disclaimerText || 'This ID card is issued by FixBro Private Platform for verified partner identification. Not a Government of India document.';
+  const disclaimer = options.disclaimerText || 'This ID card is issued by FixBro Private Platform for verified service partner identification, and is NOT issued by the Government.';
 
   // 1. Background Base
   ctx.save();
@@ -171,37 +234,20 @@ export const renderFrontCardCanvas = async (
 
   // 3. Header Background (Deep Blue/Navy)
   ctx.fillStyle = '#0F172A';
-  ctx.fillRect(0, 32, w, 90);
+  ctx.fillRect(0, 32, w, 76);
 
-  // Ashoka Lion Emblem (Three Lions)
-  await drawAshokaLion(ctx, 42, 38, 54, 76);
-
-  // Header Title: INDIAN [CATEGORY] ID CARD
+  // Header Title CENTERED: INDIAN [CATEGORY] ID CARD (No lion, no verified badge, no subtitle)
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 27px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(cardTitle, 114, 72);
-
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("VERIFIED SERVICE PROFESSIONAL  •  सेवा पेशेवर पहचान पत्र", 114, 100);
-
-  // FixBro Verified Pill on Top Right
-  ctx.fillStyle = '#10B981';
-  ctx.beginPath();
-  ctx.roundRect(w - 200, 56, 160, 40, 8);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 32px "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText("✓ VERIFIED", w - 120, 81);
+  ctx.fillText(cardTitle, w / 2, 80);
   ctx.textAlign = 'start';
 
-  // 4. PHOTO FRAME (Left Column) - Made Bigger as requested!
+  // 4. PHOTO FRAME (Left Column) - Clean, Big, NO SIM CARD / NO BADGES
   const photoX = 50;
   const photoY = 145;
-  const photoW = 230;
-  const photoH = 280;
+  const photoW = 240;
+  const photoH = 300;
 
   ctx.strokeStyle = '#0F172A';
   ctx.lineWidth = 3;
@@ -222,82 +268,73 @@ export const renderFrontCardCanvas = async (
       ctx.restore();
     } catch {
       ctx.fillStyle = '#475569';
-      ctx.font = 'bold 60px sans-serif';
+      ctx.font = 'bold 64px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 20);
+      ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 22);
       ctx.textAlign = 'start';
     }
   } else {
     ctx.fillStyle = '#475569';
-    ctx.font = 'bold 60px sans-serif';
+    ctx.font = 'bold 64px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 20);
+    ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 22);
     ctx.textAlign = 'start';
   }
 
-  // Verification Badge below photo (NO SIM CARD!)
-  ctx.fillStyle = '#0F172A';
-  ctx.beginPath();
-  ctx.roundRect(photoX, photoY + photoH + 16, photoW, 36, 6);
-  ctx.fill();
-
-  ctx.fillStyle = '#34D399';
-  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText("✓ KYC & POLICE VERIFIED", photoX + photoW / 2, photoY + photoH + 39);
-  ctx.textAlign = 'start';
-
   // 5. DETAILS (Right Column)
-  const textX = 310;
+  const textX = 320;
   let textY = 175;
 
-  // Name (Bigger as requested)
+  // Name (Bigger)
   ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
   ctx.fillText("NAME OF SERVICE PROFESSIONAL / नाम:", textX, textY);
 
-  textY += 34;
+  textY += 36;
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 30px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 32px "Segoe UI", Roboto, sans-serif';
   const splitName = providerName.length > 25 ? `${providerName.substring(0, 24)}...` : providerName;
   ctx.fillText(splitName, textX, textY);
 
+  // Indian Flag on the Right Side (Empty Space beside Name)
+  drawIndianFlagCanvas(ctx, w - 170, 150, 120, 80);
+
   // Gender / लिंग
-  textY += 36;
+  textY += 38;
   ctx.fillStyle = '#334155';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
   ctx.fillText(`लिंग / GENDER:  ${gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender}`, textX, textY);
 
-  // Trade / व्यवसाय Badge
-  textY += 34;
+  // Trade / व्यवसाय Badge (Bigger as requested)
+  textY += 38;
   ctx.fillStyle = '#0284C7';
   ctx.beginPath();
-  ctx.roundRect(textX, textY - 24, 380, 34, 6);
+  ctx.roundRect(textX, textY - 26, 420, 38, 6);
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`TRADE: ${categoryName}`, textX + 16, textY);
+  ctx.font = 'bold 19px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`TRADE / व्यवसाय:  ${categoryName}`, textX + 16, textY);
 
-  // Skill Level / कौशल स्तर
-  textY += 40;
+  // Skill Level / कौशल स्तर (Bigger as requested)
+  textY += 44;
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
   ctx.fillText(`SKILL LEVEL / कौशल स्तर:  ${skillLevel}`, textX, textY);
 
-  // Issue & Valid Thru
-  textY += 34;
-  ctx.fillStyle = '#64748B';
-  ctx.font = '16px "Segoe UI", Roboto, sans-serif';
+  // Issue & Valid Thru (Bigger as requested)
+  textY += 38;
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
   ctx.fillText(`ISSUED: ${issueDateStr}`, textX, textY);
   ctx.fillStyle = '#059669';
-  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`VALID THRU: ${validThruStr}`, textX + 220, textY);
+  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`VALID THRU: ${validThruStr}`, textX + 240, textY);
 
-  // 6. RED/SLATE BOXED DISCLAIMER (Aadhaar Style)
+  // 6. RED BOXED DISCLAIMER (Wraps to line 2/3 properly!)
   const boxX = textX;
-  const boxY = textY + 20;
-  const boxW = 650;
-  const boxH = 58;
+  const boxY = textY + 22;
+  const boxW = 640;
+  const boxH = 68;
 
   ctx.strokeStyle = '#EF4444';
   ctx.lineWidth = 1.5;
@@ -308,12 +345,10 @@ export const renderFrontCardCanvas = async (
   ctx.stroke();
 
   ctx.fillStyle = '#991B1B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("NOTICE: " + disclaimer, boxX + 12, boxY + 24);
-  ctx.font = '11.5px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("यह पहचान पत्र निजी मंच द्वारा सत्यापित साथी पहचान हेतु जारी किया गया है, यह सरकारी दस्तावेज नहीं है।", boxX + 12, boxY + 44);
+  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
+  wrapCanvasText(ctx, `NOTICE: ${disclaimer}`, boxX + 12, boxY + 24, boxW - 24, 20, 2);
 
-  // 7. BOTTOM: UNIQUE ID NUMBER (Large bold font like Aadhaar 3617 0760 6355)
+  // 7. BOTTOM: UNIQUE ID NUMBER (Large bold font)
   ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -322,7 +357,7 @@ export const renderFrontCardCanvas = async (
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 40px "Consolas", "Courier New", monospace';
+  ctx.font = 'bold 44px "Consolas", "Courier New", monospace';
   ctx.textAlign = 'center';
   ctx.fillText(idNumber, w / 2, h - 45);
   ctx.textAlign = 'start';
@@ -362,10 +397,8 @@ export const renderBackCardCanvas = async (
 
   const categoryName = (options.categoryName || 'General').toUpperCase();
   const cardTitle = `INDIAN ${categoryName} ID CARD`;
-  const address = options.residentialAddress || 'Address not registered with FixBro';
-  const idNumber = options.idCardNumber || '3617 0760 1001';
-  const helpline = options.helplinePhone || '+91 8000 123 456';
-  const signatory = options.signatoryName || 'Authorized Signatory - FixBro';
+  const address = options.residentialAddress || 'Address on record with FixBro';
+  const idNumber = options.idCardNumber || '1001';
   const verifyUrl = options.verifyUrl || `https://fixbro.in/verify/provider/${idNumber.replace(/\s+/g, '')}`;
 
   ctx.save();
@@ -387,37 +420,33 @@ export const renderBackCardCanvas = async (
   ctx.fillStyle = '#0F172A';
   ctx.fillRect(0, 32, w, 70);
 
-  // Ashoka Lion Emblem
-  await drawAshokaLion(ctx, 42, 38, 44, 58);
-
+  // Header Title CENTERED (No lions, no subtitle)
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(cardTitle, 104, 66);
+  ctx.font = 'bold 30px "Segoe UI", Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(cardTitle, w / 2, 76);
+  ctx.textAlign = 'start';
 
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("VERIFICATION & REGISTRATION DETAILS  •  सत्यापन एवं संपर्क विवरण", 104, 88);
-
-  // LEFT COLUMN: Residential Address & Contact
-  const addrX = 55;
-  let addrY = 145;
+  // LEFT COLUMN: Residential Address (Bigger) & Indian Flag Below It
+  const addrX = 60;
+  let addrY = 150;
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 24px "Segoe UI", Roboto, sans-serif';
   ctx.fillText("पता / ADDRESS:", addrX, addrY);
 
-  addrY += 28;
+  addrY += 34;
   ctx.fillStyle = '#334155';
-  ctx.font = '17px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
 
   // Format multiline address neatly
   const words = address.split(' ');
   let curLine = '';
   for (const word of words) {
     const testLine = curLine ? `${curLine} ${word}` : word;
-    if (ctx.measureText(testLine).width > 560) {
+    if (ctx.measureText(testLine).width > 540) {
       ctx.fillText(curLine, addrX, addrY);
-      addrY += 28;
+      addrY += 32;
       curLine = word;
     } else {
       curLine = testLine;
@@ -425,51 +454,35 @@ export const renderBackCardCanvas = async (
   }
   if (curLine) {
     ctx.fillText(curLine, addrX, addrY);
-    addrY += 28;
+    addrY += 32;
   }
 
-  // Customer Support & Helpline
-  addrY = Math.max(addrY + 10, 280);
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("CUSTOMER SUPPORT / ग्राहक सहायता:", addrX, addrY);
+  // Gap below address: ADD INDIAN FLAG!
+  const flagY = Math.max(addrY + 18, 310);
+  drawIndianFlagCanvas(ctx, addrX, flagY, 135, 90);
 
-  addrY += 24;
-  ctx.fillStyle = '#0284C7';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`📞 ${helpline}   |   🌐 www.fixbro.in`, addrX, addrY);
-
-  // Digital Signatory
-  addrY += 40;
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(addrX, addrY);
-  ctx.lineTo(addrX + 260, addrY);
-  ctx.stroke();
-
+  // Digital Signatory next to flag
   ctx.fillStyle = '#1E3A8A';
   ctx.font = 'italic bold 22px "Brush Script MT", cursive, Georgia, serif';
-  ctx.fillText("FixBro Verification Authority", addrX + 15, addrY - 8);
-
+  ctx.fillText("FixBro Authority", addrX + 160, flagY + 45);
   ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(signatory, addrX + 15, addrY + 18);
+  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(options.signatoryName || "Authorized Signatory", addrX + 160, flagY + 70);
 
-  // RIGHT COLUMN: Large QR Code (Aadhaar Style)
-  const qrX = 680;
-  const qrY = 125;
-  const qrSize = 270;
+  // RIGHT COLUMN: Large QR Code
+  const qrX = 660;
+  const qrY = 135;
+  const qrSize = 280;
 
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.roundRect(qrX, qrY, qrSize, qrSize, 12);
   ctx.fill();
   ctx.stroke();
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(verifyUrl)}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(verifyUrl)}`;
   try {
     const qrImg = await loadCanvasImage(qrApiUrl);
     ctx.drawImage(qrImg, qrX + 10, qrY + 10, qrSize - 20, qrSize - 20);
@@ -483,10 +496,10 @@ export const renderBackCardCanvas = async (
   }
 
   ctx.fillStyle = '#475569';
-  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText("SCAN WITH SMARTPHONE TO VERIFY", qrX + qrSize / 2, qrY + qrSize + 24);
-  ctx.fillText("क्यूआर कोड स्कैन करके सत्यापन करें", qrX + qrSize / 2, qrY + qrSize + 42);
+  ctx.fillText("SCAN WITH SMARTPHONE TO VERIFY", qrX + qrSize / 2, qrY + qrSize + 26);
+  ctx.fillText("क्यूआर कोड स्कैन करके सत्यापन करें", qrX + qrSize / 2, qrY + qrSize + 46);
   ctx.textAlign = 'start';
 
   // BOTTOM: UNIQUE ID NUMBER
@@ -498,13 +511,13 @@ export const renderBackCardCanvas = async (
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 38px "Consolas", "Courier New", monospace';
+  ctx.font = 'bold 44px "Consolas", "Courier New", monospace';
   ctx.textAlign = 'center';
   ctx.fillText(idNumber, w / 2, h - 50);
 
   // Legal Notice
   ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
   ctx.fillText("This ID card is issued by a private platform (FixBro) for partner verification, not issued by government.", w / 2, h - 30);
   ctx.textAlign = 'start';
 
@@ -532,17 +545,13 @@ export const generatePvcPdf = (
   backDataUrl: string,
   fileName: string = 'FixBro_PVC_ID_Card.pdf'
 ) => {
-  // CR80 Plastic Card Dimensions: 85.6mm x 53.98mm
   const pdf = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
     format: [85.6, 53.98],
   });
 
-  // Page 1: Front
   pdf.addImage(frontDataUrl, 'PNG', 0, 0, 85.6, 53.98);
-
-  // Page 2: Back
   pdf.addPage([85.6, 53.98], 'landscape');
   pdf.addImage(backDataUrl, 'PNG', 0, 0, 85.6, 53.98);
 

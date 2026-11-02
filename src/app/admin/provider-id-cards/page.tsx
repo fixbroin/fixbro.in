@@ -33,8 +33,20 @@ import PermissionGuard from "@/components/admin/PermissionGuard";
 import ProviderIdCardModal from "@/components/admin/ProviderIdCardModal";
 import { 
   getProvidersWithIdCardsAction, 
-  getProviderIdCardSettingsAction 
+  getProviderIdCardSettingsAction,
+  deleteOrResetProviderIdCardAction,
 } from "@/app/actions/providerIdCardActions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Trash2, RotateCcw } from "lucide-react";
 import type { ProviderIdCardRecord, ProviderIdCardSettings } from "@/types/providerAreaAndId";
 import { DEFAULT_ID_CARD_SETTINGS } from "@/types/providerAreaAndId";
 
@@ -53,6 +65,29 @@ export default function AdminProviderIdCardsPage() {
   const [selectedProvider, setSelectedProvider] = useState<ProviderIdCardRecord | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Reset / Delete state
+  const [providerToReset, setProviderToReset] = useState<ProviderIdCardRecord | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleConfirmReset = async () => {
+    if (!providerToReset) return;
+    setIsResetting(true);
+    try {
+      const result = await deleteOrResetProviderIdCardAction(providerToReset.providerId);
+      if (result.success) {
+        toast({ title: "Card Reset", description: result.message });
+        setProviderToReset(null);
+        await loadData();
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to reset card", variant: "destructive" });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -489,15 +524,29 @@ export default function AdminProviderIdCardsPage() {
 
                         {/* Actions */}
                         <TableCell className="py-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewCard(r)}
-                            className="h-8 text-xs font-semibold gap-1.5"
-                          >
-                            <Eye className="h-3.5 w-3.5 text-primary" />
-                            View Card
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewCard(r)}
+                              className="h-8 text-xs font-semibold gap-1.5"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-primary" />
+                              View Card
+                            </Button>
+
+                            {r.idCardGenerated && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setProviderToReset(r)}
+                                className="h-8 px-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-200 dark:border-rose-900/40"
+                                title="Reset / Delete ID Card so provider can regenerate"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -518,6 +567,35 @@ export default function AdminProviderIdCardsPage() {
           helplinePhone={settings.helplineNumber}
           disclaimerText={settings.disclaimerText}
         />
+
+        {/* Delete / Reset ID Card Alert Dialog */}
+        <AlertDialog open={!!providerToReset} onOpenChange={(open) => !open && setProviderToReset(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-rose-600">
+                <RotateCcw className="h-5 w-5" /> Reset & Delete Provider ID Card?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2 text-xs">
+                <p>
+                  Are you sure you want to reset the generated ID card for <strong>{providerToReset?.fullName}</strong>?
+                </p>
+                <p>
+                  This will clear their assigned ID card number, purchase status, and download records. The provider will then be able to generate a fresh ID card with your latest sequence and prefix settings.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmReset}
+                disabled={isResetting}
+                className="bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                {isResetting ? "Resetting..." : "Reset & Delete Card"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </PermissionGuard>
   );
