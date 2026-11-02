@@ -31,6 +31,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import PermissionGuard from "@/components/admin/PermissionGuard";
 import ProviderIdCardModal from "@/components/admin/ProviderIdCardModal";
+import ProviderIdCardSettingsTab from "@/components/admin/provider-controls/ProviderIdCardSettingsTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   getProvidersWithIdCardsAction, 
   getProviderIdCardSettingsAction,
@@ -58,6 +60,7 @@ export default function AdminProviderIdCardsPage() {
   const [records, setRecords] = useState<ProviderIdCardRecord[]>([]);
   const [settings, setSettings] = useState<ProviderIdCardSettings>(DEFAULT_ID_CARD_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
+  const [mainTab, setMainTab] = useState<'cards_list' | 'card_settings'>('cards_list');
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<'all_generated' | 'purchased' | 'pending_payment' | 'all_approved'>('all_generated');
   
@@ -187,11 +190,19 @@ export default function AdminProviderIdCardsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href="/admin/provider-controls">
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs font-semibold">
-                <Settings className="h-3.5 w-3.5" /> ID Card Settings
-              </Button>
-            </Link>
+            <Button
+              variant={mainTab === 'card_settings' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                const nextTab = mainTab === 'card_settings' ? 'cards_list' : 'card_settings';
+                setMainTab(nextTab);
+                if (nextTab === 'cards_list') loadData();
+              }}
+              className="h-9 gap-1.5 text-xs font-semibold"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              {mainTab === 'card_settings' ? 'View Cards List' : 'ID Card Settings'}
+            </Button>
 
             <Button
               variant="outline"
@@ -204,6 +215,21 @@ export default function AdminProviderIdCardsPage() {
             </Button>
           </div>
         </div>
+
+        {/* Main Tabs Navigation */}
+        <Tabs value={mainTab} onValueChange={(val: any) => { setMainTab(val); if (val === 'cards_list') loadData(); }} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsTrigger value="cards_list" className="flex items-center gap-2 font-semibold">
+              <Contact2 className="h-4 w-4" />
+              Generated ID Cards
+            </TabsTrigger>
+            <TabsTrigger value="card_settings" className="flex items-center gap-2 font-semibold">
+              <Settings className="h-4 w-4" />
+              ID Card Settings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cards_list" className="space-y-6 mt-0">
 
         {/* Metric Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -556,6 +582,12 @@ export default function AdminProviderIdCardsPage() {
             </Table>
           </div>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="card_settings" className="mt-0">
+        <ProviderIdCardSettingsTab />
+      </TabsContent>
+    </Tabs>
 
         {/* Card Preview and Download Modal */}
         <ProviderIdCardModal
