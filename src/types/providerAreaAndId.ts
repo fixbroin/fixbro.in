@@ -37,3 +37,42 @@ export interface PendingLocationChangeItem {
   photoUrl?: string;
   request: SerializedLocationChangeRequest;
 }
+
+export function formatTechnicianId(uid: string): string {
+  const cleanHash = (uid || 'FXB1001').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
+  return `FXB - ${cleanHash.slice(0, 4)} - ${cleanHash.slice(4, 8) || '2026'}`;
+}
+
+export interface ProviderIdCardRecord {
+  providerId: string;
+  fullName: string;
+  mobileNumber?: string;
+  email?: string;
+  profilePhotoUrl?: string;
+  workCategoryName?: string;
+  workAreaAddress?: string;
+  technicianId: string;
+  status: string;
+
+  // ID Card Generation & Unlock Info
+  idCardGenerated: boolean;
+  idCardGeneratedAt?: number | null;
+  idCardUnlocked: boolean;
+  idCardUnlockedAt?: number | null;
+  idCardPaymentId?: string | null;
+  idCardOrderId?: string | null;
+  idCardPaidAmount?: number;
+
+  // Downloads metrics
+  idCardDownloadCount: number;
+  idCardPdfDownloadCount: number;
+  idCardFrontPngDownloadCount: number;
+  idCardBackPngDownloadCount: number;
+  idCardLastDownloadedAt?: number | null;
+  idCardDownloads?: Array<{
+    type: 'pdf' | 'front_png' | 'back_png';
+    downloadedAt: number;
+    id?: string;
+  }>;
+}
+

@@ -1480,6 +1480,25 @@ export interface ProviderApplication {
   withdrawableBalance?: number;
   totalEarnings?: number;
   totalDeductions?: number;
+
+  // Provider ID Card Generation, Purchase & Download Tracking
+  idCardGenerated?: boolean;
+  idCardGeneratedAt?: Timestamp | any;
+  idCardUnlocked?: boolean;
+  idCardUnlockedAt?: Timestamp | any;
+  idCardPaymentId?: string | null;
+  idCardOrderId?: string | null;
+  idCardPaidAmount?: number;
+  idCardDownloadCount?: number;
+  idCardPdfDownloadCount?: number;
+  idCardFrontPngDownloadCount?: number;
+  idCardBackPngDownloadCount?: number;
+  idCardLastDownloadedAt?: Timestamp | any;
+  idCardDownloads?: Array<{
+    type: 'pdf' | 'front_png' | 'back_png';
+    downloadedAt: number;
+    id?: string;
+  }>;
 }
 
 

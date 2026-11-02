@@ -32,6 +32,8 @@ import type { ProviderApplication, FirestoreUser } from '@/types/firestore';
 import { 
   getProviderIdCardSettingsAction, 
   unlockProviderIdCardAction, 
+  recordIdCardGenerationAction,
+  trackIdCardDownloadAction,
 } from '@/app/actions/providerIdCardActions';
 import { type ProviderIdCardSettings, DEFAULT_ID_CARD_SETTINGS } from '@/types/providerAreaAndId';
 import { jsPDF } from 'jspdf';
@@ -73,7 +75,11 @@ export default function ProviderIdCardPage() {
       setIdCardSettings(settings);
 
       if (appSnap.exists()) {
-        setProviderApp(appSnap.data() as ProviderApplication);
+        const appData = appSnap.data() as ProviderApplication;
+        setProviderApp(appData);
+        if (appData.status === 'approved' && providerUser?.uid) {
+          recordIdCardGenerationAction(providerUser.uid).catch(console.error);
+        }
       }
       if (userSnap.exists()) {
         setUserProfile(userSnap.data() as FirestoreUser);
@@ -189,6 +195,7 @@ export default function ProviderIdCardPage() {
               const unlockResult = await unlockProviderIdCardAction(providerUser.uid, {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
+                amount: idCardSettings.downloadFee,
               });
               if (unlockResult.success) {
                 toast({ title: "Unlocked!", description: "Official PVC ID Card is now permanently unlocked." });
@@ -709,6 +716,9 @@ export default function ProviderIdCardPage() {
       a.href = dataUrl;
       a.download = `FixBro_ID_Front_${cleanHash}.png`;
       a.click();
+      if (providerUser?.uid) {
+        trackIdCardDownloadAction(providerUser.uid, 'front_png').catch(console.error);
+      }
       toast({ title: "Downloaded!", description: "Front ID card image saved in 300 DPI high resolution." });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate front image.", variant: "destructive" });
@@ -726,6 +736,9 @@ export default function ProviderIdCardPage() {
       a.href = dataUrl;
       a.download = `FixBro_ID_Back_${cleanHash}.png`;
       a.click();
+      if (providerUser?.uid) {
+        trackIdCardDownloadAction(providerUser.uid, 'back_png').catch(console.error);
+      }
       toast({ title: "Downloaded!", description: "Back ID card image saved in 300 DPI high resolution." });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate back image.", variant: "destructive" });
@@ -756,6 +769,9 @@ export default function ProviderIdCardPage() {
       pdf.addImage(backDataUrl, 'PNG', 0, 0, 85.6, 53.98);
 
       pdf.save(`FixBro_PVC_ID_Card_${cleanHash}.pdf`);
+      if (providerUser?.uid) {
+        trackIdCardDownloadAction(providerUser.uid, 'pdf').catch(console.error);
+      }
       toast({ 
         title: "PVC Print PDF Downloaded!", 
         description: "Standard CR80 85.6mm x 54mm PDF ready for plastic ID card printers." 
