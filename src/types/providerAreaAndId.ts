@@ -19,9 +19,9 @@ export const DEFAULT_ID_CARD_SETTINGS: ProviderIdCardSettings = {
   validityYears: 2,
   validityMonths: 0,
   signatoryName: "Authorized Signatory - FixBro",
-  helplineNumber: "+91 8000 123 456",
+  helplineNumber: "+91 7353113455",
   idNumberPrefix: "",
-  idNumberStartingSeq: 361707601001,
+  idNumberStartingSeq: 1001,
   disclaimerText: "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.",
 };
 

@@ -209,7 +209,6 @@ export const renderFrontCardCanvas = async (
   const idNumber = options.idCardNumber || '1001';
   const issueDateStr = options.issueDateStr || '11/2026';
   const validThruStr = options.validThruStr || '11/2028';
-  const disclaimer = options.disclaimerText || 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
 
   // 1. Background Base
   ctx.save();
@@ -225,35 +224,35 @@ export const renderFrontCardCanvas = async (
 
   // Security Pattern & Background Ashoka Chakra Watermark
   drawGuillochePattern(ctx, w, h);
-  drawAshokaChakra(ctx, w / 2 + 100, h / 2 + 20, 140, 0.04);
+  drawAshokaChakra(ctx, w / 2 + 100, h / 2 + 20, 150, 0.04);
 
   // 2. TOP BANNER: Indian Tricolor Band (Saffron, White, Green)
   ctx.fillStyle = '#FF9933';
-  ctx.fillRect(0, 0, w, 12);
+  ctx.fillRect(0, 0, w, 10);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 12, w, 8);
+  ctx.fillRect(0, 10, w, 6);
   ctx.fillStyle = '#138808';
-  ctx.fillRect(0, 20, w, 12);
+  ctx.fillRect(0, 16, w, 10);
 
   // 3. Header Background (Deep Blue/Navy)
   ctx.fillStyle = '#0F172A';
-  ctx.fillRect(0, 32, w, 76);
+  ctx.fillRect(0, 26, w, 72);
 
-  // Header Title CENTERED: INDIAN [CATEGORY] ID CARD (No lion, no verified badge, no subtitle)
+  // Header Title CENTERED: INDIAN [CATEGORY] ID CARD
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 32px "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(cardTitle, w / 2, 80);
+  ctx.fillText(cardTitle, w / 2, 73);
   ctx.textAlign = 'start';
 
-  // 4. PHOTO FRAME (Left Column) - Clean, Big, NO SIM CARD / NO BADGES
-  const photoX = 50;
-  const photoY = 145;
-  const photoW = 240;
-  const photoH = 300;
+  // 4. PHOTO FRAME (Left Column) - Fills height cleanly from y=106 to y=526 (420px tall)
+  const photoX = 35;
+  const photoY = 106;
+  const photoW = 285;
+  const photoH = 420;
 
   ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.5;
   ctx.fillStyle = '#E2E8F0';
   ctx.beginPath();
   ctx.roundRect(photoX, photoY, photoW, photoH, 10);
@@ -271,69 +270,75 @@ export const renderFrontCardCanvas = async (
       ctx.restore();
     } catch {
       ctx.fillStyle = '#475569';
-      ctx.font = 'bold 64px sans-serif';
+      ctx.font = 'bold 80px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 22);
+      ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 28);
       ctx.textAlign = 'start';
     }
   } else {
     ctx.fillStyle = '#475569';
-    ctx.font = 'bold 64px sans-serif';
+    ctx.font = 'bold 80px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 22);
+    ctx.fillText(providerName.charAt(0), photoX + photoW / 2, photoY + photoH / 2 + 28);
     ctx.textAlign = 'start';
   }
 
-  // 5. DETAILS (Right Column)
-  const textX = 320;
-  let textY = 175;
+  // 5. DETAILS (Right Column) - Expanded to utilize all available space
+  const textX = 345;
+  const rightBoundary = w - 35;
+  const detailsWidth = rightBoundary - textX;
 
-  // Name (Bigger)
+  // Indian Flag on the Right Side (beside name)
+  const flagW = 128;
+  const flagH = 84;
+  drawIndianFlagCanvas(ctx, rightBoundary - flagW, 106, flagW, flagH);
+
+  // Name Label
   ctx.fillStyle = '#64748B';
   ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("NAME OF SERVICE PROFESSIONAL / नाम:", textX, textY);
+  ctx.fillText("NAME OF SERVICE PROFESSIONAL / नाम:", textX, 128);
 
-  textY += 36;
+  // Name (Larger & Bolder)
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 32px "Segoe UI", Roboto, sans-serif';
-  const splitName = providerName.length > 25 ? `${providerName.substring(0, 24)}...` : providerName;
-  ctx.fillText(splitName, textX, textY);
+  ctx.font = 'bold 36px "Segoe UI", Roboto, sans-serif';
+  const maxNameWidth = detailsWidth - flagW - 15;
+  let splitName = providerName;
+  if (ctx.measureText(splitName).width > maxNameWidth) {
+    while (splitName.length > 3 && ctx.measureText(`${splitName}...`).width > maxNameWidth) {
+      splitName = splitName.slice(0, -1);
+    }
+    splitName = `${splitName}...`;
+  }
+  ctx.fillText(splitName, textX, 168);
 
-  // Indian Flag on the Right Side (Empty Space beside Name)
-  drawIndianFlagCanvas(ctx, w - 170, 150, 120, 80);
-
-  // Gender / लिंग & DOB
-  textY += 38;
-  ctx.fillStyle = '#334155';
-  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
+  // Gender & DOB
+  ctx.fillStyle = '#1E293B';
+  ctx.font = 'bold 22px "Segoe UI", Roboto, sans-serif';
   const genderLabel = gender === 'MALE' ? 'MALE / पुरुष' : gender === 'FEMALE' ? 'FEMALE / महिला' : gender;
-  const dobLabel = options.dob ? `   DOB: ${options.dob}` : '';
-  ctx.fillText(`लिंग / GENDER:  ${genderLabel}${dobLabel}`, textX, textY);
+  const dobLabel = options.dob ? `     DOB: ${options.dob}` : '';
+  ctx.fillText(`लिंग / GENDER:  ${genderLabel}${dobLabel}`, textX, 212);
 
-  // Trade / व्यवसाय Badge (Bigger as requested)
-  textY += 38;
+  // Trade / व्यवसाय Badge (Taller, wider, and bolder)
   ctx.fillStyle = '#0284C7';
   ctx.beginPath();
-  ctx.roundRect(textX, textY - 26, 420, 38, 6);
+  ctx.roundRect(textX, 230, detailsWidth, 48, 8);
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 19px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`TRADE / व्यवसाय:  ${categoryName}`, textX + 16, textY);
+  ctx.font = 'bold 24px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`TRADE / व्यवसाय:  ${categoryName}`, textX + 18, 263);
 
-  // Skill Level / कौशल स्तर (Bigger as requested)
-  textY += 44;
+  // Skill Level / कौशल स्तर
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 20px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`SKILL LEVEL / कौशल स्तर:  ${skillLevel}`, textX, textY);
+  ctx.font = 'bold 23px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`SKILL LEVEL / कौशल स्तर:  ${skillLevel}`, textX, 314);
 
-  // Issue & Valid Thru (Bigger as requested)
-  textY += 38;
+  // Issue & Valid Thru
   ctx.fillStyle = '#475569';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`ISSUED: ${issueDateStr}`, textX, textY);
+  ctx.font = 'bold 21px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`ISSUED: ${issueDateStr}`, textX, 355);
   ctx.fillStyle = '#059669';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`VALID THRU: ${validThruStr}`, textX + 240, textY);
+  ctx.font = 'bold 21px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`VALID THRU: ${validThruStr}`, textX + 270, 355);
 
   // 6. RED BOXED DISCLAIMER (Generalized, no FixBro mention)
   let cleanDisclaimer = options.disclaimerText || 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
@@ -342,9 +347,9 @@ export const renderFrontCardCanvas = async (
   }
 
   const boxX = textX;
-  const boxY = textY + 14;
-  const boxW = 640;
-  const boxH = 56;
+  const boxY = 376;
+  const boxW = detailsWidth;
+  const boxH = 64;
 
   ctx.strokeStyle = '#EF4444';
   ctx.lineWidth = 1.5;
@@ -355,56 +360,64 @@ export const renderFrontCardCanvas = async (
   ctx.stroke();
 
   ctx.fillStyle = '#991B1B';
-  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
-  wrapCanvasText(ctx, `NOTICE: ${cleanDisclaimer}`, boxX + 12, boxY + 20, boxW - 24, 18, 2);
+  ctx.font = 'bold 13.5px "Segoe UI", Roboto, sans-serif';
+  wrapCanvasText(ctx, `NOTICE: ${cleanDisclaimer}`, boxX + 12, boxY + 22, boxW - 24, 20, 2);
 
-  // 7. CARDHOLDER SIGNATURE (Below Notice)
-  const sigY = boxY + boxH + 6;
+  // 7. CARDHOLDER SIGNATURE & SECURITY NOTE (Below Notice)
+  const sigY = 448;
   const titleCaseName = providerName
     .toLowerCase()
     .split(' ')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
 
-  const sigRightX = boxX + boxW - 10;
+  // Left side under notice: Partner verification assurance
+  ctx.fillStyle = '#0284C7';
+  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("Certified Skilled Partner", boxX, sigY + 22);
+  ctx.fillStyle = '#64748B';
+  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("Verified Work Credential • Non-Transferable", boxX, sigY + 44);
+
+  // Right side: Signature in cursive script font
+  const sigRightX = boxX + boxW - 8;
   ctx.textAlign = 'right';
 
-  // Digital Signature in cursive script font
   ctx.fillStyle = '#1E3A8A';
-  ctx.font = 'italic 26px "Brush Script MT", "Caveat", "Segoe Script", cursive, Georgia, serif';
+  ctx.font = 'italic 32px "Brush Script MT", "Caveat", "Segoe Script", cursive, Georgia, serif';
   ctx.fillText(titleCaseName, sigRightX, sigY + 22);
 
   // Signature line
   const nameMetrics = ctx.measureText(titleCaseName);
-  const lineW = Math.max(180, nameMetrics.width + 20);
+  const lineW = Math.max(200, nameMetrics.width + 20);
   ctx.strokeStyle = '#94A3B8';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(sigRightX - lineW, sigY + 28);
-  ctx.lineTo(sigRightX, sigY + 28);
+  ctx.moveTo(sigRightX - lineW, sigY + 30);
+  ctx.lineTo(sigRightX, sigY + 30);
   ctx.stroke();
 
   // Signature label
   ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 11px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("हस्ताक्षर / Cardholder Signature", sigRightX, sigY + 44);
+  ctx.font = 'bold 12.5px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("हस्ताक्षर / Cardholder Signature", sigRightX, sigY + 48);
   ctx.textAlign = 'start';
 
-  // 8. BOTTOM: UNIQUE ID NUMBER (Large bold font)
-  ctx.strokeStyle = '#E2E8F0';
+  // 8. BOTTOM: UNIQUE ID NUMBER (Clean divider and large monospace number)
+  ctx.strokeStyle = '#CBD5E1';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(50, h - 85);
-  ctx.lineTo(w - 50, h - 85);
+  ctx.moveTo(35, 538);
+  ctx.lineTo(w - 35, 538);
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 44px "Consolas", "Courier New", monospace';
+  ctx.font = 'bold 56px "Consolas", "Courier New", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(idNumber, w / 2, h - 42);
+  ctx.fillText(idNumber, w / 2, 592);
   ctx.textAlign = 'start';
 
-  // 8. Bottom Tricolor Stripe
+  // 9. Bottom Tricolor Stripe
   ctx.fillStyle = '#FF9933';
   ctx.fillRect(0, h - 24, w, 8);
   ctx.fillStyle = '#FFFFFF';
@@ -452,127 +465,146 @@ export const renderBackCardCanvas = async (
 
   // Top Tricolor Stripe
   ctx.fillStyle = '#FF9933';
-  ctx.fillRect(0, 0, w, 12);
+  ctx.fillRect(0, 0, w, 10);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 12, w, 8);
+  ctx.fillRect(0, 10, w, 6);
   ctx.fillStyle = '#138808';
-  ctx.fillRect(0, 20, w, 12);
+  ctx.fillRect(0, 16, w, 10);
 
   // Top Header Background
   ctx.fillStyle = '#0F172A';
-  ctx.fillRect(0, 32, w, 70);
+  ctx.fillRect(0, 26, w, 72);
 
-  // Header Title CENTERED (No lions, no subtitle)
+  // Header Title CENTERED
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 30px "Segoe UI", Roboto, sans-serif';
+  ctx.font = 'bold 32px "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(cardTitle, w / 2, 76);
+  ctx.fillText(cardTitle, w / 2, 73);
   ctx.textAlign = 'start';
 
-  // LEFT COLUMN: Residential Address, Mobile, Email & Flag Below
-  const addrX = 60;
-  let addrY = 145;
-
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 22px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("पता / ADDRESS:", addrX, addrY);
-
-  addrY += 30;
-  ctx.fillStyle = '#334155';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-
-  // Format multiline address neatly
-  const words = address.split(' ');
-  let curLine = '';
-  for (const word of words) {
-    const testLine = curLine ? `${curLine} ${word}` : word;
-    if (ctx.measureText(testLine).width > 540) {
-      ctx.fillText(curLine, addrX, addrY);
-      addrY += 28;
-      curLine = word;
-    } else {
-      curLine = testLine;
-    }
-  }
-  if (curLine) {
-    ctx.fillText(curLine, addrX, addrY);
-    addrY += 28;
-  }
-
-  // 1. Mobile Number below address
-  const mobile = options.mobileNumber || '+91 73531 45565';
-  addrY += 6;
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`मोबाईल / MOBILE:  ${mobile}`, addrX, addrY);
-
-  // 2. Email below mobile
-  const email = options.email || 'provider@fixbro.in';
-  addrY += 26;
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 18px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText(`ईमेल / EMAIL:  ${email}`, addrX, addrY);
-
-  // 3. Indian Flag below email (Authority text removed as requested)
-  const flagY = addrY + 16;
-  const flagW = 125;
-  const flagH = 82;
-  drawIndianFlagCanvas(ctx, addrX, flagY, flagW, flagH);
-
-  // 4. Disclaimer text below flag (Not issued by government)
-  const noticeY = flagY + flagH + 22;
-  ctx.fillStyle = '#991B1B';
-  ctx.font = 'bold 13.5px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("This ID is not issued by Government.", addrX, noticeY);
-  ctx.fillStyle = '#DC2626';
-  ctx.font = '12px "Segoe UI", Roboto, sans-serif';
-  ctx.fillText("यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।", addrX, noticeY + 18);
-
-  // RIGHT COLUMN: Large QR Code
-  const qrX = 660;
-  const qrY = 135;
-  const qrSize = 280;
+  // RIGHT COLUMN: Large Verification QR Code (Positioned first to define left column width)
+  const qrSize = 320;
+  const qrX = w - 35 - qrSize; // 657
+  const qrY = 110;
 
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.roundRect(qrX, qrY, qrSize, qrSize, 12);
   ctx.fill();
   ctx.stroke();
 
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(verifyUrl)}`;
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(verifyUrl)}`;
   try {
     const qrImg = await loadCanvasImage(qrApiUrl);
-    ctx.drawImage(qrImg, qrX + 10, qrY + 10, qrSize - 20, qrSize - 20);
+    ctx.drawImage(qrImg, qrX + 12, qrY + 12, qrSize - 24, qrSize - 24);
   } catch {
     ctx.fillStyle = '#111827';
-    ctx.fillRect(qrX + 35, qrY + 35, 50, 50);
-    ctx.fillRect(qrX + qrSize - 85, qrY + 35, 50, 50);
-    ctx.fillRect(qrX + 35, qrY + qrSize - 85, 50, 50);
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText("SCAN TO VERIFY", qrX + 60, qrY + qrSize / 2);
+    ctx.fillRect(qrX + 35, qrY + 35, 60, 60);
+    ctx.fillRect(qrX + qrSize - 95, qrY + 35, 60, 60);
+    ctx.fillRect(qrX + 35, qrY + qrSize - 95, 60, 60);
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText("SCAN TO VERIFY", qrX + 65, qrY + qrSize / 2);
   }
 
-  ctx.fillStyle = '#475569';
-  ctx.font = 'bold 14px "Segoe UI", Roboto, sans-serif';
+  // QR Instructions below QR box
+  const qrCenterX = qrX + qrSize / 2;
   ctx.textAlign = 'center';
-  ctx.fillText("SCAN WITH SMARTPHONE TO VERIFY", qrX + qrSize / 2, qrY + qrSize + 26);
-  ctx.fillText("क्यूआर कोड स्कैन करके सत्यापन करें", qrX + qrSize / 2, qrY + qrSize + 46);
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("SCAN WITH SMARTPHONE TO VERIFY", qrCenterX, qrY + qrSize + 28);
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("क्यूआर कोड स्कैन करके सत्यापन करें", qrCenterX, qrY + qrSize + 50);
+  ctx.fillStyle = '#0284C7';
+  ctx.font = 'bold 13px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("Official Digital Verification Portal", qrCenterX, qrY + qrSize + 72);
   ctx.textAlign = 'start';
 
-  // BOTTOM: UNIQUE ID NUMBER (Clean, disclaimer below ID removed as requested)
-  ctx.strokeStyle = '#E2E8F0';
+  // LEFT COLUMN: Residential Address, Mobile, Email & Flag
+  const addrX = 35;
+  const maxAddrWidth = qrX - addrX - 25; // ~597px
+  let curY = 136;
+
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 25px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("पता / ADDRESS:", addrX, curY);
+
+  curY += 32;
+  ctx.fillStyle = '#334155';
+  ctx.font = 'bold 21px "Segoe UI", Roboto, sans-serif';
+
+  // Format multiline address neatly (up to 3 lines)
+  const words = address.split(' ');
+  let curLine = '';
+  let lineCount = 0;
+  for (const word of words) {
+    const testLine = curLine ? `${curLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxAddrWidth) {
+      ctx.fillText(curLine, addrX, curY);
+      curY += 28;
+      lineCount++;
+      curLine = word;
+      if (lineCount >= 3) {
+        break;
+      }
+    } else {
+      curLine = testLine;
+    }
+  }
+  if (curLine && lineCount < 3) {
+    ctx.fillText(curLine, addrX, curY);
+    curY += 28;
+  }
+
+  // 1. Mobile Number below address
+  const mobile = options.mobileNumber || '+91 73531 45565';
+  curY += 10;
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 22px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`मोबाईल / MOBILE:  ${mobile}`, addrX, curY);
+
+  // 2. Email below mobile
+  const email = options.email || 'provider@fixbro.in';
+  curY += 30;
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 22px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`ईमेल / EMAIL:  ${email}`, addrX, curY);
+
+  // 3. Indian Flag & Legal Disclaimer (Positioned neatly from y=415 to 515)
+  const flagY = Math.max(curY + 14, 415);
+  const flagW = 148;
+  const flagH = 98;
+  drawIndianFlagCanvas(ctx, addrX, flagY, flagW, flagH);
+
+  // 4. Disclaimer text beside flag
+  const discX = addrX + flagW + 18;
+  ctx.fillStyle = '#991B1B';
+  ctx.font = 'bold 16px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("This ID is not issued by Government.", discX, flagY + 28);
+  ctx.fillStyle = '#DC2626';
+  ctx.font = 'bold 14.5px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।", discX, flagY + 52);
+  ctx.fillStyle = '#475569';
+  ctx.font = 'bold 13.5px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("Private Skilled Professional Work ID Card", discX, flagY + 74);
+  ctx.fillStyle = '#64748B';
+  ctx.font = 'bold 12px "Segoe UI", Roboto, sans-serif';
+  ctx.fillText("FixBro Platform Partner Identification", discX, flagY + 92);
+
+  // BOTTOM: UNIQUE ID NUMBER (Clean divider and large monospace number)
+  ctx.strokeStyle = '#CBD5E1';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(50, h - 85);
-  ctx.lineTo(w - 50, h - 85);
+  ctx.moveTo(35, 538);
+  ctx.lineTo(w - 35, 538);
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 44px "Consolas", "Courier New", monospace';
+  ctx.font = 'bold 56px "Consolas", "Courier New", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(idNumber, w / 2, h - 40);
+  ctx.fillText(idNumber, w / 2, 592);
   ctx.textAlign = 'start';
 
   // Bottom Tricolor Stripe

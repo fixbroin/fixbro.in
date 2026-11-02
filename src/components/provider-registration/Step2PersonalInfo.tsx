@@ -392,7 +392,7 @@ export default function Step2PersonalInfo({
                 <FormItem>
                   <div className="flex items-center justify-between">
                     <FormLabel className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground"/>Date of Birth / जन्म तिथि <span className="text-destructive ml-1">*</span>
+                      <Calendar className="mr-2 h-4 w-4 text-muted-foreground"/>Date of Birth <span className="text-destructive ml-1">*</span>
                     </FormLabel>
                     {typeof currentAge === 'number' && currentAge >= 18 && (
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -442,7 +442,7 @@ export default function Step2PersonalInfo({
             render={({ field }) => (
               <FormItem className="space-y-2">
                 <FormLabel className="flex items-center">
-                  <User className="mr-2 h-4 w-4 text-muted-foreground"/>Gender / लिंग <span className="text-destructive ml-1">*</span>
+                  <User className="mr-2 h-4 w-4 text-muted-foreground"/>Gender<span className="text-destructive ml-1">*</span>
                 </FormLabel>
                 <FormControl>
                   <div className="flex items-center gap-6 pt-1">
@@ -457,7 +457,7 @@ export default function Step2PersonalInfo({
                           disabled={effectiveIsSaving}
                           className="h-4 w-4 text-primary focus:ring-primary border-slate-300"
                         />
-                        <span>{g === "Male" ? "Male / पुरुष" : g === "Female" ? "Female / महिला" : "Other / अन्य"}</span>
+                        <span>{g === "Male" ? "Male" : g === "Female" ? "Female" : "Other"}</span>
                       </label>
                     ))}
                   </div>

@@ -53,28 +53,28 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
           </div>
 
           {/* Card Body */}
-          <div className="px-3.5 py-1.5 flex gap-3 flex-grow items-center overflow-hidden">
-            {/* Left Photo Column (Big, Clean, NO SIM CARD, NO BADGES) */}
-            <div className="flex flex-col items-center shrink-0 w-24">
-              <div className="w-24 h-32 rounded-lg overflow-hidden border-2 border-slate-500 bg-slate-200 flex items-center justify-center relative shadow-sm">
+          <div className="px-3 py-1 flex gap-2.5 flex-grow items-stretch overflow-hidden">
+            {/* Left Photo Column (Big, Clean, Fills Height) */}
+            <div className="flex flex-col items-center shrink-0 w-[112px] my-0.5">
+              <div className="w-full h-full min-h-[170px] rounded-lg overflow-hidden border-2 border-slate-700 bg-slate-200 flex items-center justify-center relative shadow-sm">
                 {data.profilePhotoUrl ? (
                   <img src={data.profilePhotoUrl} alt={providerName} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-3xl font-bold text-slate-600">{providerName.charAt(0)}</span>
+                  <span className="text-4xl font-bold text-slate-600">{providerName.charAt(0)}</span>
                 )}
               </div>
             </div>
 
             {/* Right Information Column */}
-            <div className="flex flex-col justify-center space-y-1 overflow-hidden flex-grow text-slate-900">
+            <div className="flex flex-col justify-between overflow-hidden flex-grow text-slate-900 py-0.5">
               {/* Row with Name & Indian Flag on the Right */}
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-1.5">
                 <div className="overflow-hidden">
-                  <div className="text-[7.5px] text-slate-500 font-bold uppercase leading-none">NAME / नाम:</div>
-                  <h3 className="text-[13.5px] font-black text-slate-900 truncate tracking-tight leading-tight mt-0.5">
+                  <div className="text-[8px] text-slate-500 font-bold uppercase leading-none">NAME OF SERVICE PROFESSIONAL / नाम:</div>
+                  <h3 className="text-[14px] sm:text-[15px] font-black text-slate-900 truncate tracking-tight leading-tight mt-0.5">
                     {providerName}
                   </h3>
-                  <div className="text-[8.5px] text-slate-700 font-bold flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">
+                  <div className="text-[9px] text-slate-800 font-bold flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">
                     <div>
                       <span className="text-slate-500 uppercase">GENDER / लिंग: </span>
                       <span className="text-slate-900">
@@ -91,43 +91,49 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                 </div>
 
                 {/* Indian Flag on the Right */}
-                <div className="shrink-0 w-12 h-8 rounded border border-slate-300 shadow-xs overflow-hidden">
+                <div className="shrink-0 w-14 h-9 rounded border border-slate-300 shadow-xs overflow-hidden">
                   <img src="/images/indian-flag.svg" alt="Indian Flag" className="w-full h-full object-cover" />
                 </div>
               </div>
 
-              {/* Trade & Skill Level Badges (Bigger) */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="bg-sky-600 text-white text-[8.5px] font-bold px-2 py-0.5 rounded shadow-xs truncate">
+              {/* Trade & Skill Level Badges */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="bg-sky-600 text-white text-[9.5px] font-bold px-2.5 py-0.5 rounded shadow-xs truncate">
                   TRADE / व्यवसाय: {categoryName}
                 </span>
-                <span className="bg-slate-200 text-slate-800 text-[8.5px] font-bold px-1.5 py-0.5 rounded truncate">
+                <span className="bg-slate-200 text-slate-900 text-[9.5px] font-bold px-2 py-0.5 rounded truncate">
                   SKILL: {skillLevel}
                 </span>
               </div>
 
-              {/* Issue & Validity Dates (Bigger) */}
-              <div className="flex items-center gap-2 text-[8px] text-slate-700 font-medium pt-0.5">
+              {/* Issue & Validity Dates */}
+              <div className="flex items-center gap-2.5 text-[8.5px] text-slate-700 font-semibold">
                 <span>ISSUED: <strong>{issueDateStr}</strong></span>
                 <span>•</span>
                 <span>VALID THRU: <strong className="text-emerald-700">{validThruStr}</strong></span>
               </div>
 
               {/* Notice Disclaimer Box (Generalized, multiline 2-line wrap) */}
-              <div className="p-1 rounded border border-red-300 bg-red-50/90 text-[6.5px] text-red-900 leading-tight mt-0.5 whitespace-normal break-words">
+              <div className="p-1 rounded border border-red-300 bg-red-50 text-[7px] text-red-900 leading-snug break-words">
                 <span className="font-bold">NOTICE: </span>
                 {disclaimer}
               </div>
 
-              {/* Cardholder Signature under Notice */}
-              <div className="flex flex-col items-end pt-0.5 pr-1">
-                <span className="font-serif italic font-bold text-[11px] text-blue-900 tracking-wider leading-none">
-                  {titleCaseName}
-                </span>
-                <div className="w-24 h-[1px] bg-slate-400 mt-0.5" />
-                <span className="text-[5.5px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
-                  हस्ताक्षर / Cardholder Signature
-                </span>
+              {/* Assurance note on left & Cardholder Signature on right */}
+              <div className="flex items-end justify-between pt-0.5">
+                <div className="text-[7.5px] font-bold text-sky-700 leading-tight">
+                  Certified Skilled Partner
+                  <div className="text-[6.5px] text-slate-500 font-normal">Work Credential • Non-Transferable</div>
+                </div>
+                <div className="flex flex-col items-end pr-1">
+                  <span className="font-serif italic font-bold text-[12px] text-blue-900 tracking-wider leading-none">
+                    {titleCaseName}
+                  </span>
+                  <div className="w-24 h-[1px] bg-slate-400 mt-0.5" />
+                  <span className="text-[5.5px] font-bold text-slate-500 uppercase tracking-tight mt-0.5">
+                    हस्ताक्षर / Cardholder Signature
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -163,44 +169,45 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
           </div>
 
           {/* Body Content */}
-          <div className="px-3.5 py-1.5 flex gap-3 flex-grow items-center overflow-hidden">
+          <div className="px-3 py-1 flex gap-2.5 flex-grow items-stretch overflow-hidden">
             {/* Left Column: Multiline Address, Mobile, Email, Flag & Notice */}
-            <div className="flex flex-col justify-center space-y-1 overflow-hidden flex-grow text-slate-900">
+            <div className="flex flex-col justify-between overflow-hidden flex-grow text-slate-900 py-0.5">
               <div>
-                <span className="text-[8.5px] font-black text-slate-900 block">पता / ADDRESS:</span>
-                <p className="text-[8px] text-slate-800 leading-tight font-medium line-clamp-2">
+                <span className="text-[9px] font-black text-slate-900 block">पता / ADDRESS:</span>
+                <p className="text-[8.5px] text-slate-800 leading-tight font-medium line-clamp-3 mt-0.5">
                   {address}
                 </p>
               </div>
 
-              {/* Mobile Number below Address */}
-              <div className="text-[7.5px] font-bold text-slate-800 leading-tight">
-                <span className="text-slate-500">मोबाईल / MOBILE:</span> {mobile}
+              {/* Mobile & Email */}
+              <div className="space-y-0.5">
+                <div className="text-[8.5px] font-bold text-slate-800 leading-tight">
+                  <span className="text-slate-500">मोबाईल / MOBILE:</span> {mobile}
+                </div>
+                <div className="text-[8.5px] font-bold text-slate-800 leading-tight truncate">
+                  <span className="text-slate-500">ईमेल / EMAIL:</span> {email}
+                </div>
               </div>
 
-              {/* Email below Mobile */}
-              <div className="text-[7.5px] font-bold text-slate-800 leading-tight truncate">
-                <span className="text-slate-500">ईमेल / EMAIL:</span> {email}
-              </div>
-
-              {/* Indian Flag added below the email */}
-              <div className="flex flex-col gap-0.5 pt-0.5">
-                <div className="w-12 h-8 rounded border border-slate-300 shadow-xs overflow-hidden shrink-0">
+              {/* Indian Flag & Legal Notice side by side */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <div className="w-14 h-9 rounded border border-slate-300 shadow-xs overflow-hidden shrink-0">
                   <img src="/images/indian-flag.svg" alt="Indian Flag" className="w-full h-full object-cover" />
                 </div>
-                {/* Notice text below flag */}
-                <div className="text-[6.5px] text-red-800 font-bold leading-tight mt-0.5">
+                {/* Notice text beside flag */}
+                <div className="text-[7.5px] text-red-800 font-bold leading-tight">
                   This ID is not issued by Government.
-                  <div className="text-[5.5px] text-red-600 font-normal">यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।</div>
+                  <div className="text-[6.5px] text-red-600 font-normal">यह पहचान पत्र सरकार द्वारा जारी नहीं किया गया है।</div>
+                  <div className="text-[6px] text-slate-500 font-normal mt-0.5">Skilled Professional Work ID Card</div>
                 </div>
               </div>
             </div>
 
             {/* Right Column: Prominent QR Code */}
-            <div className="flex flex-col items-center shrink-0 w-28">
-              <div className="w-24 h-24 p-1 bg-white border-2 border-slate-300 rounded-lg shadow-sm flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center shrink-0 w-32">
+              <div className="w-28 h-28 p-1.5 bg-white border-2 border-slate-700 rounded-xl shadow-xs flex items-center justify-center">
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verifyUrl)}`}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verifyUrl)}`}
                   alt="Verification QR Code"
                   className="w-full h-full object-contain"
                   onError={(e) => {
@@ -208,8 +215,11 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
                   }}
                 />
               </div>
-              <span className="text-[6.5px] text-slate-600 font-bold mt-0.5 text-center leading-tight">
-                SCAN TO VERIFY CREDENTIALS
+              <span className="text-[7px] text-slate-700 font-bold mt-1 text-center leading-tight">
+                SCAN WITH SMARTPHONE TO VERIFY
+              </span>
+              <span className="text-[6px] text-slate-500 text-center leading-none">
+                क्यूआर कोड स्कैन करके सत्यापन करें
               </span>
             </div>
           </div>

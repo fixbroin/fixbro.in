@@ -48,7 +48,7 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: { title: s
         <Icon className="h-4 w-4" />
       </div>
     </CardHeader>
-    <CardContent className="p-3 pt-0">
+    <CardContent className="p-2 pt-0">
       <div className="text-3xl font-black tracking-tight">{value}</div>
       {subtitle && <p className="text-[10px] font-bold text-muted-foreground uppercase mt-2">{subtitle}</p>}
     </CardContent>
