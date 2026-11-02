@@ -33,6 +33,12 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
   const disclaimer = rawDisclaimer;
   const verifyUrl = data.verifyUrl || `https://fixbro.in/verify/provider/${idNumber.replace(/\s+/g, '')}`;
 
+  const nameFontSizeClass = providerName.length > 26 
+    ? 'text-[10px] sm:text-[11px]' 
+    : providerName.length > 18 
+      ? 'text-[12px] sm:text-[13px]' 
+      : 'text-[14px] sm:text-[15px]';
+
   return (
     <div className="w-full max-w-[506px] aspect-[85.6/53.98] rounded-2xl shadow-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 overflow-hidden relative select-none transition-all duration-300">
       {activeSide === 'front' ? (
@@ -71,7 +77,7 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
               <div className="flex items-start justify-between gap-1.5">
                 <div className="overflow-hidden">
                   <div className="text-[8px] text-slate-500 font-bold uppercase leading-none">NAME OF SERVICE PROFESSIONAL / नाम:</div>
-                  <h3 className="text-[14px] sm:text-[15px] font-black text-slate-900 truncate tracking-tight leading-tight mt-0.5">
+                  <h3 className={`font-black text-slate-900 tracking-tight leading-tight mt-0.5 ${nameFontSizeClass}`}>
                     {providerName}
                   </h3>
                   <div className="text-[9px] text-slate-800 font-bold flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">

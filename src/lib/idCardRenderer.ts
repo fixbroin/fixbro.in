@@ -381,18 +381,40 @@ export const renderFrontCardCanvas = async (
   ctx.font = 'bold 15px "Segoe UI", Roboto, sans-serif';
   ctx.fillText("NAME OF SERVICE PROFESSIONAL / नाम:", textX, 128);
 
-  // Name (Larger & Bolder)
+  // Name (Dynamic Auto-Scaling: scales font down from 36px to 19px so long names fit without dots)
   ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 36px "Segoe UI", Roboto, sans-serif';
   const maxNameWidth = detailsWidth - flagW - 15;
-  let splitName = providerName;
-  if (ctx.measureText(splitName).width > maxNameWidth) {
-    while (splitName.length > 3 && ctx.measureText(`${splitName}...`).width > maxNameWidth) {
-      splitName = splitName.slice(0, -1);
-    }
-    splitName = `${splitName}...`;
+  let fontSize = 36;
+  ctx.font = `bold ${fontSize}px "Segoe UI", Roboto, sans-serif`;
+
+  while (fontSize > 19 && ctx.measureText(providerName).width > maxNameWidth) {
+    fontSize -= 1.5;
+    ctx.font = `bold ${fontSize}px "Segoe UI", Roboto, sans-serif`;
   }
-  ctx.fillText(splitName, textX, 168);
+
+  // If even at 19px it exceeds the single line width (extraordinarily long name, >35 chars),
+  // split into 2 compact lines within the name slot without moving subsequent elements
+  if (ctx.measureText(providerName).width > maxNameWidth) {
+    const compactSize = 19;
+    ctx.font = `bold ${compactSize}px "Segoe UI", Roboto, sans-serif`;
+    const words = providerName.split(' ');
+    let line1 = '';
+    let line2 = '';
+    for (const w of words) {
+      const test = line1 ? `${line1} ${w}` : w;
+      if (ctx.measureText(test).width <= maxNameWidth && !line2) {
+        line1 = test;
+      } else {
+        line2 = line2 ? `${line2} ${w}` : w;
+      }
+    }
+    ctx.fillText(line1, textX, 154);
+    ctx.fillText(line2, textX, 178);
+  } else {
+    // Vertically center based on font size
+    const textY = fontSize < 26 ? 170 : 168;
+    ctx.fillText(providerName, textX, textY);
+  }
 
   // Gender & DOB
   ctx.fillStyle = '#1E293B';
