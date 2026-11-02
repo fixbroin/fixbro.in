@@ -8,7 +8,7 @@ import type { ProviderApplication, KycDocument, BankDetails, ProviderApplication
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCircle, Briefcase, FileText, Banknote, MapPin, Image as ImageIcon, ShieldCheck, CheckCircle, AlertTriangle, XCircle, Loader2, Download, Edit as EditIcon, ExternalLink, Copy, Mail, Phone, Plus, X, Tag, Search, Wrench } from "lucide-react";
+import { UserCircle, Briefcase, FileText, Banknote, MapPin, Image as ImageIcon, ShieldCheck, CheckCircle, AlertTriangle, XCircle, Loader2, Download, Edit as EditIcon, ExternalLink, Copy, Mail, Phone, Plus, X, Tag, Search, Wrench, Clock } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
@@ -789,6 +789,19 @@ export default function ProviderApplicationDetailsModal({
                   )}
                   <DetailRow label="Center Coordinates" value={application.workAreaCenter ? `${application.workAreaCenter.latitude.toFixed(6)}, ${application.workAreaCenter.longitude.toFixed(6)}` : 'N/A'} />
                   <DetailRow label="Service Radius" value={application.workAreaRadiusKm ? `${application.workAreaRadiusKm} km` : 'N/A'} />
+                  {application.locationChangeRequest?.status === 'pending' && (
+                    <div className="p-3 my-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-300 space-y-1.5">
+                      <div className="font-bold text-xs flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                        <Clock className="h-3.5 w-3.5" /> Service Area Change Request Pending:
+                      </div>
+                      <div className="text-xs">
+                        <strong>Requested Address:</strong> {application.locationChangeRequest.newAddress}
+                      </div>
+                      <div className="text-xs">
+                        <strong>Requested Radius:</strong> {application.locationChangeRequest.newRadiusKm} km
+                      </div>
+                    </div>
+                  )}
                   {application.workAreaCenter && (
                     <div className="pt-2">
                       <Button variant="outline" size="sm" onClick={() => window.open(`https://www.google.com/maps?q=${application.workAreaCenter?.latitude},${application.workAreaCenter?.longitude}`, '_blank')} className="h-8 text-xs">

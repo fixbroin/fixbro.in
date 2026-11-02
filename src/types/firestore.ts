@@ -1471,6 +1471,7 @@ export interface ProviderApplication {
   adminReviewNotes?: string;
   kycUpdateRequest?: boolean;
   kycUpdateNotes?: string;
+  locationChangeRequest?: LocationChangeRequest;
   submittedAt?: Timestamp;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -1482,6 +1483,19 @@ export interface ProviderApplication {
 }
 
 
+
+export interface LocationChangeRequest {
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  requestedAt: Timestamp | any;
+  resolvedAt?: Timestamp | any;
+  previousAddress: string;
+  previousCenter?: { latitude: number; longitude: number };
+  previousRadiusKm?: number;
+  newAddress: string;
+  newCenter: { latitude: number; longitude: number };
+  newRadiusKm: number;
+  rejectionReason?: string;
+}
 
 // This would be the main profile for an approved provider
 export interface ProviderProfile extends Omit<ProviderApplication, 'status' | 'submittedAt' | 'adminReviewNotes'> {

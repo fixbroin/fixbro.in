@@ -1,155 +1,161 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { 
   MapPin, 
   Navigation, 
   Compass, 
-  Sliders, 
   Loader2, 
-  Save, 
-  CheckCircle2, 
   Info, 
   AlertTriangle,
   LocateFixed,
-  Radio
+  Radio,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  ExternalLink
 } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
-import ProviderMapZoneSelector from '@/components/provider-registration/ProviderMapZoneSelector';
+import { doc, getDoc, onSnapshot } from '@/lib/mysqlDb';
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import type { ProviderApplication } from '@/types/firestore';
+import type { ProviderApplication, LocationChangeRequest } from '@/types/firestore';
+import { 
+  requestServiceAreaChangeAction, 
+  cancelServiceAreaChangeAction 
+} from '@/app/actions/serviceAreaChangeActions';
 
-const PRESET_RADII = [3, 5, 10, 15, 20, 25, 30, 50];
+// Dynamic import with SSR false matching Step 4 of provider registration
+const ProviderMapZoneSelector = dynamic(
+  () => import('@/components/provider-registration/ProviderMapZoneSelector'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <Loader2 className="animate-spin text-primary h-8 w-8" />
+      </div>
+    ),
+  }
+);
 
 export default function ProviderServiceAreaPage() {
   const { user: providerUser } = useAuth();
-  const { config: appConfig } = useApplicationConfig();
+  const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-
-  // Service Area State
-  const [workAreaAddress, setWorkAreaAddress] = useState<string>('');
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
-  const [radiusKm, setRadiusKm] = useState<number>(5);
-  const [initialRadiusKm, setInitialRadiusKm] = useState<number>(5);
+  const [providerApp, setProviderApp] = useState<ProviderApplication | null>(null);
 
   const googleMapsApiKey = appConfig?.googleMapsApiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-  const loadProviderApplication = useCallback(async () => {
+  // Real-time listener for provider application so status updates instantly upon admin approval
+  useEffect(() => {
     if (!providerUser?.uid) return;
     setIsLoading(true);
-    try {
-      const docRef = doc(db, "providerApplications", providerUser.uid);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data() as ProviderApplication;
-        if (data.workAreaAddress) setWorkAreaAddress(data.workAreaAddress);
-        if (data.workAreaCenter) {
-          setLatitude(data.workAreaCenter.latitude);
-          setLongitude(data.workAreaCenter.longitude);
+    const docRef = doc(db, "providerApplications", providerUser.uid);
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setProviderApp(docSnap.data() as ProviderApplication);
         }
-        if (data.workAreaRadiusKm) {
-          setRadiusKm(data.workAreaRadiusKm);
-          setInitialRadiusKm(data.workAreaRadiusKm);
-        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Error subscribing to provider service area:", error);
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error loading provider service area:", error);
-      toast({
-        title: "Error",
-        description: "Could not load current serviceable area.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [providerUser?.uid, toast]);
+    );
 
-  useEffect(() => {
-    loadProviderApplication();
-  }, [loadProviderApplication]);
+    return () => unsubscribe();
+  }, [providerUser?.uid]);
 
-  // Handle saving direct radius adjustment
-  const handleSaveRadius = async () => {
-    if (!providerUser?.uid) return;
-    setIsSaving(true);
-    try {
-      const docRef = doc(db, "providerApplications", providerUser.uid);
-      await updateDoc(docRef, {
-        workAreaRadiusKm: radiusKm,
-        updatedAt: Timestamp.now(),
-      });
-      setInitialRadiusKm(radiusKm);
-      toast({
-        title: "Radius Updated",
-        description: `Your service coverage radius is now set to ${radiusKm} km.`
-      });
-    } catch (error: any) {
-      console.error("Error updating service radius:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update radius.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // Current Active Service Area
+  const currentAddress = providerApp?.workAreaAddress || 'No location set yet.';
+  const currentLatitude = providerApp?.workAreaCenter?.latitude ?? null;
+  const currentLongitude = providerApp?.workAreaCenter?.longitude ?? null;
+  const currentRadius = providerApp?.workAreaRadiusKm ?? 5;
+  const hasActiveLocation = currentLatitude !== null && currentLongitude !== null;
 
-  // Handle confirmed location from MapZoneSelector modal
-  const handleMapConfirm = async (data: {
+  // Pending Request
+  const pendingRequest = providerApp?.locationChangeRequest?.status === 'pending' 
+    ? providerApp.locationChangeRequest 
+    : null;
+
+  // Handle Confirmed Location from ProviderMapZoneSelector Modal
+  const handleLocationConfirm = async (data: {
     center: { lat: number; lng: number };
     radiusKm: number;
     address: string;
   }) => {
     if (!providerUser?.uid) return;
-    setIsSaving(true);
+    setIsSubmitting(true);
     try {
-      const docRef = doc(db, "providerApplications", providerUser.uid);
-      const updateData = {
-        workAreaCenter: {
+      const res = await requestServiceAreaChangeAction({
+        providerId: providerUser.uid,
+        newAddress: data.address,
+        newCenter: {
           latitude: data.center.lat,
           longitude: data.center.lng,
         },
-        workAreaRadiusKm: data.radiusKm,
-        workAreaAddress: data.address,
-        updatedAt: Timestamp.now(),
-      };
-
-      await updateDoc(docRef, updateData);
-
-      setLatitude(data.center.lat);
-      setLongitude(data.center.lng);
-      setRadiusKm(data.radiusKm);
-      setInitialRadiusKm(data.radiusKm);
-      setWorkAreaAddress(data.address);
-
-      setIsMapModalOpen(false);
-      toast({
-        title: "Service Area Updated!",
-        description: `Your base location and ${data.radiusKm} km service coverage have been saved successfully.`
+        newRadiusKm: data.radiusKm,
       });
-    } catch (error: any) {
-      console.error("Error updating serviceable location:", error);
+
+      if (res.success) {
+        setIsMapModalOpen(false);
+        toast({
+          title: "Change Request Submitted!",
+          description: "Your location change has been submitted to admin for approval."
+        });
+      } else {
+        toast({
+          title: "Request Error",
+          description: res.message,
+          variant: "destructive"
+        });
+      }
+    } catch (e: any) {
       toast({
-        title: "Update Error",
-        description: error.message || "Could not save serviceable location.",
+        title: "Error",
+        description: e.message || "Failed to submit location change.",
         variant: "destructive"
       });
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Cancel Pending Request
+  const handleCancelRequest = async () => {
+    if (!providerUser?.uid || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await cancelServiceAreaChangeAction(providerUser.uid);
+      if (res.success) {
+        toast({ title: "Cancelled", description: res.message });
+      } else {
+        toast({ title: "Error", description: res.message, variant: "destructive" });
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -160,9 +166,6 @@ export default function ProviderServiceAreaPage() {
       </div>
     );
   }
-
-  const hasLocationConfigured = latitude !== null && longitude !== null;
-  const isRadiusDirty = radiusKm !== initialRadiusKm;
 
   return (
     <ProtectedRoute>
@@ -177,11 +180,12 @@ export default function ProviderServiceAreaPage() {
                   Serviceable Area & Coverage
                 </CardTitle>
                 <CardDescription>
-                  Manage the geographic base and operating radius where you receive customer booking assignments.
+                  Your current operational center and service radius. Changes are reviewed and approved by administration.
                 </CardDescription>
               </div>
               <Button
                 onClick={() => setIsMapModalOpen(true)}
+                disabled={isSubmitting || !!pendingRequest}
                 className="flex items-center gap-2 shadow-sm shrink-0"
               >
                 <LocateFixed className="h-4 w-4" />
@@ -191,7 +195,71 @@ export default function ProviderServiceAreaPage() {
           </CardHeader>
         </Card>
 
-        {/* Current Coverage Summary */}
+        {/* PENDING APPROVAL BANNER (if request is awaiting admin approval) */}
+        {pendingRequest && (
+          <Card className="border-amber-500/40 bg-amber-500/5 shadow-md overflow-hidden">
+            <CardHeader className="pb-3 border-b border-amber-500/20 bg-amber-500/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-base">
+                  <Clock className="h-5 w-5 animate-pulse" />
+                  Location Change Request Pending Admin Approval
+                </div>
+                <Badge variant="outline" className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 font-semibold">
+                  Pending Review
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You recently submitted a request to change your service area. Until approved by the admin, your current active location remains in effect for all customer bookings.
+              </p>
+
+              {/* Before vs After Comparison */}
+              <div className="grid gap-3 sm:grid-cols-2 p-3 rounded-xl border bg-card">
+                {/* Before */}
+                <div className="space-y-1 p-2 rounded-lg bg-muted/30">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Current Active (Before)
+                  </span>
+                  <p className="text-xs font-semibold text-foreground line-clamp-2">
+                    {pendingRequest.previousAddress}
+                  </p>
+                  <p className="text-xs text-primary font-bold">
+                    Radius: {pendingRequest.previousRadiusKm} km
+                  </p>
+                </div>
+
+                {/* After */}
+                <div className="space-y-1 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+                    Requested New (After) <ArrowRight className="h-3 w-3" />
+                  </span>
+                  <p className="text-xs font-semibold text-foreground line-clamp-2">
+                    {pendingRequest.newAddress}
+                  </p>
+                  <p className="text-xs text-emerald-600 font-bold">
+                    Radius: {pendingRequest.newRadiusKm} km
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelRequest}
+                  disabled={isSubmitting}
+                  className="text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <XCircle className="h-3.5 w-3.5 mr-1.5" />}
+                  Cancel Change Request
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Current Active Coverage Card */}
         <Card className="border-border/60 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2 font-semibold">
@@ -208,7 +276,7 @@ export default function ProviderServiceAreaPage() {
                     <Navigation className="h-3.5 w-3.5 text-primary" />
                     Base Operational Center
                   </span>
-                  {hasLocationConfigured ? (
+                  {hasActiveLocation ? (
                     <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-medium">
                       <Radio className="h-3 w-3 mr-1 animate-pulse" /> Live Active
                     </Badge>
@@ -219,12 +287,22 @@ export default function ProviderServiceAreaPage() {
                   )}
                 </div>
                 <p className="text-sm font-medium text-foreground">
-                  {workAreaAddress || "No specific address set yet. Click 'Change Base Location on Map' to select your center point."}
+                  {currentAddress}
                 </p>
-                {hasLocationConfigured && (
-                  <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground font-mono">
-                    <span>Lat: {latitude?.toFixed(6)}</span>
-                    <span>Lng: {longitude?.toFixed(6)}</span>
+                {hasActiveLocation && (
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+                      <span>Lat: {currentLatitude?.toFixed(6)}</span>
+                      <span>Lng: {currentLongitude?.toFixed(6)}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(`https://www.google.com/maps?q=${currentLatitude},${currentLongitude}`, '_blank')}
+                      className="h-7 text-xs text-primary"
+                    >
+                      View on Google Maps <ExternalLink className="ml-1 h-3 w-3" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -235,7 +313,7 @@ export default function ProviderServiceAreaPage() {
                   Active Radius
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold text-primary">{radiusKm}</span>
+                  <span className="text-3xl font-extrabold text-primary">{currentRadius}</span>
                   <span className="text-sm font-semibold text-muted-foreground">km</span>
                 </div>
                 <span className="text-xs text-muted-foreground">
@@ -250,93 +328,45 @@ export default function ProviderServiceAreaPage() {
               <div className="text-xs space-y-1">
                 <p className="font-semibold">How automated job matching works:</p>
                 <p className="text-blue-800/80 dark:text-blue-300/80 leading-relaxed">
-                  When a customer books a service within your <strong>{radiusKm} km</strong> circle, our platform checks your online status and automatically dispatches the job notification to you. Keeping your operational radius accurate ensures you receive jobs that are convenient to travel to.
+                  When a customer books a service within your <strong>{currentRadius} km</strong> circle, our platform checks your online status and dispatches the booking notification to you. To modify your location or radius, click <strong>"Change Base Location on Map"</strong> above.
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Quick Radius Adjustment Card */}
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 font-semibold">
-              <Sliders className="h-5 w-5 text-primary" />
-              Quick Radius Adjustment
-            </CardTitle>
-            <CardDescription>
-              Adjust your maximum serviceable distance without changing your base GPS pin.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-foreground">Service Radius:</span>
-                <span className="text-base font-bold text-primary font-mono">{radiusKm} km</span>
-              </div>
-              <Slider
-                value={[radiusKm]}
-                min={1}
-                max={50}
-                step={1}
-                onValueChange={(val) => setRadiusKm(val[0])}
-                className="py-4"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 km (Hyperlocal)</span>
-                <span>25 km (Citywide)</span>
-                <span>50 km (Metropolitan)</span>
-              </div>
-            </div>
-
-            {/* Preset Radius Buttons */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Popular Presets:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_RADII.map((preset) => (
-                  <Button
-                    key={preset}
-                    type="button"
-                    variant={radiusKm === preset ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setRadiusKm(preset)}
-                    className="text-xs h-8 px-3 rounded-lg"
-                  >
-                    {preset} km
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-end border-t pt-4">
-            <Button
-              onClick={handleSaveRadius}
-              disabled={isSaving || !isRadiusDirty}
-              className="flex items-center gap-2"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+        {/* POP-UP MODAL matching Step 4 of Provider Registration */}
+        <Dialog open={isMapModalOpen} onOpenChange={(open) => { if (!open) setIsMapModalOpen(false); }}>
+          <DialogContent 
+            className="max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col" 
+            onPointerDownOutside={(e) => e.preventDefault()} 
+            onEscapeKeyDown={(e) => e.preventDefault()} 
+            hideCloseButton={true}
+          >
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>Set Your Service Location & Radius</DialogTitle>
+              <DialogDescription>
+                Search your address or drag the pin, then adjust your coverage radius. Changes will be submitted to admin for approval.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow relative h-full">
+              {!isLoadingAppSettings && googleMapsApiKey ? (
+                <ProviderMapZoneSelector 
+                  apiKey={googleMapsApiKey} 
+                  initialCenter={hasActiveLocation ? { lat: currentLatitude!, lng: currentLongitude! } : null}
+                  initialRadiusKm={currentRadius || 5}
+                  maxRadiusKm={50}
+                  onConfirm={handleLocationConfirm} 
+                  onClose={() => setIsMapModalOpen(false)} 
+                />
               ) : (
-                <Save className="h-4 w-4" />
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="animate-spin text-primary h-8 w-8" />
+                </div>
               )}
-              {isRadiusDirty ? "Save Radius Changes" : "Radius Saved"}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Interactive Google Map Selector Modal */}
-        {isMapModalOpen && (
-          <ProviderMapZoneSelector
-            apiKey={googleMapsApiKey}
-            initialCenter={latitude && longitude ? { lat: latitude, lng: longitude } : null}
-            initialRadiusKm={radiusKm}
-            maxRadiusKm={50}
-            onConfirm={handleMapConfirm}
-            onClose={() => setIsMapModalOpen(false)}
-          />
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   );
