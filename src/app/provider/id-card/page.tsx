@@ -239,15 +239,16 @@ export default function ProviderIdCardPage() {
     try {
       pending = JSON.parse(pendingRaw);
     } catch (e) {
-      localStorage.removeItem('fixbro_pending_id_card_unlock');
+      try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
       return;
     }
 
     if (!pending || !pending.orderId || pending.providerId !== providerUser.uid) return;
 
-    // Discard stale pending records older than 20 minutes
-    if (Date.now() - pending.timestamp > 20 * 60 * 1000) {
-      localStorage.removeItem('fixbro_pending_id_card_unlock');
+    // Discard stale pending records older than 3 minutes so old attempts never re-trigger
+    if (Date.now() - pending.timestamp > 3 * 60 * 1000) {
+      try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+      setPendingUnlockVerifying(false);
       return;
     }
 
@@ -255,7 +256,7 @@ export default function ProviderIdCardPage() {
     try {
       const res = await verifyPendingIdCardUnlockAction(pending.orderId, pending.providerId, pending.amount);
       if (res.success && res.verified) {
-        localStorage.removeItem('fixbro_pending_id_card_unlock');
+        try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
         setUnlockSuccessOpen(true);
         await loadData();
         setPendingUnlockVerifying(false);
@@ -264,17 +265,22 @@ export default function ProviderIdCardPage() {
         return;
       }
 
-      // If returning right away from UPI app, Razorpay webhook/status may take 1-2 seconds
-      if (retryCount < 4) {
+      // Retry up to 2 times (3.6s total) in case Razorpay webhook arrives with 1-2s delay
+      if (retryCount < 2) {
         setTimeout(() => {
           checkAndVerifyPendingUnlock(retryCount + 1);
         }, 1800);
       } else {
+        // Payment was not completed or was cancelled: clean up localStorage so it NEVER shows popups again!
+        try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
         setPendingUnlockVerifying(false);
+        setIsPaying(false);
       }
     } catch (err) {
       console.error("Error verifying pending ID card unlock:", err);
+      try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
       setPendingUnlockVerifying(false);
+      setIsPaying(false);
     }
   }, [providerUser?.uid, loadData, toast]);
 
@@ -294,6 +300,13 @@ export default function ProviderIdCardPage() {
       checkAndVerifyPendingUnlock();
     };
 
+    const handleNativeError = () => {
+      console.log("Provider ID Card: Native payment cancelled or failed");
+      try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+      setPendingUnlockVerifying(false);
+      setIsPaying(false);
+    };
+
     // Register global bridge hook invoked by Flutter webview_screen.dart
     (window as any).checkPendingRazorpayPayment = () => {
       checkAndVerifyPendingUnlock();
@@ -301,10 +314,12 @@ export default function ProviderIdCardPage() {
 
     window.addEventListener('appResumedFromPayment', handleAppResume);
     window.addEventListener('nativePaymentSuccess', handleNativeSuccess);
+    window.addEventListener('nativePaymentError', handleNativeError);
 
     return () => {
       window.removeEventListener('appResumedFromPayment', handleAppResume);
       window.removeEventListener('nativePaymentSuccess', handleNativeSuccess);
+      window.removeEventListener('nativePaymentError', handleNativeError);
     };
   }, [providerUser?.uid, checkAndVerifyPendingUnlock]);
 
@@ -433,14 +448,22 @@ export default function ProviderIdCardPage() {
         modal: {
           ondismiss: function () {
             setIsPaying(false);
+            // Check once; if unconfirmed, cleans up localStorage immediately
             setTimeout(() => {
-              checkAndVerifyPendingUnlock();
+              checkAndVerifyPendingUnlock(2);
             }, 1000);
           }
         }
       };
 
       const rzp = new window.Razorpay(options);
+      if (typeof rzp.on === 'function') {
+        rzp.on('payment.failed', () => {
+          try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+          setPendingUnlockVerifying(false);
+          setIsPaying(false);
+        });
+      }
       rzp.open();
     } catch (err: any) {
       console.error("Payment unlock error:", err);
@@ -904,17 +927,40 @@ export default function ProviderIdCardPage() {
       </Dialog>
 
       {/* Verifying ID Card Payment Processing Modal */}
-      <Dialog open={pendingUnlockVerifying} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm text-center p-6 sm:p-8 [&>button]:hidden">
+      <Dialog 
+        open={pendingUnlockVerifying} 
+        onOpenChange={(open) => {
+          if (!open) {
+            try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+            setPendingUnlockVerifying(false);
+            setIsPaying(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm text-center p-6 sm:p-8">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 mb-4">
             <Loader2 className="h-7 w-7 text-teal-600 animate-spin" />
           </div>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-center text-slate-900">Verifying Payment</DialogTitle>
             <DialogDescription className="text-center text-sm text-muted-foreground mt-2">
-              Waiting for confirmation from your UPI app. Please keep this screen open while we unlock your ID card...
+              Waiting for confirmation from your UPI app. If you cancelled or pressed back, you can dismiss this dialog below.
             </DialogDescription>
           </DialogHeader>
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-red-600 rounded-lg"
+              onClick={() => {
+                try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+                setPendingUnlockVerifying(false);
+                setIsPaying(false);
+              }}
+            >
+              Cancel / Dismiss
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

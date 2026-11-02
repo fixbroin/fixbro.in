@@ -156,15 +156,16 @@ export default function ProviderWalletPage() {
     try {
       pending = JSON.parse(pendingRaw);
     } catch (e) {
-      localStorage.removeItem('fixbro_pending_wallet_deposit');
+      try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
       return;
     }
 
     if (!pending || !pending.orderId || pending.providerId !== providerUser.uid) return;
 
-    // Discard stale pending records older than 20 minutes
-    if (Date.now() - pending.timestamp > 20 * 60 * 1000) {
-      localStorage.removeItem('fixbro_pending_wallet_deposit');
+    // Discard stale pending records older than 3 minutes so old attempts never re-trigger
+    if (Date.now() - pending.timestamp > 3 * 60 * 1000) {
+      try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
+      setPendingDepositVerifying(false);
       return;
     }
 
@@ -172,7 +173,7 @@ export default function ProviderWalletPage() {
     try {
       const res = await verifyPendingProviderWalletDepositAction(pending.orderId, pending.providerId, pending.amount);
       if (res.success && res.verified) {
-        localStorage.removeItem('fixbro_pending_wallet_deposit');
+        try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
         const updatedBal = res.newBalance !== undefined 
           ? res.newBalance 
           : ((walletBalance ?? 0) + (res.amount || pending.amount));
@@ -189,17 +190,22 @@ export default function ProviderWalletPage() {
         return;
       }
 
-      // If returning right away from UPI app, Razorpay webhook/status may take 1-2 seconds
-      if (retryCount < 4) {
+      // Retry up to 2 times (3.6s total) in case Razorpay webhook arrives with 1-2s delay
+      if (retryCount < 2) {
         setTimeout(() => {
           checkAndVerifyPendingDeposit(retryCount + 1);
         }, 1800);
       } else {
+        // Payment was not completed or was cancelled: clean up localStorage so it NEVER shows popups again!
+        try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
         setPendingDepositVerifying(false);
+        setIsProcessingDeposit(false);
       }
     } catch (err) {
       console.error("Error verifying pending deposit:", err);
+      try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
       setPendingDepositVerifying(false);
+      setIsProcessingDeposit(false);
     }
   }, [providerUser?.uid, loadWalletDetails, walletBalance]);
 
@@ -220,6 +226,13 @@ export default function ProviderWalletPage() {
       checkAndVerifyPendingDeposit();
     };
 
+    const handleNativeError = () => {
+      console.log("Provider: Native payment cancelled or failed");
+      try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
+      setPendingDepositVerifying(false);
+      setIsProcessingDeposit(false);
+    };
+
     // Register global bridge hook invoked by Flutter webview_screen.dart
     (window as any).checkPendingRazorpayPayment = () => {
       checkAndVerifyPendingDeposit();
@@ -227,10 +240,12 @@ export default function ProviderWalletPage() {
 
     window.addEventListener('appResumedFromPayment', handleAppResume);
     window.addEventListener('nativePaymentSuccess', handleNativeSuccess);
+    window.addEventListener('nativePaymentError', handleNativeError);
 
     return () => {
       window.removeEventListener('appResumedFromPayment', handleAppResume);
       window.removeEventListener('nativePaymentSuccess', handleNativeSuccess);
+      window.removeEventListener('nativePaymentError', handleNativeError);
     };
   }, [providerUser?.uid, loadWalletDetails, checkAndVerifyPendingDeposit]);
 
@@ -370,15 +385,22 @@ export default function ProviderWalletPage() {
         modal: {
           ondismiss: function () {
             setIsProcessingDeposit(false);
-            // Check if payment was actually completed before dismissing
+            // Check once; if unconfirmed, cleans up localStorage immediately
             setTimeout(() => {
-              checkAndVerifyPendingDeposit();
+              checkAndVerifyPendingDeposit(2);
             }, 1000);
           }
         }
       };
 
       const rzp = new window.Razorpay(options);
+      if (typeof rzp.on === 'function') {
+        rzp.on('payment.failed', () => {
+          try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
+          setPendingDepositVerifying(false);
+          setIsProcessingDeposit(false);
+        });
+      }
       rzp.open();
 
     } catch (err: any) {
@@ -1045,17 +1067,40 @@ export default function ProviderWalletPage() {
       </Dialog>
 
       {/* Verifying Payment Processing Modal */}
-      <Dialog open={pendingDepositVerifying} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm text-center p-6 sm:p-8 [&>button]:hidden">
+      <Dialog 
+        open={pendingDepositVerifying} 
+        onOpenChange={(open) => {
+          if (!open) {
+            try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
+            setPendingDepositVerifying(false);
+            setIsProcessingDeposit(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm text-center p-6 sm:p-8">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 mb-4">
             <Loader2 className="h-7 w-7 text-teal-600 animate-spin" />
           </div>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-center text-slate-900">Verifying Payment</DialogTitle>
             <DialogDescription className="text-center text-sm text-muted-foreground mt-2">
-              Waiting for confirmation from your UPI app. Please keep this screen open while we credit your wallet...
+              Waiting for confirmation from your UPI app. If you cancelled or pressed back, you can dismiss this dialog below.
             </DialogDescription>
           </DialogHeader>
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-red-600 rounded-lg"
+              onClick={() => {
+                try { localStorage.removeItem('fixbro_pending_wallet_deposit'); } catch(e) {}
+                setPendingDepositVerifying(false);
+                setIsProcessingDeposit(false);
+              }}
+            >
+              Cancel / Dismiss
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
