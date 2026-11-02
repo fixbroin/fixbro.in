@@ -1,5 +1,6 @@
 'use server';
 
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { db } from '@/lib/mysqlDb';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
@@ -321,6 +322,87 @@ export async function unlockProviderIdCardAction(
   } catch (error: any) {
     console.error("Error unlocking provider ID card:", error);
     return { success: false, message: error.message || "Failed to unlock ID card." };
+  }
+}
+
+/**
+ * Verify pending Razorpay ID card unlock order (auto-recovery upon returning from UPI / app resume).
+ */
+export async function verifyPendingIdCardUnlockAction(
+  orderId: string,
+  providerId: string,
+  expectedAmount?: number
+): Promise<{
+  success: boolean;
+  verified: boolean;
+  alreadyUnlocked?: boolean;
+  unlockedNow?: boolean;
+  paymentId?: string;
+  amount?: number;
+  message?: string;
+}> {
+  try {
+    if (!orderId || !providerId) {
+      return { success: false, verified: false, message: 'Invalid order or provider ID' };
+    }
+
+    // 1. Check if ID card is already unlocked in providerApplications
+    const docRef = adminDb.collection('providerApplications').doc(providerId);
+    const docSnap = await docRef.get();
+    if (docSnap.exists) {
+      const pData = docSnap.data();
+      if (pData?.idCardUnlocked) {
+        return {
+          success: true,
+          verified: true,
+          alreadyUnlocked: true,
+          paymentId: pData.idCardPaymentId || undefined,
+          amount: Number(pData.idCardPaymentAmount) || expectedAmount || 0,
+          message: 'Official ID card is already unlocked.',
+        };
+      }
+    }
+
+    // 2. Query Razorpay API to check if the order has been paid
+    const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+    const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return { success: false, verified: false, message: 'Razorpay configuration missing' };
+    }
+
+    const instance = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
+
+    const payments: any = await instance.orders.fetchPayments(orderId);
+    const capturedPayment = payments?.items?.find((p: any) => p.status === 'captured' || p.status === 'authorized');
+
+    if (capturedPayment) {
+      const paymentAmount = capturedPayment.amount ? capturedPayment.amount / 100 : (expectedAmount || 0);
+      const unlockRes = await unlockProviderIdCardAction(providerId, {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: capturedPayment.id,
+        amount: paymentAmount,
+      });
+
+      return {
+        success: true,
+        verified: true,
+        unlockedNow: true,
+        paymentId: capturedPayment.id,
+        amount: paymentAmount,
+        message: unlockRes.message || 'Official ID card unlocked successfully.',
+      };
+    }
+
+    return { success: false, verified: false, message: 'Payment not yet confirmed by Razorpay' };
+  } catch (error: any) {
+    console.error('Error verifying pending ID card unlock:', error);
+    return { success: false, verified: false, message: error.message || 'Verification failed' };
   }
 }
 

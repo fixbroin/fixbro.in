@@ -28,6 +28,7 @@ import {
   Dialog, 
   DialogContent, 
   DialogDescription, 
+  DialogFooter,
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog";
@@ -42,9 +43,11 @@ import type { ProviderApplication, FirestoreUser } from '@/types/firestore';
 import { 
   getProviderIdCardSettingsAction, 
   unlockProviderIdCardAction, 
+  verifyPendingIdCardUnlockAction,
   recordIdCardGenerationAction,
   trackIdCardDownloadAction,
 } from '@/app/actions/providerIdCardActions';
+import { isWebView } from '@/lib/webview-bridge';
 import { 
   type ProviderIdCardSettings, 
   DEFAULT_ID_CARD_SETTINGS,
@@ -81,6 +84,8 @@ export default function ProviderIdCardPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
   const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
+  const [pendingUnlockVerifying, setPendingUnlockVerifying] = useState(false);
+  const [unlockSuccessOpen, setUnlockSuccessOpen] = useState(false);
 
   // Canvas refs for 300 DPI exports
   const frontCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -220,9 +225,93 @@ export default function ProviderIdCardPage() {
     verifyUrl: `https://fixbro.in/verify/provider/${providerUser?.uid || ''}`,
   };
 
+  // Auto-recovery & verification for pending ID card unlocks (resuming from UPI apps / PhonePe / GPay)
+  const checkAndVerifyPendingUnlock = useCallback(async (retryCount = 0) => {
+    if (!providerUser?.uid) return;
+    let pendingRaw: string | null = null;
+    try {
+      pendingRaw = localStorage.getItem('fixbro_pending_id_card_unlock');
+    } catch (e) {}
+
+    if (!pendingRaw) return;
+
+    let pending: { orderId: string; amount: number; providerId: string; timestamp: number } | null = null;
+    try {
+      pending = JSON.parse(pendingRaw);
+    } catch (e) {
+      localStorage.removeItem('fixbro_pending_id_card_unlock');
+      return;
+    }
+
+    if (!pending || !pending.orderId || pending.providerId !== providerUser.uid) return;
+
+    // Discard stale pending records older than 20 minutes
+    if (Date.now() - pending.timestamp > 20 * 60 * 1000) {
+      localStorage.removeItem('fixbro_pending_id_card_unlock');
+      return;
+    }
+
+    setPendingUnlockVerifying(true);
+    try {
+      const res = await verifyPendingIdCardUnlockAction(pending.orderId, pending.providerId, pending.amount);
+      if (res.success && res.verified) {
+        localStorage.removeItem('fixbro_pending_id_card_unlock');
+        setUnlockSuccessOpen(true);
+        await loadData();
+        setPendingUnlockVerifying(false);
+        setIsPaying(false);
+        toast({ title: "Card Unlocked!", description: "Official PVC ID Card is now permanently unlocked." });
+        return;
+      }
+
+      // If returning right away from UPI app, Razorpay webhook/status may take 1-2 seconds
+      if (retryCount < 4) {
+        setTimeout(() => {
+          checkAndVerifyPendingUnlock(retryCount + 1);
+        }, 1800);
+      } else {
+        setPendingUnlockVerifying(false);
+      }
+    } catch (err) {
+      console.error("Error verifying pending ID card unlock:", err);
+      setPendingUnlockVerifying(false);
+    }
+  }, [providerUser?.uid, loadData, toast]);
+
+  // Periodic and event-driven check for ID card unlock return
+  useEffect(() => {
+    if (providerUser?.uid) {
+      checkAndVerifyPendingUnlock();
+    }
+
+    const handleAppResume = () => {
+      console.log("Provider App Resumed: checking pending ID card unlock...");
+      checkAndVerifyPendingUnlock();
+    };
+
+    const handleNativeSuccess = (e: any) => {
+      console.log("Native Razorpay Payment Success event received for ID card:", e?.detail);
+      checkAndVerifyPendingUnlock();
+    };
+
+    // Register global bridge hook invoked by Flutter webview_screen.dart
+    (window as any).checkPendingRazorpayPayment = () => {
+      checkAndVerifyPendingUnlock();
+    };
+
+    window.addEventListener('appResumedFromPayment', handleAppResume);
+    window.addEventListener('nativePaymentSuccess', handleNativeSuccess);
+
+    return () => {
+      window.removeEventListener('appResumedFromPayment', handleAppResume);
+      window.removeEventListener('nativePaymentSuccess', handleNativeSuccess);
+    };
+  }, [providerUser?.uid, checkAndVerifyPendingUnlock]);
+
   // Razorpay Script Loader
   const loadRazorpayScript = () => new Promise((resolve) => {
-    if (window.Razorpay) { resolve(true); return; }
+    // If inside Flutter app webview or Razorpay is already available, never inject external script
+    if (isWebView() || window.Razorpay) { resolve(true); return; }
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.onload = () => resolve(true);
@@ -263,8 +352,10 @@ export default function ProviderIdCardPage() {
           receipt: `idcard_${providerUser.uid.substring(0, 10)}_${Date.now()}`,
           notes: {
             purpose: 'provider_id_card_unlock',
+            type: 'provider_id_card_unlock',
             providerId: providerUser.uid,
             providerName,
+            amount: feeAmount.toString(),
           }
         }),
       });
@@ -272,6 +363,18 @@ export default function ProviderIdCardPage() {
       const orderData = await orderRes.json();
       if (!orderRes.ok || !orderData.success) {
         throw new Error(orderData.error || 'Failed to create payment order.');
+      }
+
+      // Persist pending ID card unlock state to localStorage
+      try {
+        localStorage.setItem('fixbro_pending_id_card_unlock', JSON.stringify({
+          orderId: orderData.id,
+          amount: feeAmount,
+          providerId: providerUser.uid,
+          timestamp: Date.now()
+        }));
+      } catch (storageErr) {
+        console.warn("Could not save pending ID card unlock to localStorage:", storageErr);
       }
 
       const options = {
@@ -283,6 +386,7 @@ export default function ProviderIdCardPage() {
         order_id: orderData.id,
         handler: async function (response: any) {
           try {
+            setPendingUnlockVerifying(true);
             const verifyRes = await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -300,18 +404,22 @@ export default function ProviderIdCardPage() {
                 amount: feeAmount,
               });
               if (unlockResult.success) {
+                try { localStorage.removeItem('fixbro_pending_id_card_unlock'); } catch(e) {}
+                setUnlockSuccessOpen(true);
                 toast({ title: "Unlocked!", description: "Official PVC ID Card is now permanently unlocked." });
                 await loadData();
               } else {
                 toast({ title: "Error", description: unlockResult.message, variant: "destructive" });
               }
             } else {
-              toast({ title: "Payment Failed", description: verifyData.error || "Payment verification failed.", variant: "destructive" });
+              await checkAndVerifyPendingUnlock();
             }
           } catch (e: any) {
-            toast({ title: "Error", description: e.message || "Failed to verify transaction.", variant: "destructive" });
+            console.error("Handler error, falling back to pending verification:", e);
+            await checkAndVerifyPendingUnlock();
           } finally {
             setIsPaying(false);
+            setPendingUnlockVerifying(false);
           }
         },
         prefill: {
@@ -325,6 +433,9 @@ export default function ProviderIdCardPage() {
         modal: {
           ondismiss: function () {
             setIsPaying(false);
+            setTimeout(() => {
+              checkAndVerifyPendingUnlock();
+            }, 1000);
           }
         }
       };
@@ -789,6 +900,79 @@ export default function ProviderIdCardPage() {
               <CreditCard className="h-5 w-5 text-teal-600 ml-4 shrink-0" />
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Verifying ID Card Payment Processing Modal */}
+      <Dialog open={pendingUnlockVerifying} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm text-center p-6 sm:p-8 [&>button]:hidden">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 mb-4">
+            <Loader2 className="h-7 w-7 text-teal-600 animate-spin" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center text-slate-900">Verifying Payment</DialogTitle>
+            <DialogDescription className="text-center text-sm text-muted-foreground mt-2">
+              Waiting for confirmation from your UPI app. Please keep this screen open while we unlock your ID card...
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      {/* ID Card Unlock Success Modal */}
+      <Dialog open={unlockSuccessOpen} onOpenChange={(open) => { if (!open) setUnlockSuccessOpen(false); }}>
+        <DialogContent className="max-w-md text-center p-6 sm:p-8">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4 animate-in zoom-in duration-300">
+            <ShieldCheck className="h-10 w-10 text-emerald-600" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center text-slate-900">Official ID Card Unlocked!</DialogTitle>
+            <DialogDescription className="text-center text-sm text-muted-foreground mt-1">
+              Congratulations! Your official work identity card is now permanently unlocked and available for download.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-5 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-700 font-semibold justify-center">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <span>Lifetime Verified Work Credential</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-semibold"
+                onClick={() => {
+                  setUnlockSuccessOpen(false);
+                  handleDownloadFrontPng();
+                }}
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Front (PNG)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs font-semibold"
+                onClick={() => {
+                  setUnlockSuccessOpen(false);
+                  handleDownloadBackPng();
+                }}
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Back (PNG)
+              </Button>
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-center">
+            <Button 
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-5 text-base rounded-xl shadow-md transition-all active:scale-[0.99]"
+              onClick={() => {
+                setUnlockSuccessOpen(false);
+                loadData();
+              }}
+            >
+              Done & View Card
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </ProtectedRoute>

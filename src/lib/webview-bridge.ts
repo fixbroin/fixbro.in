@@ -44,7 +44,18 @@ if (typeof window !== 'undefined') {
 
   // Native Razorpay Proxy for seamless drop-in integration
   (window as any)._setupNativeRazorpayProxy = () => {
-    if ((window as any).isFlutterNativeApp) {
+    let isNative = Boolean(
+      (window as any).isFlutterNativeApp || 
+      (window as any).FlutterBridge || 
+      (window as any).flutter_inappwebview
+    );
+    try {
+      if (!isNative && sessionStorage.getItem('is_flutter_app') === 'true') {
+        isNative = true;
+      }
+    } catch (e) {}
+
+    if (isNative) {
       (window as any).Razorpay = function (options: any) {
         activeRazorpayOptions = options;
         return {
@@ -57,9 +68,9 @@ if (typeof window !== 'undefined') {
               currency: options.currency || 'INR',
               order_id: options.order_id,
               name: options.name || 'Fixbro',
-              description: options.description || 'Service Booking',
+              description: options.description || 'Service Payment',
               prefill: options.prefill || {},
-              theme: options.theme || { color: '#2563EB' },
+              theme: options.theme || { color: '#0d9488' },
             });
           },
           on: (event: string, callback: Function) => {
@@ -72,8 +83,16 @@ if (typeof window !== 'undefined') {
           }
         };
       };
+      (window as any)._isNativeRazorpayProxyActive = true;
     }
   };
+
+  // Run proxy setup if Flutter is already ready or detected in session
+  try {
+    if ((window as any).isFlutterNativeApp || (window as any).FlutterBridge || sessionStorage.getItem('is_flutter_app') === 'true') {
+      (window as any)._setupNativeRazorpayProxy();
+    }
+  } catch (e) {}
 
   // Run proxy setup if Flutter is already ready
   if ((window as any).isFlutterNativeApp) {

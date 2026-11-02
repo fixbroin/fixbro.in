@@ -1,5 +1,6 @@
 'use server';
 
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
@@ -296,10 +297,104 @@ export async function depositProviderWalletAction(
     }
 
     revalidatePath('/provider/wallet');
-    return { success: true, message: `Successfully deposited ${symbol}${finalCredit.toFixed(2)} to your wallet.` };
+    return { 
+      success: true, 
+      message: `Successfully deposited ${symbol}${finalCredit.toFixed(2)} to your wallet.`,
+      newBalance: finalBalance
+    };
   } catch (error: any) {
     console.error("Error depositing to provider wallet:", error);
     return { success: false, message: error.message || "Deposit transaction failed." };
+  }
+}
+
+// 4b. Verify pending Razorpay wallet deposit (used on app resume / auto-recovery)
+export async function verifyPendingProviderWalletDepositAction(
+  orderId: string,
+  providerId: string,
+  expectedAmount?: number
+): Promise<{
+  success: boolean;
+  verified: boolean;
+  alreadyCredited?: boolean;
+  creditedNow?: boolean;
+  paymentId?: string;
+  amount?: number;
+  newBalance?: number;
+  message?: string;
+}> {
+  try {
+    if (!orderId || !providerId) {
+      return { success: false, verified: false, message: 'Invalid order or provider ID' };
+    }
+
+    // 1. Check if already recorded in providerWalletTransactions (e.g. credited via webhook)
+    const txQuery = query(
+      collection(db, 'providerWalletTransactions'),
+      where('razorpay_order_id', '==', orderId)
+    );
+    const txSnap = await getDocs(txQuery);
+    if (!txSnap.empty) {
+      const txData = txSnap.docs[0].data() as any;
+      const userRef = doc(db, 'users', providerId);
+      const userSnap = await getDoc(userRef);
+      const curBalance = userSnap.exists() ? Number(userSnap.data()?.providerWalletBalance || 0) : 0;
+      return {
+        success: true,
+        verified: true,
+        alreadyCredited: true,
+        paymentId: txData.razorpay_payment_id || txData.razorpayPaymentId || undefined,
+        amount: Number(txData.amount) || expectedAmount || 0,
+        newBalance: curBalance,
+        message: 'Deposit already credited to wallet',
+      };
+    }
+
+    // 2. Query Razorpay API to check if the order has been paid
+    const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+    const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return { success: false, verified: false, message: 'Razorpay configuration missing' };
+    }
+
+    const instance = new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    });
+
+    const payments: any = await instance.orders.fetchPayments(orderId);
+    const capturedPayment = payments?.items?.find((p: any) => p.status === 'captured' || p.status === 'authorized');
+
+    if (capturedPayment) {
+      const paymentAmount = capturedPayment.amount ? capturedPayment.amount / 100 : (expectedAmount || 0);
+      const depositResult = await depositProviderWalletAction(providerId, paymentAmount, {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: capturedPayment.id,
+        payment_method: 'Razorpay',
+      });
+
+      const userRef = doc(db, 'users', providerId);
+      const userSnap = await getDoc(userRef);
+      const curBalance = userSnap.exists() ? Number(userSnap.data()?.providerWalletBalance || 0) : 0;
+
+      return {
+        success: true,
+        verified: true,
+        creditedNow: true,
+        paymentId: capturedPayment.id,
+        amount: paymentAmount,
+        newBalance: curBalance,
+        message: depositResult.message || 'Deposit confirmed successfully',
+      };
+    }
+
+    return { success: false, verified: false, message: 'Payment not yet confirmed by Razorpay' };
+  } catch (error: any) {
+    console.error('Error verifying pending provider wallet deposit:', error);
+    return { success: false, verified: false, message: error.message || 'Verification failed' };
   }
 }
 
