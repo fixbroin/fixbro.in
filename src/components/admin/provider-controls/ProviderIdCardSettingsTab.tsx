@@ -15,9 +15,8 @@ import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { 
   getProviderIdCardSettingsAction, 
   saveProviderIdCardSettingsAction, 
-  ProviderIdCardSettings,
-  DEFAULT_ID_CARD_SETTINGS 
 } from '@/app/actions/providerIdCardActions';
+import { type ProviderIdCardSettings, DEFAULT_ID_CARD_SETTINGS } from '@/types/providerAreaAndId';
 
 const idCardSettingsSchema = z.object({
   isIdCardEnabled: z.boolean().default(true),

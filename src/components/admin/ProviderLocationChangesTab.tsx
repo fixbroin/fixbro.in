@@ -32,9 +32,9 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   getPendingServiceAreaChangesAction, 
   approveServiceAreaChangeAction, 
-  rejectServiceAreaChangeAction,
-  PendingLocationChangeItem 
+  rejectServiceAreaChangeAction
 } from '@/app/actions/serviceAreaChangeActions';
+import type { PendingLocationChangeItem } from '@/types/providerAreaAndId';
 import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 

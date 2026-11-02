@@ -32,9 +32,8 @@ import type { ProviderApplication, FirestoreUser } from '@/types/firestore';
 import { 
   getProviderIdCardSettingsAction, 
   unlockProviderIdCardAction, 
-  ProviderIdCardSettings,
-  DEFAULT_ID_CARD_SETTINGS 
 } from '@/app/actions/providerIdCardActions';
+import { type ProviderIdCardSettings, DEFAULT_ID_CARD_SETTINGS } from '@/types/providerAreaAndId';
 import { jsPDF } from 'jspdf';
 
 declare global {

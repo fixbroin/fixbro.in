@@ -5,22 +5,10 @@ import { db } from '@/lib/mysqlDb';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
 import { revalidatePath } from 'next/cache';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-
-export interface ProviderIdCardSettings {
-  isIdCardEnabled: boolean;
-  downloadFee: number;
-  validityYears: number;
-  signatoryName: string;
-  helplineNumber: string;
-}
-
-export const DEFAULT_ID_CARD_SETTINGS: ProviderIdCardSettings = {
-  isIdCardEnabled: true,
-  downloadFee: 0,
-  validityYears: 2,
-  signatoryName: "Authorized Signatory - FixBro",
-  helplineNumber: "+91 8000 123 456",
-};
+import { 
+  type ProviderIdCardSettings, 
+  DEFAULT_ID_CARD_SETTINGS 
+} from '@/types/providerAreaAndId';
 
 /**
  * Fetch provider ID card settings from database.
@@ -81,7 +69,7 @@ export async function saveProviderIdCardSettingsAction(
     try {
       const docRef = doc(db, 'appConfiguration', 'provider_id_card');
       await setDoc(docRef, cleanData, { merge: true });
-    } catch (e) {
+    } catch {
       // adminDb write already committed directly
     }
 
@@ -119,7 +107,7 @@ export async function unlockProviderIdCardAction(
 
     try {
       await setDoc(doc(db, 'providerApplications', providerId), updatePayload, { merge: true });
-    } catch (e) {
+    } catch {
       // adminDb already saved
     }
 

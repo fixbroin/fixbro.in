@@ -6,16 +6,9 @@ import { doc, getDoc, setDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
 import { revalidatePath } from 'next/cache';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { sendServerPushNotification } from '@/app/actions/providerWalletActions';
+import { getTimestampMillis } from '@/lib/utils';
 import type { LocationChangeRequest, ProviderApplication } from '@/types/firestore';
-
-export interface PendingLocationChangeItem {
-  providerId: string;
-  providerName: string;
-  providerPhone?: string;
-  categoryName?: string;
-  photoUrl?: string;
-  request: LocationChangeRequest;
-}
+import type { PendingLocationChangeItem } from '@/types/providerAreaAndId';
 
 /**
  * 1. Provider submits a request to change their serviceable base location & radius.
@@ -314,18 +307,39 @@ export async function getPendingServiceAreaChangesAction(): Promise<PendingLocat
     snap.forEach((docSnap) => {
       const data = docSnap.data() as ProviderApplication;
       if (data.locationChangeRequest && data.locationChangeRequest.status === 'pending') {
+        const req = data.locationChangeRequest;
+        const requestedAt = getTimestampMillis(req.requestedAt) || (typeof req.requestedAt === 'number' ? req.requestedAt : Date.now());
+        const resolvedAt = req.resolvedAt ? (getTimestampMillis(req.resolvedAt) || Date.now()) : undefined;
+
         list.push({
           providerId: docSnap.id,
-          providerName: data.fullName || 'Provider',
-          providerPhone: data.mobileNumber,
-          categoryName: data.workCategoryName,
-          photoUrl: data.profilePhotoUrl,
-          request: data.locationChangeRequest,
+          providerName: String(data.fullName || 'Provider'),
+          providerPhone: data.mobileNumber ? String(data.mobileNumber) : undefined,
+          categoryName: data.workCategoryName ? String(data.workCategoryName) : undefined,
+          photoUrl: data.profilePhotoUrl ? String(data.profilePhotoUrl) : undefined,
+          request: {
+            status: req.status,
+            requestedAt,
+            resolvedAt,
+            previousAddress: String(req.previousAddress || ''),
+            previousCenter: req.previousCenter ? {
+              latitude: Number(req.previousCenter.latitude || 0),
+              longitude: Number(req.previousCenter.longitude || 0),
+            } : undefined,
+            previousRadiusKm: Number(req.previousRadiusKm || 5),
+            newAddress: String(req.newAddress || ''),
+            newCenter: {
+              latitude: Number(req.newCenter?.latitude || 0),
+              longitude: Number(req.newCenter?.longitude || 0),
+            },
+            newRadiusKm: Number(req.newRadiusKm || 5),
+            rejectionReason: req.rejectionReason ? String(req.rejectionReason) : undefined,
+          },
         });
       }
     });
 
-    return list;
+    return JSON.parse(JSON.stringify(list));
   } catch (error) {
     console.error("Error fetching pending area changes:", error);
     return [];
