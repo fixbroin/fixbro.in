@@ -24,6 +24,9 @@ const idCardSettingsSchema = z.object({
   validityYears: z.coerce.number().min(1, "Validity must be at least 1 year.").max(10, "Maximum validity is 10 years."),
   signatoryName: z.string().min(2, "Signatory name is required."),
   helplineNumber: z.string().min(5, "Helpline number is required."),
+  idNumberPrefix: z.string().optional().default(""),
+  idNumberStartingSeq: z.coerce.number().min(1, "Starting sequence must be at least 1.").default(361707601001),
+  disclaimerText: z.string().min(10, "Disclaimer text is required."),
 });
 
 type IdCardSettingsFormData = z.infer<typeof idCardSettingsSchema>;
@@ -204,6 +207,66 @@ export default function ProviderIdCardSettingsTab() {
                     </FormControl>
                     <FormDescription>
                       Helpline and verification number printed on the back of the ID card for customer inquiries.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ID Number Starting Sequence */}
+              <FormField
+                control={form.control}
+                name="idNumberStartingSeq"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Contact2 className="h-4 w-4 text-primary" />
+                      ID Card Starting Sequence (12-Digit Base)
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} placeholder="361707601001" disabled={isSaving} />
+                    </FormControl>
+                    <FormDescription>
+                      Starting base number for generating unique Aadhaar-style 12-digit partner numbers (e.g. 3617 0760 1001).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* ID Prefix */}
+              <FormField
+                control={form.control}
+                name="idNumberPrefix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID Number Prefix (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g. FXB or leave blank for pure numbers" disabled={isSaving} />
+                    </FormControl>
+                    <FormDescription>
+                      Optional prefix added before the 12-digit number (leave blank for Aadhaar-style 12 digits).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Private Entity Disclaimer */}
+              <FormField
+                control={form.control}
+                name="disclaimerText"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      Legal / Private Identification Disclaimer
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="This ID card is issued by FixBro Private Platform..." disabled={isSaving} />
+                    </FormControl>
+                    <FormDescription>
+                      Printed in the verification box on the front and back of the card stating it is private, not government issued.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

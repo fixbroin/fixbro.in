@@ -739,6 +739,7 @@ export default function ProviderApplicationDetailsModal({
                   } 
                 />
                 <DetailRow label="Address" value={application.address || 'N/A'} />
+                <DetailRow label="Gender" value={application.gender || 'N/A'} />
                 <DetailRow label="Age" value={application.age || 'N/A'} />
                 <DetailRow label="Qualification" value={application.qualificationLabel || 'N/A'} />
                 <DetailRow label="Languages Spoken" value={application.languagesSpokenLabels?.join(', ') || 'N/A'} />

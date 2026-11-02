@@ -1444,6 +1444,7 @@ export interface ProviderApplication {
   mobileNumber?: string;
   address?: string;
   age?: number;
+  gender?: 'Male' | 'Female' | 'Other' | string;
   qualificationId?: string;
   qualificationLabel?: string; // Denormalized
   alternateMobile?: string;
@@ -1482,6 +1483,7 @@ export interface ProviderApplication {
   totalDeductions?: number;
 
   // Provider ID Card Generation, Purchase & Download Tracking
+  idCardNumber?: string;
   idCardGenerated?: boolean;
   idCardGeneratedAt?: Timestamp | any;
   idCardUnlocked?: boolean;

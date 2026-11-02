@@ -41,6 +41,7 @@ const step2PersonalInfoSchema = z.object({
   mobileNumber: z.string().min(10, "Valid mobile number required.").max(15).regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone format."),
   address: z.string().min(5, "Address is required.").max(250),
   age: z.coerce.number().min(18, "Must be at least 18.").max(99, "Age seems incorrect."),
+  gender: z.enum(["Male", "Female", "Other"]).default("Male"),
   qualificationId: z.string({ required_error: "Please select your qualification." }),
   alternateMobile: z.string().max(15).regex(/^\+?[1-9]\d{1,14}$/, "Invalid alternate phone format.").optional().or(z.literal('')),
   languagesSpokenIds: z.array(z.string()).min(1, "Select at least one language spoken.").max(5, "Select up to 5 languages."),
@@ -87,6 +88,7 @@ export default function Step2PersonalInfo({
       mobileNumber: initialData?.mobileNumber || firestoreUser?.mobileNumber || user?.phoneNumber || "",
       address: initialData?.address || "",
       age: initialData?.age ?? undefined, 
+      gender: (initialData?.gender as any) || "Male",
       qualificationId: initialData?.qualificationId || undefined,
       alternateMobile: initialData?.alternateMobile || "",
       languagesSpokenIds: initialData?.languagesSpokenIds || [],
@@ -306,6 +308,37 @@ export default function Step2PersonalInfo({
                 </FormItem>
               );
             }}
+          />
+
+          <FormField
+            control={form.control}
+            name="gender"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel className="flex items-center">
+                  <User className="mr-2 h-4 w-4 text-muted-foreground"/>Gender / लिंग <span className="text-destructive ml-1">*</span>
+                </FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-6 pt-1">
+                    {["Male", "Female", "Other"].map((g) => (
+                      <label key={g} className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value={g}
+                          checked={field.value === g}
+                          onChange={() => field.onChange(g)}
+                          disabled={effectiveIsSaving}
+                          className="h-4 w-4 text-primary focus:ring-primary border-slate-300"
+                        />
+                        <span>{g === "Male" ? "Male / पुरुष" : g === "Female" ? "Female / महिला" : "Other / अन्य"}</span>
+                      </label>
+                    ))}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
 
           <FormField

@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280" width="200" height="280">
+  <!-- Ashoka Lion Capital (State Emblem of India) Stylized Vector Representation -->
+  <g fill="#1e293b" stroke="#0f172a" stroke-width="0.5">
+    <!-- Back Central Mane & Head Structure -->
+    <path d="M100 15 C85 15, 75 28, 75 45 C75 62, 85 75, 100 75 C115 75, 125 62, 125 45 C125 28, 115 15, 100 15 Z" fill="#0f172a" />
+    
+    <!-- Central Lion Crown / Forehead -->
+    <path d="M88 22 C92 18, 108 18, 112 22 C116 26, 118 36, 114 42 C108 45, 92 45, 86 42 C82 36, 84 26, 88 22 Z" fill="#1e293b" />
+    
+    <!-- Central Lion Ears -->
+    <path d="M80 20 C76 14, 84 10, 88 18 Z" fill="#0f172a" />
+    <path d="M120 20 C124 14, 116 10, 112 18 Z" fill="#0f172a" />
+    
+    <!-- Central Lion Face & Muzzle -->
+    <path d="M92 38 C92 32, 108 32, 108 38 C108 44, 104 48, 100 48 C96 48, 92 44, 92 38 Z" fill="#334155" />
+    <circle cx="94" cy="32" r="2" fill="#f8fafc" />
+    <circle cx="106" cy="32" r="2" fill="#f8fafc" />
+    <!-- Nose and Whisker Pads -->
+    <path d="M97 38 L103 38 L100 42 Z" fill="#0f172a" />
+    <path d="M96 42 Q100 45 104 42" stroke="#0f172a" stroke-width="1.5" fill="none" />
+    <!-- Open Mouth & Teeth -->
+    <path d="M96 45 Q100 52 104 45 Z" fill="#475569" />
+    <polygon points="98,45 100,48 102,45" fill="#f8fafc" />
+
+    <!-- Left Lion (Profile Facing Left) -->
+    <g>
+      <path d="M52 38 C42 42, 38 52, 40 65 C44 75, 58 82, 70 80 C74 74, 75 58, 70 48 C65 42, 58 38, 52 38 Z" fill="#1e293b" />
+      <path d="M38 48 C32 46, 30 52, 34 56 C38 60, 44 62, 48 58 Z" fill="#334155" />
+      <!-- Left Lion Ear -->
+      <path d="M56 32 C52 26, 60 24, 62 30 Z" fill="#0f172a" />
+      <!-- Eye -->
+      <circle cx="44" cy="50" r="2" fill="#f8fafc" />
+      <!-- Open Jaw Left -->
+      <path d="M33 54 L38 56 L35 59 Z" fill="#f8fafc" />
+    </g>
+
+    <!-- Right Lion (Profile Facing Right) -->
+    <g>
+      <path d="M148 38 C158 42, 162 52, 160 65 C156 75, 142 82, 130 80 C126 74, 125 58, 130 48 C135 42, 142 38, 148 38 Z" fill="#1e293b" />
+      <path d="M162 48 C168 46, 170 52, 166 56 C162 60, 156 62, 152 58 Z" fill="#334155" />
+      <!-- Right Lion Ear -->
+      <path d="M144 32 C148 26, 140 24, 138 30 Z" fill="#0f172a" />
+      <!-- Eye -->
+      <circle cx="156" cy="50" r="2" fill="#f8fafc" />
+      <!-- Open Jaw Right -->
+      <path d="M167 54 L162 56 L165 59 Z" fill="#f8fafc" />
+    </g>
+
+    <!-- Detailed Lion Manes (Layered Locks) -->
+    <!-- Central Lion Mane Locks -->
+    <path d="M85 52 C80 62, 78 80, 85 95 C92 98, 98 98, 100 95 C102 98, 108 98, 115 95 C122 80, 120 62, 115 52 Z" fill="#0f172a" />
+    <path d="M92 56 C88 68, 88 82, 94 92 C97 94, 103 94, 106 92 C112 82, 112 68, 108 56 Z" fill="#1e293b" />
+    <path d="M96 62 C94 72, 95 82, 100 88 C105 82, 106 72, 104 62 Z" fill="#334155" />
+
+    <!-- Left Mane Flow -->
+    <path d="M68 58 C60 68, 56 82, 60 98 C66 102, 76 100, 80 92 C76 80, 75 68, 68 58 Z" fill="#1e293b" />
+    <path d="M52 70 C46 82, 48 95, 56 106 C62 108, 68 104, 70 96 C64 88, 60 78, 52 70 Z" fill="#0f172a" />
+
+    <!-- Right Mane Flow -->
+    <path d="M132 58 C140 68, 144 82, 140 92 C136 100, 124 102, 120 92 C124 80, 125 68, 132 58 Z" fill="#1e293b" />
+    <path d="M148 70 C154 82, 152 95, 144 106 C138 108, 132 104, 130 96 C136 88, 140 78, 148 70 Z" fill="#0f172a" />
+
+    <!-- Chest and Forelegs of the 3 Lions -->
+    <!-- Left Foreleg -->
+    <path d="M65 95 C62 108, 60 125, 62 140 L74 140 C75 125, 76 108, 72 95 Z" fill="#334155" />
+    <path d="M60 136 C58 140, 64 144, 76 144 C80 144, 82 138, 76 136 Z" fill="#1e293b" />
+
+    <!-- Center Left Foreleg -->
+    <path d="M85 96 C82 110, 82 128, 84 140 L94 140 C95 128, 96 110, 92 96 Z" fill="#1e293b" />
+    <path d="M82 136 C80 140, 86 144, 96 144 C100 144, 102 138, 96 136 Z" fill="#0f172a" />
+
+    <!-- Center Right Foreleg -->
+    <path d="M108 96 C105 110, 105 128, 106 140 L116 140 C118 128, 118 110, 115 96 Z" fill="#1e293b" />
+    <path d="M104 136 C102 140, 108 144, 118 144 C122 144, 124 138, 118 136 Z" fill="#0f172a" />
+
+    <!-- Right Foreleg -->
+    <path d="M128 95 C124 108, 125 125, 126 140 L138 140 C140 125, 138 108, 135 95 Z" fill="#334155" />
+    <path d="M124 136 C122 140, 128 144, 140 144 C144 144, 146 138, 140 136 Z" fill="#1e293b" />
+
+    <!-- Abacus Base / Pedestal Platform -->
+    <path d="M30 144 L170 144 L165 152 L35 152 Z" fill="#0f172a" />
+    <rect x="25" y="152" width="150" height="34" rx="2" fill="#f8fafc" stroke="#0f172a" stroke-width="2" />
+
+    <!-- Ashoka Chakra in Center of Abacus (24 Spokes) -->
+    <circle cx="100" cy="169" r="13" fill="none" stroke="#000080" stroke-width="1.8" />
+    <circle cx="100" cy="169" r="2.5" fill="#000080" />
+    <!-- 24 Spokes of Dharmachakra -->
+    <g stroke="#000080" stroke-width="0.75">
+      <line x1="100" y1="156" x2="100" y2="182" />
+      <line x1="87" y1="169" x2="113" y2="169" />
+      <line x1="90.8" y1="159.8" x2="109.2" y2="178.2" />
+      <line x1="90.8" y1="178.2" x2="109.2" y2="159.8" />
+      <line x1="93.5" y1="156.8" x2="106.5" y2="181.2" />
+      <line x1="93.5" y1="181.2" x2="106.5" y2="156.8" />
+      <line x1="87.8" y1="162.5" x2="112.2" y2="175.5" />
+      <line x1="87.8" y1="175.5" x2="112.2" y2="162.5" />
+      <line x1="96.6" y1="156.3" x2="103.4" y2="181.7" />
+      <line x1="96.6" y1="181.7" x2="103.4" y2="156.3" />
+      <line x1="87.3" y1="165.6" x2="112.7" y2="172.4" />
+      <line x1="87.3" y1="172.4" x2="112.7" y2="165.6" />
+    </g>
+
+    <!-- Galloping Horse on Left Side of Abacus -->
+    <g fill="#0f172a">
+      <path d="M50 162 C48 158, 54 156, 56 160 C58 163, 62 165, 65 162 C68 166, 62 172, 58 171 L56 177 L53 177 L54 170 C51 172, 48 170, 48 166 Z" />
+    </g>
+
+    <!-- Bull on Right Side of Abacus -->
+    <g fill="#0f172a">
+      <path d="M142 165 C146 160, 152 162, 150 168 C148 172, 142 174, 138 170 L136 176 L133 176 L134 168 C132 166, 134 163, 138 163 Z" />
+    </g>
+
+    <!-- Bottom Inverted Lotus Bell Structure -->
+    <path d="M35 186 L165 186 C160 206, 140 220, 100 220 C60 220, 40 206, 35 186 Z" fill="#1e293b" />
+    <!-- Lotus Petal Ridges -->
+    <g stroke="#f8fafc" stroke-width="1" fill="none">
+      <path d="M100 186 Q100 215 100 220" />
+      <path d="M85 186 Q86 210 92 218" />
+      <path d="M115 186 Q114 210 108 218" />
+      <path d="M70 186 Q74 205 82 214" />
+      <path d="M130 186 Q126 205 118 214" />
+      <path d="M55 186 Q62 198 72 208" />
+      <path d="M145 186 Q138 198 128 208" />
+    </g>
+
+    <!-- Base Plinth -->
+    <rect x="30" y="220" width="140" height="10" rx="2" fill="#0f172a" />
+
+    <!-- Motto: Satyameva Jayate (सत्यमेव जयते) in Devanagari Script -->
+    <text x="100" y="254" font-family="'Noto Sans Devanagari', 'Mangal', 'Segoe UI', Arial, sans-serif" font-size="20" font-weight="900" text-anchor="middle" fill="#0f172a" letter-spacing="1">सत्यमेव जयते</text>
+    <text x="100" y="272" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#64748b" letter-spacing="2">SATYAMEVA JAYATE</text>
+  </g>
+</svg>

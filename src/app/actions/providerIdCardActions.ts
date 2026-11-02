@@ -10,7 +10,8 @@ import {
   type ProviderIdCardSettings, 
   DEFAULT_ID_CARD_SETTINGS,
   type ProviderIdCardRecord,
-  formatTechnicianId
+  formatTechnicianId,
+  generateUniqueIdCardNumber
 } from '@/types/providerAreaAndId';
 import type { ProviderApplication } from '@/types/firestore';
 
@@ -28,6 +29,9 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
+        idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
+        idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
+        disclaimerText: String(data.disclaimerText || DEFAULT_ID_CARD_SETTINGS.disclaimerText),
       };
     }
 
@@ -40,6 +44,9 @@ export async function getProviderIdCardSettingsAction(): Promise<ProviderIdCardS
         validityYears: Number(data.validityYears ?? DEFAULT_ID_CARD_SETTINGS.validityYears),
         signatoryName: String(data.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName),
         helplineNumber: String(data.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber),
+        idNumberPrefix: String(data.idNumberPrefix ?? DEFAULT_ID_CARD_SETTINGS.idNumberPrefix),
+        idNumberStartingSeq: Number(data.idNumberStartingSeq ?? DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq),
+        disclaimerText: String(data.disclaimerText || DEFAULT_ID_CARD_SETTINGS.disclaimerText),
       };
     }
 
@@ -63,6 +70,9 @@ export async function saveProviderIdCardSettingsAction(
       validityYears: Math.max(1, Number(settings.validityYears || 2)),
       signatoryName: String(settings.signatoryName || DEFAULT_ID_CARD_SETTINGS.signatoryName).trim(),
       helplineNumber: String(settings.helplineNumber || DEFAULT_ID_CARD_SETTINGS.helplineNumber).trim(),
+      idNumberPrefix: String(settings.idNumberPrefix || '').trim(),
+      idNumberStartingSeq: Math.max(1, Number(settings.idNumberStartingSeq || DEFAULT_ID_CARD_SETTINGS.idNumberStartingSeq)),
+      disclaimerText: String(settings.disclaimerText || DEFAULT_ID_CARD_SETTINGS.disclaimerText).trim(),
       updatedAt: Timestamp.now(),
     };
 
@@ -93,10 +103,11 @@ export async function saveProviderIdCardSettingsAction(
 
 /**
  * Record when a verified provider views/generates their ID card for the first time.
+ * Also assigns a unique ID card number if not already present.
  */
 export async function recordIdCardGenerationAction(
   providerId: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; idCardNumber?: string }> {
   try {
     if (!providerId) return { success: false, message: "Missing provider ID" };
 
@@ -105,13 +116,13 @@ export async function recordIdCardGenerationAction(
     if (!snap.exists) return { success: false, message: "Application not found" };
 
     const data = snap.data() as ProviderApplication;
-    if (data.idCardGenerated) {
-      return { success: true, message: "Already recorded" };
-    }
+    const settings = await getProviderIdCardSettingsAction();
+    const assignedNumber = data.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
 
     const updatePayload: Record<string, any> = {
       idCardGenerated: true,
-      idCardGeneratedAt: Timestamp.now(),
+      idCardGeneratedAt: data.idCardGeneratedAt || Timestamp.now(),
+      idCardNumber: assignedNumber,
       updatedAt: Timestamp.now(),
     };
 
@@ -123,7 +134,7 @@ export async function recordIdCardGenerationAction(
     }
 
     revalidatePath('/admin/provider-id-cards');
-    return { success: true, message: "ID card generation recorded" };
+    return { success: true, message: "ID card generation recorded", idCardNumber: assignedNumber };
   } catch (error: any) {
     console.error("Error recording ID card generation:", error);
     return { success: false, message: error.message || "Failed to record generation" };
@@ -138,11 +149,18 @@ export async function unlockProviderIdCardAction(
   paymentDetails?: { razorpay_order_id?: string; razorpay_payment_id?: string; amount?: number }
 ): Promise<{ success: boolean; message: string }> {
   try {
+    const settings = await getProviderIdCardSettingsAction();
+    const docRef = adminDb.collection('providerApplications').doc(providerId);
+    const snap = await docRef.get();
+    const data = snap.exists ? (snap.data() as ProviderApplication) : null;
+    const assignedNumber = data?.idCardNumber || generateUniqueIdCardNumber(providerId, settings.idNumberStartingSeq, settings.idNumberPrefix);
+
     const updatePayload: Record<string, any> = {
       idCardUnlocked: true,
       idCardUnlockedAt: Timestamp.now(),
       idCardGenerated: true,
-      idCardGeneratedAt: Timestamp.now(),
+      idCardGeneratedAt: data?.idCardGeneratedAt || Timestamp.now(),
+      idCardNumber: assignedNumber,
     };
 
     if (paymentDetails?.razorpay_payment_id) {
@@ -153,7 +171,7 @@ export async function unlockProviderIdCardAction(
       updatePayload.idCardPaidAmount = 0;
     }
 
-    await adminDb.collection('providerApplications').doc(providerId).set(updatePayload, { merge: true });
+    await docRef.set(updatePayload, { merge: true });
 
     try {
       await setDoc(doc(db, 'providerApplications', providerId), updatePayload, { merge: true });
@@ -241,12 +259,15 @@ export async function trackIdCardDownloadAction(
  */
 export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRecord[]> {
   try {
-    const snap = await adminDb.collection('providerApplications').get();
+    const [snap, settings] = await Promise.all([
+      adminDb.collection('providerApplications').get(),
+      getProviderIdCardSettingsAction(),
+    ]);
+
     const records: ProviderIdCardRecord[] = [];
 
     snap.forEach((docSnap) => {
       const data = docSnap.data() as ProviderApplication;
-      // We focus on approved providers
       if (data.status === 'approved') {
         const isGenerated = Boolean(
           data.idCardGenerated || 
@@ -266,6 +287,9 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
             }))
           : [];
 
+        // Format unique ID number (Aadhaar style: e.g. 3617 0760 6355)
+        const idCardNumber = data.idCardNumber || generateUniqueIdCardNumber(docSnap.id, settings.idNumberStartingSeq, settings.idNumberPrefix);
+
         records.push({
           providerId: docSnap.id,
           fullName: String(data.fullName || 'Service Provider'),
@@ -273,7 +297,12 @@ export async function getProvidersWithIdCardsAction(): Promise<ProviderIdCardRec
           email: data.email ? String(data.email) : undefined,
           profilePhotoUrl: data.profilePhotoUrl ? String(data.profilePhotoUrl) : undefined,
           workCategoryName: data.workCategoryName ? String(data.workCategoryName) : undefined,
+          skillLevelLabel: data.skillLevelLabel ? String(data.skillLevelLabel) : undefined,
           workAreaAddress: data.workAreaAddress ? String(data.workAreaAddress) : undefined,
+          residentialAddress: data.address ? String(data.address) : undefined,
+          gender: data.gender ? String(data.gender) : 'Male',
+          age: data.age ? Number(data.age) : undefined,
+          idCardNumber,
           technicianId: formatTechnicianId(docSnap.id),
           status: data.status,
           idCardGenerated: isGenerated,
