@@ -26,9 +26,9 @@ export default function OfficialIdCardView({ data, activeSide }: OfficialIdCardV
   const mobile = data.mobileNumber || '+91 73531 45565';
   const email = data.email || 'provider@fixbro.in';
 
-  let rawDisclaimer = data.disclaimerText || 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
+  let rawDisclaimer = data.disclaimerText || 'This ID is not issued by Government.';
   if (rawDisclaimer.includes('FixBro') || rawDisclaimer.includes('Fixbro') || rawDisclaimer.includes('private platform')) {
-    rawDisclaimer = 'This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.';
+    rawDisclaimer = 'This ID is not issued by Government.';
   }
   const disclaimer = rawDisclaimer;
   const verifyUrl = data.verifyUrl || `https://fixbro.in/verify/provider/${idNumber.replace(/\s+/g, '')}`;

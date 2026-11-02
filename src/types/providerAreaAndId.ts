@@ -22,7 +22,7 @@ export const DEFAULT_ID_CARD_SETTINGS: ProviderIdCardSettings = {
   helplineNumber: "+91 7353113455",
   idNumberPrefix: "",
   idNumberStartingSeq: 1001,
-  disclaimerText: "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.",
+  disclaimerText: "This ID is not issued by Government.",
 };
 
 export interface SerializedLocationChangeRequest {

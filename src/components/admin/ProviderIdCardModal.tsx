@@ -53,7 +53,7 @@ export default function ProviderIdCardModal({
   currencySymbol = "₹",
   signatoryName = "Authorized Signatory - FixBro",
   helplinePhone = "+91 8000 123 456",
-  disclaimerText = "This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government.",
+  disclaimerText = "This ID is not issued by Government.",
   validityYears = 2,
   validityMonths = 0,
 }: ProviderIdCardModalProps) {

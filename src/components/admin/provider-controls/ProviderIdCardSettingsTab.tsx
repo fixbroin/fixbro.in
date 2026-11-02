@@ -289,7 +289,7 @@ export default function ProviderIdCardSettingsTab() {
                       Legal / Private Identification Disclaimer
                     </FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="This is a professional work identity card for individuals engaged in skilled service professions. Not issued by Government." disabled={isSaving} />
+                      <Input {...field} placeholder="This ID is not issued by Government." disabled={isSaving} />
                     </FormControl>
                     <FormDescription>
                       Printed in the verification box on the front and back of the card stating it is private, not government issued.
