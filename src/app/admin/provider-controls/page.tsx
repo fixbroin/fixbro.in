@@ -2,7 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCheck, Settings, ListChecks, Languages, Paperclip, Power, MapPin, HandCoins, Banknote, FileText } from "lucide-react";
+import { UserCheck, Settings, ListChecks, Languages, Paperclip, Power, MapPin, HandCoins, Banknote, FileText, Contact2 } from "lucide-react";
 import ExperienceLevelManager from "@/components/admin/provider-controls/ExperienceLevelManager";
 import SkillLevelManager from "@/components/admin/provider-controls/SkillLevelManager";
 import QualificationManager from "@/components/admin/provider-controls/QualificationManager";
@@ -12,6 +12,7 @@ import ProviderRegistrationToggleTab from "@/components/admin/provider-controls/
 import ProviderFeesSetupTab from "@/components/admin/provider-controls/ProviderFeesSetupTab"; 
 import WithdrawalSettingsTab from "@/components/admin/provider-controls/WithdrawalSettingsTab";
 import ProviderTermsManager from "@/components/admin/provider-controls/ProviderTermsManager";
+import ProviderIdCardSettingsTab from "@/components/admin/provider-controls/ProviderIdCardSettingsTab";
 import { useAuth } from "@/hooks/useAuth";
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -89,6 +90,12 @@ export default function ProviderControlsPage() {
               >
                 <FileText className="mr-2 h-4 w-4"/>Terms
               </TabsTrigger>
+              <TabsTrigger 
+                value="id_card_settings"
+                className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+              >
+                <Contact2 className="mr-2 h-4 w-4"/>ID Card
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -119,6 +126,9 @@ export default function ProviderControlsPage() {
           </TabsContent>
           <TabsContent value="terms_management">
             <ProviderTermsManager />
+          </TabsContent>
+          <TabsContent value="id_card_settings">
+            <ProviderIdCardSettingsTab />
           </TabsContent>
         </Tabs>
       </PermissionGuard>

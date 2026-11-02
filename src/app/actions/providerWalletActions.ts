@@ -3,13 +3,14 @@
 import { adminDb } from '@/lib/firebaseAdmin';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
+import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getTimestampMillis } from '@/lib/utils';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
+import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
 
 export interface WalletProviderSettings {
   minDepositAmount: number;
@@ -43,9 +44,26 @@ const DEFAULT_SETTINGS: WalletProviderSettings = {
 // 1. Fetch wallet settings (MySQL)
 export async function getProviderWalletSettingsAction(): Promise<WalletProviderSettings> {
   try {
+    const adminSnap = await adminDb.collection('appConfiguration').doc('wallet_provider').get();
+    if (adminSnap.exists) {
+      const data = adminSnap.data() as any;
+      return {
+        minDepositAmount: Number(data.minDepositAmount ?? DEFAULT_SETTINGS.minDepositAmount),
+        maxDepositAmount: Number(data.maxDepositAmount ?? DEFAULT_SETTINGS.maxDepositAmount),
+        depositBonusPercentage: Number(data.depositBonusPercentage ?? DEFAULT_SETTINGS.depositBonusPercentage),
+        minBalanceForJobs: Number(data.minBalanceForJobs ?? DEFAULT_SETTINGS.minBalanceForJobs),
+      };
+    }
+
     const settingsDoc = await getDoc(doc(db, 'appConfiguration', 'wallet_provider'));
     if (settingsDoc.exists()) {
-      return { ...DEFAULT_SETTINGS, ...settingsDoc.data() } as WalletProviderSettings;
+      const data = settingsDoc.data() as any;
+      return {
+        minDepositAmount: Number(data.minDepositAmount ?? DEFAULT_SETTINGS.minDepositAmount),
+        maxDepositAmount: Number(data.maxDepositAmount ?? DEFAULT_SETTINGS.maxDepositAmount),
+        depositBonusPercentage: Number(data.depositBonusPercentage ?? DEFAULT_SETTINGS.depositBonusPercentage),
+        minBalanceForJobs: Number(data.minBalanceForJobs ?? DEFAULT_SETTINGS.minBalanceForJobs),
+      };
     }
     return DEFAULT_SETTINGS;
   } catch (error) {
@@ -57,21 +75,30 @@ export async function getProviderWalletSettingsAction(): Promise<WalletProviderS
 // 2. Save wallet settings (MySQL)
 export async function saveProviderWalletSettingsAction(settings: WalletProviderSettings) {
   try {
-    const docRef = doc(db, 'appConfiguration', 'wallet_provider');
-    // Set settings
-    const exists = (await getDoc(docRef)).exists();
-    if (exists) {
-      await updateDoc(docRef, {
-        ...settings,
-        updatedAt: Timestamp.now()
-      });
-    } else {
-      // Use addDoc or setDoc structure
-      await updateDoc(docRef, {
-        ...settings,
-        updatedAt: Timestamp.now()
-      });
+    const cleanSettings = {
+      minDepositAmount: Number(settings.minDepositAmount),
+      maxDepositAmount: Number(settings.maxDepositAmount),
+      depositBonusPercentage: Number(settings.depositBonusPercentage),
+      minBalanceForJobs: Number(settings.minBalanceForJobs),
+      updatedAt: Timestamp.now()
+    };
+
+    // Save directly via adminDb into MySQL
+    await adminDb.collection('appConfiguration').doc('wallet_provider').set(cleanSettings, { merge: true });
+
+    // Also persist via client SDK reference to ensure cache synchronization
+    try {
+      const docRef = doc(db, 'appConfiguration', 'wallet_provider');
+      await setDoc(docRef, cleanSettings, { merge: true });
+    } catch (sdkError) {
+      // adminDb write already committed directly to the database
     }
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/wallet');
+    triggerRefresh('/admin/provider-withdrawals');
+    triggerRefresh('/provider/wallet');
+
     return { success: true, message: "Wallet settings saved successfully." };
   } catch (error: any) {
     console.error("Error saving wallet settings:", error);
