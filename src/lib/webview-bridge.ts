@@ -68,9 +68,9 @@ if (typeof window !== 'undefined') {
               currency: options.currency || 'INR',
               order_id: options.order_id,
               name: options.name || 'Fixbro',
-              description: options.description || 'Service Payment',
+              description: options.description || 'Service Booking',
               prefill: options.prefill || {},
-              theme: options.theme || { color: '#0d9488' },
+              theme: options.theme || { color: '#2563EB' },
             });
           },
           on: (event: string, callback: Function) => {
