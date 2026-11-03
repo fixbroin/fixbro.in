@@ -68,7 +68,8 @@ const PwaInstallButton = () => {
 
     // Check iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
-    setIsIos(/iphone|ipad|ipod/.test(userAgent));
+    const isApple = /iphone|ipad|ipod/.test(userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    setIsIos(isApple);
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -202,10 +203,10 @@ const PwaInstallButton = () => {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Smartphone className="h-5 w-5 text-primary" />
-                            Install on iPhone
+                            Install {appInfo.name} on iPhone
                         </DialogTitle>
                         <DialogDescription className="text-left pt-2">
-                            To install the Fixbro app on your iPhone, follow these simple steps:
+                            To install {appInfo.name} on your iPhone, follow these simple steps:
                         </DialogDescription>
                     </DialogHeader>
                     
@@ -220,8 +221,12 @@ const PwaInstallButton = () => {
                         </div>
                         <div className="flex items-start gap-3">
                             <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">3</div>
-                            <p className="text-sm">Tap <span className="text-primary font-bold">Add</span> in the top right corner.</p>
+                            <p className="text-sm">Confirm title <span className="font-semibold text-primary">"{appInfo.name}"</span> and tap <span className="text-primary font-bold">Add</span> in the top right corner.</p>
                         </div>
+                    </div>
+
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground text-left mb-2">
+                        🚀 <strong>Dedicated App:</strong> This saves a separate app icon on your home screen that opens directly into {pathname.startsWith('/admin') ? 'the Admin Panel' : pathname.startsWith('/provider') ? 'the Provider Dashboard' : 'Fixbro'}.
                     </div>
 
                     <DialogFooter>
@@ -246,7 +251,7 @@ const PwaInstallButton = () => {
         
         <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
           <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Desktop App</p>
-          <p className="text-xs font-bold text-foreground">Install Fixbro</p>
+          <p className="text-xs font-bold text-foreground">Install {appInfo.name}</p>
         </div>
       </div>
 
