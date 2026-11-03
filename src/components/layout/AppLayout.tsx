@@ -191,6 +191,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     const preventRightClick = (e: MouseEvent) => e.preventDefault();
     document.addEventListener('contextmenu', preventRightClick);
 
+    // --- PREVENT ACCIDENTAL PINCH-TO-ZOOM ON IOS ---
+    const preventGesture = (e: Event) => {
+      e.preventDefault();
+    };
+    const preventMultiTouch = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('gesturestart', preventGesture, { passive: false });
+    document.addEventListener('gesturechange', preventGesture, { passive: false });
+    document.addEventListener('gestureend', preventGesture, { passive: false });
+    document.addEventListener('touchmove', preventMultiTouch, { passive: false });
+
     // --- SERVICE WORKER REGISTRATION ---
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', function() {
@@ -203,7 +218,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
     }
     // --- END SERVICE WORKER REGISTRATION ---
 
-    return () => document.removeEventListener('contextmenu', preventRightClick);
+    return () => {
+      document.removeEventListener('contextmenu', preventRightClick);
+      document.removeEventListener('gesturestart', preventGesture);
+      document.removeEventListener('gesturechange', preventGesture);
+      document.removeEventListener('gestureend', preventGesture);
+      document.removeEventListener('touchmove', preventMultiTouch);
+    };
   }, []);
 
   useEffect(() => {
