@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Share, PlusSquare, Smartphone } from 'lucide-react';
+import { Download, X, Share, PlusSquare, Smartphone, Menu, ChevronDown, Compass, Chrome } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePathname } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
@@ -32,6 +32,8 @@ const PwaInstallButton = () => {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [showIosGuide, setShowIosInstruction] = useState(false);
   const [isIos, setIsIos] = useState(false);
+  const [isIosChrome, setIsIosChrome] = useState(false);
+  const [activeIosTab, setActiveIosTab] = useState<'safari' | 'chrome'>('safari');
   const [isMinimized, setIsMinimized] = useState(true);
   
   const isMobile = useIsMobile();
@@ -66,10 +68,15 @@ const PwaInstallButton = () => {
                         (window.navigator as any).standalone === true;
     if (isStandalone) setIsAppInstalled(true);
 
-    // Check iOS
+    // Check iOS / iPadOS
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isApple = /iphone|ipad|ipod/.test(userAgent) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     setIsIos(isApple);
+
+    // Detect Chrome on iOS (CriOS)
+    const isChromeOnIos = isApple && /crios/i.test(userAgent);
+    setIsIosChrome(isChromeOnIos);
+    setActiveIosTab(isChromeOnIos ? 'chrome' : 'safari');
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -167,12 +174,12 @@ const PwaInstallButton = () => {
                     </div>
 
                     <Button size="sm" onClick={handleInstallClick} className="rounded-full px-5 font-bold shadow-lg shadow-primary/20">
-                        {isIos ? "Setup" : "Install"}
+                        {isIos ? "Install" : "Install"}
                     </Button>
                 </div>
             </div>
 
-            {/* MINIMIZED SIDE BADGE (After 10 Seconds) */}
+            {/* MINIMIZED SIDE BADGE (Floating Button) */}
             <div 
                 onClick={handleInstallClick}
                 className={`fixed top-[40%] right-0 z-[100] transition-all duration-700 ease-in-out transform flex items-center bg-primary text-white shadow-2xl rounded-l-xl p-2 cursor-pointer ${
@@ -197,40 +204,114 @@ const PwaInstallButton = () => {
                 </button>
             </div>
 
-            {/* iOS Installation Guide */}
+            {/* iOS Smart Installation Guide (Auto-adapts to Chrome vs Safari) */}
             <Dialog open={showIosGuide} onOpenChange={setShowIosInstruction}>
-                <DialogContent className="max-w-[90vw] rounded-2xl">
+                <DialogContent className="max-w-[92vw] sm:max-w-md rounded-2xl p-5 sm:p-6">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
+                        <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                             <Smartphone className="h-5 w-5 text-primary" />
                             Install {appInfo.name} on iPhone
                         </DialogTitle>
-                        <DialogDescription className="text-left pt-2">
-                            To install {appInfo.name} on your iPhone, follow these simple steps:
+                        <DialogDescription className="text-left pt-1 text-xs sm:text-sm">
+                            Follow the simple steps below for your current browser:
                         </DialogDescription>
                     </DialogHeader>
-                    
-                    <div className="space-y-4 py-4">
-                        <div className="flex items-start gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">1</div>
-                            <p className="text-sm">Tap the <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Share size={14} /> Share</span> button in Safari footer.</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">2</div>
-                            <p className="text-sm">Scroll down and tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><PlusSquare size={14} /> Add to Home Screen</span>.</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs">3</div>
-                            <p className="text-sm">Confirm title <span className="font-semibold text-primary">"{appInfo.name}"</span> and tap <span className="text-primary font-bold">Add</span> in the top right corner.</p>
-                        </div>
-                    </div>
 
-                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground text-left mb-2">
+                    {/* Browser Switcher Pills */}
+                    <div className="flex items-center bg-muted/70 p-1 rounded-xl gap-1 mt-2">
+                        <button
+                            type="button"
+                            onClick={() => setActiveIosTab('safari')}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                                activeIosTab === 'safari' 
+                                ? 'bg-background text-primary shadow-sm' 
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            <Compass className="h-3.5 w-3.5" />
+                            Apple Safari {!isIosChrome && <span className="text-[10px] opacity-75 font-normal">(Detected)</span>}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveIosTab('chrome')}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                                activeIosTab === 'chrome' 
+                                ? 'bg-background text-primary shadow-sm' 
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            <Chrome className="h-3.5 w-3.5" />
+                            Google Chrome {isIosChrome && <span className="text-[10px] opacity-75 font-normal">(Detected)</span>}
+                        </button>
+                    </div>
+                    
+                    {/* Safari Instructions */}
+                    {activeIosTab === 'safari' && (
+                        <div className="space-y-3 py-3">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">1</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Tap the <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Menu size={12} /> Menu</span> (three lines) inside the bottom address bar pill, then tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Share size={12} /> Share</span>.
+                                    <span className="block text-[11px] text-muted-foreground mt-0.5">(Or tap the direct Share button if using classic toolbar)</span>
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">2</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    In the share sheet, tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><ChevronDown size={12} /> View More</span>.
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">3</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Scroll down and tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><PlusSquare size={12} /> Add to Home Screen</span>.
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">4</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Confirm title <span className="font-semibold text-primary">"{appInfo.name}"</span> and tap <span className="text-primary font-bold">Add</span> in the top right corner.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Chrome Instructions */}
+                    {activeIosTab === 'chrome' && (
+                        <div className="space-y-3 py-3">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">1</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Tap the <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Share size={12} /> Share</span> button in the top address bar (next to the website URL).
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">2</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    In the quick actions sheet, tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><ChevronDown size={12} /> View More</span>.
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">3</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Scroll down and tap <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><PlusSquare size={12} /> Add to Home Screen</span>.
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">4</div>
+                                <p className="text-xs sm:text-sm text-left">
+                                    Ensure <span className="font-semibold">"Open as Web App"</span> is ON, confirm title <span className="font-semibold text-primary">"{appInfo.name}"</span>, and tap <span className="text-primary font-bold">Add</span> in the top right corner.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground text-left mb-1">
                         🚀 <strong>Dedicated App:</strong> This saves a separate app icon on your home screen that opens directly into {pathname.startsWith('/admin') ? 'the Admin Panel' : pathname.startsWith('/provider') ? 'the Provider Dashboard' : 'Fixbro'}.
                     </div>
 
                     <DialogFooter>
-                        <Button onClick={() => setShowIosInstruction(false)} className="w-full rounded-xl">Got it!</Button>
+                        <Button onClick={() => setShowIosInstruction(false)} className="w-full rounded-xl font-bold">Got it!</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
