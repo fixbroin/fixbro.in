@@ -1709,6 +1709,7 @@ export interface PinCodeAreaMapping {
 }
 
 export interface AppUpdateTargetConfig {
+  // Android configuration
   enabled: boolean;
   forceUpdate: boolean;
   minVersionCode: number;
@@ -1716,12 +1717,33 @@ export interface AppUpdateTargetConfig {
   playStoreUrl: string;
   title: string;
   message: string;
+
+  // iOS configuration
+  iosEnabled?: boolean;
+  iosForceUpdate?: boolean;
+  iosMinVersionCode?: number;
+  iosLatestVersionName?: string;
+  appStoreUrl?: string;
+  iosTitle?: string;
+  iosMessage?: string;
+
   updatedAt?: any;
 }
 
 export interface AppUpdateSettings {
   customer: AppUpdateTargetConfig;
   provider: AppUpdateTargetConfig;
+  updatedAt?: any;
+}
+
+export type AppDownloadMode = 'pwa' | 'native_stores' | 'disabled';
+
+export interface AppDownloadSettings {
+  mode: AppDownloadMode;
+  androidUserUrl: string;
+  androidProviderUrl: string;
+  iosUserUrl: string;
+  iosProviderUrl: string;
   updatedAt?: any;
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Share, PlusSquare, Smartphone, Menu, ChevronDown, Compass, Chrome } from 'lucide-react';
+import { Download, X, Share, PlusSquare, Smartphone, Menu, ChevronDown, Compass, Chrome, Apple } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePathname } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import type { AppDownloadSettings } from '@/types/firestore';
 
 // Extend Event type to include PWA-specific properties
 interface BeforeInstallPromptEvent extends Event {
@@ -31,14 +32,19 @@ const PwaInstallButton = () => {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [showIosGuide, setShowIosInstruction] = useState(false);
+  const [showDesktopStoreDialog, setShowDesktopStoreDialog] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [isIosChrome, setIsIosChrome] = useState(false);
   const [activeIosTab, setActiveIosTab] = useState<'safari' | 'chrome'>('safari');
   const [isMinimized, setIsMinimized] = useState(true);
+  const [downloadSettings, setDownloadSettings] = useState<AppDownloadSettings | null>(null);
   
   const isMobile = useIsMobile();
   const pathname = usePathname();
   const DISMISS_KEY = 'pwa_install_prompt_dismissed_v2';
+
+  const isAdmin = pathname.startsWith('/admin');
+  const isProvider = pathname.startsWith('/provider');
 
   // Determine which app we are installing
   const appInfo = {
@@ -46,15 +52,27 @@ const PwaInstallButton = () => {
     desc: "Faster booking & real-time updates"
   };
 
-  if (pathname.startsWith('/admin')) {
+  if (isAdmin) {
     appInfo.name = "Fixbro Admin";
     appInfo.desc = "Manage orders & providers";
-  } else if (pathname.startsWith('/provider')) {
+  } else if (isProvider) {
     appInfo.name = "Fixbro Provider";
     appInfo.desc = "Manage your jobs & earnings";
   }
 
-  // 1. Core initialization and event listener
+  // 1. Fetch dynamic app download settings
+  useEffect(() => {
+    fetch('/api/app-download-settings', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          setDownloadSettings(data.settings);
+        }
+      })
+      .catch((err) => console.error("Error fetching download settings:", err));
+  }, []);
+
+  // 2. Core initialization and event listener
   useEffect(() => {
     setIsMounted(true);
     
@@ -87,14 +105,14 @@ const PwaInstallButton = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  // 2. Timer and Page visibility logic for the PWA prompt
+  // 3. Timer and Page visibility logic for the PWA prompt
   useEffect(() => {
     if (!isMounted || isAppInstalled || isDismissed) return;
 
     if (pathname === '/') {
       // Check if the home page banner was already shown in this session
       const bannerShownSession = sessionStorage.getItem('pwa_banner_shown_home');
-      if (!bannerShownSession && (installPrompt || isIos)) {
+      if (!bannerShownSession && (installPrompt || isIos || downloadSettings?.mode === 'native_stores')) {
         setIsMinimized(false);
         // Show for 3 to 4 seconds (3500ms), then minimize to floating button
         const timer = setTimeout(() => {
@@ -109,11 +127,43 @@ const PwaInstallButton = () => {
       // On all other pages, directly keep it minimized (floating button)
       setIsMinimized(true);
     }
-  }, [pathname, isMounted, isAppInstalled, isDismissed, installPrompt, isIos]);
+  }, [pathname, isMounted, isAppInstalled, isDismissed, installPrompt, isIos, downloadSettings?.mode]);
+
+  const isDownloadsDisabled = !isAdmin && downloadSettings?.mode === 'disabled';
+  const isNativeStoresMode = !isAdmin && downloadSettings?.mode === 'native_stores';
 
   const handleInstallClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // 1. If in Native Stores Mode (Customer or Provider)
+    if (isNativeStoresMode && downloadSettings) {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const isAndroid = /android/i.test(userAgent);
+      const isApple = isIos;
+
+      const targetAndroidUrl = isProvider 
+        ? downloadSettings.androidProviderUrl 
+        : downloadSettings.androidUserUrl;
+      const targetIosUrl = isProvider 
+        ? downloadSettings.iosProviderUrl 
+        : downloadSettings.iosUserUrl;
+
+      if (isAndroid && targetAndroidUrl) {
+        window.open(targetAndroidUrl, '_blank');
+        return;
+      }
+
+      if (isApple && targetIosUrl) {
+        window.open(targetIosUrl, '_blank');
+        return;
+      }
+
+      // If on desktop or specific mobile link missing, show desktop store dialog
+      setShowDesktopStoreDialog(true);
+      return;
+    }
+
+    // 2. Otherwise: PWA Mode (or Admin Panel)
     if (isIos && !isAppInstalled) {
         setShowIosInstruction(true);
         return;
@@ -135,12 +185,12 @@ const PwaInstallButton = () => {
     localStorage.setItem(DISMISS_KEY, 'true');
   };
 
-  if (!isMounted || isAppInstalled || isDismissed) {
+  if (!isMounted || isAppInstalled || isDismissed || isDownloadsDisabled) {
     return null;
   }
 
-  // Only show if we have a prompt (Android/Chrome) OR if it's iOS (for manual guide)
-  if (!installPrompt && !isIos) {
+  // Only show if we have a prompt (Android/Chrome) OR if it's iOS OR if in Native Stores mode
+  if (!isNativeStoresMode && !installPrompt && !isIos) {
       return null;
   }
 
@@ -169,12 +219,14 @@ const PwaInstallButton = () => {
                     </div>
 
                     <div className="flex-grow min-w-0">
-                        <h4 className="text-sm font-bold text-foreground">Install {appInfo.name}</h4>
+                        <h4 className="text-sm font-bold text-foreground">
+                          {isNativeStoresMode ? `Download ${appInfo.name}` : `Install ${appInfo.name}`}
+                        </h4>
                         <p className="text-[10px] text-muted-foreground line-clamp-1">{appInfo.desc}</p>
                     </div>
 
                     <Button size="sm" onClick={handleInstallClick} className="rounded-full px-5 font-bold shadow-lg shadow-primary/20">
-                        {isIos ? "Install" : "Install"}
+                        {isNativeStoresMode ? "Download" : "Install"}
                     </Button>
                 </div>
             </div>
@@ -190,7 +242,9 @@ const PwaInstallButton = () => {
             >
                 <div className="flex flex-col items-center gap-1">
                     <Download size={18} className="animate-bounce" />
-                    <span className="text-[10px] font-bold uppercase tracking-tighter [writing-mode:vertical-lr] rotate-180">Install</span>
+                    <span className="text-[10px] font-bold uppercase tracking-tighter [writing-mode:vertical-lr] rotate-180">
+                      {isNativeStoresMode ? "Get App" : "Install"}
+                    </span>
                 </div>
                 
                 <button 
@@ -204,7 +258,7 @@ const PwaInstallButton = () => {
                 </button>
             </div>
 
-            {/* iOS Smart Installation Guide (Auto-adapts to Chrome vs Safari) */}
+            {/* iOS Smart Installation Guide (Auto-adapts to Chrome vs Safari in PWA mode) */}
             <Dialog open={showIosGuide} onOpenChange={setShowIosInstruction}>
                 <DialogContent className="max-w-[92vw] sm:max-w-md rounded-2xl p-5 sm:p-6">
                     <DialogHeader>
@@ -315,34 +369,166 @@ const PwaInstallButton = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Desktop / Multi-Store Selection Dialog (In Native Stores Mode) */}
+            <Dialog open={showDesktopStoreDialog} onOpenChange={setShowDesktopStoreDialog}>
+                <DialogContent className="max-w-[90vw] sm:max-w-sm rounded-2xl p-5 sm:p-6 text-center">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-black text-center text-foreground">
+                            Download {appInfo.name}
+                        </DialogTitle>
+                        <DialogDescription className="text-center text-xs text-muted-foreground mt-1">
+                            Available on Google Play and Apple App Store
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 py-4">
+                        {(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) && (
+                            <Button
+                                onClick={() => {
+                                    const url = isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl;
+                                    if (url) window.open(url, '_blank');
+                                }}
+                                variant="outline"
+                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-950/20"
+                            >
+                                <Smartphone className="h-5 w-5 text-green-600" />
+                                <div className="text-left">
+                                    <p className="text-[10px] text-muted-foreground font-semibold leading-none">GET IT ON</p>
+                                    <p className="text-sm font-bold text-foreground leading-tight">Google Play</p>
+                                </div>
+                            </Button>
+                        )}
+
+                        {(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                            <Button
+                                onClick={() => {
+                                    const url = isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl;
+                                    if (url) window.open(url, '_blank');
+                                }}
+                                variant="outline"
+                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-900"
+                            >
+                                <Apple className="h-5 w-5 text-foreground" />
+                                <div className="text-left">
+                                    <p className="text-[10px] text-muted-foreground font-semibold leading-none">Download on the</p>
+                                    <p className="text-sm font-bold text-foreground leading-tight">App Store</p>
+                                </div>
+                            </Button>
+                        )}
+
+                        {!(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) &&
+                         !(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                            <p className="text-xs text-muted-foreground py-2">
+                                Store download links are currently being configured. Please check back soon!
+                            </p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setShowDesktopStoreDialog(false)} className="w-full rounded-xl font-bold">
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
       );
   }
 
   // --- DESKTOP FLOATING TAB UI ---
   return (
-    <div
-      className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden animate-pulse hover:animate-none"
-      onClick={handleInstallClick}
-    >
-      <div className="flex items-center w-full h-full p-2.5">
-        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
-            <Download className="h-5 w-5 text-white animate-bounce group-hover:animate-none" />
+    <>
+      <div
+        className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden animate-pulse hover:animate-none"
+        onClick={handleInstallClick}
+      >
+        <div className="flex items-center w-full h-full p-2.5">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
+              <Download className="h-5 w-5 text-white animate-bounce group-hover:animate-none" />
+          </div>
+          
+          <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+              {isNativeStoresMode ? "Mobile Apps" : "Desktop App"}
+            </p>
+            <p className="text-xs font-bold text-foreground">
+              {isNativeStoresMode ? `Get ${appInfo.name}` : `Install ${appInfo.name}`}
+            </p>
+          </div>
         </div>
-        
-        <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Desktop App</p>
-          <p className="text-xs font-bold text-foreground">Install {appInfo.name}</p>
-        </div>
+
+        <button
+            onClick={handleDismiss}
+            className="absolute top-1 right-1 h-4 w-4 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white flex items-center justify-center"
+          >
+            <X size={10} />
+        </button>
       </div>
 
-      <button
-          onClick={handleDismiss}
-          className="absolute top-1 right-1 h-4 w-4 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white flex items-center justify-center"
-        >
-          <X size={10} />
-      </button>
-    </div>
+      {/* Desktop / Multi-Store Selection Dialog */}
+      <Dialog open={showDesktopStoreDialog} onOpenChange={setShowDesktopStoreDialog}>
+          <DialogContent className="max-w-[90vw] sm:max-w-sm rounded-2xl p-5 sm:p-6 text-center">
+              <DialogHeader>
+                  <DialogTitle className="text-lg font-black text-center text-foreground">
+                      Download {appInfo.name}
+                  </DialogTitle>
+                  <DialogDescription className="text-center text-xs text-muted-foreground mt-1">
+                      Available on Google Play and Apple App Store
+                  </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-4">
+                  {(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) && (
+                      <Button
+                          onClick={() => {
+                              const url = isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl;
+                              if (url) window.open(url, '_blank');
+                          }}
+                          variant="outline"
+                          className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-950/20"
+                      >
+                          <Smartphone className="h-5 w-5 text-green-600" />
+                          <div className="text-left">
+                              <p className="text-[10px] text-muted-foreground font-semibold leading-none">GET IT ON</p>
+                              <p className="text-sm font-bold text-foreground leading-tight">Google Play</p>
+                          </div>
+                      </Button>
+                  )}
+
+                  {(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                      <Button
+                          onClick={() => {
+                              const url = isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl;
+                              if (url) window.open(url, '_blank');
+                          }}
+                          variant="outline"
+                          className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-900"
+                      >
+                          <Apple className="h-5 w-5 text-foreground" />
+                          <div className="text-left">
+                              <p className="text-[10px] text-muted-foreground font-semibold leading-none">Download on the</p>
+                              <p className="text-sm font-bold text-foreground leading-tight">App Store</p>
+                          </div>
+                      </Button>
+                  )}
+
+                  {!(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) &&
+                   !(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                      <p className="text-xs text-muted-foreground py-2">
+                          Store download links are currently being configured. Please check back soon!
+                      </p>
+                  )}
+              </div>
+
+              <DialogFooter>
+                  <Button variant="ghost" onClick={() => setShowDesktopStoreDialog(false)} className="w-full rounded-xl font-bold">
+                      Close
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

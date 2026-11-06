@@ -63,6 +63,7 @@ export const PERMISSION_MODULES = [
   { id: 'cookie_settings', label: 'Cookie Settings', paths: ['/admin/cookie-settings'] },
   { id: 'database_tools', label: 'Database Tools', paths: ['/admin/database-tools'] },
   { id: 'app_update', label: 'App Update', paths: ['/admin/app-update'] },
+  { id: 'app_download_settings', label: 'App Download Settings', paths: ['/admin/app-download-settings'] },
   { id: 'system_logs', label: 'System Logs', paths: ['/admin/system-logs'] },
 ];
 
