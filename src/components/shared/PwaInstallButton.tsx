@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Share, PlusSquare, Smartphone, Menu, ChevronDown, Compass, Chrome, Apple } from 'lucide-react';
+import { Download, X, Share, PlusSquare, Smartphone, Menu, ChevronDown, Compass, Chrome, Apple, Monitor, Laptop } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePathname } from 'next/navigation';
 import AppImage from '@/components/ui/AppImage';
@@ -33,6 +33,8 @@ const PwaInstallButton = () => {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [showIosGuide, setShowIosInstruction] = useState(false);
   const [showDesktopStoreDialog, setShowDesktopStoreDialog] = useState(false);
+  const [showDesktopPwaGuide, setShowDesktopPwaGuide] = useState(false);
+  const [activeDesktopTab, setActiveDesktopTab] = useState<'windows' | 'mac'>('windows');
   const [isIos, setIsIos] = useState(false);
   const [isIosChrome, setIsIosChrome] = useState(false);
   const [activeIosTab, setActiveIosTab] = useState<'safari' | 'chrome'>('safari');
@@ -59,6 +61,15 @@ const PwaInstallButton = () => {
     appInfo.name = "Fixbro Provider";
     appInfo.desc = "Manage your jobs & earnings";
   }
+
+  const targetAndroidUrl = isProvider 
+    ? downloadSettings?.androidProviderUrl 
+    : downloadSettings?.androidUserUrl;
+  const targetIosUrl = isProvider 
+    ? downloadSettings?.iosProviderUrl 
+    : downloadSettings?.iosUserUrl;
+  const hasAndroidApp = Boolean(targetAndroidUrl && targetAndroidUrl.trim() !== '');
+  const hasIosApp = Boolean(targetIosUrl && targetIosUrl.trim() !== '');
 
   // 1. Fetch dynamic app download settings
   useEffect(() => {
@@ -96,13 +107,34 @@ const PwaInstallButton = () => {
     setIsIosChrome(isChromeOnIos);
     setActiveIosTab(isChromeOnIos ? 'chrome' : 'safari');
 
+    const isMacPlatform = /macintosh|mac os x/i.test(userAgent) && !isApple;
+    if (isMacPlatform) {
+      setActiveDesktopTab('mac');
+    }
+
+    // Pick up globally captured prompt if it already fired before this component mounted
+    if (typeof window !== 'undefined' && (window as any).__deferredInstallPrompt) {
+      setInstallPrompt((window as any).__deferredInstallPrompt);
+    }
+
+    const handlePromptAvailable = () => {
+      if ((window as any).__deferredInstallPrompt) {
+        setInstallPrompt((window as any).__deferredInstallPrompt);
+      }
+    };
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      (window as any).__deferredInstallPrompt = e;
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-available', handlePromptAvailable);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
+    };
   }, []);
 
   // 3. Timer and Page visibility logic for the PWA prompt
@@ -141,21 +173,21 @@ const PwaInstallButton = () => {
       const isAndroid = /android/i.test(userAgent);
       const isApple = isIos;
 
-      const targetAndroidUrl = isProvider 
-        ? downloadSettings.androidProviderUrl 
-        : downloadSettings.androidUserUrl;
-      const targetIosUrl = isProvider 
-        ? downloadSettings.iosProviderUrl 
-        : downloadSettings.iosUserUrl;
-
-      if (isAndroid && targetAndroidUrl) {
+      if (isAndroid && hasAndroidApp && targetAndroidUrl) {
         window.open(targetAndroidUrl, '_blank');
         return;
       }
 
-      if (isApple && targetIosUrl) {
-        window.open(targetIosUrl, '_blank');
-        return;
+      if (isApple) {
+        if (hasIosApp && targetIosUrl) {
+          window.open(targetIosUrl, '_blank');
+          return;
+        } else {
+          // Smart Fallback: iOS app is not on the App Store yet.
+          // Directly open the iOS PWA "Add to Home Screen" instructions!
+          setShowIosInstruction(true);
+          return;
+        }
       }
 
       // If on desktop or specific mobile link missing, show desktop store dialog
@@ -178,6 +210,33 @@ const PwaInstallButton = () => {
     }
     setInstallPrompt(null);
   };
+
+  const handleDesktopPwaInstall = async () => {
+    setShowDesktopStoreDialog(false);
+
+    // Retrieve active prompt from state OR from global window
+    const promptEvent = installPrompt || (typeof window !== 'undefined' ? (window as any).__deferredInstallPrompt : null);
+
+    if (promptEvent) {
+      try {
+        await promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
+        if (outcome === 'accepted') {
+          setIsAppInstalled(true);
+        }
+        setInstallPrompt(null);
+        if (typeof window !== 'undefined') {
+          (window as any).__deferredInstallPrompt = null;
+        }
+        return;
+      } catch (err) {
+        console.error("Desktop install prompt error:", err);
+      }
+    }
+
+    // Only fallback to guidance if browser cannot directly trigger prompt (e.g. Safari on Mac)
+    setShowDesktopPwaGuide(true);
+  };
   
   const handleDismiss = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -194,9 +253,9 @@ const PwaInstallButton = () => {
       return null;
   }
 
-  // --- MOBILE UI (Banner -> Floating Badge) ---
-  if (isMobile) {
-      return (
+  return (
+    <>
+      {isMobile ? (
         <>
             {/* LARGE BANNER (Initial State) */}
             <div 
@@ -220,13 +279,13 @@ const PwaInstallButton = () => {
 
                     <div className="flex-grow min-w-0">
                         <h4 className="text-sm font-bold text-foreground">
-                          {isNativeStoresMode ? `Download ${appInfo.name}` : `Install ${appInfo.name}`}
+                          {isNativeStoresMode && (!isIos || hasIosApp) ? `Download ${appInfo.name}` : `Install ${appInfo.name}`}
                         </h4>
                         <p className="text-[10px] text-muted-foreground line-clamp-1">{appInfo.desc}</p>
                     </div>
 
                     <Button size="sm" onClick={handleInstallClick} className="rounded-full px-5 font-bold shadow-lg shadow-primary/20">
-                        {isNativeStoresMode ? "Download" : "Install"}
+                        {isNativeStoresMode && (!isIos || hasIosApp) ? "Download" : "Install"}
                     </Button>
                 </div>
             </div>
@@ -243,7 +302,7 @@ const PwaInstallButton = () => {
                 <div className="flex flex-col items-center gap-1">
                     <Download size={18} className="animate-bounce" />
                     <span className="text-[10px] font-bold uppercase tracking-tighter [writing-mode:vertical-lr] rotate-180">
-                      {isNativeStoresMode ? "Get App" : "Install"}
+                      {isNativeStoresMode && (!isIos || hasIosApp) ? "Get App" : "Install"}
                     </span>
                 </div>
                 
@@ -257,6 +316,36 @@ const PwaInstallButton = () => {
                     <X size={10} />
                 </button>
             </div>
+        </>
+      ) : (
+        /* DESKTOP FLOATING TAB UI */
+        <div
+          className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden animate-pulse hover:animate-none"
+          onClick={handleInstallClick}
+        >
+          <div className="flex items-center w-full h-full p-2.5">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
+                <Download className="h-5 w-5 text-white animate-bounce group-hover:animate-none" />
+            </div>
+            
+            <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                {isNativeStoresMode ? "Mobile Apps" : "Desktop App"}
+              </p>
+              <p className="text-xs font-bold text-foreground">
+                {isNativeStoresMode ? `Get ${appInfo.name}` : `Install ${appInfo.name}`}
+              </p>
+            </div>
+          </div>
+
+          <button
+              onClick={handleDismiss}
+              className="absolute top-1 right-1 h-4 w-4 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white flex items-center justify-center"
+            >
+              <X size={10} />
+          </button>
+        </div>
+      )}
 
             {/* iOS Smart Installation Guide (Auto-adapts to Chrome vs Safari in PWA mode) */}
             <Dialog open={showIosGuide} onOpenChange={setShowIosInstruction}>
@@ -270,6 +359,13 @@ const PwaInstallButton = () => {
                             Follow the simple steps below for your current browser:
                         </DialogDescription>
                     </DialogHeader>
+
+                    {!hasIosApp && isNativeStoresMode && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-900 dark:text-amber-200 text-left mt-1 flex items-start gap-2">
+                            <Apple className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <span><strong>Apple App Store app coming soon!</strong> In the meantime, you can add Fixbro to your iPhone home screen for the full app experience.</span>
+                        </div>
+                    )}
 
                     {/* Browser Switcher Pills */}
                     <div className="flex items-center bg-muted/70 p-1 rounded-xl gap-1 mt-2">
@@ -383,14 +479,13 @@ const PwaInstallButton = () => {
                     </DialogHeader>
 
                     <div className="space-y-3 py-4">
-                        {(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) && (
+                        {hasAndroidApp && (
                             <Button
                                 onClick={() => {
-                                    const url = isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl;
-                                    if (url) window.open(url, '_blank');
+                                    if (targetAndroidUrl) window.open(targetAndroidUrl, '_blank');
                                 }}
                                 variant="outline"
-                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-950/20"
+                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-950/20 shadow-xs"
                             >
                                 <Smartphone className="h-5 w-5 text-green-600" />
                                 <div className="text-left">
@@ -400,14 +495,13 @@ const PwaInstallButton = () => {
                             </Button>
                         )}
 
-                        {(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                        {hasIosApp ? (
                             <Button
                                 onClick={() => {
-                                    const url = isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl;
-                                    if (url) window.open(url, '_blank');
+                                    if (targetIosUrl) window.open(targetIosUrl, '_blank');
                                 }}
                                 variant="outline"
-                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-900"
+                                className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-900 shadow-xs"
                             >
                                 <Apple className="h-5 w-5 text-foreground" />
                                 <div className="text-left">
@@ -415,10 +509,44 @@ const PwaInstallButton = () => {
                                     <p className="text-sm font-bold text-foreground leading-tight">App Store</p>
                                 </div>
                             </Button>
+                        ) : (
+                            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/30 text-left">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                      <Apple className="h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-1.5">
+                                          <p className="text-xs font-bold text-foreground">Apple App Store</p>
+                                          <span className="text-[9px] bg-primary/10 text-primary font-bold px-1.5 py-0.5 rounded">Coming Soon</span>
+                                        </div>
+                                        <p className="text-[10px] text-muted-foreground">iOS version in development</p>
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
-                        {!(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) &&
-                         !(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
+                        {/* 3rd Option: Desktop Web App (PWA) for PC / Mac */}
+                        <div className="pt-3 border-t border-border/70 space-y-2">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground text-left px-0.5">
+                                Or use on this computer
+                            </p>
+                            <Button
+                                onClick={handleDesktopPwaInstall}
+                                className="w-full flex items-center justify-between h-12 rounded-xl bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-bold shadow-md hover:opacity-95 px-3.5 transition-all"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <Monitor className="h-5 w-5 shrink-0" />
+                                    <div className="text-left">
+                                        <p className="text-[9px] uppercase font-bold opacity-80 leading-none">Windows PC & Mac</p>
+                                        <p className="text-xs sm:text-sm font-bold leading-tight">Install Desktop App</p>
+                                    </div>
+                                </div>
+                                <Download className="h-4 w-4 shrink-0 opacity-90" />
+                            </Button>
+                        </div>
+
+                        {!hasAndroidApp && !hasIosApp && (
                             <p className="text-xs text-muted-foreground py-2">
                                 Store download links are currently being configured. Please check back soon!
                             </p>
@@ -431,102 +559,107 @@ const PwaInstallButton = () => {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
-        </>
-      );
-  }
+      </Dialog>
 
-  // --- DESKTOP FLOATING TAB UI ---
-  return (
-    <>
-      <div
-        className="group fixed top-1/2 right-0 -translate-y-1/2 z-50 flex items-center bg-card border-y border-l border-primary/20 shadow-2xl rounded-l-2xl cursor-pointer transition-all duration-500 ease-out w-12 hover:w-48 h-16 overflow-hidden animate-pulse hover:animate-none"
-        onClick={handleInstallClick}
-      >
-        <div className="flex items-center w-full h-full p-2.5">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30 group-hover:rotate-12 transition-transform">
-              <Download className="h-5 w-5 text-white animate-bounce group-hover:animate-none" />
+      {/* Desktop PWA Installation Guide (Windows / Mac) */}
+      <Dialog open={showDesktopPwaGuide} onOpenChange={setShowDesktopPwaGuide}>
+        <DialogContent className="max-w-[92vw] sm:max-w-md rounded-2xl p-5 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Monitor className="h-5 w-5 text-primary" />
+              Install {appInfo.name} on Computer
+            </DialogTitle>
+            <DialogDescription className="text-left pt-1 text-xs sm:text-sm">
+              Follow the quick steps below for your operating system:
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* OS Switcher Pills */}
+          <div className="flex items-center bg-muted/70 p-1 rounded-xl gap-1 mt-2">
+            <button
+              type="button"
+              onClick={() => setActiveDesktopTab('windows')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                activeDesktopTab === 'windows' 
+                ? 'bg-background text-primary shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Laptop className="h-3.5 w-3.5" />
+              Windows (Chrome / Edge)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveDesktopTab('mac')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                activeDesktopTab === 'mac' 
+                ? 'bg-background text-primary shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Apple className="h-3.5 w-3.5" />
+              Mac (Safari / Chrome)
+            </button>
           </div>
-          
-          <div className="ml-3 transition-all duration-500 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
-              {isNativeStoresMode ? "Mobile Apps" : "Desktop App"}
-            </p>
-            <p className="text-xs font-bold text-foreground">
-              {isNativeStoresMode ? `Get ${appInfo.name}` : `Install ${appInfo.name}`}
-            </p>
-          </div>
-        </div>
 
-        <button
-            onClick={handleDismiss}
-            className="absolute top-1 right-1 h-4 w-4 rounded-full bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white flex items-center justify-center"
-          >
-            <X size={10} />
-        </button>
-      </div>
-
-      {/* Desktop / Multi-Store Selection Dialog */}
-      <Dialog open={showDesktopStoreDialog} onOpenChange={setShowDesktopStoreDialog}>
-          <DialogContent className="max-w-[90vw] sm:max-w-sm rounded-2xl p-5 sm:p-6 text-center">
-              <DialogHeader>
-                  <DialogTitle className="text-lg font-black text-center text-foreground">
-                      Download {appInfo.name}
-                  </DialogTitle>
-                  <DialogDescription className="text-center text-xs text-muted-foreground mt-1">
-                      Available on Google Play and Apple App Store
-                  </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-3 py-4">
-                  {(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) && (
-                      <Button
-                          onClick={() => {
-                              const url = isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl;
-                              if (url) window.open(url, '_blank');
-                          }}
-                          variant="outline"
-                          className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-green-600 hover:bg-green-50/50 dark:hover:bg-green-950/20"
-                      >
-                          <Smartphone className="h-5 w-5 text-green-600" />
-                          <div className="text-left">
-                              <p className="text-[10px] text-muted-foreground font-semibold leading-none">GET IT ON</p>
-                              <p className="text-sm font-bold text-foreground leading-tight">Google Play</p>
-                          </div>
-                      </Button>
-                  )}
-
-                  {(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
-                      <Button
-                          onClick={() => {
-                              const url = isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl;
-                              if (url) window.open(url, '_blank');
-                          }}
-                          variant="outline"
-                          className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border-2 hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-900"
-                      >
-                          <Apple className="h-5 w-5 text-foreground" />
-                          <div className="text-left">
-                              <p className="text-[10px] text-muted-foreground font-semibold leading-none">Download on the</p>
-                              <p className="text-sm font-bold text-foreground leading-tight">App Store</p>
-                          </div>
-                      </Button>
-                  )}
-
-                  {!(isProvider ? downloadSettings?.androidProviderUrl : downloadSettings?.androidUserUrl) &&
-                   !(isProvider ? downloadSettings?.iosProviderUrl : downloadSettings?.iosUserUrl) && (
-                      <p className="text-xs text-muted-foreground py-2">
-                          Store download links are currently being configured. Please check back soon!
-                      </p>
-                  )}
+          {/* Windows / Chrome / Edge Instructions */}
+          {activeDesktopTab === 'windows' && (
+            <div className="space-y-3 py-3">
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">1</div>
+                <p className="text-xs sm:text-sm text-left">
+                  Look at the right side of your browser's top address bar.
+                </p>
               </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">2</div>
+                <p className="text-xs sm:text-sm text-left">
+                  Click the <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Download size={12} /> Install App</span> or <span className="font-bold inline-flex items-center bg-muted px-1.5 py-0.5 rounded gap-1"><Monitor size={12} /> Desktop</span> icon.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">3</div>
+                <p className="text-xs sm:text-sm text-left">
+                  Click <span className="text-primary font-bold">Install</span>. Fixbro will launch in its own desktop window with a desktop shortcut icon!
+                </p>
+              </div>
+            </div>
+          )}
 
-              <DialogFooter>
-                  <Button variant="ghost" onClick={() => setShowDesktopStoreDialog(false)} className="w-full rounded-xl font-bold">
-                      Close
-                  </Button>
-              </DialogFooter>
-          </DialogContent>
+          {/* Mac Instructions */}
+          {activeDesktopTab === 'mac' && (
+            <div className="space-y-3 py-3">
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">1</div>
+                <p className="text-xs sm:text-sm text-left">
+                  In <strong>Apple Safari</strong>: Click <span className="font-bold bg-muted px-1.5 py-0.5 rounded">File</span> in the top menu bar, then click <span className="font-bold text-primary bg-muted px-1.5 py-0.5 rounded">Add to Dock</span>.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">2</div>
+                <p className="text-xs sm:text-sm text-left">
+                  In <strong>Google Chrome</strong>: Click the install icon in the top address bar or open the 3 dots menu <span className="font-bold bg-muted px-1.5 py-0.5 rounded">⋮</span> &gt; <span className="font-bold bg-muted px-1.5 py-0.5 rounded">Save and Share</span> &gt; <span className="font-bold text-primary bg-muted px-1.5 py-0.5 rounded">Install Fixbro</span>.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg text-primary font-bold text-xs shrink-0 mt-0.5">3</div>
+                <p className="text-xs sm:text-sm text-left">
+                  Fixbro is now added to your Mac Dock and Launchpad as a dedicated app!
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground text-left mb-1">
+            💻 <strong>Desktop App:</strong> Runs cleanly with instant startup, full screen, and desktop notifications.
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowDesktopPwaGuide(false)} className="w-full rounded-xl font-bold">
+              Got it!
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   );
