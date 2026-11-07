@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { AppDownloadSettings } from '@/types/firestore';
+import { isWebView } from '@/lib/webview-bridge';
 
 // Extend Event type to include PWA-specific properties
 interface BeforeInstallPromptEvent extends Event {
@@ -40,6 +41,7 @@ const PwaInstallButton = () => {
   const [activeIosTab, setActiveIosTab] = useState<'safari' | 'chrome'>('safari');
   const [isMinimized, setIsMinimized] = useState(true);
   const [downloadSettings, setDownloadSettings] = useState<AppDownloadSettings | null>(null);
+  const [isInNativeApp, setIsInNativeApp] = useState(false);
   
   const isMobile = useIsMobile();
   const pathname = usePathname();
@@ -129,9 +131,19 @@ const PwaInstallButton = () => {
       setInstallPrompt(e as BeforeInstallPromptEvent);
     };
 
+    // Check if running inside Flutter Native WebView
+    if (isWebView()) {
+      setIsInNativeApp(true);
+    }
+    const handleNativeReady = () => {
+      setIsInNativeApp(true);
+    };
+    window.addEventListener('flutterNativeReady', handleNativeReady);
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('pwa-prompt-available', handlePromptAvailable);
     return () => {
+      window.removeEventListener('flutterNativeReady', handleNativeReady);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
     };
@@ -244,7 +256,7 @@ const PwaInstallButton = () => {
     localStorage.setItem(DISMISS_KEY, 'true');
   };
 
-  if (!isMounted || isAppInstalled || isDismissed || isDownloadsDisabled) {
+  if (!isMounted || isAppInstalled || isDismissed || isDownloadsDisabled || isInNativeApp || isWebView()) {
     return null;
   }
 

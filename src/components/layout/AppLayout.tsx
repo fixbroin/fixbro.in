@@ -21,6 +21,7 @@ import CookieConsentBanner from '@/components/shared/CookieConsentBanner';
 import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
 import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileDialog';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
+import { isWebView } from '@/lib/webview-bridge';
 import type { SiloData } from '@/lib/seoServerUtils';
 
 interface AppLayoutProps {
@@ -335,7 +336,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/') && !isMarketplaceRoute;
   const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
   const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !isMarketplaceRoute;
-  const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
+  const shouldShowPwaInstallButton = isClientMounted && !isWebView() && !pathname.startsWith('/category/') && !pathname.includes('/category/') && !isMarketplaceRoute;
 
   const bottomNavActivePaths = ['/', '/chat', '/notifications', '/my-bookings', '/profile', '/referral','/checkout/schedule', '/custom-service',
     '/checkout/address', '/checkout/payment', '/checkout/thank-you', '/cart', '/categories', '/my-address', '/about-us', '/contact-us', '/terms-and-conditions', 

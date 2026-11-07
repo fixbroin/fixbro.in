@@ -115,18 +115,29 @@ export const isWebView = (): boolean => {
     (window as any).FlutterBridge ||
     (window as any).flutter_inappwebview
   ) {
-    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+    try {
+      sessionStorage.setItem('is_flutter_app', 'true');
+      localStorage.setItem('is_flutter_app', 'true');
+    } catch (e) {}
     return true;
   }
 
   const ua = (navigator.userAgent || '').toLowerCase();
-  if (ua.includes('fixbroapp') || ua.includes('fixbro') || ua.includes('flutter')) {
-    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+  if (ua.includes('fixbroapp') || ua.includes('fixbroproviderapp') || ua.includes('fixbro') || ua.includes('flutter')) {
+    try {
+      sessionStorage.setItem('is_flutter_app', 'true');
+      localStorage.setItem('is_flutter_app', 'true');
+    } catch (e) {}
     return true;
   }
 
   try {
     if (sessionStorage.getItem('is_flutter_app') === 'true') return true;
+  } catch (e) {}
+
+  try {
+    if (localStorage.getItem('is_flutter_app') === 'true') return true;
+    if (Boolean(localStorage.getItem('fixbro_native_fcm_token'))) return true;
   } catch (e) {}
 
   return false;
