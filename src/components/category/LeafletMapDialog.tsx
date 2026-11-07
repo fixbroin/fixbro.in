@@ -274,7 +274,7 @@ export default function LeafletMapDialog({ isOpen, onClose, areas, onConfirm }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="map-dialog-content sm:max-w-[550px] p-6 gap-4">
+      <DialogContent className="sm:max-w-[550px] p-6 gap-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="text-primary h-6 w-6" /> Select Your Location
@@ -292,7 +292,7 @@ export default function LeafletMapDialog({ isOpen, onClose, areas, onConfirm }: 
               onChange={(e) => handleInputChange(e.target.value)}
               onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
               disabled={isSearching || !isMapLoaded}
-              className="flex-1 no-keyboard-scroll"
+              className="flex-1"
             />
             <Button type="submit" disabled={isSearching || !isMapLoaded}>
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}

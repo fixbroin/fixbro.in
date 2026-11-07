@@ -789,7 +789,7 @@ export default function PostRentalPropertyPage() {
       {/* Standalone Map Selector Dialog */}
       <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
         <DialogContent
-          className="map-dialog-content max-w-3xl w-[95vw] sm:w-[90vw] max-h-[92vh] h-[85vh] sm:h-[88vh] p-0 flex flex-col overflow-hidden rounded-3xl"
+          className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[92vh] h-[85vh] sm:h-[88vh] p-0 flex flex-col overflow-hidden rounded-3xl"
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target?.closest('.pac-container')) e.preventDefault();

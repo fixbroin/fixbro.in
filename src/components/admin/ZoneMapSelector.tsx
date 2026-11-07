@@ -178,7 +178,7 @@ const ZoneMapSelector: React.FC<ZoneMapSelectorProps> = ({ apiKey, center, radiu
         <Input 
           ref={autocompleteInputRef} 
           placeholder="Search for building, place, or address..." 
-          className="shadow-md h-9 no-keyboard-scroll"
+          className="shadow-md h-9"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
