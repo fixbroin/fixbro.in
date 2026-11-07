@@ -1348,7 +1348,7 @@ export default function ProviderWithdrawalsPage() {
 
       {/* DIRECT PAYOUT / RECORD PAYMENT DIALOG */}
       <Dialog open={showDirectPayoutDialog} onOpenChange={setShowDirectPayoutDialog}>
-        <DialogContent className="max-w-md rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto w-[calc(100%-1.5rem)] sm:w-full">
+        <DialogContent className="max-w-md rounded-2xl max-h-[85dvh] sm:max-h-[88vh] overflow-y-auto w-[calc(100%-1.5rem)] sm:w-full p-4 sm:p-6 my-auto">
           <form onSubmit={handleExecuteDirectPayout} className="space-y-4">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -1387,43 +1387,43 @@ export default function ProviderWithdrawalsPage() {
                   setIsProviderPickerOpen(true);
                 }}
                 className={cn(
-                  "w-full text-left font-normal h-auto py-2.5 px-3 rounded-xl border bg-background hover:bg-primary hover:text-white hover:border-primary transition-all group shadow-2xs",
+                  "w-full text-left font-normal h-auto py-2.5 px-3 rounded-xl border bg-background hover:bg-muted/40 hover:border-primary/50 transition-all group shadow-2xs",
                   !directPayoutProvider ? "text-foreground" : ""
                 )}
               >
                 {directPayoutProvider ? (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-2 text-left">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <UserCircle className="h-6 w-6 text-primary group-hover:text-white shrink-0 transition-colors" />
+                      <UserCircle className="h-6 w-6 text-primary shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm text-foreground group-hover:text-white leading-tight truncate transition-colors">
+                        <p className="font-semibold text-sm text-foreground leading-tight truncate">
                           {directPayoutProvider.displayName || 'Unnamed Provider'}
                         </p>
-                        <p className="text-xs text-muted-foreground group-hover:text-white/80 truncate transition-colors">
+                        <p className="text-xs text-muted-foreground truncate">
                           {directPayoutProvider.email || directPayoutProvider.mobileNumber || ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0 border-border/50 group-hover:border-white/20">
-                      <span className="text-[10px] text-muted-foreground group-hover:text-white/80 uppercase font-semibold transition-colors">Balance:</span>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0 border-border/50">
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">Balance:</span>
                       <span className={cn(
-                        "font-bold text-sm transition-colors",
+                        "font-bold text-sm",
                         (directPayoutProvider.withdrawableBalance || 0) < 0 
-                          ? "text-destructive group-hover:text-red-200" 
-                          : "text-primary group-hover:text-white"
+                          ? "text-destructive" 
+                          : "text-primary"
                       )}>
                         {formatCurrency(directPayoutProvider.withdrawableBalance || 0, symbol, decimals, code)}
                       </span>
-                      <Search className="ml-1 h-3.5 w-3.5 text-muted-foreground group-hover:text-white opacity-60 group-hover:opacity-100 transition-all" />
+                      <Search className="ml-1 h-3.5 w-3.5 text-muted-foreground opacity-60 group-hover:opacity-100 transition-all" />
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2 text-foreground group-hover:text-white transition-colors">
-                      <Search className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:text-white shrink-0 transition-all" />
+                    <div className="flex items-center gap-2 text-foreground">
+                      <Search className="h-4 w-4 opacity-60 group-hover:opacity-100 shrink-0 transition-all" />
                       <span className="text-sm font-medium">Search and select provider...</span>
                     </div>
-                    <Search className="h-4 w-4 shrink-0 opacity-60 group-hover:opacity-100 group-hover:text-white transition-all" />
+                    <Search className="h-4 w-4 shrink-0 opacity-60 group-hover:opacity-100 transition-all" />
                   </div>
                 )}
               </Button>

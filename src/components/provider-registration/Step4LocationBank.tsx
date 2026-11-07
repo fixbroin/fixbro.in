@@ -119,7 +119,7 @@ export default function Step4LocationBank({
   const [isFormBusyForSignature, setIsFormBusyForSignature] = useState(false);
 
   const enableBankDetails = appConfig?.enableBankDetailsSection === true;
-  const enableCancelledCheque = appConfig?.enableCancelledChequeUpload !== false;
+  const enableCancelledCheque = appConfig?.enableCancelledChequeUpload === true;
   const enableSignature = appConfig?.enableSignatureUpload !== false;
   const maxRadius = appConfig.maxProviderRadiusKm || 50;
   const step4Schema = useMemo(() => createStep4Schema(maxRadius, enableBankDetails), [maxRadius, enableBankDetails]);
@@ -327,7 +327,7 @@ export default function Step4LocationBank({
     }
     
     const enableBankDetails = appConfig?.enableBankDetailsSection === true;
-    const enableCancelledCheque = appConfig.enableCancelledChequeUpload !== false;
+    const enableCancelledCheque = appConfig.enableCancelledChequeUpload === true;
     const isChequeCompulsory = appConfig.isCancelledChequeCompulsory === true;
     const enableSignature = appConfig.enableSignatureUpload !== false;
 

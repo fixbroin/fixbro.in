@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -430,32 +430,131 @@ function WithdrawalPageContent() {
     }
   };
 
+  const scrollToField = (id: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+  };
+
+  const onInvalid = (errors: FieldErrors<WithdrawalFormData>) => {
+    let firstErrorId: string | null = null;
+    let toastTitle = "Validation Error";
+    let toastDescription = "Please check the highlighted fields.";
+
+    if (errors.amount) {
+      firstErrorId = "withdrawal-amount-input";
+      toastTitle = "Invalid Amount";
+      toastDescription = (errors.amount.message as string) || "Please enter a valid withdrawal amount.";
+    } else if (errors.method) {
+      firstErrorId = "withdrawal-method-trigger";
+      toastTitle = "Method Required";
+      toastDescription = (errors.method.message as string) || "Please select a withdrawal method.";
+    } else if (errors.details) {
+      const details = errors.details as any;
+      if (details.confirmAccountNumber) {
+        firstErrorId = "details-confirm-account-number";
+        toastDescription = details.confirmAccountNumber.message || "Please confirm your account number.";
+      } else if (details.accountNumber) {
+        firstErrorId = "details-account-number";
+        toastDescription = details.accountNumber.message || "Account number is required.";
+      } else if (details.bankName) {
+        firstErrorId = "details-bank-name";
+        toastDescription = details.bankName.message || "Bank name is required.";
+      } else if (details.accountHolderName) {
+        firstErrorId = "details-account-holder-name";
+        toastDescription = details.accountHolderName.message || "Account holder name is required.";
+      } else if (details.ifscCode) {
+        firstErrorId = "details-ifsc-code";
+        toastDescription = details.ifscCode.message || `${appConfig?.customBankFields?.[0]?.name || "IFSC code"} is required.`;
+      } else if (details.upiId) {
+        firstErrorId = "details-upi-id";
+        toastDescription = details.upiId.message || "Please enter a valid UPI ID.";
+      } else if (details.email) {
+        firstErrorId = "details-email";
+        toastDescription = details.email.message || "A valid email is required for Amazon Gift Card.";
+      }
+    }
+
+    if (firstErrorId) {
+      scrollToField(firstErrorId);
+    } else {
+      setTimeout(() => {
+        const anyInvalid = document.querySelector('[aria-invalid="true"]') as HTMLElement | null;
+        if (anyInvalid) {
+          anyInvalid.focus();
+          anyInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+    }
+
+    toast({
+      title: toastTitle,
+      description: toastDescription,
+      variant: "destructive"
+    });
+  };
+
   const onSubmit = async (data: WithdrawalFormData) => {
     if (!providerUser || !firestoreUser) return;
+
+    const scrollToAmount = () => {
+      scrollToField("withdrawal-amount-input");
+    };
+
     if (!data.amount || data.amount <= 0) {
-        form.setError("amount", { message: "Please enter a valid amount." }); return;
+      form.setError("amount", { message: "Withdrawal amount must be positive." });
+      scrollToAmount();
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a positive withdrawal amount.",
+        variant: "destructive"
+      });
+      return;
     }
     
     if (!editingRequest && firestoreUser.withdrawalPending) {
-        toast({ title: "Request Pending", description: "You already have a withdrawal request being processed.", variant: "destructive"}); return;
+      toast({ title: "Request Pending", description: "You already have a withdrawal request being processed.", variant: "destructive"});
+      return;
     }
 
     setIsSubmitting(true);
     
     if (!withdrawalSettings?.isWithdrawalEnabled) {
-      toast({ title: "Withdrawals Disabled", variant: "destructive" });
-      setIsSubmitting(false); return;
+      toast({ title: "Withdrawals Disabled", description: "Withdrawals are currently disabled by the admin.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
     }
     
     const effectiveBalance = editingRequest ? withdrawableBalance + editingRequest.amount : withdrawableBalance;
     if (data.amount > effectiveBalance) {
-      form.setError("amount", { message: `Amount exceeds your balance of ${symbol}${effectiveBalance.toFixed(decimals)}` });
-      setIsSubmitting(false); return;
+      const msg = `Amount exceeds your balance of ${symbol}${effectiveBalance.toFixed(decimals)}`;
+      form.setError("amount", { message: msg });
+      scrollToAmount();
+      toast({
+        title: "Insufficient Balance",
+        description: `${msg}. You entered ${symbol}${data.amount}.`,
+        variant: "destructive"
+      });
+      setIsSubmitting(false);
+      return;
     }
 
-    if (data.amount < (withdrawalSettings.minWithdrawalAmount)) { 
-      form.setError("amount", { message: `Minimum withdrawal is ${symbol}${withdrawalSettings.minWithdrawalAmount}` });
-      setIsSubmitting(false); return;
+    const minAmount = withdrawalSettings?.minWithdrawalAmount || 0;
+    if (data.amount < minAmount) { 
+      const msg = `Minimum withdrawal is ${symbol}${minAmount}`;
+      form.setError("amount", { message: msg });
+      scrollToAmount();
+      toast({
+        title: "Minimum Amount Required",
+        description: `${msg}. You entered ${symbol}${data.amount}.`,
+        variant: "destructive"
+      });
+      setIsSubmitting(false);
+      return;
     }
 
     try {
@@ -571,10 +670,10 @@ function WithdrawalPageContent() {
     switch (watchedMethod) {
       case 'bank_transfer': return (
         <>
-          <FormField control={form.control} name="details.accountHolderName" render={({ field }) => (<FormItem><FormLabel>Account Holder Name</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
-          <FormField control={form.control} name="details.bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
-          <FormField control={form.control} name="details.accountNumber" render={({ field }) => (<FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
-          <FormField control={form.control} name="details.confirmAccountNumber" render={({ field }) => (<FormItem><FormLabel>Confirm Account Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="details.accountHolderName" render={({ field }) => (<FormItem><FormLabel>Account Holder Name</FormLabel><FormControl><Input id="details-account-holder-name" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="details.bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input id="details-bank-name" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="details.accountNumber" render={({ field }) => (<FormItem><FormLabel>Account Number</FormLabel><FormControl><Input id="details-account-number" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="details.confirmAccountNumber" render={({ field }) => (<FormItem><FormLabel>Confirm Account Number</FormLabel><FormControl><Input id="details-confirm-account-number" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
           <FormField control={form.control} name="details.ifscCode" render={({ field }) => {
             const firstCustomField = appConfig?.customBankFields?.[0];
             const bankCodeLabel = firstCustomField?.name || "IFSC Code";
@@ -584,6 +683,7 @@ function WithdrawalPageContent() {
                 <FormLabel>{bankCodeLabel}</FormLabel>
                 <FormControl>
                   <Input 
+                    id="details-ifsc-code"
                     placeholder={bankPlaceholder} 
                     {...field} 
                     value={field.value ?? ""} 
@@ -604,8 +704,8 @@ function WithdrawalPageContent() {
           }} />
         </>
       );
-      case 'upi': return (<FormField control={form.control} name="details.upiId" render={({ field }) => (<FormItem><FormLabel>UPI ID</FormLabel><FormControl><Input placeholder="yourname@okhdfc" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />);
-      case 'amazon_gift_card': return (<FormField control={form.control} name="details.email" render={({ field }) => (<FormItem><FormLabel>Email for Gift Card</FormLabel><FormControl><Input type="email" placeholder="your@email.com" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />);
+      case 'upi': return (<FormField control={form.control} name="details.upiId" render={({ field }) => (<FormItem><FormLabel>UPI ID</FormLabel><FormControl><Input id="details-upi-id" placeholder="yourname@okhdfc" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />);
+      case 'amazon_gift_card': return (<FormField control={form.control} name="details.email" render={({ field }) => (<FormItem><FormLabel>Email for Gift Card</FormLabel><FormControl><Input id="details-email" type="email" placeholder="your@email.com" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />);
       default: return null;
     }
   };
@@ -633,12 +733,11 @@ function WithdrawalPageContent() {
             </div>
             <Button
               type="button"
-              variant="outline"
               onClick={() => setIsManageMethodsOpen(true)}
-              className="w-full sm:w-auto rounded-xl border border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-white hover:border-primary font-semibold text-xs h-9 justify-center shrink-0 flex items-center gap-1.5 transition-all shadow-2xs group"
+              className="w-full sm:w-auto rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-xs h-9 justify-center shrink-0 flex items-center gap-1.5 transition-all shadow-xs"
             >
-              <PlusCircle className="h-4 w-4 text-primary group-hover:text-white transition-colors" />
-              <span className="text-primary group-hover:text-white transition-colors">Add Withdrawal Method</span>
+              <PlusCircle className="h-4 w-4 text-primary-foreground" />
+              <span>Add Withdrawal Method</span>
             </Button>
           </div>
         </CardHeader>
@@ -650,32 +749,33 @@ function WithdrawalPageContent() {
         </CardContent>
         {withdrawalSettings?.isWithdrawalEnabled ? (
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)}>
+                <form onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
                 <CardContent className="space-y-4">
                     {!editingRequest && firestoreUser?.withdrawalPending && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Request Already Pending</AlertTitle><AlertDescription>You have a withdrawal request being processed.</AlertDescription></Alert>}
-                    <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount to Withdraw ({symbol})</FormLabel><FormControl><Input type="number" placeholder={`Available: ${symbol}${withdrawableBalance.toFixed(decimals)}`} {...field} value={field.value ?? ""} disabled={isSubmitting || (firestoreUser?.withdrawalPending && !editingRequest)} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount to Withdraw ({symbol})</FormLabel><FormControl><Input id="withdrawal-amount-input" type="number" placeholder={`Available: ${symbol}${withdrawableBalance.toFixed(decimals)}`} {...field} value={field.value ?? ""} disabled={isSubmitting || (firestoreUser?.withdrawalPending && !editingRequest)} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="method" render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel className="mb-2">Withdrawal Method</FormLabel>
                         <Dialog open={isMethodPickerOpen} onOpenChange={setIsMethodPickerOpen}>
                           <DialogTrigger asChild>
                             <Button
+                              id="withdrawal-method-trigger"
                               variant="outline"
                               role="combobox"
                               className={cn(
-                                "w-full justify-between text-left font-normal h-10 rounded-xl border bg-background hover:bg-primary hover:text-white hover:border-primary transition-all group",
+                                "w-full justify-between text-left font-normal h-10 rounded-xl border bg-background hover:bg-muted/50 hover:text-foreground hover:border-primary/50 transition-all group",
                                 !field.value && "text-muted-foreground"
                               )}
                               disabled={isSubmitting || (firestoreUser?.withdrawalPending && !editingRequest)}
                               type="button"
                             >
-                              <span className="group-hover:text-white transition-colors">
+                              <span>
                                 {field.value === "bank_transfer" && "Bank Transfer"}
                                 {field.value === "upi" && "UPI"}
                                 {field.value === "amazon_gift_card" && "Amazon Gift Card"}
                                 {!field.value && "Select a method"}
                               </span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:opacity-100 group-hover:text-white transition-all" />
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:opacity-100 transition-all" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="w-[calc(100%-6px)] sm:max-w-[425px]">

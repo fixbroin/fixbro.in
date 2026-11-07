@@ -24,7 +24,7 @@ export default function ProviderRegistrationToggleTab() {
   const [isChequeCompulsory, setIsChequeCompulsory] = useState(false);
   const [enableDefaultIndianKyc, setEnableDefaultIndianKyc] = useState(true);
   
-  const [enableCancelledChequeUpload, setEnableCancelledChequeUpload] = useState(true);
+  const [enableCancelledChequeUpload, setEnableCancelledChequeUpload] = useState(false);
   const [enableSignatureUpload, setEnableSignatureUpload] = useState(true);
   const [enableBankDetailsSection, setEnableBankDetailsSection] = useState(false);
   const [customBankFields, setCustomBankFields] = useState<CustomBankField[]>([]);
@@ -40,7 +40,7 @@ export default function ProviderRegistrationToggleTab() {
       setIsRegistrationEnabled(appConfig.isProviderRegistrationEnabled === undefined ? true : appConfig.isProviderRegistrationEnabled);
       setIsChequeCompulsory(appConfig.isCancelledChequeCompulsory === undefined ? false : appConfig.isCancelledChequeCompulsory);
       setEnableDefaultIndianKyc(appConfig.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc);
-      setEnableCancelledChequeUpload(appConfig.enableCancelledChequeUpload === undefined ? true : appConfig.enableCancelledChequeUpload);
+      setEnableCancelledChequeUpload(appConfig.enableCancelledChequeUpload === undefined ? false : appConfig.enableCancelledChequeUpload);
       setEnableSignatureUpload(appConfig.enableSignatureUpload === undefined ? true : appConfig.enableSignatureUpload);
       setEnableBankDetailsSection(appConfig.enableBankDetailsSection === undefined ? false : appConfig.enableBankDetailsSection);
       setCustomBankFields(appConfig.customBankFields || [

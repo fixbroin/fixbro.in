@@ -1405,12 +1405,12 @@ export async function saveProviderWithdrawalMethodAction(params: {
     revalidatePath('/provider/withdrawal');
     revalidatePath('/admin/provider-withdrawals');
 
-    return { 
+    return JSON.parse(JSON.stringify({ 
       success: true, 
       message: "Withdrawal method saved successfully.", 
       savedMethod: serializeMethod(newOrUpdatedMethod),
       methods: cleanMethods 
-    };
+    }));
   } catch (error: any) {
     console.error("Error in saveProviderWithdrawalMethodAction:", error);
     return { success: false, message: error.message || "Failed to save withdrawal method." };
@@ -1486,11 +1486,11 @@ export async function deleteProviderWithdrawalMethodAction(params: {
     revalidatePath('/provider/withdrawal');
     revalidatePath('/admin/provider-withdrawals');
 
-    return { 
+    return JSON.parse(JSON.stringify({ 
       success: true, 
       message: "Withdrawal method deleted successfully.", 
       methods: updatedMethods 
-    };
+    }));
   } catch (error: any) {
     console.error("Error in deleteProviderWithdrawalMethodAction:", error);
     return { success: false, message: error.message || "Failed to delete withdrawal method." };
