@@ -36,6 +36,7 @@ const processData = (firestoreData: Partial<AppSettings>): AppSettings => {
     isCancelledChequeCompulsory: typeof firestoreData.isCancelledChequeCompulsory === 'boolean' ? firestoreData.isCancelledChequeCompulsory : defaultAppSettings.isCancelledChequeCompulsory,
     enableCancelledChequeUpload: typeof firestoreData.enableCancelledChequeUpload === 'boolean' ? firestoreData.enableCancelledChequeUpload : defaultAppSettings.enableCancelledChequeUpload,
     enableSignatureUpload: typeof firestoreData.enableSignatureUpload === 'boolean' ? firestoreData.enableSignatureUpload : defaultAppSettings.enableSignatureUpload,
+    enableBankDetailsSection: typeof firestoreData.enableBankDetailsSection === 'boolean' ? firestoreData.enableBankDetailsSection : defaultAppSettings.enableBankDetailsSection,
     customBankFields: firestoreData.customBankFields || defaultAppSettings.customBankFields || [],
     enableEmailPasswordLogin: typeof firestoreData.enableEmailPasswordLogin === 'boolean' ? firestoreData.enableEmailPasswordLogin : defaultAppSettings.enableEmailPasswordLogin,
     enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,

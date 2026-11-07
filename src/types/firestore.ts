@@ -673,6 +673,7 @@ export interface AppSettings {
   isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
   enableCancelledChequeUpload?: boolean; // Toggle to completely enable/disable cancelled cheque section
   enableSignatureUpload?: boolean; // Toggle to completely enable/disable signature section
+  enableBankDetailsSection?: boolean; // Toggle to completely enable/disable the bank account details section in Step 4
   customBankFields?: CustomBankField[]; // Dynamic custom bank details fields
   enableDefaultIndianKyc?: boolean; // For toggling Aadhaar and PAN defaults
   maxProviderRadiusKm?: number; // New for provider work area

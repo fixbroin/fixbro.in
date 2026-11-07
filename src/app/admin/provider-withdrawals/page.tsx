@@ -154,7 +154,7 @@ export default function ProviderWithdrawalsPage() {
     setIsProviderPickerOpen(false);
     setProviderPickerSearch('');
     if (provider && (provider.withdrawableBalance || 0) > 0) {
-      setDirectPayoutAmount(String(provider.withdrawableBalance));
+      setDirectPayoutAmount(Number((provider.withdrawableBalance || 0).toFixed(decimals)).toString());
     } else {
       setDirectPayoutAmount('');
     }
@@ -1313,7 +1313,7 @@ export default function ProviderWithdrawalsPage() {
       </AlertDialog>
 
       <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] sm:max-h-[90vh] overflow-y-auto w-[calc(100%-1.5rem)] sm:w-full rounded-2xl">
             <DialogHeader>
                 <DialogTitle>Withdrawal Request Details</DialogTitle>
                 <DialogDescriptionComponent>
@@ -1348,7 +1348,7 @@ export default function ProviderWithdrawalsPage() {
 
       {/* DIRECT PAYOUT / RECORD PAYMENT DIALOG */}
       <Dialog open={showDirectPayoutDialog} onOpenChange={setShowDirectPayoutDialog}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto w-[calc(100%-1.5rem)] sm:w-full">
           <form onSubmit={handleExecuteDirectPayout} className="space-y-4">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lg font-bold">
@@ -1521,7 +1521,7 @@ export default function ProviderWithdrawalsPage() {
                 {directPayoutProvider && (directPayoutProvider.withdrawableBalance || 0) > 0 && (
                   <button
                     type="button"
-                    onClick={() => setDirectPayoutAmount(String(directPayoutProvider.withdrawableBalance))}
+                    onClick={() => setDirectPayoutAmount(Number(((directPayoutProvider.withdrawableBalance) || 0).toFixed(decimals)).toString())}
                     className="text-[11px] text-primary hover:underline font-semibold"
                   >
                     Pay Full Balance ({formatCurrency(directPayoutProvider.withdrawableBalance || 0, symbol, decimals, code)})
@@ -1649,7 +1649,7 @@ export default function ProviderWithdrawalsPage() {
                         onClick={() => {
                           setDirectPayoutProvider(p);
                           if (balance > 0) {
-                            setDirectPayoutAmount(String(balance));
+                            setDirectPayoutAmount(Number(balance.toFixed(decimals)).toString());
                           } else {
                             setDirectPayoutAmount('');
                           }
