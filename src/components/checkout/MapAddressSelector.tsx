@@ -498,7 +498,7 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
 
   return (
     <>
-      <div className="w-full h-full flex flex-col">
+      <div className="w-full h-full flex flex-col" data-map-modal="true">
         <div className="p-2 sm:p-4 border-b bg-background z-10 space-y-2">
           <div className="relative">
              <Input
@@ -506,7 +506,7 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
                 ref={autocompleteInputRef}
                 type="text"
                 placeholder="Search for building, area, street, or address..."
-                className="shadow-md h-9 pr-10"
+                className="shadow-md h-9 pr-10 no-keyboard-scroll"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();

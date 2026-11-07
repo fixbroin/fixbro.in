@@ -858,7 +858,7 @@ export default function CustomServiceRequestForm({
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
         <DialogContent 
-          className="max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col"
+          className="map-dialog-content max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col"
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('.pac-container')) {

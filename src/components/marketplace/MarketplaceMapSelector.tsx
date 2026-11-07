@@ -329,7 +329,7 @@ const MarketplaceMapSelector: React.FC<MarketplaceMapSelectorProps> = ({
 
   return (
     <>
-      <div className="w-full h-full flex flex-col overflow-hidden bg-background">
+      <div className="w-full h-full flex flex-col overflow-hidden bg-background" data-map-modal="true">
         {/* Search header */}
         <div className="flex-shrink-0 p-3 sm:p-4 border-b bg-background z-10 space-y-2">
           <div className="relative">
@@ -338,7 +338,7 @@ const MarketplaceMapSelector: React.FC<MarketplaceMapSelectorProps> = ({
               ref={autocompleteInputRef}
               type="text"
               placeholder="Search city, area, street, or landmark in India..."
-              className="shadow-sm h-10 pr-10 rounded-xl"
+              className="shadow-sm h-10 pr-10 rounded-xl no-keyboard-scroll"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.preventDefault();
               }}

@@ -481,7 +481,7 @@ export default function FurnitureMarketplacePage() {
       {/* Standalone Map Selector Modal with 100% Button Visibility */}
       <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
         <DialogContent
-          className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[92vh] h-[85vh] sm:h-[88vh] p-0 flex flex-col overflow-hidden rounded-3xl"
+          className="map-dialog-content max-w-3xl w-[95vw] sm:w-[90vw] max-h-[92vh] h-[85vh] sm:h-[88vh] p-0 flex flex-col overflow-hidden rounded-3xl"
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target?.closest('.pac-container')) e.preventDefault();
