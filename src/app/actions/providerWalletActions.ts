@@ -1206,13 +1206,14 @@ export async function recalculateProviderStatsAction(providerId: string) {
 export async function createAdminDirectPayoutAction(params: {
   providerId: string;
   amount: number;
-  method: 'bank_transfer' | 'upi' | 'cash';
+  method: 'bank_transfer' | 'upi' | 'cash' | 'amazon_gift_card';
   details?: {
     accountHolderName?: string;
     bankName?: string;
     accountNumber?: string;
     ifscCode?: string;
     upiId?: string;
+    email?: string;
     notes?: string;
   };
   referenceNotes?: string;
@@ -1243,6 +1244,7 @@ export async function createAdminDirectPayoutAction(params: {
         accountNumber: details.accountNumber || "",
         ifscCode: details.ifscCode || "",
         upiId: details.upiId || "",
+        email: details.email || "",
         notes: referenceNotes || "Direct Payout recorded by Admin",
       },
       status: 'completed',
@@ -1294,6 +1296,204 @@ export async function createAdminDirectPayoutAction(params: {
   } catch (error: any) {
     console.error("Error in createAdminDirectPayoutAction:", error);
     return { success: false, message: error.message || "Failed to record direct payout." };
+  }
+}
+
+// 14. Save Provider Withdrawal Method (MySQL/Firestore)
+export async function saveProviderWithdrawalMethodAction(params: {
+  providerId: string;
+  method: {
+    id?: string;
+    type: 'bank_transfer' | 'upi' | 'amazon_gift_card' | 'other';
+    title?: string;
+    isDefault?: boolean;
+    details: {
+      accountHolderName?: string;
+      bankName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      upiId?: string;
+      email?: string;
+    };
+  };
+}) {
+  try {
+    const { providerId, method } = params;
+    if (!providerId || !method?.type) {
+      return { success: false, message: "Provider ID and method type are required." };
+    }
+
+    const userRef = doc(db, 'users', providerId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+
+    const userData = userSnap.data() as any;
+    let existingMethods = (userData.savedWithdrawalMethods || []) as any[];
+
+    const methodId = method.id || 'mth_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+    const isDefault = Boolean(method.isDefault) || existingMethods.length === 0;
+
+    if (isDefault) {
+      existingMethods = existingMethods.map(m => m.type === method.type ? { ...m, isDefault: false } : m);
+    }
+
+    const serializeMethod = (m: any) => ({
+      id: String(m.id || ''),
+      type: m.type,
+      title: m.title || '',
+      isDefault: Boolean(m.isDefault),
+      details: {
+        accountHolderName: m.details?.accountHolderName || '',
+        bankName: m.details?.bankName || '',
+        accountNumber: m.details?.accountNumber || '',
+        ifscCode: m.details?.ifscCode || '',
+        upiId: m.details?.upiId || '',
+        email: m.details?.email || '',
+      },
+      createdAt: m.createdAt?.toDate ? m.createdAt.toDate().toISOString() : (m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000).toISOString() : (typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString()))
+    });
+
+    const newOrUpdatedMethod = {
+      id: methodId,
+      type: method.type,
+      title: method.title?.trim() || (
+        method.type === 'bank_transfer' 
+          ? (method.details.bankName ? `${method.details.bankName} Account` : 'Bank Account')
+          : method.type === 'upi'
+          ? (method.details.upiId ? `UPI (${method.details.upiId})` : 'UPI ID')
+          : (method.details.email ? `Amazon (${method.details.email})` : 'Gift Card')
+      ),
+      isDefault,
+      details: {
+        accountHolderName: method.details.accountHolderName?.trim() || '',
+        bankName: method.details.bankName?.trim() || '',
+        accountNumber: method.details.accountNumber?.trim() || '',
+        ifscCode: method.details.ifscCode?.trim().toUpperCase() || '',
+        upiId: method.details.upiId?.trim().toLowerCase() || '',
+        email: method.details.email?.trim().toLowerCase() || '',
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    const existingIndex = existingMethods.findIndex(m => m.id === methodId);
+    if (existingIndex >= 0) {
+      existingMethods[existingIndex] = { ...existingMethods[existingIndex], ...newOrUpdatedMethod };
+    } else {
+      existingMethods.push(newOrUpdatedMethod);
+    }
+
+    const cleanMethods = existingMethods.map(serializeMethod);
+
+    // Also update bankDetails on user if bank_transfer and bankDetails is missing or has empty account
+    const updatePayload: any = {
+      savedWithdrawalMethods: cleanMethods,
+    };
+    if (method.type === 'bank_transfer' && (!userData.bankDetails || !userData.bankDetails.accountNumber)) {
+      updatePayload.bankDetails = {
+        ...(userData.bankDetails || {}),
+        accountHolderName: method.details.accountHolderName || '',
+        bankName: method.details.bankName || '',
+        accountNumber: method.details.accountNumber || '',
+        ifscCode: method.details.ifscCode || '',
+      };
+    }
+
+    await updateDoc(userRef, updatePayload);
+
+    revalidatePath('/provider/withdrawal');
+    revalidatePath('/admin/provider-withdrawals');
+
+    return { 
+      success: true, 
+      message: "Withdrawal method saved successfully.", 
+      savedMethod: serializeMethod(newOrUpdatedMethod),
+      methods: cleanMethods 
+    };
+  } catch (error: any) {
+    console.error("Error in saveProviderWithdrawalMethodAction:", error);
+    return { success: false, message: error.message || "Failed to save withdrawal method." };
+  }
+}
+
+// 15. Delete Provider Withdrawal Method (MySQL/Firestore)
+export async function deleteProviderWithdrawalMethodAction(params: {
+  providerId: string;
+  methodId: string;
+}) {
+  try {
+    const { providerId, methodId } = params;
+    if (!providerId || !methodId) {
+      return { success: false, message: "Provider ID and method ID are required." };
+    }
+
+    const userRef = doc(db, 'users', providerId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+
+    const userData = userSnap.data() as any;
+    const existingMethods = (userData.savedWithdrawalMethods || []) as any[];
+    const serializeMethod = (m: any) => ({
+      id: String(m.id || ''),
+      type: m.type,
+      title: m.title || '',
+      isDefault: Boolean(m.isDefault),
+      details: {
+        accountHolderName: m.details?.accountHolderName || '',
+        bankName: m.details?.bankName || '',
+        accountNumber: m.details?.accountNumber || '',
+        ifscCode: m.details?.ifscCode || '',
+        upiId: m.details?.upiId || '',
+        email: m.details?.email || '',
+      },
+      createdAt: m.createdAt?.toDate ? m.createdAt.toDate().toISOString() : (m.createdAt?.seconds ? new Date(m.createdAt.seconds * 1000).toISOString() : (typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString()))
+    });
+
+    const methodToDelete = existingMethods.find(m => m.id === methodId);
+    const updatedMethods = existingMethods.filter(m => m.id !== methodId).map(serializeMethod);
+
+    const updatePayload: any = {
+      savedWithdrawalMethods: updatedMethods,
+    };
+
+    // If deleting profile_bank or if deleted method matches bankDetails, clear bankDetails so it doesn't resurrect
+    if (
+      methodId === 'profile_bank' ||
+      (methodToDelete && methodToDelete.type === 'bank_transfer' && userData.bankDetails?.accountNumber === methodToDelete.details?.accountNumber) ||
+      updatedMethods.filter(m => m.type === 'bank_transfer').length === 0
+    ) {
+      updatePayload.bankDetails = null;
+    }
+
+    // If deleting profile_upi or if deleted method matches bankDetails.upiId
+    if (
+      methodId === 'profile_upi' ||
+      (methodToDelete && methodToDelete.type === 'upi' && userData.bankDetails?.upiId === methodToDelete.details?.upiId)
+    ) {
+      if (updatePayload.bankDetails !== null) {
+        updatePayload.bankDetails = {
+          ...(userData.bankDetails || {}),
+          upiId: null,
+        };
+      }
+    }
+
+    await updateDoc(userRef, updatePayload);
+
+    revalidatePath('/provider/withdrawal');
+    revalidatePath('/admin/provider-withdrawals');
+
+    return { 
+      success: true, 
+      message: "Withdrawal method deleted successfully.", 
+      methods: updatedMethods 
+    };
+  } catch (error: any) {
+    console.error("Error in deleteProviderWithdrawalMethodAction:", error);
+    return { success: false, message: error.message || "Failed to delete withdrawal method." };
   }
 }
 

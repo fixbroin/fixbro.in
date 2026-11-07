@@ -325,6 +325,8 @@ export interface FirestoreUser {
   totalEarnings?: number; // Lifetime gross earnings
   totalCommissionPaid?: number; // Lifetime commission paid to admin
   withdrawalPending?: boolean; // True if a withdrawal request is active
+  savedWithdrawalMethods?: SavedWithdrawalMethod[];
+  bankDetails?: BankDetails;
   
   referralStatus?: {
     totalReferred: number;
@@ -1645,6 +1647,22 @@ export interface EnrichedReferral extends Referral {
 // Withdrawal Types (NEW)
 export type WithdrawalMethodType = 'bank_transfer' | 'upi' | 'amazon_gift_card' | 'other';
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected' | 'processing' | 'completed' | 're_submit';
+
+export interface SavedWithdrawalMethod {
+  id: string;
+  type: WithdrawalMethodType;
+  title?: string;
+  isDefault?: boolean;
+  createdAt?: any;
+  details: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+    email?: string;
+  };
+}
 
 export interface SystemStats {
   totalBookings: number;

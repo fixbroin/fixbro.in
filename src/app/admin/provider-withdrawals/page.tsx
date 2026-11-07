@@ -131,7 +131,7 @@ export default function ProviderWithdrawalsPage() {
   const [showDirectPayoutDialog, setShowDirectPayoutDialog] = useState(false);
   const [directPayoutProvider, setDirectPayoutProvider] = useState<FirestoreUser | null>(null);
   const [directPayoutAmount, setDirectPayoutAmount] = useState('');
-  const [directPayoutMethod, setDirectPayoutMethod] = useState<'bank_transfer' | 'upi' | 'cash'>('bank_transfer');
+  const [directPayoutMethod, setDirectPayoutMethod] = useState<'bank_transfer' | 'upi' | 'cash' | 'amazon_gift_card'>('bank_transfer');
   const [directPayoutNotes, setDirectPayoutNotes] = useState('');
   const [isSubmittingDirectPayout, setIsSubmittingDirectPayout] = useState(false);
   const [isProviderPickerOpen, setIsProviderPickerOpen] = useState(false);
@@ -158,13 +158,30 @@ export default function ProviderWithdrawalsPage() {
     } else {
       setDirectPayoutAmount('');
     }
+    
+    // Auto-detect default saved payment method if available
+    const savedMethods = ((provider as any)?.savedWithdrawalMethods || []) as any[];
     const bankDetails = (provider as any)?.bankDetails || {};
-    if (bankDetails.upiId) {
+    if (savedMethods.length > 0) {
+      const def = savedMethods.find(m => m.isDefault) || savedMethods[0];
+      setDirectPayoutMethod(def.type || 'bank_transfer');
+      if (def.type === 'bank_transfer') {
+        setDirectPayoutNotes(`Bank: ${def.details?.bankName || ''}, A/C: ${def.details?.accountNumber || ''}, IFSC: ${def.details?.ifscCode || ''}`);
+      } else if (def.type === 'upi') {
+        setDirectPayoutNotes(`UPI ID: ${def.details?.upiId || ''}`);
+      } else if (def.type === 'amazon_gift_card') {
+        setDirectPayoutNotes(`Amazon Gift Card to: ${def.details?.email || ''}`);
+      }
+    } else if (bankDetails.upiId) {
       setDirectPayoutMethod('upi');
+      setDirectPayoutNotes(`UPI ID: ${bankDetails.upiId}`);
+    } else if (bankDetails.accountNumber) {
+      setDirectPayoutMethod('bank_transfer');
+      setDirectPayoutNotes(`Bank: ${bankDetails.bankName || ''}, A/C: ${bankDetails.accountNumber || ''}, IFSC: ${bankDetails.ifscCode || ''}`);
     } else {
       setDirectPayoutMethod('bank_transfer');
+      setDirectPayoutNotes('');
     }
-    setDirectPayoutNotes('');
     setShowDirectPayoutDialog(true);
   };
 
@@ -911,10 +928,10 @@ export default function ProviderWithdrawalsPage() {
                                       variant="outline"
                                       size="sm"
                                       onClick={() => openDirectPayoutModal(p)}
-                                      className="h-8 px-2.5 text-xs border-green-600/40 text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg font-bold"
+                                      className="h-8 px-2.5 text-xs border-green-600/40 text-green-700 hover:text-white hover:bg-green-600 rounded-lg font-bold transition-all group"
                                       title="Record a completed direct payout to this provider"
                                     >
-                                      <Banknote className="h-3.5 w-3.5 mr-1 text-green-600" />
+                                      <Banknote className="h-3.5 w-3.5 mr-1 text-green-600 group-hover:text-white transition-colors" />
                                       Pay Provider
                                     </Button>
 
@@ -1031,9 +1048,9 @@ export default function ProviderWithdrawalsPage() {
                                  variant="outline"
                                  size="sm"
                                  onClick={() => openDirectPayoutModal(p)}
-                                 className="flex-1 h-8 text-xs border-green-600/40 text-green-700 hover:bg-green-50 rounded-lg font-bold"
+                                 className="flex-1 h-8 text-xs border-green-600/40 text-green-700 hover:bg-green-600 hover:text-white rounded-lg font-bold transition-all group"
                                >
-                                 <Banknote className="h-3.5 w-3.5 mr-1 text-green-600" />
+                                 <Banknote className="h-3.5 w-3.5 mr-1 text-green-600 group-hover:text-white transition-colors" />
                                  Pay
                                </Button>
 
@@ -1370,66 +1387,132 @@ export default function ProviderWithdrawalsPage() {
                   setIsProviderPickerOpen(true);
                 }}
                 className={cn(
-                  "w-full text-left font-normal h-auto py-2.5 px-3 rounded-xl border bg-background hover:bg-muted/50",
-                  !directPayoutProvider && "text-muted-foreground"
+                  "w-full text-left font-normal h-auto py-2.5 px-3 rounded-xl border bg-background hover:bg-primary hover:text-white hover:border-primary transition-all group shadow-2xs",
+                  !directPayoutProvider ? "text-foreground" : ""
                 )}
               >
                 {directPayoutProvider ? (
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-2 text-left">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <UserCircle className="h-6 w-6 text-primary shrink-0" />
+                      <UserCircle className="h-6 w-6 text-primary group-hover:text-white shrink-0 transition-colors" />
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm text-foreground leading-tight truncate">
+                        <p className="font-semibold text-sm text-foreground group-hover:text-white leading-tight truncate transition-colors">
                           {directPayoutProvider.displayName || 'Unnamed Provider'}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground group-hover:text-white/80 truncate transition-colors">
                           {directPayoutProvider.email || directPayoutProvider.mobileNumber || ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0 border-border/50">
-                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">Balance:</span>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0 border-border/50 group-hover:border-white/20">
+                      <span className="text-[10px] text-muted-foreground group-hover:text-white/80 uppercase font-semibold transition-colors">Balance:</span>
                       <span className={cn(
-                        "font-bold text-sm",
-                        (directPayoutProvider.withdrawableBalance || 0) < 0 ? "text-destructive" : "text-primary"
+                        "font-bold text-sm transition-colors",
+                        (directPayoutProvider.withdrawableBalance || 0) < 0 
+                          ? "text-destructive group-hover:text-red-200" 
+                          : "text-primary group-hover:text-white"
                       )}>
                         {formatCurrency(directPayoutProvider.withdrawableBalance || 0, symbol, decimals, code)}
                       </span>
-                      <Search className="ml-1 h-3.5 w-3.5 text-muted-foreground opacity-60" />
+                      <Search className="ml-1 h-3.5 w-3.5 text-muted-foreground group-hover:text-white opacity-60 group-hover:opacity-100 transition-all" />
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <Search className="h-4 w-4 opacity-50 shrink-0" />
-                      <span>Search and select provider...</span>
+                    <div className="flex items-center gap-2 text-foreground group-hover:text-white transition-colors">
+                      <Search className="h-4 w-4 opacity-60 group-hover:opacity-100 group-hover:text-white shrink-0 transition-all" />
+                      <span className="text-sm font-medium">Search and select provider...</span>
                     </div>
-                    <Search className="h-4 w-4 shrink-0 opacity-50" />
+                    <Search className="h-4 w-4 shrink-0 opacity-60 group-hover:opacity-100 group-hover:text-white transition-all" />
                   </div>
                 )}
               </Button>
             </div>
 
-            {/* Provider Bank / UPI info if available */}
-            {directPayoutProvider && (
-              <div className="text-xs p-2.5 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
-                <p className="font-semibold text-primary">Saved Payment Details:</p>
-                {(() => {
-                  const bd = (directPayoutProvider as any)?.bankDetails;
-                  if (!bd || (!bd.accountNumber && !bd.upiId)) {
-                    return <p className="text-muted-foreground">No bank or UPI details saved on profile.</p>;
-                  }
-                  return (
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-muted-foreground">
-                      {bd.bankName && <div><span className="font-medium text-foreground">Bank:</span> {bd.bankName}</div>}
-                      {bd.accountNumber && <div><span className="font-medium text-foreground">A/C:</span> {bd.accountNumber}</div>}
-                      {bd.ifscCode && <div><span className="font-medium text-foreground">IFSC:</span> {bd.ifscCode}</div>}
-                      {bd.upiId && <div><span className="font-medium text-foreground">UPI:</span> {bd.upiId}</div>}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+            {/* Provider Saved Accounts / Bank Details */}
+            {directPayoutProvider && (() => {
+              const savedMethods = ((directPayoutProvider as any)?.savedWithdrawalMethods || []) as any[];
+              const legacyBd = (directPayoutProvider as any)?.bankDetails;
+              
+              const accountsToDisplay = [...savedMethods];
+              if (accountsToDisplay.length === 0 && legacyBd && (legacyBd.accountNumber || legacyBd.upiId)) {
+                if (legacyBd.accountNumber) {
+                  accountsToDisplay.push({
+                    id: 'legacy_bank',
+                    type: 'bank_transfer',
+                    title: legacyBd.bankName ? `${legacyBd.bankName} Account` : 'Profile Bank A/C',
+                    details: legacyBd,
+                  });
+                }
+                if (legacyBd.upiId) {
+                  accountsToDisplay.push({
+                    id: 'legacy_upi',
+                    type: 'upi',
+                    title: `UPI (${legacyBd.upiId})`,
+                    details: { upiId: legacyBd.upiId },
+                  });
+                }
+              }
+
+              if (accountsToDisplay.length === 0) {
+                return (
+                  <div className="text-xs p-2.5 rounded-xl bg-muted/40 border text-muted-foreground">
+                    No saved bank, UPI, or gift card accounts on profile. You can still pay via Cash, Bank, UPI, or Gift Card and enter details below.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="text-xs p-2.5 rounded-xl bg-primary/5 border border-primary/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold text-primary">Saved Payment Accounts (Click to select):</p>
+                    <span className="text-[10px] text-muted-foreground font-medium">{accountsToDisplay.length} saved</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {accountsToDisplay.map((acc) => {
+                      const isSelected = directPayoutMethod === acc.type && (
+                        acc.type === 'bank_transfer' ? directPayoutNotes.includes(acc.details?.accountNumber || '---') :
+                        acc.type === 'upi' ? directPayoutNotes.includes(acc.details?.upiId || '---') :
+                        directPayoutNotes.includes(acc.details?.email || '---')
+                      );
+
+                      return (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          onClick={() => {
+                            setDirectPayoutMethod(acc.type);
+                            if (acc.type === 'bank_transfer') {
+                              setDirectPayoutNotes(`Bank: ${acc.details?.bankName || ''}, A/C: ${acc.details?.accountNumber || ''}, IFSC: ${acc.details?.ifscCode || ''}, Name: ${acc.details?.accountHolderName || ''}`);
+                            } else if (acc.type === 'upi') {
+                              setDirectPayoutNotes(`UPI ID: ${acc.details?.upiId || ''}`);
+                            } else if (acc.type === 'amazon_gift_card') {
+                              setDirectPayoutNotes(`Amazon Gift Card to: ${acc.details?.email || ''}`);
+                            }
+                          }}
+                          className={cn(
+                            "p-2 rounded-lg border text-left transition-all flex flex-col gap-0.5",
+                            isSelected 
+                              ? "bg-primary/15 border-primary text-foreground shadow-xs font-semibold" 
+                              : "bg-background border-border/80 hover:bg-muted/70 text-muted-foreground"
+                          )}
+                        >
+                          <span className="font-semibold text-xs text-foreground truncate">
+                            {acc.type === 'bank_transfer' ? '🏦 ' : acc.type === 'upi' ? '📱 ' : '🎁 '}
+                            {acc.title || (acc.type === 'bank_transfer' ? 'Bank Account' : acc.type === 'upi' ? 'UPI' : 'Gift Card')}
+                          </span>
+                          <span className="text-[11px] truncate">
+                            {acc.type === 'bank_transfer' ? `A/C: ${acc.details?.accountNumber || ''} (${acc.details?.ifscCode || ''})` :
+                             acc.type === 'upi' ? acc.details?.upiId :
+                             acc.details?.email}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Amount */}
             <div className="space-y-1.5">
@@ -1461,20 +1544,20 @@ export default function ProviderWithdrawalsPage() {
             {/* Payment Method */}
             <div className="space-y-1.5">
               <Label className="text-xs font-bold">Payment Method</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['bank_transfer', 'upi', 'cash'] as const).map(method => (
+              <div className="grid grid-cols-4 gap-2">
+                {(['bank_transfer', 'upi', 'cash', 'amazon_gift_card'] as const).map(method => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setDirectPayoutMethod(method)}
                     className={cn(
-                      "py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all",
+                      "py-2 px-1.5 text-xs font-bold rounded-xl border text-center transition-all truncate",
                       directPayoutMethod === method
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted/30 text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {method === 'bank_transfer' ? 'Bank Transfer' : method === 'upi' ? 'UPI' : 'Cash'}
+                    {method === 'bank_transfer' ? 'Bank Transfer' : method === 'upi' ? 'UPI' : method === 'cash' ? 'Cash' : 'Gift Card'}
                   </button>
                 ))}
               </div>
