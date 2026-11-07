@@ -479,17 +479,17 @@ export default function Step2PersonalInfo({
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-between h-11 text-left font-normal",
+                          "w-full justify-between h-auto min-h-[44px] py-2 px-3 text-left font-normal",
                           !field.value && "text-muted-foreground"
                         )}
                         disabled={effectiveIsSaving}
                       >
-                        <span className="truncate">
+                        <span className="truncate flex-1 mr-2">
                           {field.value
                             ? controlOptions.qualificationOptions.find((opt) => opt.id === field.value)?.label
                             : "Select your qualification"}
                         </span>
-                        <ChevronRight className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </FormControl>
                   </DialogTrigger>
@@ -503,14 +503,14 @@ export default function Step2PersonalInfo({
                           <Button
                             key={opt.id}
                             variant="ghost"
-                            className="w-full justify-between font-normal h-11 px-3"
+                            className="w-full justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(opt.id);
                               setIsQualificationDialogOpen(false);
                             }}
                           >
-                            <span>{opt.label}</span>
-                            {field.value === opt.id && <Check className="h-4 w-4 text-primary" />}
+                            <span className="text-sm leading-snug break-words text-left flex-1 mr-2">{opt.label}</span>
+                            {field.value === opt.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
                       </div>

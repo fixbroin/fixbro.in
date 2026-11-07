@@ -91,6 +91,7 @@ export default function ProviderRegistrationToggleTab() {
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
+      await triggerRefresh('app-settings');
       await triggerRefresh('global-cache');
       toast({ title: "Success", description: "Provider registration settings updated." });
     } catch (error) {
