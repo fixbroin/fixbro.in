@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, PackageSearch, Check, X, MoreHorizontal, AlertTriangle, Eye, Trash2 } from "lucide-react";
+import { Loader2, PackageSearch, Check, X, MoreHorizontal, AlertTriangle, Eye, Trash2, Search, UserCircle } from "lucide-react";
 import { Button } from '@/components/ui/button';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -12,10 +12,10 @@ import type { WithdrawalRequest, WithdrawalStatus, FirestoreNotification, Firest
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Banknote, RefreshCw, Wallet, History, Settings, IndianRupee } from "lucide-react";
+import { Users, Banknote, RefreshCw, Wallet, History, Settings, IndianRupee, PlusCircle } from "lucide-react";
 import { cn, formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { getProviderWalletDetailsAction } from '@/app/actions/providerWalletActions';
+import { getProviderWalletDetailsAction, createAdminDirectPayoutAction } from '@/app/actions/providerWalletActions';
 import WalletComplaintsTab from '@/components/admin/provider-controls/WalletComplaintsTab';
 import WalletSettingsTab from '@/components/admin/provider-controls/WalletSettingsTab';
 import BookingFeesBreakdownTab from '@/components/admin/provider-controls/BookingFeesBreakdownTab';
@@ -47,7 +47,9 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from "@/components/ui/input";
@@ -124,6 +126,108 @@ export default function ProviderWithdrawalsPage() {
   const [walletHistory, setWalletHistory] = useState<any[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+
+  // Direct Payout Modal States
+  const [showDirectPayoutDialog, setShowDirectPayoutDialog] = useState(false);
+  const [directPayoutProvider, setDirectPayoutProvider] = useState<FirestoreUser | null>(null);
+  const [directPayoutAmount, setDirectPayoutAmount] = useState('');
+  const [directPayoutMethod, setDirectPayoutMethod] = useState<'bank_transfer' | 'upi' | 'cash'>('bank_transfer');
+  const [directPayoutNotes, setDirectPayoutNotes] = useState('');
+  const [isSubmittingDirectPayout, setIsSubmittingDirectPayout] = useState(false);
+  const [isProviderPickerOpen, setIsProviderPickerOpen] = useState(false);
+  const [providerPickerSearch, setProviderPickerSearch] = useState('');
+
+  const filteredProvidersForPicker = providers.filter((p) => {
+    const q = providerPickerSearch.toLowerCase().trim();
+    if (!q) return true;
+    const name = (p.displayName || '').toLowerCase();
+    const email = (p.email || '').toLowerCase();
+    const phone = ((p.mobileNumber as string) || ((p as any).phoneNumber as string) || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q);
+  });
+
+  const openDirectPayoutModal = (provider: FirestoreUser | null) => {
+    if (providers.length === 0) {
+      loadProviders();
+    }
+    setDirectPayoutProvider(provider);
+    setIsProviderPickerOpen(false);
+    setProviderPickerSearch('');
+    if (provider && (provider.withdrawableBalance || 0) > 0) {
+      setDirectPayoutAmount(String(provider.withdrawableBalance));
+    } else {
+      setDirectPayoutAmount('');
+    }
+    const bankDetails = (provider as any)?.bankDetails || {};
+    if (bankDetails.upiId) {
+      setDirectPayoutMethod('upi');
+    } else {
+      setDirectPayoutMethod('bank_transfer');
+    }
+    setDirectPayoutNotes('');
+    setShowDirectPayoutDialog(true);
+  };
+
+  const handleExecuteDirectPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!directPayoutProvider?.uid && !directPayoutProvider?.id) {
+      toast({ title: "Select Provider", description: "Please select a provider for this payout.", variant: "destructive" });
+      return;
+    }
+    const providerId = directPayoutProvider.uid || directPayoutProvider.id!;
+    const parsedAmount = parseFloat(directPayoutAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast({ title: "Invalid Amount", description: "Please enter a valid payout amount greater than 0.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingDirectPayout(true);
+    try {
+      const bankDetails = (directPayoutProvider as any)?.bankDetails || {};
+      const res = await createAdminDirectPayoutAction({
+        providerId,
+        amount: parsedAmount,
+        method: directPayoutMethod,
+        details: {
+          accountHolderName: bankDetails.accountHolderName || directPayoutProvider.displayName || "",
+          bankName: bankDetails.bankName || "",
+          accountNumber: bankDetails.accountNumber || "",
+          ifscCode: bankDetails.ifscCode || "",
+          upiId: bankDetails.upiId || "",
+          notes: directPayoutNotes.trim()
+        },
+        referenceNotes: directPayoutNotes.trim()
+      });
+
+      if (res.success) {
+        toast({
+          title: "Payout Recorded",
+          description: res.message,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+        setShowDirectPayoutDialog(false);
+        setDirectPayoutProvider(null);
+        setDirectPayoutAmount('');
+        setDirectPayoutNotes('');
+        await loadProviders();
+      } else {
+        toast({
+          title: "Payout Failed",
+          description: res.message,
+          variant: "destructive"
+        });
+      }
+    } catch (err: any) {
+      console.error("Direct payout error:", err);
+      toast({
+        title: "Payout Failed",
+        description: err.message || "An unexpected error occurred.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingDirectPayout(false);
+    }
+  };
 
   const filteredProvidersForSelect = providers.filter(p => 
     (p.displayName || '').toLowerCase().includes(providerSearch.toLowerCase()) || 
@@ -482,9 +586,21 @@ export default function ProviderWithdrawalsPage() {
 
         <TabsContent value="requests">
           <Card>
-            <CardHeader>
-              <CardTitle>Withdrawal Requests</CardTitle>
-              <CardDescription>Process pending payout requests from service providers.</CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Withdrawal Requests</CardTitle>
+                <CardDescription>Process pending payout requests from service providers.</CardDescription>
+              </div>
+              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                <Button 
+                  size="sm"
+                  onClick={() => openDirectPayoutModal(null)} 
+                  className="bg-primary text-primary-foreground font-bold shadow-sm rounded-xl shrink-0"
+                >
+                  <PlusCircle className="h-4 w-4 mr-1.5" />
+                  Record Direct Payout
+                </Button>
+              </PermissionGuard>
             </CardHeader>
             <CardContent>
               {requests.length === 0 ? (
@@ -721,14 +837,25 @@ export default function ProviderWithdrawalsPage() {
         <TabsContent value="balances">
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <CardTitle>Provider Earnings Overview</CardTitle>
                     <CardDescription>Current withdrawable balances and lifetime payouts for all providers.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={loadProviders} disabled={isLoadingProviders}>
-                    {isLoadingProviders ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <RefreshCw className="h-4 w-4 mr-2"/>} Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                    <Button 
+                      size="sm"
+                      onClick={() => openDirectPayoutModal(null)}
+                      className="bg-primary text-primary-foreground font-bold shadow-sm rounded-lg"
+                    >
+                      <PlusCircle className="h-4 w-4 mr-1.5" /> Direct Payout
+                    </Button>
+                  </PermissionGuard>
+                  <Button variant="outline" size="sm" onClick={loadProviders} disabled={isLoadingProviders}>
+                      {isLoadingProviders ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <RefreshCw className="h-4 w-4 mr-2"/>} Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -779,7 +906,18 @@ export default function ProviderWithdrawalsPage() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                  <div className="flex justify-end gap-2">
+                                  <div className="flex justify-end gap-2 items-center">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openDirectPayoutModal(p)}
+                                      className="h-8 px-2.5 text-xs border-green-600/40 text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg font-bold"
+                                      title="Record a completed direct payout to this provider"
+                                    >
+                                      <Banknote className="h-3.5 w-3.5 mr-1 text-green-600" />
+                                      Pay Provider
+                                    </Button>
+
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -892,20 +1030,30 @@ export default function ProviderWithdrawalsPage() {
                                <Button
                                  variant="outline"
                                  size="sm"
+                                 onClick={() => openDirectPayoutModal(p)}
+                                 className="flex-1 h-8 text-xs border-green-600/40 text-green-700 hover:bg-green-50 rounded-lg font-bold"
+                               >
+                                 <Banknote className="h-3.5 w-3.5 mr-1 text-green-600" />
+                                 Pay
+                               </Button>
+
+                               <Button
+                                 variant="outline"
+                                 size="sm"
                                  onClick={() => {
                                    setProviderToClear(p);
                                    setClearMode('balance');
                                    setShowClearWalletDialog(true);
                                  }}
                                  disabled={balance === 0 || isClearingWallet === p.uid}
-                                 className="w-1/2 h-8 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                                 className="flex-1 h-8 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
                                >
                                  {isClearingWallet === p.uid && clearMode === 'balance' ? (
                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                                  ) : (
                                    <Trash2 className="h-3.5 w-3.5 mr-1" />
                                  )}
-                                 Clear Wallet
+                                 Clear
                                </Button>
 
                                <Button
@@ -917,7 +1065,7 @@ export default function ProviderWithdrawalsPage() {
                                    setShowClearWalletDialog(true);
                                  }}
                                  disabled={isClearingWallet === p.uid}
-                                 className="w-1/2 h-8 text-xs rounded-lg font-medium bg-destructive hover:bg-destructive/90 text-white"
+                                 className="flex-1 h-8 text-xs rounded-lg font-medium bg-destructive hover:bg-destructive/90 text-white"
                                >
                                  {isClearingWallet === p.uid && clearMode === 'all' ? (
                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
@@ -1178,6 +1326,301 @@ export default function ProviderWithdrawalsPage() {
                     <Button type="button" variant="secondary">Close</Button>
                 </DialogClose>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIRECT PAYOUT / RECORD PAYMENT DIALOG */}
+      <Dialog open={showDirectPayoutDialog} onOpenChange={setShowDirectPayoutDialog}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <form onSubmit={handleExecuteDirectPayout} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <Banknote className="h-5 w-5 text-primary" />
+                Record Direct Payout to Provider
+              </DialogTitle>
+              <DialogDescriptionComponent className="text-xs">
+                Record an offline payment (Bank Transfer, UPI, or Cash) made to the provider. This directly settles their withdrawable balance and creates a completed payout record.
+              </DialogDescriptionComponent>
+            </DialogHeader>
+
+            {/* Provider Selector via Popup Search */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <Label className="text-xs font-bold">Provider</Label>
+                {directPayoutProvider && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDirectPayoutProvider(null);
+                      setDirectPayoutAmount('');
+                    }}
+                    className="text-[11px] text-muted-foreground hover:text-foreground font-medium"
+                  >
+                    Change / Clear
+                  </button>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                onClick={() => {
+                  if (providers.length === 0) loadProviders();
+                  setIsProviderPickerOpen(true);
+                }}
+                className={cn(
+                  "w-full text-left font-normal h-auto py-2.5 px-3 rounded-xl border bg-background hover:bg-muted/50",
+                  !directPayoutProvider && "text-muted-foreground"
+                )}
+              >
+                {directPayoutProvider ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-2 text-left">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <UserCircle className="h-6 w-6 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-foreground leading-tight truncate">
+                          {directPayoutProvider.displayName || 'Unnamed Provider'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {directPayoutProvider.email || directPayoutProvider.mobileNumber || ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1.5 sm:pt-0 border-t sm:border-0 border-border/50">
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">Balance:</span>
+                      <span className={cn(
+                        "font-bold text-sm",
+                        (directPayoutProvider.withdrawableBalance || 0) < 0 ? "text-destructive" : "text-primary"
+                      )}>
+                        {formatCurrency(directPayoutProvider.withdrawableBalance || 0, symbol, decimals, code)}
+                      </span>
+                      <Search className="ml-1 h-3.5 w-3.5 text-muted-foreground opacity-60" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-4 w-4 opacity-50 shrink-0" />
+                      <span>Search and select provider...</span>
+                    </div>
+                    <Search className="h-4 w-4 shrink-0 opacity-50" />
+                  </div>
+                )}
+              </Button>
+            </div>
+
+            {/* Provider Bank / UPI info if available */}
+            {directPayoutProvider && (
+              <div className="text-xs p-2.5 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
+                <p className="font-semibold text-primary">Saved Payment Details:</p>
+                {(() => {
+                  const bd = (directPayoutProvider as any)?.bankDetails;
+                  if (!bd || (!bd.accountNumber && !bd.upiId)) {
+                    return <p className="text-muted-foreground">No bank or UPI details saved on profile.</p>;
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-muted-foreground">
+                      {bd.bankName && <div><span className="font-medium text-foreground">Bank:</span> {bd.bankName}</div>}
+                      {bd.accountNumber && <div><span className="font-medium text-foreground">A/C:</span> {bd.accountNumber}</div>}
+                      {bd.ifscCode && <div><span className="font-medium text-foreground">IFSC:</span> {bd.ifscCode}</div>}
+                      {bd.upiId && <div><span className="font-medium text-foreground">UPI:</span> {bd.upiId}</div>}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Amount */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="direct-payout-amount" className="text-xs font-bold">Payout Amount ({symbol})</Label>
+                {directPayoutProvider && (directPayoutProvider.withdrawableBalance || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDirectPayoutAmount(String(directPayoutProvider.withdrawableBalance))}
+                    className="text-[11px] text-primary hover:underline font-semibold"
+                  >
+                    Pay Full Balance ({formatCurrency(directPayoutProvider.withdrawableBalance || 0, symbol, decimals, code)})
+                  </button>
+                )}
+              </div>
+              <Input
+                id="direct-payout-amount"
+                type="number"
+                step="any"
+                min="1"
+                placeholder="0.00"
+                value={directPayoutAmount}
+                onChange={(e) => setDirectPayoutAmount(e.target.value)}
+                required
+                className="h-10 rounded-xl"
+              />
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Payment Method</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['bank_transfer', 'upi', 'cash'] as const).map(method => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setDirectPayoutMethod(method)}
+                    className={cn(
+                      "py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all",
+                      directPayoutMethod === method
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-muted/30 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {method === 'bank_transfer' ? 'Bank Transfer' : method === 'upi' ? 'UPI' : 'Cash'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Transaction Ref / Notes */}
+            <div className="space-y-1.5">
+              <Label htmlFor="direct-payout-notes" className="text-xs font-bold">Transaction Reference / Notes</Label>
+              <Textarea
+                id="direct-payout-notes"
+                placeholder="e.g. UTR #12345678, IMPS Ref, Cash in hand, or reason..."
+                value={directPayoutNotes}
+                onChange={(e) => setDirectPayoutNotes(e.target.value)}
+                className="h-20 rounded-xl text-xs resize-none"
+              />
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowDirectPayoutDialog(false);
+                  setDirectPayoutProvider(null);
+                }}
+                disabled={isSubmittingDirectPayout}
+                className="rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmittingDirectPayout || !directPayoutAmount}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
+              >
+                {isSubmittingDirectPayout ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Confirm & Record Payout
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* SEARCHABLE PROVIDER PICKER MODAL (STANDALONE TO PREVENT CSS NESTING ISSUES ON MOBILE) */}
+      <Dialog open={isProviderPickerOpen} onOpenChange={setIsProviderPickerOpen}>
+        <DialogContent className="z-[70] sm:max-w-[425px] rounded-2xl w-[calc(100%-2rem)] max-w-lg mx-auto">
+          <DialogHeader>
+            <DialogTitle>Select Provider</DialogTitle>
+            <DialogDescriptionComponent>
+              Search approved providers by name, email, or phone.
+            </DialogDescriptionComponent>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Type provider name, email, or phone..."
+                className="pl-9 h-10 rounded-xl"
+                value={providerPickerSearch}
+                onChange={(e) => setProviderPickerSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <ScrollArea className="h-[270px] rounded-xl border p-2">
+              <div className="space-y-1.5">
+                {filteredProvidersForPicker.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No approved providers found.
+                  </div>
+                ) : (
+                  filteredProvidersForPicker.map((p) => {
+                    const isSelected = (directPayoutProvider?.uid || directPayoutProvider?.id) === (p.uid || p.id);
+                    const balance = p.withdrawableBalance || 0;
+                    return (
+                      <Button
+                        key={p.uid || p.id}
+                        type="button"
+                        variant={isSelected ? "secondary" : "ghost"}
+                        className="w-full text-left h-auto py-2.5 px-3 relative rounded-xl whitespace-normal break-words hover:bg-muted/60"
+                        onClick={() => {
+                          setDirectPayoutProvider(p);
+                          if (balance > 0) {
+                            setDirectPayoutAmount(String(balance));
+                          } else {
+                            setDirectPayoutAmount('');
+                          }
+                          const bankDetails = (p as any)?.bankDetails || {};
+                          if (bankDetails.upiId) {
+                            setDirectPayoutMethod('upi');
+                          } else {
+                            setDirectPayoutMethod('bank_transfer');
+                          }
+                          setIsProviderPickerOpen(false);
+                          setProviderPickerSearch('');
+                        }}
+                      >
+                        <div className="flex flex-col gap-1.5 text-left w-full py-0.5">
+                          {/* First line: Name + icon + Check indicator */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <UserCircle className={cn("h-4 w-4 shrink-0", isSelected ? "text-primary" : "text-muted-foreground")} />
+                              <span className="font-semibold text-sm leading-tight text-foreground truncate">
+                                {p.displayName || 'Unnamed Provider'}
+                              </span>
+                            </div>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-primary shrink-0" />
+                            )}
+                          </div>
+
+                          {/* Second line: Contact details on left, Balance badge on right */}
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                            <span className="text-[11px] text-muted-foreground truncate">
+                              {p.email && <span>{p.email}</span>}
+                              {p.email && p.mobileNumber && <span> • </span>}
+                              {p.mobileNumber && <span>{p.mobileNumber}</span>}
+                              {!p.email && !p.mobileNumber && <span>No contact info</span>}
+                            </span>
+                            <div className="shrink-0 self-start sm:self-auto">
+                              <span className={cn(
+                                "inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold leading-tight",
+                                balance < 0 
+                                  ? "bg-destructive/10 text-destructive border border-destructive/20" 
+                                  : "bg-primary/10 text-primary border border-primary/20"
+                              )}>
+                                Balance: {formatCurrency(balance, symbol, decimals, code)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </Button>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 

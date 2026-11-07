@@ -1202,3 +1202,98 @@ export async function recalculateProviderStatsAction(providerId: string) {
   }
 }
 
+// 13. Create Direct Payout from Admin (MySQL)
+export async function createAdminDirectPayoutAction(params: {
+  providerId: string;
+  amount: number;
+  method: 'bank_transfer' | 'upi' | 'cash';
+  details?: {
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+    notes?: string;
+  };
+  referenceNotes?: string;
+}) {
+  try {
+    const { providerId, amount, method, details = {}, referenceNotes = '' } = params;
+    const numAmount = Number(amount);
+    if (!providerId || isNaN(numAmount) || numAmount <= 0) {
+      return { success: false, message: "Valid provider and positive numeric amount are required." };
+    }
+
+    const providerUserRef = doc(db, 'users', providerId);
+    const providerUserSnap = await getDoc(providerUserRef);
+    if (!providerUserSnap.exists()) {
+      return { success: false, message: "Provider user not found." };
+    }
+    const providerUser = providerUserSnap.data() as any;
+
+    const requestData = {
+      providerId,
+      providerName: providerUser.displayName || "Provider",
+      providerEmail: providerUser.email || "",
+      amount: numAmount,
+      method,
+      details: {
+        accountHolderName: details.accountHolderName || providerUser.displayName || "",
+        bankName: details.bankName || "",
+        accountNumber: details.accountNumber || "",
+        ifscCode: details.ifscCode || "",
+        upiId: details.upiId || "",
+        notes: referenceNotes || "Direct Payout recorded by Admin",
+      },
+      status: 'completed',
+      requestedAt: Timestamp.now(),
+      processedAt: Timestamp.now(),
+      adminNotes: referenceNotes || "Direct payout processed by Admin",
+    };
+
+    // 1. Write completed withdrawal request
+    await addDoc(collection(db, 'withdrawalRequests'), requestData);
+
+    // 2. Update user totals (withdrawableBalance & totalPaidOut)
+    const currentTotalPaidOut = Number(providerUser.totalPaidOut) || 0;
+    const currentBalance = Number(providerUser.withdrawableBalance) || 0;
+    const newBalance = Math.max(0, currentBalance - numAmount);
+
+    await updateDoc(providerUserRef, {
+      totalPaidOut: currentTotalPaidOut + numAmount,
+      withdrawableBalance: newBalance,
+      withdrawalPending: false,
+    });
+
+    // 3. Write in-app notification to provider
+    try {
+      await addDoc(collection(db, 'userNotifications'), {
+        userId: providerId,
+        title: "Payout Received",
+        message: `A direct payout of ₹${numAmount.toFixed(2)} has been recorded via ${method.replace('_', ' ').toUpperCase()}.${referenceNotes ? ` Reference: ${referenceNotes}` : ''}`,
+        type: 'success',
+        href: '/provider/withdrawal',
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    } catch (e) {
+      console.warn("Could not send payout notification:", e);
+    }
+
+    // 4. Synchronize provider stats and earnings
+    await recalculateProviderStatsAction(providerId);
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/earnings');
+    revalidatePath('/provider/withdrawal');
+
+    return {
+      success: true,
+      message: `Successfully recorded direct payout of ₹${numAmount.toFixed(2)} for ${providerUser.displayName || 'Provider'}.`
+    };
+  } catch (error: any) {
+    console.error("Error in createAdminDirectPayoutAction:", error);
+    return { success: false, message: error.message || "Failed to record direct payout." };
+  }
+}
+
