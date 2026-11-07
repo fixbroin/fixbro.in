@@ -503,13 +503,13 @@ export default function Step2PersonalInfo({
                           <Button
                             key={opt.id}
                             variant="ghost"
-                            className="w-full justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
+                            className="w-full min-w-0 justify-between items-center font-normal h-auto min-h-[44px] py-2.5 px-3 text-left whitespace-normal break-words hover:bg-muted/60"
                             onClick={() => {
                               field.onChange(opt.id);
                               setIsQualificationDialogOpen(false);
                             }}
                           >
-                            <span className="text-sm leading-snug break-words text-left flex-1 mr-2">{opt.label}</span>
+                            <span className="text-sm leading-snug break-words whitespace-normal text-left flex-1 min-w-0 mr-2">{opt.label}</span>
                             {field.value === opt.id && <Check className="h-4 w-4 text-primary shrink-0" />}
                           </Button>
                         ))}
