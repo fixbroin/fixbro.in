@@ -312,7 +312,27 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         return;
       }
 
-      const isProfileIncomplete = !docSnap.exists() || !userData?.displayName || !userData?.mobileNumber || !userData?.email;
+      let isProfileIncomplete = !docSnap.exists() || !userData?.displayName || !userData?.mobileNumber || !userData?.email;
+
+      // If user profile is incomplete or doc does not exist, check if an admin-created account exists to auto-link
+      if (isProfileIncomplete) {
+        try {
+          const idToken = await user.getIdToken();
+          const resolveRes = await fetch('/api/auth/resolve-account', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            }
+          });
+          const resolveData = await resolveRes.json();
+          if (resolveData?.success && resolveData?.resolved && resolveData?.user) {
+            isProfileIncomplete = false;
+          }
+        } catch (resolveErr) {
+          console.warn('Account auto-link resolution check skipped:', resolveErr);
+        }
+      }
 
       if (isProfileIncomplete) {
           setUserCredentialForProfileCompletion(userCredential);

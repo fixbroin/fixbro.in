@@ -71,7 +71,13 @@ const removeUndefined = (obj: any): any => {
 };
 
 export default function ProviderRegistrationPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isSuperAdmin, adminRole, adminPermissions } = useAuth();
+  const isAuthorizedAdmin = Boolean(
+    user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+    isSuperAdmin ||
+    adminRole ||
+    (adminPermissions && adminPermissions['provider_applications']?.write)
+  );
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -97,14 +103,14 @@ export default function ProviderRegistrationPage() {
 
   useEffect(() => {
     const editAppId = searchParams.get('editApplicationId');
-    if (editAppId && user?.email === ADMIN_EMAIL) {
+    if (editAppId && isAuthorizedAdmin) {
       setEditingApplicationIdForAdmin(editAppId);
       setIsEditModeByAdmin(true);
     } else {
       setEditingApplicationIdForAdmin(null);
       setIsEditModeByAdmin(false);
     }
-  }, [searchParams, user]);
+  }, [searchParams, user, isAuthorizedAdmin]);
 
   useEffect(() => {
     if (isLoadingPage || !formContainerRef.current) return;
@@ -387,7 +393,7 @@ export default function ProviderRegistrationPage() {
     return (<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>);
   }
 
-  if (!appConfig.isProviderRegistrationEnabled && user?.email !== ADMIN_EMAIL && !isEditModeByAdmin) {
+  if (!appConfig.isProviderRegistrationEnabled && !isAuthorizedAdmin && !isEditModeByAdmin) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <ShieldOff className="mx-auto h-24 w-24 text-muted-foreground mb-6" />

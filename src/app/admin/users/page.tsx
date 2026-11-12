@@ -39,6 +39,7 @@ import { useAdminStats } from '@/hooks/useAdminStats';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import CreateUserModal from '@/components/admin/CreateUserModal';
 
 const formatUserTimestamp = (timestamp?: unknown, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -93,6 +94,25 @@ export default function AdminUsersPage() {
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
   const [selectedUserForWallet, setSelectedUserForWallet] = useState<FirestoreUser | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+
+  const handleRefreshUsers = async () => {
+    setIsLoading(true);
+    try {
+      const usersCollectionRef = collection(db, "users");
+      const q = query(usersCollectionRef, orderBy("userNumber", "desc"));
+      const querySnapshot = await getDocs(q);
+      const fetchedUsers = querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+      } as FirestoreUser));
+      setUsers(fetchedUsers);
+    } catch (error) {
+      console.error("Error refreshing users:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -523,6 +543,13 @@ export default function AdminUsersPage() {
         </div>
         <div className="flex items-center gap-3">
             <Button 
+                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-primary/90 transition-all duration-300 flex items-center gap-1.5"
+                onClick={() => setIsCreateUserModalOpen(true)}
+            >
+                <UserPlus className="h-3.5 w-3.5" />
+                Add User
+            </Button>
+            <Button 
                 variant="outline" 
                 className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
                 onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
@@ -774,6 +801,12 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateUserModal
+        isOpen={isCreateUserModalOpen}
+        onClose={() => setIsCreateUserModalOpen(false)}
+        onUserCreated={handleRefreshUsers}
+      />
 
       {selectedUserForWallet && (
         <ProviderWalletAdjustmentModal 

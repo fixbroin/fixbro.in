@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Users2, MapPin, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown } from "lucide-react";
+import { Users2, MapPin, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown, UserPlus } from "lucide-react";
 import type { ProviderApplication, ProviderApplicationStatus, FirestoreNotification } from '@/types/firestore';
 import { db, storage } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import ProviderApplicationDetailsModal from '@/components/admin/ProviderApplicationDetailsModal';
+import CreateProviderModal from '@/components/admin/CreateProviderModal';
 import { Textarea } from '@/components/ui/textarea'; 
 import { Label } from '@/components/ui/label'; 
 import { useApplicationConfig } from '@/hooks/useApplicationConfig'; 
@@ -47,6 +48,7 @@ export default function AdminProviderApplicationsPage() {
   const [isUpdating, setIsUpdating] = useState<string | null>(null); 
   const [filterStatus, setFilterStatus] = useState<ProviderApplicationStatus | "all">("all");
   const [isFilterStatusPickerOpen, setIsFilterStatusPickerOpen] = useState(false);
+  const [isCreateProviderModalOpen, setIsCreateProviderModalOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -457,7 +459,14 @@ export default function AdminProviderApplicationsPage() {
               Review and manage provider registration applications.
             </CardDescription>
           </div>
-          <div className="mt-4 sm:mt-0 w-full sm:w-auto sm:min-w-[200px]">
+          <div className="mt-4 sm:mt-0 w-full sm:w-auto flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Button
+              onClick={() => setIsCreateProviderModalOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm h-10 px-3.5 flex items-center gap-1.5 shrink-0"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add Provider</span>
+            </Button>
             <Dialog open={isFilterStatusPickerOpen} onOpenChange={setIsFilterStatusPickerOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -692,6 +701,12 @@ export default function AdminProviderApplicationsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <CreateProviderModal
+        isOpen={isCreateProviderModalOpen}
+        onClose={() => setIsCreateProviderModalOpen(false)}
+        onProviderCreated={fetchApplications}
+      />
 
       {selectedApplication && (
         <ProviderApplicationDetailsModal
