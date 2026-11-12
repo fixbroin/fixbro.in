@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronDown, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2, Wallet } from "lucide-react";
+import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronDown, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2, Wallet, Activity } from "lucide-react";
 import type { FirestoreUser, Address } from '@/types/firestore';
 import { db } from '@/lib/firebase'; 
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, limit, startAfter, getDocs, where, type QueryDocumentSnapshot } from '@/lib/mysqlDb';
@@ -40,6 +40,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import CreateUserModal from '@/components/admin/CreateUserModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ActiveUsersTab from '@/components/admin/ActiveUsersTab';
 
 const formatUserTimestamp = (timestamp?: unknown, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -569,7 +571,29 @@ export default function AdminUsersPage() {
         </div>
       </header>
 
-      <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+      <Tabs defaultValue="all_users" className="w-full space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <TabsList className="bg-muted/60 p-1.5 rounded-2xl h-13 w-full sm:w-auto inline-flex border border-border/40 shadow-xs">
+            <TabsTrigger 
+              value="all_users" 
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+            >
+              <Users className="h-4 w-4" />
+              <span>All Users ({filteredUsers.length || users.length})</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="active_users" 
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+            >
+              <Activity className="h-4 w-4 text-emerald-500" />
+              <span>Active Users</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="all_users" className="space-y-6 mt-0">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
         <CardHeader className="p-8 pb-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="relative flex-grow w-full max-w-2xl group">
@@ -723,7 +747,19 @@ export default function AdminUsersPage() {
             </>
           )}
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="active_users" className="space-y-6 mt-0">
+          <ActiveUsersTab
+            users={users}
+            isLoading={isLoading}
+            onRefresh={handleRefreshUsers}
+            onViewUserDetails={handleViewDetails}
+            appConfig={appConfig}
+          />
+        </TabsContent>
+      </Tabs>
 
       {selectedUserForModal && (
         <Dialog open={isUserDetailsModalOpen} onOpenChange={setIsUserDetailsModalOpen}>
