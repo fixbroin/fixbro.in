@@ -8,7 +8,7 @@ import { sendProviderBookingAssignmentEmail } from '@/ai/flows/sendProviderBooki
 import { getBaseUrl } from '@/lib/config';
 import { generateInvoicePdf } from '@/lib/invoiceGenerator';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import { getZonedDate, formatScheduledDate, isCashPayment } from '@/lib/utils';
+import { getZonedDate, formatScheduledDate, isCashPayment, isProviderWorkingAtTimeSlot } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
@@ -115,6 +115,19 @@ export async function POST(request: Request) {
                         });
                         if (isOnLeave) {
                             continue; // Skip provider on leave
+                        }
+
+                        // Check Provider Shift Working Hours
+                        if (closestProvider.workingHours && booking.scheduledDate && booking.scheduledTimeSlot) {
+                            const isWorking = isProviderWorkingAtTimeSlot(
+                                closestProvider.workingHours,
+                                booking.scheduledDate,
+                                booking.scheduledTimeSlot,
+                                appConfig?.timezone || 'Asia/Kolkata'
+                            );
+                            if (!isWorking) {
+                                continue; // Skip provider because they are off-shift or day off during this appointment time
+                            }
                         }
 
                         // Check Overlaps

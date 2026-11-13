@@ -822,6 +822,42 @@ export default function ProviderApplicationDetailsModal({
                     isVerifying={verifyingDocType === 'bank'}
                   />
                 </div>
+                <Separator className="my-2" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-primary uppercase tracking-wider">Weekly Working Hours</h4>
+                    {application.workingHours ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">Custom Shifts Active</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground text-[10px]">Platform Standard Hours</Badge>
+                    )}
+                  </div>
+                  {application.workingHours ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                      {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map(day => {
+                        const d = (application.workingHours as any)?.[day];
+                        const isOff = d?.isEnabled === false;
+                        const intervals = d?.intervals || [{ startTime: d?.startTime || "10:00", endTime: d?.endTime || "18:00" }];
+                        return (
+                          <div key={day} className="p-2 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-between">
+                            <span className="capitalize font-semibold text-foreground">{day}:</span>
+                            {isOff ? (
+                              <span className="text-[10px] text-muted-foreground font-bold px-1.5 py-0.5 rounded bg-muted">Day Off</span>
+                            ) : (
+                              <span className="font-mono text-primary font-bold text-[11px]">
+                                {intervals.map((i: any) => `${i.startTime} - ${i.endTime}`).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Provider has not configured custom shift hours yet. Using global platform operating hours.
+                    </p>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="confirmation" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">

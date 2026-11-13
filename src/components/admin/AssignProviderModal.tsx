@@ -5,14 +5,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Loader2, UserCheck2, UserCircle, PackageSearch, MapPin, CalendarOff } from "lucide-react";
+import { Loader2, UserCheck2, UserCircle, PackageSearch, MapPin, CalendarOff, Clock } from "lucide-react";
 import type { ProviderApplication, FirestoreBooking, FirestoreService, FirestoreSubCategory, LeaveRequest } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getHaversineDistance } from '@/lib/locationUtils';
-import { cn } from '@/lib/utils';
+import { cn, isProviderWorkingAtTimeSlot } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface AssignProviderModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ interface AssignProviderModalProps {
 }
 
 export default function AssignProviderModal({ isOpen, onClose, booking, onAssignConfirm }: AssignProviderModalProps) {
+  const { config: appConfig } = useApplicationConfig();
   const [providers, setProviders] = useState<ProviderApplication[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>(undefined);
@@ -101,11 +103,19 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
         if (!booking.scheduledDate) return false;
         return l.startDate <= booking.scheduledDate && l.endDate >= booking.scheduledDate;
       });
+      const isOnDuty = isProviderWorkingAtTimeSlot(
+        p.workingHours,
+        booking.scheduledDate || '',
+        booking.scheduledTimeSlot || '',
+        appConfig?.timezone || 'Asia/Kolkata'
+      );
       return { 
         ...p, 
         distance,
         isOnLeave: !!activeLeave,
-        activeLeave
+        activeLeave,
+        isOnDuty,
+        hasCustomHours: !!p.workingHours
       };
     });
   }, [providers, booking, leaves]);
@@ -130,8 +140,18 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
       }
     });
 
-    matching.sort((a, b) => (Number(a.isOnLeave) - Number(b.isOnLeave)) || (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || (a.distance - b.distance));
-    other.sort((a, b) => (Number(a.isOnLeave) - Number(b.isOnLeave)) || (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || (a.distance - b.distance));
+    matching.sort((a, b) => 
+      (Number(a.isOnLeave) - Number(b.isOnLeave)) || 
+      (Number(b.isOnDuty) - Number(a.isOnDuty)) ||
+      (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || 
+      (a.distance - b.distance)
+    );
+    other.sort((a, b) => 
+      (Number(a.isOnLeave) - Number(b.isOnLeave)) || 
+      (Number(b.isOnDuty) - Number(a.isOnDuty)) ||
+      (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || 
+      (a.distance - b.distance)
+    );
 
     return { matchingProviders: matching, otherProviders: other };
   }, [providersWithDistance, bookingCategoryId]);
@@ -171,6 +191,17 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border leading-none bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 flex items-center gap-1">
                     <CalendarOff className="h-2.5 w-2.5" />
                     On Leave {provider.activeLeave?.leaveType === 'full_day' ? '(Full Day)' : `(${provider.activeLeave?.startTime}-${provider.activeLeave?.endTime})`}
+                  </span>
+                )}
+                {provider.hasCustomHours && (
+                  <span className={cn(
+                    "text-[9px] font-bold px-1.5 py-0.5 rounded-full border leading-none flex items-center gap-1",
+                    provider.isOnDuty
+                      ? "bg-blue-500/10 text-blue-600 border-blue-500/30 dark:text-blue-400"
+                      : "bg-rose-500/10 text-rose-600 border-rose-500/30 dark:text-rose-400"
+                  )}>
+                    <Clock className="h-2.5 w-2.5" />
+                    {provider.isOnDuty ? "On Shift" : "Off Duty"}
                   </span>
                 )}
               </div>

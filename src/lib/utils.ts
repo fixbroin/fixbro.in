@@ -463,3 +463,93 @@ export function getBookingScheduledTimestamp(b: any): number {
   return getTimestampMillis(b.createdAt);
 }
 
+/**
+ * Parses time strings such as "10:00 AM", "06:00 PM", or "14:30" into minutes from midnight (0 - 1439).
+ */
+export function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return 0;
+  const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (timeMatch) {
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3]?.toUpperCase();
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  }
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+/**
+ * Formats total minutes from midnight into 12-hour AM/PM string, e.g. 600 -> "10:00 AM".
+ */
+export function formatTimeFromMinutes(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const period = hours >= 12 && hours < 24 ? 'PM' : 'AM';
+  let displayHours = hours % 12;
+  if (displayHours === 0) displayHours = 12;
+  return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Checks whether a provider is on duty at a given date and time slot.
+ * If workingHours is undefined/null, provider has not configured custom hours,
+ * so this returns true (standard platform availability fallback).
+ */
+export function isProviderWorkingAtTimeSlot(
+  workingHours: any,
+  dateISOOrObj: string | Date,
+  timeSlotMinutesOrStr: number | string,
+  timeZone: string = 'Asia/Kolkata'
+): boolean {
+  if (!workingHours || typeof workingHours !== 'object') {
+    return true; // Backward compatibility fallback: follows platform hours
+  }
+
+  let weekday = '';
+  if (typeof dateISOOrObj === 'string') {
+    const cleanDate = dateISOOrObj.split('T')[0];
+    const parts = cleanDate.split('-').map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
+      weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone }).format(d).toLowerCase();
+    }
+  } else if (dateISOOrObj instanceof Date) {
+    weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone }).format(dateISOOrObj).toLowerCase();
+  }
+
+  if (!weekday || !workingHours[weekday]) {
+    return true;
+  }
+
+  const daySchedule = workingHours[weekday];
+  if (daySchedule.isEnabled === false) {
+    return false; // Provider specifically marked this weekday as non-working / off-day
+  }
+
+  const slotMinutes = typeof timeSlotMinutesOrStr === 'number' 
+    ? timeSlotMinutesOrStr 
+    : parseTimeToMinutes(timeSlotMinutesOrStr);
+
+  // Check multiple custom shifts / intervals if provided
+  if (Array.isArray(daySchedule.intervals) && daySchedule.intervals.length > 0) {
+    return daySchedule.intervals.some((int: any) => {
+      const s = parseTimeToMinutes(int.startTime);
+      const e = parseTimeToMinutes(int.endTime);
+      return slotMinutes >= s && slotMinutes < e;
+    });
+  }
+
+  // Check standard single start/end time fallback
+  if (daySchedule.startTime && daySchedule.endTime) {
+    const s = parseTimeToMinutes(daySchedule.startTime);
+    const e = parseTimeToMinutes(daySchedule.endTime);
+    return slotMinutes >= s && slotMinutes < e;
+  }
+
+  return true;
+}
+
+

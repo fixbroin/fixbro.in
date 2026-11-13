@@ -1507,6 +1507,17 @@ export interface ProviderApplication {
     downloadedAt: number;
     id?: string;
   }>;
+
+  // Individual Working Hours / Weekly Shift Timings
+  workingHours?: {
+    monday?: DayAvailability;
+    tuesday?: DayAvailability;
+    wednesday?: DayAvailability;
+    thursday?: DayAvailability;
+    friday?: DayAvailability;
+    saturday?: DayAvailability;
+    sunday?: DayAvailability;
+  };
 }
 
 

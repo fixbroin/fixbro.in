@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { AppSettings, FirestoreService, FirestoreSubCategory, TimeSlotCategoryLimit, FirestoreBooking, LeaveRequest } from '@/types/firestore';
 import { defaultAppSettings } from '@/config/appDefaults';
-import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC, getTimestampMillis } from '@/lib/utils';
+import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC, getTimestampMillis, isProviderWorkingAtTimeSlot } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 export const dynamic = 'force-dynamic';
@@ -752,6 +752,16 @@ export async function POST(req: NextRequest) {
                                 if (step.minutes >= leaveStart && step.minutes < leaveEnd) {
                                     busyProviderIds.add(l.providerId);
                                 }
+                            }
+                        }
+                    });
+
+                    // Also mark provider as busy if outside their individual configured working hours
+                    eligibleLocalProviders.forEach(p => {
+                        if (p.workingHours) {
+                            const isWorking = isProviderWorkingAtTimeSlot(p.workingHours, step.dateISO, step.minutes, timezone);
+                            if (!isWorking) {
+                                busyProviderIds.add(p.id);
                             }
                         }
                     });
