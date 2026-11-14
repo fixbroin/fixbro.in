@@ -410,6 +410,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       return {
         serviceId: entry.serviceId,
         name: detail.name,
+        slug: detail.slug || null,
         quantity: entry.quantity,
         pricePerUnit: displayedPriceForQuantity / entry.quantity,
         discountedPricePerUnit: detail.discountedPrice || null,

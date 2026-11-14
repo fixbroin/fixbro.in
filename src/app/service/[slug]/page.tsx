@@ -50,10 +50,22 @@ const getServiceData = cache(async (slug: string): Promise<ClientServiceData | n
       try {
         const servRef = adminDb.collection('adminServices');
         const q = servRef.where('slug', '==', slug).where('isActive', '==', true).limit(1);
-        const snapshot = await q.get();
-        if (snapshot.empty) return null;
+        let snapshot = await q.get();
+        let serviceDoc: any = !snapshot.empty ? snapshot.docs[0] : null;
 
-        const serviceDoc = snapshot.docs[0];
+        // Fallback: check if slug is the service document ID
+        if (!serviceDoc) {
+          const byIdDoc = await servRef.doc(slug).get();
+          if (byIdDoc.exists) {
+            const data = byIdDoc.data() as FirestoreService | undefined;
+            if (data && data.isActive !== false) {
+              serviceDoc = byIdDoc;
+            }
+          }
+        }
+
+        if (!serviceDoc) return null;
+
         const serviceDocData = serviceDoc.data() as FirestoreService | undefined;
         if (!serviceDocData) return null; 
 
@@ -280,7 +292,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const breadcrumbItems = [
     { name: "Home", url: appBaseUrl },
     ...(serviceData.parentCategorySlug ? [{ name: serviceData.parentCategoryName || "Category", url: `${appBaseUrl}/category/${serviceData.parentCategorySlug}` }] : []),
-    { name: serviceData.name, url: `${appBaseUrl}/service/${slug}` }
+    { name: serviceData.name, url: `${appBaseUrl}/service/${serviceData.slug || slug}` }
   ];
   const breadcrumbSchema = generateBreadcrumbSchema(breadcrumbItems);
   const ratingValue = serviceData.rating || aggregateRating?.ratingValue || seoSettings.fallbackRatingValue || "4.8";

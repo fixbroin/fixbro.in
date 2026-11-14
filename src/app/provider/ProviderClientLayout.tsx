@@ -327,7 +327,7 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
     }
 
     // 2. Setup order specific sound
-    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.wav';
+    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.mp3';
     if (!providerOrderAudioRef.current) {
       providerOrderAudioRef.current = new Audio(bookingSoundUrl);
       providerOrderAudioRef.current.load();

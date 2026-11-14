@@ -163,6 +163,7 @@ export type BookingStatus =
 export interface BookingServiceItem {
   serviceId: string;
   name: string;
+  slug?: string; // Slug for direct routing to /service/[slug]
   imageUrl?: string; // Added imageUrl property
   shortDescription?: string | null; // Added shortDescription
   taskTimeValue?: number | null; // Added taskTimeValue

@@ -61,14 +61,14 @@ export default function ChatSettingsForm() {
       isChatEnabled: false,
       isAiChatBotEnabled: false,
       chatNotificationSoundUrl: defaultAppSettings.chatNotificationSoundUrl || "",
-      bookingNotificationSoundUrl: "/sounds/order_sound.wav",
+      bookingNotificationSoundUrl: "/sounds/order_sound.mp3",
     },
   });
 
   useEffect(() => {
     if (globalSettings && !isLoadingGlobalSettings) {
       const currentSoundUrl = globalSettings.chatNotificationSoundUrl || defaultAppSettings.chatNotificationSoundUrl || "";
-      const currentBookingSoundUrl = globalSettings.bookingNotificationSoundUrl || "/sounds/order_sound.wav";
+      const currentBookingSoundUrl = globalSettings.bookingNotificationSoundUrl || "/sounds/order_sound.mp3";
       form.reset({
         isChatEnabled: globalSettings.isChatEnabled || false,
         isAiChatBotEnabled: globalSettings.isAiChatBotEnabled || false,
@@ -113,7 +113,7 @@ export default function ChatSettingsForm() {
 
       if (storedUrl && isFirebaseStorageUrl(storedUrl) && 
           storedUrl !== "/sounds/default-notification.mp3" && 
-          storedUrl !== "/sounds/order_sound.wav") {
+          storedUrl !== "/sounds/order_sound.mp3") {
         const soundRef = storageRef(storage, storedUrl);
         await deleteObject(soundRef);
       }
@@ -153,7 +153,7 @@ export default function ChatSettingsForm() {
     // If there was a selected local file, just discard it and revert preview
     if (selectedBookingSoundFile) {
       setSelectedBookingSoundFile(null);
-      const defaultBookingSound = globalSettings?.bookingNotificationSoundUrl || "/sounds/order_sound.wav";
+      const defaultBookingSound = globalSettings?.bookingNotificationSoundUrl || "/sounds/order_sound.mp3";
       form.setValue('bookingNotificationSoundUrl', defaultBookingSound);
       setCurrentBookingSoundUrlPreview(defaultBookingSound);
       return;
@@ -169,12 +169,12 @@ export default function ChatSettingsForm() {
 
       if (storedUrl && isFirebaseStorageUrl(storedUrl) && 
           storedUrl !== "/sounds/default-notification.mp3" && 
-          storedUrl !== "/sounds/order_sound.wav") {
+          storedUrl !== "/sounds/order_sound.mp3") {
         const soundRef = storageRef(storage, storedUrl);
         await deleteObject(soundRef);
       }
 
-      const defaultBookingSound = "/sounds/order_sound.wav";
+      const defaultBookingSound = "/sounds/order_sound.mp3";
       await setDoc(docRef, {
         bookingNotificationSoundUrl: defaultBookingSound,
         updatedAt: Timestamp.now(),
@@ -195,7 +195,7 @@ export default function ChatSettingsForm() {
   const onSubmit = async (data: ChatSettingsFormData) => {
     setIsSaving(true);
     let finalSoundUrl = data.chatNotificationSoundUrl || defaultAppSettings.chatNotificationSoundUrl || ""; 
-    let finalBookingSoundUrl = data.bookingNotificationSoundUrl || "/sounds/order_sound.wav";
+    let finalBookingSoundUrl = data.bookingNotificationSoundUrl || "/sounds/order_sound.mp3";
 
     // Retrieve fresh settings from db to bypass REST cache for deletion mapping
     let freshSettings: any = null;
@@ -215,7 +215,7 @@ export default function ChatSettingsForm() {
       const oldSoundUrl = freshSettings?.chatNotificationSoundUrl || globalSettings?.chatNotificationSoundUrl;
       if (oldSoundUrl && isFirebaseStorageUrl(oldSoundUrl) && 
           oldSoundUrl !== "/sounds/default-notification.mp3" && 
-          oldSoundUrl !== "/sounds/order_sound.wav") {
+          oldSoundUrl !== "/sounds/order_sound.mp3") {
         try {
           const oldSoundRef = storageRef(storage, oldSoundUrl);
           await deleteObject(oldSoundRef);
@@ -254,7 +254,7 @@ export default function ChatSettingsForm() {
       const oldBookingSoundUrl = freshSettings?.bookingNotificationSoundUrl || globalSettings?.bookingNotificationSoundUrl;
       if (oldBookingSoundUrl && isFirebaseStorageUrl(oldBookingSoundUrl) && 
           oldBookingSoundUrl !== "/sounds/default-notification.mp3" && 
-          oldBookingSoundUrl !== "/sounds/order_sound.wav") {
+          oldBookingSoundUrl !== "/sounds/order_sound.mp3") {
         try {
           const oldBookingSoundRef = storageRef(storage, oldBookingSoundUrl);
           await deleteObject(oldBookingSoundRef);
@@ -488,12 +488,12 @@ export default function ChatSettingsForm() {
                       <FormLabel className="text-xs font-semibold">Sound Source URL</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="/sounds/order_sound.wav"
+                          placeholder="/sounds/order_sound.mp3"
                           className="rounded-xl border-none bg-background h-10 focus-visible:ring-primary/20 text-xs"
                           {...field} 
                           onChange={(e) => {
                             field.onChange(e);
-                            setCurrentBookingSoundUrlPreview(e.target.value || "/sounds/order_sound.wav");
+                            setCurrentBookingSoundUrlPreview(e.target.value || "/sounds/order_sound.mp3");
                             setSelectedBookingSoundFile(null);
                           }}
                         />

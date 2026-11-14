@@ -183,7 +183,7 @@ export const onForegroundMessage = async () => {
       
       // Play custom sound based on notification type/data
       try {
-        const soundFile = payload.data?.sound === 'order' ? '/sounds/order_sound.wav' : '/sounds/default-notification.mp3';
+        const soundFile = payload.data?.sound === 'order' ? '/sounds/order_sound.mp3' : '/sounds/default-notification.mp3';
         const audio = new Audio(soundFile);
         audio.play().catch(e => console.warn("FCM Utils: Could not play notification sound:", e));
       } catch (soundErr) {

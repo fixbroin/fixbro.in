@@ -196,7 +196,7 @@ export default function AdminClientLayout({ children }: PropsWithChildren) {
     }
 
     // 2. Setup order specific sound
-    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.wav';
+    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.mp3';
     if (!adminOrderAudioRef.current) {
       adminOrderAudioRef.current = new Audio(bookingSoundUrl);
       adminOrderAudioRef.current.load();

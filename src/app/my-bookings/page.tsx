@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock } from "lucide-react"; // Added Phone
+import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, Calendar, CalendarDays, CheckCircle2, CreditCard, IndianRupee } from "lucide-react"; // Added Phone
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
@@ -206,19 +206,28 @@ export default function MyBookingsPage() {
           }
         }
 
-        // 2. Fetch missing service images
-        if (booking.services && booking.services.length > 0 && !booking.services[0].imageUrl) {
+        // 2. Fetch missing service images and slugs
+        if (booking.services && booking.services.length > 0) {
             try {
-                const serviceDocRef = doc(db, "adminServices", booking.services[0].serviceId);
-                const serviceDocSnap = await getDoc(serviceDocRef);
-                if (serviceDocSnap.exists()) {
-                    const sData = serviceDocSnap.data();
-                    if (sData?.imageUrl) {
-                        enrichedBooking.services[0].imageUrl = sData.imageUrl;
+                await Promise.all(
+                  booking.services.map(async (serviceItem) => {
+                    if ((!serviceItem.imageUrl || !serviceItem.slug) && serviceItem.serviceId) {
+                      const serviceDocRef = doc(db, "adminServices", serviceItem.serviceId);
+                      const serviceDocSnap = await getDoc(serviceDocRef);
+                      if (serviceDocSnap.exists()) {
+                        const sData = serviceDocSnap.data();
+                        if (!serviceItem.imageUrl && sData?.imageUrl) {
+                          serviceItem.imageUrl = sData.imageUrl;
+                        }
+                        if (!serviceItem.slug && sData?.slug) {
+                          serviceItem.slug = sData.slug;
+                        }
+                      }
                     }
-                }
+                  })
+                );
             } catch (err) {
-                console.error("Failed to fetch service image for enrichment", err);
+                console.error("Failed to fetch service details for enrichment", err);
             }
         }
 
@@ -632,20 +641,24 @@ export default function MyBookingsPage() {
                         <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                           {booking.services.map((service) => (
                             <div key={service.serviceId} className="flex items-center justify-between p-3 border rounded-xl bg-background shadow-xs gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
+                              <Link 
+                                href={`/service/${service.slug || service.serviceId}`}
+                                className="flex items-center gap-3 min-w-0 group hover:opacity-90 transition-opacity cursor-pointer"
+                                title={`View ${service.name}`}
+                              >
                                 <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
                                   <AppImage 
                                     src={service.imageUrl || "/default-image.png"} 
                                     alt={service.name}
                                     fill
-                                    className="object-cover"
+                                    className="object-cover transition-transform duration-300 group-hover:scale-110"
                                   />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-bold text-xs truncate text-foreground" title={service.name}>{service.name}</p>
+                                  <p className="font-bold text-xs truncate text-foreground group-hover:text-primary group-hover:underline transition-colors" title={service.name}>{service.name}</p>
                                   <p className="text-[10px] text-muted-foreground">{formatCurrency(service.pricePerUnit, symbol, decimals, code)} per unit</p>
                                 </div>
-                              </div>
+                              </Link>
                               <div className="text-right shrink-0">
                                 <p className="text-[10px] font-black text-primary">Qty: {service.quantity}</p>
                                 <p className="font-black text-xs text-foreground">{formatCurrency(service.pricePerUnit * service.quantity, symbol, decimals, code)}</p>
@@ -655,25 +668,49 @@ export default function MyBookingsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="relative w-full aspect-square md:w-80 md:h-81 bg-muted shrink-0">
+                      <Link
+                        href={`/service/${booking.services[0]?.slug || booking.services[0]?.serviceId}`}
+                        className="group relative w-full aspect-square md:w-80 md:h-81 bg-muted shrink-0 overflow-hidden block cursor-pointer"
+                        title={`View ${booking.services[0]?.name || "Service"}`}
+                      >
                         <AppImage 
                           src={booking.services[0]?.imageUrl || "/default-image.png"} 
                           alt={booking.services[0]?.name || "Service Image"}
                           fill
                           priority={index === 0}
-                          className="object-cover"
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
                         />
-                      </div>
+                      </Link>
                     )}
 
                     <div className="flex-1 flex flex-col">
                       <CardHeader>
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                           <CardTitle className="text-xl font-headline">
-                            {hasMultipleServices 
-                              ? booking.services.map(s => s.name).join(', ') 
-                              : (booking.services[0]?.name || "Service Image")
-                            }
+                            {hasMultipleServices ? (
+                              <span>
+                                {booking.services.map((s, sIdx) => (
+                                  <span key={s.serviceId || sIdx}>
+                                    <Link 
+                                      href={`/service/${s.slug || s.serviceId}`}
+                                      className="hover:text-primary hover:underline transition-colors cursor-pointer"
+                                      title={`View ${s.name}`}
+                                    >
+                                      {s.name}
+                                    </Link>
+                                    {sIdx < booking.services.length - 1 && ', '}
+                                  </span>
+                                ))}
+                              </span>
+                            ) : (
+                              <Link 
+                                href={`/service/${booking.services[0]?.slug || booking.services[0]?.serviceId}`}
+                                className="hover:text-primary hover:underline transition-colors cursor-pointer"
+                                title={`View ${booking.services[0]?.name || "Service"}`}
+                              >
+                                {booking.services[0]?.name || "Service Image"}
+                              </Link>
+                            )}
                           </CardTitle>
                           <Badge variant={getStatusBadgeVariant(booking.status)} className={`capitalize text-xs w-fit ${getStatusBadgeClass(booking.status)}`}>
                               {booking.status}
@@ -681,25 +718,71 @@ export default function MyBookingsPage() {
                         </div>
                         <CardDescription>Booking ID: {booking.bookingId}</CardDescription>
                       </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm flex-grow">
-                  <div>
-                    <p className="text-muted-foreground">Scheduled Date</p>
-                    <p className="font-medium">{formatDateForDisplay(booking.scheduledDate)}</p>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm flex-grow pt-1">
+                  <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                    <span className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                      <Calendar className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Scheduled Date
+                    </span>
+                    <span className="font-semibold text-foreground text-xs sm:text-sm text-right">
+                      {formatDateForDisplay(booking.scheduledDate)}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Time Slot</p>
-                    <p className="font-medium">{booking.scheduledTimeSlot}</p>
+
+                  <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                    <span className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                      <Clock className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Time Slot
+                    </span>
+                    <span className="font-semibold text-foreground text-xs sm:text-sm text-right">
+                      {booking.scheduledTimeSlot}
+                    </span>
                   </div>
+
+                  <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                    <span className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                      <IndianRupee className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Total Amount
+                    </span>
+                    <span className="font-bold text-foreground text-sm sm:text-base text-right">
+                      {formatCurrency(booking.totalAmount, symbol, decimals, code)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                    <span className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                      <CreditCard className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                      Payment Method
+                    </span>
+                    <span className="font-medium text-foreground text-xs sm:text-sm text-right">
+                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                    <span className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+                      Booked On
+                    </span>
+                    <span className="font-medium text-muted-foreground text-xs sm:text-sm text-right">
+                      {formatBookingTimestamp(booking.createdAt)}
+                    </span>
+                  </div>
+
                   {booking.estimatedEndTime && (
-                    <div>
-                      <p className="text-muted-foreground text-green-600 font-semibold">Estimated Completion</p>
-                      <p className="font-medium text-green-700">
+                    <div className="flex items-center justify-between py-2 border-b border-border/30 text-sm gap-2">
+                      <span className="text-green-700 dark:text-green-400 font-semibold text-xs sm:text-sm flex items-center gap-1.5 shrink-0">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                        Estimated Completion
+                      </span>
+                      <span className="font-semibold text-green-700 dark:text-green-400 text-xs sm:text-sm text-right leading-tight">
                         {formatDateInTimezone(booking.estimatedEndTime, appConfig.timezone, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {formatTimeInTimezone(booking.estimatedEndTime, appConfig.timezone)}
-                      </p>
+                      </span>
                     </div>
                   )}
+
                   {booking.dailyTimeline && booking.dailyTimeline.length > 1 && (
-                    <div className="sm:col-span-2 md:col-span-3 py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground my-1">
+                    <div className="col-span-1 md:col-span-2 py-2.5 px-3 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/50 rounded-xl space-y-2 text-sm text-muted-foreground my-1">
                       <p className="font-bold text-xs text-blue-800 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1">
                         <Clock className="h-3 w-3" /> Day-by-Day Work Schedule
                       </p>
@@ -715,8 +798,9 @@ export default function MyBookingsPage() {
                       </div>
                     </div>
                   )}
+
                   {booking.interveningBreaks && booking.interveningBreaks.length > 0 && (
-                    <div className="sm:col-span-2 md:col-span-3 py-2.5 px-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 rounded-xl space-y-1.5 text-xs text-muted-foreground my-1">
+                    <div className="col-span-1 md:col-span-2 py-2.5 px-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 rounded-xl space-y-1.5 text-xs text-muted-foreground my-1">
                       <p className="font-bold text-[10px] text-amber-800 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" /> Includes Gaps / Holidays
                       </p>
@@ -734,49 +818,40 @@ export default function MyBookingsPage() {
                       </div>
                     </div>
                   )}
-                  <div>
-                    <p className="text-muted-foreground">Total Amount</p>
-                    <p className="font-medium">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Payment Method</p>
-                    <p className="font-medium">
-                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
-                    </p>
-                  </div>
-                  <div className="sm:col-span-2 md:col-span-3">
-                    <p className="text-muted-foreground">Booked On</p>
-                    <p className="font-medium">{formatBookingTimestamp(booking.createdAt)}</p>
-                  </div>
 
                   {booking.providerDetails && shouldShowProviderDetails(booking.status) && (
-                    <div className="sm:col-span-2 md:col-span-3 pt-4 border-t">
-                      <h4 className="text-md font-semibold mb-2 text-foreground">Your Provider</h4>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12">
+                    <div className="col-span-1 md:col-span-2 pt-4 border-t mt-1">
+                      <h4 className="text-md font-semibold mb-2.5 text-foreground">Your Provider</h4>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Avatar className="h-12 w-12 shrink-0">
                             <AvatarImage src={booking.providerDetails.profilePhotoUrl || undefined} alt={booking.providerDetails.fullName} />
                             <AvatarFallback><UserCircle className="h-6 w-6" /></AvatarFallback>
                             </Avatar>
-                            <div>
-                            <p className="font-semibold">{booking.providerDetails.fullName}</p>
+                            <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-foreground text-sm sm:text-base leading-snug whitespace-nowrap overflow-hidden text-ellipsis">{booking.providerDetails.fullName}</p>
                             {booking.providerDetails.languagesSpokenLabels && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1"><Languages className="h-3 w-3"/> {booking.providerDetails.languagesSpokenLabels.join(', ')}</p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis" title={booking.providerDetails.languagesSpokenLabels.join(', ')}>
+                                  <Languages className="h-3.5 w-3.5 shrink-0"/> 
+                                  <span className="truncate">{booking.providerDetails.languagesSpokenLabels.join(', ')}</span>
+                                </p>
                             )}
                             </div>
                         </div>
                         {booking.providerDetails.mobileNumber && (
-                           booking.status === 'AssignedToProvider' ? (
-                             <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
-                               <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
-                             </Button>
-                           ) : (
-                             <a href={`tel:${booking.providerDetails.mobileNumber}`}>
-                                <Button variant="outline" size="sm">
-                                    <Phone className="mr-2 h-4 w-4" /> Call
-                                </Button>
-                             </a>
-                           )
+                           <div className="w-full sm:w-auto shrink-0">
+                             {booking.status === 'AssignedToProvider' ? (
+                               <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance" className="w-full sm:w-auto text-xs sm:text-sm">
+                                 <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                               </Button>
+                             ) : (
+                               <a href={`tel:${booking.providerDetails.mobileNumber}`} className="block w-full sm:w-auto">
+                                  <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs sm:text-sm">
+                                      <Phone className="mr-2 h-4 w-4" /> Call
+                                  </Button>
+                               </a>
+                             )}
+                           </div>
                          )}
                       </div>
                     </div>

@@ -532,6 +532,7 @@ export default function PaymentPage() {
       return {
         serviceId: entry.serviceId,
         name: detail.name,
+        slug: detail.slug || null,
         quantity: entry.quantity,
         pricePerUnit: displayedPriceForQuantity / entry.quantity,
         discountedPricePerUnit: detail.discountedPrice || null,
