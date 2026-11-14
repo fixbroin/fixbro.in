@@ -4,7 +4,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { depositProviderWalletAction } from '@/app/actions/providerWalletActions';
 import { unlockProviderIdCardAction } from '@/app/actions/providerIdCardActions';
 import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs, limit, deleteDoc } from '@/lib/mysqlDb';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
@@ -48,45 +48,72 @@ export async function POST(req: NextRequest) {
     console.log(`Received Razorpay Webhook Event: ${event}`);
 
     if (event === 'order.paid' || event === 'payment.captured') {
-      const order = payload.payload.payment?.entity?.order_id 
-        ? payload.payload.payment.entity 
-        : payload.payload.order?.entity;
+      const paymentEntity = payload.payload.payment?.entity;
+      const orderEntity = payload.payload.order?.entity;
+      const order = paymentEntity || orderEntity;
 
-      if (!order) {
+      if (!paymentEntity && !orderEntity) {
         return NextResponse.json({ success: true, message: 'No order or payment entity found.' });
       }
 
-      // Retrieve notes
-      const notes = order.notes || {};
-      const { type, bookingId, providerId, amount: amountStr } = notes;
+      // Merge notes from order and payment entity
+      const notes = {
+        ...(orderEntity?.notes || {}),
+        ...(paymentEntity?.notes || {})
+      };
+      const { type, providerId, amount: amountStr } = notes;
+      let bookingId = notes.bookingId;
 
-      if (type === 'booking' && bookingId) {
+      const orderId = paymentEntity?.order_id || orderEntity?.id || '';
+      const paymentId = paymentEntity?.id || (orderEntity?.id ? `order_paid_${orderEntity.id}` : '');
+
+      // Secondary lookup by razorpayOrderId if bookingId is not in notes
+      if (!bookingId && orderId) {
+        try {
+          const qSnap = await adminDb.collection('bookings').where('razorpayOrderId', '==', orderId).limit(1).get();
+          if (!qSnap.empty) {
+            bookingId = qSnap.docs[0].id;
+          }
+        } catch (lookupErr) {
+          console.warn("Could not lookup booking by razorpayOrderId in webhook:", lookupErr);
+        }
+      }
+
+      if ((type === 'booking' || (!type && bookingId)) && bookingId) {
         const bookingRef = doc(db, 'bookings', bookingId);
         const bookingSnap = await getDoc(bookingRef);
 
         if (bookingSnap.exists()) {
           const bookingData = bookingSnap.data() as any;
           if (bookingData.status === 'Pending Payment') {
-            const orderId = order.order_id || order.id;
-            const paymentId = order.id;
             const nextBookingNumber = await assignNewBookingNumber();
 
             await updateDoc(bookingRef, {
               status: 'Confirmed',
               bookingNumber: nextBookingNumber,
               paymentMethod: 'Online',
-              razorpayPaymentId: paymentId,
-              razorpayOrderId: orderId,
+              razorpayPaymentId: paymentId || bookingData.razorpayPaymentId || null,
+              razorpayOrderId: orderId || bookingData.razorpayOrderId || null,
               updatedAt: Timestamp.now(),
             });
 
             // Trigger post-processing (emails, stats, auto-dispatch, WhatsApp)
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fixbro.in';
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'production' ? 'https://fixbro.in' : 'http://localhost:3001');
             fetch(`${appUrl}/api/bookings/post-process`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ bookingDocId: bookingId, triggerSource: 'razorpay_webhook' })
             }).catch(err => console.error("Error triggering post-process from Razorpay webhook:", err));
+
+            // Clean up server-side cart for user if userId is present
+            if (bookingData.userId) {
+              try {
+                const userCartRef = doc(db, 'userCarts', bookingData.userId);
+                await deleteDoc(userCartRef);
+              } catch (cartErr) {
+                console.warn("Could not delete user cart in webhook:", cartErr);
+              }
+            }
 
             // Create and send notification to customer
             if (bookingData.userId) {

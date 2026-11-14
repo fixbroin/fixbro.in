@@ -325,17 +325,24 @@ export default function ThankYouPage() {
         return;
       }
       
-      const cartEntriesFromStorage = getActiveCheckoutEntries();
-      if (cartEntriesFromStorage.length === 0) {
-        toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
-        router.push('/my-bookings');
-        setIsLoadingPage(false);
-        return;
-      }
-
       // --- 2. Handle Regular Booking Confirmation ---
       const stripeBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
       const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
+
+      const urlBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
+      const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
+
+      const cartEntriesFromStorage = getActiveCheckoutEntries();
+
+      // Only redirect for legacy non-bookingId flows if the cart is completely empty
+      if (!isStripeBooking && !(isRazorpayBooking && urlBookingId)) {
+        if (cartEntriesFromStorage.length === 0) {
+          toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
+          router.push('/my-bookings');
+          setIsLoadingPage(false);
+          return;
+        }
+      }
 
       if (isStripeBooking) {
         if (!stripeSessionId || !stripeBookingId) {
@@ -410,15 +417,107 @@ export default function ThankYouPage() {
         return;
       }
 
-      const urlBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
-      const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
-
       if (isRazorpayBooking && urlBookingId) {
-        if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
-            toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
-            router.push('/cart'); setIsLoadingPage(false); return;
-        }
         try {
+            const bookingRef = doc(db, 'bookings', urlBookingId);
+            let bookingSnap = await getDoc(bookingRef);
+
+            // 1. First check if the background Webhook already confirmed this booking!
+            if (bookingSnap.exists()) {
+              const existingBooking = bookingSnap.data() as FirestoreBooking;
+              if (existingBooking.status === 'Confirmed') {
+                const finalBookingNum = existingBooking.bookingNumber;
+                const servicesSummary = (existingBooking.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+
+                logUserActivity(
+                  'newBooking',
+                  {
+                    bookingId: existingBooking.bookingId,
+                    bookingDocId: urlBookingId,
+                    totalAmount: existingBooking.totalAmount,
+                    paymentMethod: 'Online',
+                    customerName: existingBooking.customerName,
+                    customerPhone: existingBooking.customerPhone,
+                    servicesSummary
+                  },
+                  currentUser?.uid,
+                  !currentUser ? getGuestId() : null,
+                  existingBooking.customerName
+                );
+
+                setBookingDetailsForDisplay({ 
+                    ...existingBooking, 
+                    id: urlBookingId, 
+                    bookingNumber: finalBookingNum,
+                    servicesSummary, 
+                    createdAt: (() => {
+                        const millis = getTimestampMillis(existingBooking.createdAt);
+                        if (!millis) return 'N/A';
+                        const d = new Date(millis);
+                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
+                    })(),
+                    scheduledDateDisplay: formatDateForDisplay(existingBooking.scheduledDate, appConfig),
+                    latitude: existingBooking.latitude === undefined ? null : existingBooking.latitude, 
+                    longitude: existingBooking.longitude === undefined ? null : existingBooking.longitude, 
+                    visitingChargeDisplayed: existingBooking.visitingCharge || 0, 
+                    discountCode: existingBooking.discountCode || null, 
+                    discountAmount: existingBooking.discountAmount || 0, 
+                    paymentMethod: 'Online',
+                    status: 'Confirmed',
+                });
+
+                toast({ title: "Booking Confirmed!", description: "Your payment was verified successfully." });
+                await clearLocalStorageItems(currentUser?.uid);
+                setIsLoadingPage(false);
+                return;
+              }
+            }
+
+            // 2. If status is still Pending Payment, verify with payment tokens or allow a 2.5s window for webhook
+            if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+                // Give background webhook 2.5 seconds in case of slow network/bank notification
+                await new Promise(r => setTimeout(r, 2500));
+                bookingSnap = await getDoc(bookingRef);
+                if (bookingSnap.exists()) {
+                  const recheckData = bookingSnap.data() as FirestoreBooking;
+                  if (recheckData.status === 'Confirmed') {
+                    const finalBookingNum = recheckData.bookingNumber;
+                    const servicesSummary = (recheckData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+
+                    setBookingDetailsForDisplay({ 
+                        ...recheckData, 
+                        id: urlBookingId, 
+                        bookingNumber: finalBookingNum,
+                        servicesSummary, 
+                        createdAt: (() => {
+                            const millis = getTimestampMillis(recheckData.createdAt);
+                            if (!millis) return 'N/A';
+                            const d = new Date(millis);
+                            return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
+                        })(),
+                        scheduledDateDisplay: formatDateForDisplay(recheckData.scheduledDate, appConfig),
+                        latitude: recheckData.latitude === undefined ? null : recheckData.latitude, 
+                        longitude: recheckData.longitude === undefined ? null : recheckData.longitude, 
+                        visitingChargeDisplayed: recheckData.visitingCharge || 0, 
+                        discountCode: recheckData.discountCode || null, 
+                        discountAmount: recheckData.discountAmount || 0, 
+                        paymentMethod: 'Online',
+                        status: 'Confirmed',
+                    });
+                    toast({ title: "Booking Confirmed!", description: "Your payment was verified successfully." });
+                    await clearLocalStorageItems(currentUser?.uid);
+                    setIsLoadingPage(false);
+                    return;
+                  }
+                }
+
+                toast({ title: "Verification Details Pending", description: "Payment is being finalized. You can check your booking status in My Bookings.", variant: "default" });
+                router.push('/my-bookings');
+                setIsLoadingPage(false);
+                return;
+            }
+
+            // 3. Authoritatively verify signature and gateway capture status
             const verificationResponse = await fetch('/api/razorpay/verify-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -435,11 +534,10 @@ export default function ThankYouPage() {
             }
             toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
 
-            const bookingRef = doc(db, 'bookings', urlBookingId);
-            const bookingSnap = await getDoc(bookingRef);
+            const updatedBookingSnap = await getDoc(bookingRef);
 
-            if (bookingSnap.exists() || verificationResult.booking) {
-                const bookingData = (verificationResult.booking || (bookingSnap.exists() ? bookingSnap.data() : {})) as FirestoreBooking;
+            if (updatedBookingSnap.exists() || verificationResult.booking) {
+                const bookingData = (verificationResult.booking || (updatedBookingSnap.exists() ? updatedBookingSnap.data() : {})) as FirestoreBooking;
                 const finalBookingNum = bookingData.bookingNumber;
                 const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
 

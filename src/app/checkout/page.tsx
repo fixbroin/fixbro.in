@@ -23,6 +23,8 @@ import PaymentMethods from '@/components/checkout/payment/PaymentMethods';
 import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { formatDateInTimezone } from '@/lib/utils';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from '@/lib/mysqlDb';
 
 interface AppliedPromoCodeInfo {
   id: string;
@@ -75,6 +77,22 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setIsMounted(true);
+
+    // If an online booking was already confirmed in the background by Razorpay/Stripe webhook, redirect immediately
+    if (typeof window !== 'undefined') {
+      const existingPendingId = localStorage.getItem('pendingBookingDocId');
+      if (existingPendingId) {
+        getDoc(doc(db, 'bookings', existingPendingId)).then((snap) => {
+          if (snap.exists()) {
+            const bData = snap.data();
+            if (bData?.status === 'Confirmed') {
+              router.push(`/checkout/thank-you?payment_method=razorpay&bookingId=${existingPendingId}`);
+            }
+          }
+        }).catch(() => {});
+      }
+    }
+
     // Load from localStorage
     const savedDateStr = localStorage.getItem('fixbroScheduledDate');
     const savedSlot = localStorage.getItem('fixbroScheduledTimeSlot');

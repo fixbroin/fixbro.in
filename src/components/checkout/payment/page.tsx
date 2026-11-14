@@ -617,6 +617,25 @@ export default function PaymentPage() {
         }
       }
 
+      let pendingDocRefId: string | null = null;
+      if (!isCancellationFeeMode) {
+        const { docRef } = await createPendingBooking();
+        pendingDocRefId = docRef.id;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pendingBookingDocId', docRef.id);
+          localStorage.setItem('fixbroPaymentMethod', 'Online');
+          localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
+          if (appliedPromoCode) {
+            localStorage.setItem('fixbroBookingDiscountCode', appliedPromoCode.code);
+            localStorage.setItem('fixbroBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
+            localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromoCode.id);
+          }
+          if (calculatedPlatformFees.length > 0) {
+            localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
+          }
+        }
+      }
+
       const customerAddressDataString = localStorage.getItem('fixbroCustomerAddress');
       if (customerAddressDataString) { 
         try { 
@@ -651,12 +670,22 @@ export default function PaymentPage() {
                 amount: cancellationFeeDetails.feeAmount.toString()
               } : {
                 type: 'booking',
+                bookingId: pendingDocRefId || undefined,
                 amount: totalAmountDue.toString()
               }
           }),
       });
 
       if (!orderCreationResponse.ok) {
+        if (pendingDocRefId) {
+          try {
+            await fetch('/api/bookings/cancel-pending-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingId: pendingDocRefId }),
+            });
+          } catch (e) {}
+        }
         const errorResult = await orderCreationResponse.json();
         throw new Error(errorResult.error || 'Failed to create Razorpay order.');
       }
@@ -677,7 +706,11 @@ export default function PaymentPage() {
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
-          localStorage.removeItem('pendingBookingDocId');
+          if (pendingDocRefId) {
+            localStorage.setItem('pendingBookingDocId', pendingDocRefId);
+          } else {
+            localStorage.removeItem('pendingBookingDocId');
+          }
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
@@ -695,14 +728,14 @@ export default function PaymentPage() {
               localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromoCode.id);
             }
             if (calculatedPlatformFees.length > 0) localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('fixbroAppliedPlatformFees');
-            router.push(`/checkout/thank-you?payment_method=razorpay`);
+            router.push(pendingDocRefId ? `/checkout/thank-you?payment_method=razorpay&bookingId=${pendingDocRefId}` : `/checkout/thank-you?payment_method=razorpay`);
           }
         },
         prefill: { name: customerNameForPrefill, email: customerEmailForPrefill, contact: customerContactForPrefill },
         notes: { 
           address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Fixbro"} Service Booking`, 
           ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), 
-          ...(!isCancellationFeeMode && {type: 'booking', cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) 
+          ...(!isCancellationFeeMode && {type: 'booking', bookingId: pendingDocRefId || undefined, cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) 
         },
         theme: { color: "#45A0A2" },
         modal: { 

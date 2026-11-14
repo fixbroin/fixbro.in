@@ -485,9 +485,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       };
       const currencyDecimals = getCurrencySubunitDecimals(code);
 
-      let customerName = "Guest User", customerEmail = "", customerPhone = "N/A";
-      let currentCategoryId: string | null = null;
-
+      // Clean up previous abandoned pending booking if exists
       if (typeof window !== 'undefined') {
         const oldPendingId = localStorage.getItem('pendingBookingDocId');
         if (oldPendingId) {
@@ -498,21 +496,23 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
             body: JSON.stringify({ bookingId: oldPendingId }),
           }).catch(() => {});
         }
+      }
 
-        const storedEmail = localStorage.getItem('fixbroCustomerEmail');
-        customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (auth.currentUser?.email || "");
-        currentCategoryId = localStorage.getItem('fixbroActiveCheckoutCategory');
-        const addressDataString = localStorage.getItem('fixbroCustomerAddress');
-        if (addressDataString) {
-          try {
-            const addressData = JSON.parse(addressDataString);
-            customerName = addressData.fullName || auth.currentUser?.displayName || customerName;
-            customerPhone = addressData.phone || (auth.currentUser as any)?.phoneNumber || customerPhone;
-            customerEmail = addressData.email || customerEmail;
-          } catch (e) {}
-        } else if (auth.currentUser) {
-          customerName = auth.currentUser.displayName || customerName;
-          customerPhone = (auth.currentUser as any)?.phoneNumber || customerPhone;
+      // Pre-create authoritative Pending Payment booking record in the database
+      const { docRef, customerName: createdCustomerName, customerEmail: createdCustomerEmail, customerPhone: createdCustomerPhone } = await createPendingBookingRecord();
+      const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('fixbroActiveCheckoutCategory') : null;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pendingBookingDocId', docRef.id);
+        localStorage.setItem('fixbroPaymentMethod', 'Online');
+        localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
+        if (appliedPromo) {
+          localStorage.setItem('fixbroBookingDiscountCode', appliedPromo.code);
+          localStorage.setItem('fixbroBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
+          localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromo.id);
+        }
+        if (calculatedPlatformFees.length > 0) {
+          localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
         }
       }
 
@@ -527,12 +527,20 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
               categoryId: currentCategoryId || undefined,
               notes: {
                 type: 'booking',
+                bookingId: docRef.id,
                 amount: totalAmountDue.toString()
               }
           }),
       });
 
       if (!res.ok) {
+        try {
+          await fetch('/api/bookings/cancel-pending-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: docRef.id }),
+          });
+        } catch (e) {}
         const errorResult = await res.json();
         throw new Error(errorResult.error || 'Failed to create Razorpay order.');
       }
@@ -552,22 +560,23 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('fixbroPaymentMethod', 'Online');
           localStorage.setItem('fixbroFinalBookingTotal', totalAmountDue.toString());
-          localStorage.removeItem('pendingBookingDocId');
+          localStorage.setItem('pendingBookingDocId', docRef.id);
           if (appliedPromo) {
             localStorage.setItem('fixbroBookingDiscountCode', appliedPromo.code);
             localStorage.setItem('fixbroBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
             localStorage.setItem('fixbroAppliedPromoCodeId', appliedPromo.id);
           }
           if (calculatedPlatformFees.length > 0) localStorage.setItem('fixbroAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
-          router.push(`/checkout/thank-you?payment_method=razorpay`);
+          router.push(`/checkout/thank-you?payment_method=razorpay&bookingId=${docRef.id}`);
         },
         prefill: {
-          name: customerName,
-          email: customerEmail,
-          contact: customerPhone !== 'N/A' ? customerPhone : undefined
+          name: createdCustomerName,
+          email: createdCustomerEmail,
+          contact: createdCustomerPhone !== 'N/A' ? createdCustomerPhone : undefined
         },
         notes: {
-          type: 'booking'
+          type: 'booking',
+          bookingId: docRef.id,
         },
         theme: { color: "#45A0A2" },
         modal: { 

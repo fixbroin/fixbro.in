@@ -188,6 +188,17 @@ export async function POST(req: NextRequest) {
     if (!order) {
       return NextResponse.json({ success: false, error: 'Failed to create order with Razorpay.' }, { status: 500 });
     }
+
+    if (bookingId && type === 'booking') {
+      try {
+        await adminDb.collection('bookings').doc(bookingId).update({
+          razorpayOrderId: order.id,
+          updatedAt: new Date(),
+        });
+      } catch (syncErr) {
+        console.warn("Could not attach razorpayOrderId to pending booking:", syncErr);
+      }
+    }
     
     return NextResponse.json({ success: true, ...order });
 
