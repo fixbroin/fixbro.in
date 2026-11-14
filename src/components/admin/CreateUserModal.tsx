@@ -174,8 +174,8 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }: Crea
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden">
-        <DialogHeader className="p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b">
+      <DialogContent className="w-[calc(100%-24px)] sm:w-full sm:max-w-lg max-h-[85vh] sm:max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl shadow-2xl">
+        <DialogHeader className="p-4 sm:p-6 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
               <UserPlus className="h-5 w-5" />
@@ -194,7 +194,7 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }: Crea
         </DialogHeader>
 
         {createdUser ? (
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
             <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
               <CheckCircle2 className="h-12 w-12 text-emerald-600 mb-2 animate-in zoom-in" />
               <h3 className="font-bold text-lg text-foreground">{createdUser.name}</h3>
@@ -241,8 +241,8 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }: Crea
             </DialogFooter>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0 [scrollbar-width:thin]">
               {/* Full Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="cust-name" className="text-xs font-semibold flex items-center gap-1.5">
@@ -371,7 +371,7 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }: Crea
               </div>
             </div>
 
-            <DialogFooter className="p-4 bg-muted/20 border-t flex items-center justify-between">
+            <DialogFooter className="p-3 sm:p-4 bg-muted/20 border-t shrink-0 flex items-center justify-between">
               <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting}>
                 Cancel
               </Button>

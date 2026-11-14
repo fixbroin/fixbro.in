@@ -543,31 +543,36 @@ export default function AdminUsersPage() {
           <h1 className="text-4xl font-black tracking-tight">User Directory <span className="text-primary/40 ml-2">({filteredUsers.length || stats.activeUsers})</span></h1>
           <p className="text-muted-foreground text-sm font-medium">Manage and audit your registered user ecosystem.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+            {/* Line 1 on mobile: Full width Add User button */}
             <Button 
-                className="h-10 px-4 rounded-xl bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest shadow-md hover:bg-primary/90 transition-all duration-300 flex items-center gap-1.5"
+                className="w-full sm:w-auto h-11 sm:h-10 px-5 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs sm:text-[10px] tracking-wider sm:tracking-widest shadow-md hover:bg-primary/90 transition-all duration-300 flex items-center justify-center gap-2 shrink-0"
                 onClick={() => setIsCreateUserModalOpen(true)}
             >
-                <UserPlus className="h-3.5 w-3.5" />
-                Add User
+                <UserPlus className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <span>Add User</span>
             </Button>
-            <Button 
-                variant="outline" 
-                className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
-                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            >
-                {sortOrder === 'desc' ? <ChevronDown className="mr-2 h-3 w-3" /> : <UserPlus className="mr-2 h-3 w-3 rotate-180" />}
-                {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
-            </Button>
-            <Button 
-                variant="outline" 
-                className="h-10 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest hover:bg-primary hover:text-white transition-all duration-300"
-                onClick={handleSyncIDs}
-                disabled={isSyncing}
-            >
-                {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-2 h-3 w-3" />}
-                Sync Member IDs
-            </Button>
+
+            {/* Line 2 on mobile: 2 equal buttons side-by-side */}
+            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:w-auto">
+              <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto h-10 px-3 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-wider sm:tracking-widest hover:bg-primary hover:text-white transition-all duration-300 flex items-center justify-center gap-1.5"
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+              >
+                  {sortOrder === 'desc' ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5 rotate-180" />}
+                  <span>{sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}</span>
+              </Button>
+              <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto h-10 px-3 rounded-xl border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-wider sm:tracking-widest hover:bg-primary hover:text-white transition-all duration-300 flex items-center justify-center gap-1.5"
+                  onClick={handleSyncIDs}
+                  disabled={isSyncing}
+              >
+                  {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                  <span className="truncate">Sync Member IDs</span>
+              </Button>
+            </div>
         </div>
       </header>
 

@@ -202,6 +202,138 @@ export default function ActiveUsersTab({
     }
   };
 
+  const renderMobileActiveUserCard = (
+    u: FirestoreUser & { isReturning: boolean; lastActiveMillis: number; createdMillis: number },
+    idx: number
+  ) => {
+    const cleanPhone = (u.mobileNumber || '').replace(/[^0-9]/g, '');
+    const regDateStr = u.createdMillis 
+      ? formatDateInTimezone(new Date(u.createdMillis), timezone) 
+      : 'N/A';
+    const lastActiveDateStr = u.lastActiveMillis 
+      ? `${formatDateInTimezone(new Date(u.lastActiveMillis), timezone)} at ${formatTimeInTimezone(new Date(u.lastActiveMillis), timezone)}` 
+      : 'N/A';
+    const relativeTimeStr = formatRelativeTime(u.lastActiveMillis);
+
+    return (
+      <motion.div
+        key={u.id}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: idx < 12 ? idx * 0.04 : 0 }}
+        className="p-4 sm:p-5 bg-card hover:bg-muted/20 transition-colors space-y-3.5"
+      >
+        {/* Top Header Row: Avatar, Name, Member # & Badge */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar className="h-11 w-11 rounded-xl border border-border/60 shadow-2xs shrink-0">
+              <AvatarImage src={u.photoURL || undefined} alt={u.displayName || 'User'} />
+              <AvatarFallback className="rounded-xl bg-primary/10 text-primary font-black text-xs">
+                {(u.displayName || u.email || 'U').charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold text-sm text-foreground truncate max-w-[170px]">
+                  {u.displayName || 'Anonymous User'}
+                </span>
+                <span className="text-[10px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded-md">
+                  #{u.userNumber || '...'}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate max-w-[190px]">
+                {u.email || 'No email provided'}
+              </p>
+            </div>
+          </div>
+
+          {/* Category Badge */}
+          <div className="shrink-0">
+            {u.isReturning ? (
+              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 font-bold text-[9px] uppercase tracking-wider py-1 px-2 flex items-center gap-1 shadow-2xs">
+                <Repeat className="h-2.5 w-2.5" />
+                Returning
+              </Badge>
+            ) : (
+              <Badge className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25 font-bold text-[9px] uppercase tracking-wider py-1 px-2 flex items-center gap-1 shadow-2xs">
+                <Sparkles className="h-2.5 w-2.5" />
+                New User
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Info Box: Phone, Last Active, Registered Date */}
+        <div className="p-3 rounded-xl bg-muted/30 border border-border/40 space-y-2 text-xs">
+          {/* Last Seen / Active Status */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+              Last Seen:
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="text-[9px] font-bold text-primary border-primary/30 bg-primary/5 py-0 px-1.5">
+                {relativeTimeStr}
+              </Badge>
+              <span className="text-[11px] font-medium text-foreground">
+                {lastActiveDateStr}
+              </span>
+            </div>
+          </div>
+
+          {/* Account Created Date */}
+          <div className="flex items-center justify-between gap-2 border-t border-border/30 pt-1.5">
+            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground/80 shrink-0" />
+              Joined Fixbro:
+            </span>
+            <span className="text-[11px] font-medium text-foreground">
+              {regDateStr}
+            </span>
+          </div>
+
+          {/* Contact Mobile Number */}
+          {u.mobileNumber && (
+            <div className="flex items-center justify-between gap-2 border-t border-border/30 pt-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground/80 shrink-0" />
+                Phone:
+              </span>
+              <a href={`tel:${u.mobileNumber}`} className="text-[11px] font-mono text-primary hover:underline font-bold">
+                {u.mobileNumber}
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Actions Row */}
+        <div className="flex items-center gap-2 pt-1">
+          {cleanPhone && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openWhatsAppChooser(cleanPhone, `Hello ${u.displayName || ''}, thank you for choosing Fixbro!`)}
+              className="h-9 px-3 rounded-xl bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border-emerald-500/20 font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5"
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span>WhatsApp</span>
+            </Button>
+          )}
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onViewUserDetails(u)}
+            className="flex-1 h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            <span>View Details</span>
+          </Button>
+        </div>
+      </motion.div>
+    );
+  };
+
   const handleExportCSV = () => {
     if (displayedUsers.length === 0) return;
 
@@ -289,40 +421,44 @@ export default function ActiveUsersTab({
             </div>
           </div>
 
-          {/* Date Filter Buttons */}
-          <div className="mt-5 flex flex-wrap items-center gap-2 pt-2">
-            <span className="text-xs font-bold text-muted-foreground mr-1 flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" /> Filter Period:
-            </span>
-            {(
-              [
-                { id: 'last_3_days', label: 'Last 3 Days' },
-                { id: 'last_7_days', label: 'Last 7 Days' },
-                { id: 'last_15_days', label: 'Last 15 Days' },
-                { id: 'last_30_days', label: 'Last 30 Days' },
-                { id: 'this_month', label: 'This Month' },
-                { id: 'last_month', label: 'Last Month' },
-                { id: 'custom', label: 'Custom Range' },
-              ] as const
-            ).map((preset) => {
-              const isSelected = dateFilter === preset.id;
-              return (
-                <Button
-                  key={preset.id}
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateFilter(preset.id)}
-                  className={cn(
-                    "h-8 px-3 rounded-lg text-xs font-bold transition-all shadow-2xs",
-                    isSelected
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "border-border/70 hover:border-primary/40 hover:bg-muted/50"
-                  )}
-                >
-                  {preset.label}
-                </Button>
-              );
-            })}
+          {/* Date Filter Buttons (Horizontally scrollable on mobile) */}
+          <div className="mt-5 pt-2">
+            <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center gap-2 w-max">
+                <span className="text-xs font-bold text-muted-foreground mr-1 flex items-center gap-1 shrink-0">
+                  <Calendar className="h-3.5 w-3.5" /> Filter Period:
+                </span>
+                {(
+                  [
+                    { id: 'last_3_days', label: 'Last 3 Days' },
+                    { id: 'last_7_days', label: 'Last 7 Days' },
+                    { id: 'last_15_days', label: 'Last 15 Days' },
+                    { id: 'last_30_days', label: 'Last 30 Days' },
+                    { id: 'this_month', label: 'This Month' },
+                    { id: 'last_month', label: 'Last Month' },
+                    { id: 'custom', label: 'Custom Range' },
+                  ] as const
+                ).map((preset) => {
+                  const isSelected = dateFilter === preset.id;
+                  return (
+                    <Button
+                      key={preset.id}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setDateFilter(preset.id)}
+                      className={cn(
+                        "h-8 px-3 rounded-lg text-xs font-bold transition-all shadow-2xs whitespace-nowrap shrink-0",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
+                          : "border-border/70 hover:border-primary/40 hover:bg-muted/50"
+                      )}
+                    >
+                      {preset.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Custom Date Picker Inputs */}
@@ -429,46 +565,48 @@ export default function ActiveUsersTab({
       <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
         <CardHeader className="p-6 md:p-8 pb-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            {/* Sub-filter tabs (All / Returning / New) */}
-            <div className="flex items-center gap-2 p-1 bg-muted/60 rounded-xl border border-border/40">
-              <button
-                type="button"
-                onClick={() => setUserTypeFilter('all')}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all",
-                  userTypeFilter === 'all'
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                All Active ({allActiveUsers.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserTypeFilter('returning')}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
-                  userTypeFilter === 'returning'
-                    ? "bg-emerald-500 text-white shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Repeat className="h-3 w-3" />
-                Returning Users ({returningActiveUsers.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setUserTypeFilter('new')}
-                className={cn(
-                  "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5",
-                  userTypeFilter === 'new'
-                    ? "bg-indigo-500 text-white shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Sparkles className="h-3 w-3" />
-                New Users ({newActiveUsers.length})
-              </button>
+            {/* Sub-filter tabs (All / Returning / New) with smooth horizontal scroll */}
+            <div className="w-full md:w-auto overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center gap-1.5 sm:gap-2 p-1 bg-muted/60 rounded-xl border border-border/40 w-max">
+                <button
+                  type="button"
+                  onClick={() => setUserTypeFilter('all')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap",
+                    userTypeFilter === 'all'
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  All Active ({allActiveUsers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserTypeFilter('returning')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap",
+                    userTypeFilter === 'returning'
+                      ? "bg-emerald-500 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Repeat className="h-3.5 w-3.5" />
+                  <span>Returning Users ({returningActiveUsers.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserTypeFilter('new')}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap",
+                    userTypeFilter === 'new'
+                      ? "bg-indigo-500 text-white shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>New Users ({newActiveUsers.length})</span>
+                </button>
+              </div>
             </div>
 
             {/* In-table Search */}
@@ -522,8 +660,10 @@ export default function ActiveUsersTab({
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              {/* Desktop View: Full Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow className="hover:bg-transparent border-b border-border/40">
                     <TableHead className="w-16 font-black text-[10px] uppercase tracking-widest text-muted-foreground py-4 pl-6">ID</TableHead>
@@ -649,7 +789,15 @@ export default function ActiveUsersTab({
                 </TableBody>
               </Table>
             </div>
-          )}
+
+            {/* Mobile View: High-Quality Cards */}
+            <div className="md:hidden divide-y divide-border/30">
+              <AnimatePresence initial={false}>
+                {displayedUsers.map((u, idx) => renderMobileActiveUserCard(u, idx))}
+              </AnimatePresence>
+            </div>
+          </>
+        )}
         </CardContent>
       </Card>
     </div>
