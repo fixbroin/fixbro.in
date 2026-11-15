@@ -215,7 +215,7 @@ export const getHomepageData = cache(async (): Promise<HomepageData> => {
             }
         },
         ['homepage-data'],
-        { revalidate: 1,
+        { revalidate: 300,
  tags: ['global', 'cities', 'categories', 'services', 'global-cache'] }
     )();
 });

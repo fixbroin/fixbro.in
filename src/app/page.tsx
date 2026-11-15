@@ -8,7 +8,7 @@ import { getHomepageData, getAggregateRating } from '@/lib/homepageUtils';
 import { getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 300; // 5-minute smart ISR caching with on-demand tag revalidation
 
 export async function generateMetadata(
   _: {}, 

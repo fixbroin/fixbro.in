@@ -110,6 +110,8 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, './'),
+  compress: true,
+  poweredByHeader: false,
   serverExternalPackages: [
     'genkit',
     '@genkit-ai/core',
@@ -120,10 +122,10 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: false,
     formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 2592000, // 30 days image cache (saves VPS CPU)
     remotePatterns: [
       { protocol: 'https', hostname: 'fixbro.in' },
-      { protocol: 'https', hostname: 'fixbro.in' },
-      { protocol: 'https', hostname: '*.fixbro.in' }, // ADD THIS
+      { protocol: 'https', hostname: '*.fixbro.in' },
       { protocol: 'https', hostname: 'ad.fixbro.in' },
       { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
       { protocol: 'https', hostname: 'maps.googleapis.com' },
@@ -132,11 +134,29 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.googleusercontent.com' },
     ],
   },
-
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
   typescript: { ignoreBuildErrors: true },
   experimental: {
     workerThreads: false,
-    cpus: 4
+    cpus: 4,
+    optimizePackageImports: [
+      'lucide-react',
+      'date-fns',
+      'recharts',
+      'framer-motion',
+    ],
   }
 };
 

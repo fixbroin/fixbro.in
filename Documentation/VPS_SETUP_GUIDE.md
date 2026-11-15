@@ -188,11 +188,19 @@ Next.js standalone server handles execution under a customized node configuratio
 
 * **If you built the app directly on the server (Option A or B):**
 ```bash
+# Single-instance:
 pm2 start .next/standalone/server.js --name "your-app-name"
+
+# Or Cluster mode (utilizes all CPU cores for high traffic):
+pm2 start .next/standalone/server.js -i max --name "your-app-name"
 ```
 * **If you uploaded the local standalone build (Option C):**
 ```bash
+# Single-instance:
 pm2 start server.js --name "your-app-name"
+
+# Or Cluster mode (utilizes all CPU cores for high traffic):
+pm2 start server.js -i max --name "your-app-name"
 ```
 
 Save the process list so that it auto-starts when the VPS reboots:
@@ -294,6 +302,13 @@ server {
     add_header Content-Security-Policy "frame-ancestors 'self'" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Gzip Compression (Accelerates web & API responses by up to 70%)
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
 
     # Static files cache (Optimizes browser asset loading speed)
     location ~* \.(jpg|jpeg|png|gif|webp|svg|ico|css|js|woff|woff2|ttf)$ {
