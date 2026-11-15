@@ -299,21 +299,21 @@ export default function CustomServiceAdminPage() {
         </Button>
         {req.status !== 'reviewed' && (
           <PermissionGuard moduleId="custom_service" action="write">
-            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'reviewed')} disabled={isUpdating === req.id} className="h-8 text-xs text-blue-600 border-blue-200 hover:bg-blue-50">
+            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'reviewed')} disabled={isUpdating === req.id} className="h-8 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300">
               <Check className="h-3.5 w-3.5 mr-1" /> Reviewed
             </Button>
           </PermissionGuard>
         )}
         {req.status !== 'contacted' && (
           <PermissionGuard moduleId="custom_service" action="write">
-            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'contacted')} disabled={isUpdating === req.id} className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50">
+            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'contacted')} disabled={isUpdating === req.id} className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300">
               <Phone className="h-3.5 w-3.5 mr-1" /> Contacted
             </Button>
           </PermissionGuard>
         )}
         {req.status !== 'closed' && (
           <PermissionGuard moduleId="custom_service" action="write">
-            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'closed')} disabled={isUpdating === req.id} className="h-8 text-xs text-gray-600 border-gray-200 hover:bg-gray-50">
+            <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'closed')} disabled={isUpdating === req.id} className="h-8 text-xs text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-400">
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Close
             </Button>
           </PermissionGuard>
@@ -412,17 +412,17 @@ export default function CustomServiceAdminPage() {
                               <Separator orientation="vertical" className="h-6 mx-1" />
 
                               {req.status !== 'reviewed' && hasActionPermission(adminPermissions, 'custom_service', 'write') && (
-                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'reviewed')} disabled={isUpdating === req.id} className="h-8 text-xs text-blue-600 border-blue-200 hover:bg-blue-50">
+                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'reviewed')} disabled={isUpdating === req.id} className="h-8 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300">
                                   <Check className="h-3.5 w-3.5 mr-1.5" /> Mark as Reviewed
                                 </Button>
                               )}
                               {req.status !== 'contacted' && hasActionPermission(adminPermissions, 'custom_service', 'write') && (
-                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'contacted')} disabled={isUpdating === req.id} className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50">
+                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'contacted')} disabled={isUpdating === req.id} className="h-8 text-xs text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 hover:border-green-300">
                                   <Phone className="h-3.5 w-3.5 mr-1.5" /> Mark as Contacted
                                 </Button>
                               )}
                               {req.status !== 'closed' && hasActionPermission(adminPermissions, 'custom_service', 'write') && (
-                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'closed')} disabled={isUpdating === req.id} className="h-8 text-xs text-gray-600 border-gray-200 hover:bg-gray-50">
+                                <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req.id!, 'closed')} disabled={isUpdating === req.id} className="h-8 text-xs text-gray-700 border-gray-300 hover:bg-gray-100 hover:text-gray-900 hover:border-gray-400">
                                   <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Closed
                                 </Button>
                               )}

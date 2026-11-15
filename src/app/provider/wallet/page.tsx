@@ -1034,7 +1034,7 @@ export default function ProviderWalletPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <Button 
-              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-900 rounded-xl h-auto w-full"
               variant="outline"
               onClick={async () => {
                 setIsGatewayDialogOpen(false);
@@ -1049,7 +1049,7 @@ export default function ProviderWalletPage() {
             </Button>
 
             <Button 
-              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-900 rounded-xl h-auto w-full"
               variant="outline"
               onClick={async () => {
                 setIsGatewayDialogOpen(false);

@@ -223,7 +223,7 @@ export default function WalletComplaintsTab() {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="h-8 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 flex items-center gap-1 font-bold text-xs"
+                              className="h-8 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 hover:text-green-800 flex items-center gap-1 font-bold text-xs"
                               onClick={() => openResolution(comp, 'approve')}
                             >
                               <Check className="h-3.5 w-3.5" /> Approve Refund
@@ -231,7 +231,7 @@ export default function WalletComplaintsTab() {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              className="h-8 border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 flex items-center gap-1 font-bold text-xs"
+                              className="h-8 border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-800 flex items-center gap-1 font-bold text-xs"
                               onClick={() => openResolution(comp, 'reject')}
                             >
                               <X className="h-3.5 w-3.5" /> Close Dispute

@@ -70,7 +70,7 @@ const KycDocDisplay: React.FC<{
               <Button 
                   size="sm" 
                   variant="outline" 
-                  className="h-7 text-[10px] border-green-500 text-green-600 hover:bg-green-50"
+                  className="h-7 text-[10px] border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 hover:border-green-600"
                   onClick={(e) => { e.stopPropagation(); onVerify(); }}
                   disabled={isVerifying}
               >
@@ -139,7 +139,7 @@ const BankDetailsDisplay: React.FC<{
             <Button 
                 size="sm" 
                 variant="outline" 
-                className="h-7 text-[10px] border-green-500 text-green-600 hover:bg-green-50"
+                className="h-7 text-[10px] border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 hover:border-green-600"
                 onClick={onVerify}
                 disabled={isVerifying}
             >

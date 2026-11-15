@@ -418,7 +418,7 @@ export default function RecommendedServicesSection({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 rounded-full border-border/80 shadow-sm hover:bg-muted"
+                className="h-8 w-8 rounded-full border-border/80 shadow-sm hover:bg-muted hover:text-foreground"
                 onClick={scrollLeft}
                 aria-label="Scroll left"
               >
@@ -427,7 +427,7 @@ export default function RecommendedServicesSection({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 rounded-full border-border/80 shadow-sm hover:bg-muted"
+                className="h-8 w-8 rounded-full border-border/80 shadow-sm hover:bg-muted hover:text-foreground"
                 onClick={scrollRight}
                 aria-label="Scroll right"
               >

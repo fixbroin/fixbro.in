@@ -63,7 +63,7 @@ export default function NewJobProviderPopup({
           <Button 
             variant="outline" 
             onClick={handleClosePopup} 
-            className="px-6 py-2 border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
+            className="px-6 py-2 border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:text-slate-900 hover:border-slate-400 rounded-xl font-medium transition-colors"
           >
             Close
           </Button>

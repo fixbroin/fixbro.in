@@ -403,7 +403,7 @@ export default function ActiveUsersTab({
                 size="sm"
                 onClick={handleManualRefresh}
                 disabled={isLoading || isRefreshing}
-                className="h-10 px-3.5 rounded-xl border border-border/80 font-bold text-xs flex items-center gap-2 hover:bg-muted"
+                className="h-10 px-3.5 rounded-xl border border-border/80 font-bold text-xs flex items-center gap-2 hover:bg-muted hover:text-foreground"
               >
                 <RefreshCw className={cn("h-3.5 w-3.5", (isLoading || isRefreshing) && "animate-spin text-primary")} />
                 <span>Refresh Data</span>

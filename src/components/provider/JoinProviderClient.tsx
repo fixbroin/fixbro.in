@@ -120,7 +120,7 @@ export default function JoinProviderClient({
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  className="w-full sm:w-auto h-12 px-6 text-base font-semibold rounded-xl border-border/80 hover:bg-muted transition-all"
+                  className="w-full sm:w-auto h-12 px-6 text-base font-semibold rounded-xl border-border/80 hover:bg-muted hover:text-foreground transition-all"
                 >
                   {settings.heroSecondaryCtaText}
                 </Button>
