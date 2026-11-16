@@ -273,18 +273,60 @@ export const syncNativeFcmToken = (userId: string) => {
 
 /**
  * Requests the native Flutter app to handle a file or PDF invoice download.
+ * Falls back safely to standard browser download via Blob URL if no Flutter bridge is active.
  */
 export const requestFileDownload = (url: string, fileName?: string) => {
-  if (isWebView()) {
+  const hasFlutterBridge = typeof window !== 'undefined' && Boolean(
+    ((window as any).FlutterBridge && typeof (window as any).FlutterBridge.postMessage === 'function') ||
+    ((window as any).flutter_inappwebview && typeof (window as any).flutter_inappwebview.callHandler === 'function')
+  );
+
+  if (hasFlutterBridge) {
     postToFlutter({ action: 'downloadFile', url, fileName });
-  } else {
-    // Standard web download
+    return;
+  }
+
+  // Standard web download fallback using Blob URL for cross-browser safety
+  try {
+    let downloadUrl = url;
+    let objectUrl: string | null = null;
+
+    if (url.startsWith('data:')) {
+      const parts = url.split(',');
+      if (parts.length >= 2) {
+        const base64Data = parts[1].replace(/[\r\n\s]/g, '');
+        const byteString = atob(base64Data);
+        const mimeString = (parts[0].split(':')[1] || 'application/pdf').split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeString });
+        objectUrl = URL.createObjectURL(blob);
+        downloadUrl = objectUrl;
+      }
+    }
+
     const link = document.createElement('a');
-    link.href = url;
+    link.href = downloadUrl;
     if (fileName) link.download = fileName;
+    link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+
+    setTimeout(() => {
+      try {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } catch (e) {}
+    }, 2000);
+  } catch (err) {
+    console.error("Error executing web download:", err);
   }
 };
 

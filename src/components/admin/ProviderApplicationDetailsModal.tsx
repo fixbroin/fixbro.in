@@ -456,8 +456,11 @@ export default function ProviderApplicationDetailsModal({
         contactMobile: globalCompanySettings?.contactMobile || '+91-XXXXXXXXXX',
         logoUrl: globalCompanySettings?.logoUrl || undefined,
       };
+      const cleanName = (application.fullName || application.id || 'Provider').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `ProviderApp-${cleanName}.pdf`;
       const pdfDataUri = await generateProviderApplicationPdf(application, companyInfo, appConfig?.customBankFields);
-      triggerPdfDownload(pdfDataUri, `ProviderApp-${application.fullName?.replace(/\s+/g, '_') || application.id}.pdf`);
+      triggerPdfDownload(pdfDataUri, filename);
+      toast({ title: "Downloaded", description: `${filename} downloaded successfully.` });
     } catch (error) {
       console.error("Error generating or downloading provider PDF:", error);
       toast({ title: "PDF Error", description: (error as Error).message || "Could not generate or download PDF.", variant: "destructive" });

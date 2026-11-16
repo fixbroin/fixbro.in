@@ -5,7 +5,7 @@ import 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import type { ProviderApplication, KycDocument, BankDetails, CompanyDetailsForPdf } from '@/types/firestore';
 import { Timestamp } from '@/lib/mysqlDb';
-import { formatDateInTimezone } from './utils';
+import { formatDateInTimezone, getTimestampMillis } from './utils';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -14,22 +14,16 @@ declare module 'jspdf' {
   }
 }
 
-const formatTimestampToReadable = (timestamp?: Timestamp | Date | string): string => {
+const formatTimestampToReadable = (timestamp?: any): string => {
   if (!timestamp) return "N/A";
-  let date: Date;
-  if (timestamp instanceof Timestamp) {
-    date = timestamp.toDate();
-  } else if (timestamp instanceof Date) {
-    date = timestamp;
-  } else {
-    try {
-      date = new Date(timestamp);
-      if (isNaN(date.getTime())) throw new Error("Invalid date string");
-    } catch (e) {
-      return String(timestamp); // Fallback
+  const millis = getTimestampMillis(timestamp);
+  if (!millis) {
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      return formatDateInTimezone(timestamp, 'Asia/Kolkata');
     }
+    return String(timestamp);
   }
-  return formatDateInTimezone(date, 'Asia/Kolkata');
+  return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
 };
 
 // Colors matching Fixbro theme (Teal/Dark Gray)
@@ -85,35 +79,151 @@ const addDetail = (doc: jsPDF, label: string, value: string | string[] | undefin
   return nextY + 3; // Spacing for the next item
 };
 
-async function getImageDataUri(url: string): Promise<{ dataUri: string; format: string } | null> {
-  if (!url) return null;
+interface LoadedImageResult {
+  dataUri: string;
+  width: number;
+  height: number;
+}
 
-  let targetUrl = url;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    if (typeof window !== 'undefined') {
-      targetUrl = window.location.origin + (url.startsWith('/') ? url : '/' + url);
-    }
+/**
+ * Loads an image safely, scales it down to optimal dimensions for PDF generation,
+ * converts it to standard JPEG (solving jsPDF WebP unsupported format crashes),
+ * and enforces a strict safety timeout.
+ */
+async function loadAndPrepareImage(
+  url: string,
+  maxWidth = 1200,
+  maxHeight = 1200,
+  timeoutMs = 6000
+): Promise<LoadedImageResult | null> {
+  if (!url || typeof window === 'undefined') return null;
+
+  let targetUrl = url.trim();
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('data:')) {
+    targetUrl = window.location.origin + (targetUrl.startsWith('/') ? targetUrl : '/' + targetUrl);
   }
 
-  try {
-    const response = await fetch(targetUrl);
-    if (!response.ok) {
-      console.warn(`Failed to fetch image from ${targetUrl}: ${response.statusText}`);
+  const loadWithTimeout = async (): Promise<LoadedImageResult | null> => {
+    // Strategy 1: Load via HTML Image with crossOrigin = 'anonymous' and render to canvas
+    try {
+      const res = await new Promise<LoadedImageResult | null>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = () => {
+          try {
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (!w || !h) {
+              resolve(null);
+              return;
+            }
+
+            // Downscale oversized smartphone photos (e.g., 4000x3000 -> max 1200x1200px)
+            if (w > maxWidth || h > maxHeight) {
+              const ratio = Math.min(maxWidth / w, maxHeight / h);
+              w = Math.max(1, Math.round(w * ratio));
+              h = Math.max(1, Math.round(h * ratio));
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+
+            // White background for transparent PNG/WebP (e.g., signatures)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+
+            // Always export as JPEG so jsPDF never throws "UNKNOWN IMAGE TYPE" (which happens with WebP)
+            const jpegDataUri = canvas.toDataURL('image/jpeg', 0.85);
+            resolve({ dataUri: jpegDataUri, width: w, height: h });
+          } catch {
+            // Canvas tainted by CORS -> try fetch fallback
+            resolve(null);
+          }
+        };
+
+        img.onerror = () => resolve(null);
+        img.src = targetUrl;
+      });
+
+      if (res) return res;
+    } catch {
+      // Proceed to strategy 2
+    }
+
+    // Strategy 2: Fetch as blob -> createObjectURL -> Canvas (bypasses canvas taint for same-origin or CORS-allowed blobs)
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const res = await new Promise<LoadedImageResult | null>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (!w || !h) {
+              resolve(null);
+              return;
+            }
+
+            if (w > maxWidth || h > maxHeight) {
+              const ratio = Math.min(maxWidth / w, maxHeight / h);
+              w = Math.max(1, Math.round(w * ratio));
+              h = Math.max(1, Math.round(h * ratio));
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              resolve(null);
+              return;
+            }
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+
+            const jpegDataUri = canvas.toDataURL('image/jpeg', 0.85);
+            resolve({ dataUri: jpegDataUri, width: w, height: h });
+          } catch {
+            resolve(null);
+          } finally {
+            URL.revokeObjectURL(blobUrl);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        };
+
+        img.src = blobUrl;
+      });
+
+      return res;
+    } catch {
       return null;
     }
-    const blob = await response.blob();
-    const format = blob.type.split('/')[1]?.toUpperCase() || 'JPEG'; // e.g., JPEG, PNG
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve({ dataUri: reader.result as string, format });
-      reader.onerror = (error) => {
-        console.error(`FileReader error for ${url}:`, error);
-        reject(null);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error(`Error fetching or converting image ${url}:`, error);
+  };
+
+  try {
+    return await Promise.race([
+      loadWithTimeout(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs))
+    ]);
+  } catch {
     return null;
   }
 }
@@ -138,17 +248,17 @@ const addImageToPdf = async (
 ): Promise<number> => {
   let newY = currentY;
   if (imageUrl) {
-    newY = checkAndAddPage(doc, newY, imageMaxHeightMm + 10); 
+    newY = checkAndAddPage(doc, newY, 20); 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(label, 14, newY);
     doc.setFont("helvetica", "normal");
     newY += 4;
-    const imageData = await getImageDataUri(imageUrl);
-    if (imageData) {
-      try {
-        const imgProps = doc.getImageProperties(imageData.dataUri);
-        const aspectRatio = imgProps.width / imgProps.height;
+
+    try {
+      const imageData = await loadAndPrepareImage(imageUrl);
+      if (imageData && imageData.width > 0 && imageData.height > 0) {
+        const aspectRatio = imageData.width / imageData.height;
         let pdfImgWidth = imageWidthMm;
         let pdfImgHeight = imageWidthMm / aspectRatio;
 
@@ -156,21 +266,21 @@ const addImageToPdf = async (
           pdfImgHeight = imageMaxHeightMm;
           pdfImgWidth = imageMaxHeightMm * aspectRatio;
         }
-        newY = checkAndAddPage(doc, newY, pdfImgHeight + 2); 
-        doc.addImage(imageData.dataUri, imageData.format, 14, newY, pdfImgWidth, pdfImgHeight);
-        newY += pdfImgHeight + 5; 
-      } catch (e) {
-        console.error(`Error adding image ${label} to PDF:`, e);
+        newY = checkAndAddPage(doc, newY, pdfImgHeight + 4); 
+        doc.addImage(imageData.dataUri, 'JPEG', 14, newY, pdfImgWidth, pdfImgHeight);
+        newY += pdfImgHeight + 6; 
+      } else {
         doc.setFont("helvetica", "oblique");
-        doc.text(`(Image for ${label} could not be loaded)`, 14, newY);
+        doc.text(`(Image for ${label} could not be previewed)`, 14, newY);
         doc.setFont("helvetica", "normal");
-        newY += 5;
+        newY += 6;
       }
-    } else {
+    } catch (e) {
+      console.warn(`Error adding image ${label} to PDF:`, e);
       doc.setFont("helvetica", "oblique");
-      doc.text(`(Image for ${label} not available or failed to load)`, 14, newY);
+      doc.text(`(Image for ${label} could not be loaded)`, 14, newY);
       doc.setFont("helvetica", "normal");
-      newY += 5;
+      newY += 6;
     }
   } else {
     newY = checkAndAddPage(doc, newY, 10);
@@ -225,8 +335,13 @@ export const generateProviderApplicationPdf = async (
   doc.setFont("helvetica", "normal");
   doc.setTextColor(textColor.r, textColor.g, textColor.b);
 
+  const statusStr = (application.status || 'Pending')
+    .toString()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
+
   doc.text(`Application ID: ${application.id || 'N/A'}`, 196, y - 4, { align: "right" });
-  doc.text(`Status: ${application.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`, 196, y + 1, { align: "right" });
+  doc.text(`Status: ${statusStr}`, 196, y + 1, { align: "right" });
   
   // Separation Line under Company Header
   y += 6;
@@ -312,7 +427,12 @@ export const generateProviderApplicationPdf = async (
   if (application.workAreaAddress) {
     y = addDetail(doc, "Work Location / Zone", application.workAreaAddress, y);
   }
-  y = addDetail(doc, "Work Area Center (Lat, Long)", application.workAreaCenter ? `${application.workAreaCenter.latitude.toFixed(6)}, ${application.workAreaCenter.longitude.toFixed(6)}` : "N/A", y);
+  const latVal = application.workAreaCenter?.latitude;
+  const lngVal = application.workAreaCenter?.longitude;
+  const latStr = typeof latVal === 'number' ? latVal.toFixed(6) : (latVal ? String(latVal) : null);
+  const lngStr = typeof lngVal === 'number' ? lngVal.toFixed(6) : (lngVal ? String(lngVal) : null);
+  const centerStr = (latStr && lngStr) ? `${latStr}, ${lngStr}` : "N/A";
+  y = addDetail(doc, "Work Area Center (Lat, Long)", centerStr, y);
   y = addDetail(doc, "Service Radius (Kilometers)", application.workAreaRadiusKm ? `${application.workAreaRadiusKm} km` : "N/A", y);
   y += 4; 
 
