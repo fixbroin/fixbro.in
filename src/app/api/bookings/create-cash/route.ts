@@ -4,7 +4,7 @@ import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
-import { generateBookingId } from '@/lib/bookingUtils';
+import { generateBookingId, generateBookingOtp } from '@/lib/bookingUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
 import { verifyRequest } from '@/lib/dbSecurity';
 import { getPool, getDocsInternal } from '@/lib/mysql';
@@ -200,6 +200,8 @@ export async function POST(req: NextRequest) {
       ...(pricing.discountAmount > 0 && { discountAmount: pricing.discountAmount }),
       paymentMethod: finalPaymentMethod,
       status: finalStatus,
+      startOtp: generateBookingOtp(),
+      completeOtp: generateBookingOtp(),
       ...onlinePaymentFields,
       createdAt: Timestamp.now(),
       isReviewedByCustomer: false,

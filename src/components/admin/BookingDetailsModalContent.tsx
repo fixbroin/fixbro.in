@@ -8,9 +8,10 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban } from 'lucide-react'; 
+import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban, KeyRound, Camera } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
 import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
+import { ensureBookingOtps } from '@/lib/bookingUtils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
@@ -344,6 +345,93 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                 ))}
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* --- OTP & Verification Security Details --- */}
+      <Card className="shadow-sm border-blue-200/80 bg-blue-50/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
+              <KeyRound className="h-4 w-4 text-primary" />
+              Service OTPs & Work Evidence
+            </CardTitle>
+            {appConfig?.requireBookingOtp ? (
+              <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200 font-bold uppercase tracking-tight">
+                OTP Verification Active
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border font-bold uppercase tracking-tight">
+                OTP Feature Disabled
+              </Badge>
+            )}
+          </div>
+          <CardDescription className="text-xs">
+            Customer verification codes and optional evidence photos uploaded by the provider.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Start OTP */}
+            <div className="p-3 bg-background rounded-xl border border-border flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Start Service OTP</p>
+                <p className="text-xs text-muted-foreground">Provided to start work</p>
+              </div>
+              <span className="font-mono text-xl font-black bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200 px-3 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 tracking-widest shadow-inner">
+                {ensureBookingOtps(booking).startOtp}
+              </span>
+            </div>
+
+            {/* Complete OTP */}
+            <div className="p-3 bg-background rounded-xl border border-border flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Complete Service OTP</p>
+                <p className="text-xs text-muted-foreground">Provided to complete work</p>
+              </div>
+              <span className="font-mono text-xl font-black bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 px-3 py-1 rounded-lg border border-blue-200 dark:border-blue-800 tracking-widest shadow-inner">
+                {ensureBookingOtps(booking).completeOtp}
+              </span>
+            </div>
+          </div>
+
+          {/* Before & After Work Photos */}
+          {(booking.startWorkPhotoUrl || booking.completeWorkPhotoUrl) ? (
+            <div className="pt-2 border-t border-border/60">
+              <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                <Camera className="h-3.5 w-3.5 text-primary" />
+                Work Evidence Photos
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {booking.startWorkPhotoUrl && (
+                  <div className="border rounded-xl p-2.5 bg-background shadow-sm space-y-1.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">Before-Work Photo</span>
+                    <a href={booking.startWorkPhotoUrl} target="_blank" rel="noopener noreferrer" className="block relative h-36 w-full rounded-lg overflow-hidden border group hover:opacity-95 transition-opacity">
+                      <AppImage src={booking.startWorkPhotoUrl} alt="Before work photo" fill className="object-cover" />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-semibold gap-1">
+                        <ExternalLink className="h-3.5 w-3.5" /> View Full Image
+                      </div>
+                    </a>
+                  </div>
+                )}
+                {booking.completeWorkPhotoUrl && (
+                  <div className="border rounded-xl p-2.5 bg-background shadow-sm space-y-1.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">After-Work / Completion Photo</span>
+                    <a href={booking.completeWorkPhotoUrl} target="_blank" rel="noopener noreferrer" className="block relative h-36 w-full rounded-lg overflow-hidden border group hover:opacity-95 transition-opacity">
+                      <AppImage src={booking.completeWorkPhotoUrl} alt="Completed work photo" fill className="object-cover" />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-semibold gap-1">
+                        <ExternalLink className="h-3.5 w-3.5" /> View Full Image
+                      </div>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic pt-1">
+              No evidence photos uploaded for this booking yet.
+            </p>
           )}
         </CardContent>
       </Card>

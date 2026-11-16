@@ -14,6 +14,7 @@ import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc } from '@/lib/mysqlDb';
 import type { FirestoreService, AppliedPlatformFeeItem } from '@/types/firestore';
+import { generateBookingOtp } from '@/lib/bookingUtils';
 import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import TaxBreakdownDisplay from '@/components/shared/TaxBreakdownDisplay';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -456,6 +457,8 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       ...(calculatedPlatformFees.length > 0 && { appliedPlatformFees: calculatedPlatformFees }),
       paymentMethod: 'Online',
       status: 'Pending Payment',
+      startOtp: generateBookingOtp(),
+      completeOtp: generateBookingOtp(),
       createdAt: Timestamp.now(),
       isReviewedByCustomer: false,
       workCategoryId: currentCategoryId || undefined,

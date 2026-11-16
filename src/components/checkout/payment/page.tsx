@@ -30,6 +30,7 @@ import { getGuestId } from '@/lib/guestIdManager';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { isWebView } from '@/lib/webview-bridge';
 import { getTimestampMillis } from '@/lib/utils';
+import { generateBookingOtp } from '@/lib/bookingUtils';
 
 
 const generateBookingId = (): string => {
@@ -567,6 +568,8 @@ export default function PaymentPage() {
       ...(calculatedPlatformFees.length > 0 && { appliedPlatformFees: calculatedPlatformFees }),
       paymentMethod: 'Online',
       status: 'Pending Payment',
+      startOtp: generateBookingOtp(),
+      completeOtp: generateBookingOtp(),
       createdAt: Timestamp.now(),
       isReviewedByCustomer: false,
       workCategoryId: currentCategoryId || undefined,

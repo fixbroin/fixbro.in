@@ -247,6 +247,12 @@ export interface FirestoreBooking {
   isProviderNotified?: boolean;
   workCategoryId?: string;
   autoDispatchBypassed?: boolean;
+
+  // Job Start & Completion OTP Verification Fields
+  startOtp?: string; // 4-digit start OTP shared by customer
+  completeOtp?: string; // 4-digit complete/ending OTP shared by customer
+  startWorkPhotoUrl?: string; // Optional evidence photo before starting work
+  completeWorkPhotoUrl?: string; // Optional evidence photo after work completion
 }
 
 export interface Address {
@@ -679,6 +685,7 @@ export interface AppSettings {
   enableDefaultIndianKyc?: boolean; // For toggling Aadhaar and PAN defaults
   maxProviderRadiusKm?: number; // New for provider work area
   autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
+  requireBookingOtp?: boolean; // Toggle for requiring Start & Complete OTP verification for providers
   
   // Login Settings
   enableEmailPasswordLogin?: boolean;

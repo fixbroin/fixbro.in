@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, Calendar, CalendarDays, CheckCircle2, CreditCard, IndianRupee } from "lucide-react"; // Added Phone
+import { ListOrdered, PackageSearch, ArrowLeft, Loader2, Eye, Trash2, Download, Ban, UserCircle, Languages, Phone, AlertTriangle, Clock, Calendar, CalendarDays, CheckCircle2, CreditCard, IndianRupee, KeyRound } from "lucide-react"; // Added Phone
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { ensureBookingOtps } from "@/lib/bookingUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getDoc, addDoc, getDocs, limit } from '@/lib/mysqlDb'; 
@@ -815,6 +816,43 @@ export default function MyBookingsPage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customer OTP Security Display (When Enabled by Admin) */}
+                  {appConfig?.requireBookingOtp && (booking.status === 'AssignedToProvider' || booking.status === 'ProviderAccepted') && (
+                    <div className="col-span-1 md:col-span-2 py-3 px-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-3 flex-wrap">
+                      <div className="space-y-0.5 min-w-[200px]">
+                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <KeyRound className="h-3.5 w-3.5" /> Start Service OTP
+                        </p>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                          Share this OTP with your service professional when they arrive to start the service.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xl font-black bg-white dark:bg-emerald-900 text-emerald-700 dark:text-emerald-200 px-3.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 tracking-widest shadow-sm">
+                          {ensureBookingOtps(booking).startOtp}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {appConfig?.requireBookingOtp && booking.status === 'InProgressByProvider' && (
+                    <div className="col-span-1 md:col-span-2 py-3 px-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between gap-3 flex-wrap">
+                      <div className="space-y-0.5 min-w-[200px]">
+                        <p className="text-xs font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <KeyRound className="h-3.5 w-3.5" /> Complete Service OTP
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                          Share this OTP with your provider only after the job is completed to your satisfaction.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xl font-black bg-white dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-3.5 py-1 rounded-lg border border-blue-300 dark:border-blue-700 tracking-widest shadow-sm">
+                          {ensureBookingOtps(booking).completeOtp}
+                        </span>
                       </div>
                     </div>
                   )}

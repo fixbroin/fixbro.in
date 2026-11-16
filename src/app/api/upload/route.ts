@@ -21,10 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate size (5MB max)
-    const MAX_SIZE = 5 * 1024 * 1024;
+    // Validate size (50MB max)
+    const MAX_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ success: false, error: 'File size exceeds limit of 5MB.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'File size exceeds limit of 50MB.' }, { status: 400 });
     }
 
     // Validate extension

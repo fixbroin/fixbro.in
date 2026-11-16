@@ -17,12 +17,14 @@ import ProviderJobCard from '@/components/provider/ProviderJobCard';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import StartBookingDialog from '@/components/shared/StartBookingDialog';
 import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getBookingScheduledTimestamp } from '@/lib/utils';
 
 export default function ProviderMyJobsPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
+  const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
@@ -35,6 +37,22 @@ export default function ProviderMyJobsPage() {
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+
+  // Start Verification Dialog State
+  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
+  const [bookingToStart, setBookingToStart] = useState<FirestoreBooking | null>(null);
+
+  const handleStartWorkClick = (bookingId: string) => {
+    const job = bookings.find(b => b.id === bookingId);
+    if (!job) return;
+
+    if (appConfig?.requireBookingOtp) {
+      setBookingToStart(job);
+      setIsStartDialogOpen(true);
+    } else {
+      updateBookingStatus(bookingId, 'InProgressByProvider');
+    }
+  };
 
   useEffect(() => {
     if (!providerUser || authIsLoading) return;
@@ -83,7 +101,14 @@ export default function ProviderMyJobsPage() {
     return () => unsubscribe();
   }, [providerUser, authIsLoading, toast, displayLimit]);
 
-  const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
+  const updateBookingStatus = async (
+    bookingId: string, 
+    newStatus: BookingStatus, 
+    additionalCharges?: {name: string, amount: number}[], 
+    finalizedPaymentMethod?: string,
+    otp?: string,
+    photoUrl?: string
+  ) => {
     // SINGLE COMPLETION POPUP
     if (newStatus === 'Completed' && !finalizedPaymentMethod) {
         const job = bookings.find(b => b.id === bookingId);
@@ -109,6 +134,11 @@ export default function ProviderMyJobsPage() {
             updateData.totalAmount = ((job?.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + c.amount, 0));
         }
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
+        if (photoUrl) updateData.completeWorkPhotoUrl = photoUrl;
+      }
+
+      if (newStatus === "InProgressByProvider" && photoUrl) {
+        updateData.startWorkPhotoUrl = photoUrl;
       }
 
       if (!providerUser?.uid) {
@@ -120,7 +150,9 @@ export default function ProviderMyJobsPage() {
         providerUser.uid,
         newStatus,
         additionalCharges,
-        finalizedPaymentMethod
+        finalizedPaymentMethod,
+        otp,
+        photoUrl
       );
 
       if (!result.success) {
@@ -142,6 +174,12 @@ export default function ProviderMyJobsPage() {
         if (finalizedPaymentMethod) {
           updated.paymentMethod = finalizedPaymentMethod;
         }
+        if (newStatus === 'InProgressByProvider' && photoUrl) {
+          updated.startWorkPhotoUrl = photoUrl;
+        }
+        if (newStatus === 'Completed' && photoUrl) {
+          updated.completeWorkPhotoUrl = photoUrl;
+        }
         return updated;
       }));
       
@@ -155,9 +193,11 @@ export default function ProviderMyJobsPage() {
       toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
       setIsCompleteDialogOpen(false);
       setBookingToComplete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating job status:", error);
-      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
+      const msg = error?.message || "Could not update job status.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      throw error;
     } finally {
       setProcessingBookingAction(null);
     }
@@ -267,7 +307,7 @@ export default function ProviderMyJobsPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
               {ongoingJobs.map((job, idx) => (
                 <ProviderJobCard key={job.id} job={job} type="ongoing" queuePosition={idx + 1}
-                  onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
+                  onStartWork={(id) => handleStartWorkClick(id)}
                   onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                   isProcessingAction={processingBookingAction === job.id}
                   providerWalletBalance={providerWalletBalance}
@@ -321,11 +361,29 @@ export default function ProviderMyJobsPage() {
         <CompleteBookingDialog 
           isOpen={isCompleteDialogOpen}
           onClose={() => { setIsCompleteDialogOpen(false); setBookingToComplete(null); }}
-          onConfirm={(charges, pMethod) => updateBookingStatus(bookingToComplete.id!, 'Completed', charges, pMethod)}
+          onConfirm={async (charges, pMethod, otp, photoUrl) => {
+            await updateBookingStatus(bookingToComplete.id!, 'Completed', charges, pMethod, otp, photoUrl);
+            setIsCompleteDialogOpen(false);
+            setBookingToComplete(null);
+          }}
           booking={bookingToComplete}
           originalAmount={bookingToComplete.totalAmount}
           currentPaymentMethod={bookingToComplete.paymentMethod || "Pay After Service"}
           isProcessing={processingBookingAction === bookingToComplete.id}
+        />
+      )}
+
+      {bookingToStart && (
+        <StartBookingDialog 
+          isOpen={isStartDialogOpen}
+          onClose={() => { setIsStartDialogOpen(false); setBookingToStart(null); }}
+          onConfirm={async (otp, photoUrl) => {
+            await updateBookingStatus(bookingToStart.id!, 'InProgressByProvider', undefined, undefined, otp, photoUrl);
+            setIsStartDialogOpen(false);
+            setBookingToStart(null);
+          }}
+          booking={bookingToStart}
+          isProcessing={processingBookingAction === bookingToStart.id}
         />
       )}
     </div>

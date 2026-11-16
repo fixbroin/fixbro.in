@@ -8,6 +8,11 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getTimestampMillis } from '@/lib/utils';
+import { ensureBookingOtps } from '@/lib/bookingUtils';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { nanoid } from 'nanoid';
+import { executeDbGetDoc } from '@/app/actions/dbActions';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
@@ -482,7 +487,9 @@ export async function updateBookingStatusByProviderAction(
   providerId: string,
   newStatus: string,
   additionalCharges?: { name: string; amount: number }[],
-  finalizedPaymentMethod?: string
+  finalizedPaymentMethod?: string,
+  otp?: string,
+  photoUrl?: string
 ) {
   try {
     const bookingDocRef = doc(db, 'bookings', bookingId);
@@ -506,6 +513,44 @@ export async function updateBookingStatusByProviderAction(
       status: newStatus,
       updatedAt: Timestamp.now(),
     };
+
+    // OTP & Job Verification Photo Validation
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? (configSnap.data() as any) : {};
+    const requireBookingOtp = Boolean(appConfig?.requireBookingOtp);
+
+    if (requireBookingOtp) {
+      const { startOtp, completeOtp } = ensureBookingOtps(bookingData);
+
+      if (newStatus === 'InProgressByProvider') {
+        const cleanOtp = (otp || '').trim();
+        if (!cleanOtp || cleanOtp !== startOtp) {
+          throw new Error("Wrong OTP. You entered an incorrect Start OTP number. Please ask the customer for the correct OTP.");
+        }
+        if (photoUrl) {
+          updateData.startWorkPhotoUrl = photoUrl;
+        }
+        if (!bookingData.startOtp) updateData.startOtp = startOtp;
+        if (!bookingData.completeOtp) updateData.completeOtp = completeOtp;
+      }
+
+      if (newStatus === 'Completed') {
+        const cleanOtp = (otp || '').trim();
+        if (!cleanOtp || cleanOtp !== completeOtp) {
+          throw new Error("Wrong OTP. You entered an incorrect Complete OTP number. Please ask the customer for the correct OTP.");
+        }
+        if (photoUrl) {
+          updateData.completeWorkPhotoUrl = photoUrl;
+        }
+      }
+    } else {
+      if (newStatus === 'InProgressByProvider' && photoUrl) {
+        updateData.startWorkPhotoUrl = photoUrl;
+      }
+      if (newStatus === 'Completed' && photoUrl) {
+        updateData.completeWorkPhotoUrl = photoUrl;
+      }
+    }
 
     // 1. Acceptance Checks & Wallet Deductions
     if (newStatus === 'ProviderAccepted') {
@@ -1494,6 +1539,96 @@ export async function deleteProviderWithdrawalMethodAction(params: {
   } catch (error: any) {
     console.error("Error in deleteProviderWithdrawalMethodAction:", error);
     return { success: false, message: error.message || "Failed to delete withdrawal method." };
+  }
+}
+
+/**
+ * Server action to securely upload booking evidence photos (before-work or completion photo).
+ * Handles file validation, size limits (up to 10MB), and persists to VPS public uploads directory or remote storage.
+ */
+export async function uploadBookingEvidenceAction(
+  formData: FormData
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const file = formData.get('file') as File | null;
+    if (!file) {
+      return { success: false, error: 'No file provided.' };
+    }
+
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
+    if (file.size > MAX_SIZE) {
+      return { success: false, error: 'File size exceeds maximum limit of 50MB.' };
+    }
+
+    const ext = path.extname(file.name).toLowerCase();
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return { success: false, error: `Invalid image format "${ext}". Allowed: JPG, PNG, WebP.` };
+    }
+
+    // Check remote storage vs local VPS storage
+    let driver = process.env.STORAGE_DRIVER || 'local';
+    let remoteUploadUrl = process.env.REMOTE_UPLOAD_URL || '';
+    let remoteSecretKey = process.env.REMOTE_SECRET_KEY || '';
+
+    try {
+      const storageDoc = await executeDbGetDoc('webSettings', 'storageConfiguration');
+      if (storageDoc && storageDoc.exists && storageDoc.data) {
+        if (storageDoc.data.driver) driver = storageDoc.data.driver;
+        if (storageDoc.data.remoteUploadUrl) remoteUploadUrl = storageDoc.data.remoteUploadUrl;
+        if (storageDoc.data.remoteSecretKey) remoteSecretKey = storageDoc.data.remoteSecretKey;
+      }
+    } catch (dbErr) {
+      console.warn("Could not load storageConfiguration from DB:", dbErr);
+    }
+
+    if (driver === 'remote' && remoteUploadUrl && remoteUploadUrl.trim() !== '') {
+      try {
+        const remoteFormData = new FormData();
+        remoteFormData.append('file', file);
+        remoteFormData.append('uploadPath', 'bookings/evidence');
+
+        const remoteRes = await fetch(remoteUploadUrl.trim(), {
+          method: 'POST',
+          headers: {
+            'x-api-secret': remoteSecretKey
+          },
+          body: remoteFormData
+        });
+
+        const remoteData = await remoteRes.json();
+        if (remoteRes.ok && remoteData.success && remoteData.url) {
+          return { success: true, url: remoteData.url };
+        }
+      } catch (remoteErr) {
+        console.error("Remote storage upload failed, falling back to local:", remoteErr);
+      }
+    }
+
+    // Local VPS storage
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    let baseDir = process.cwd();
+    if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+      baseDir = path.join(baseDir, '..', '..');
+    }
+    const targetDir = path.join(baseDir, 'public', 'uploads', 'bookings', 'evidence');
+    await fs.mkdir(targetDir, { recursive: true });
+
+    const fileExt = ext || '.jpg';
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const uniqueSuffix = nanoid(8).toLowerCase();
+    const filename = `${dateStr}-evidence-${uniqueSuffix}${fileExt}`;
+    const fullPath = path.join(targetDir, filename);
+
+    await fs.writeFile(fullPath, buffer);
+
+    const publicUrl = `/uploads/bookings/evidence/${filename}`;
+    return { success: true, url: publicUrl };
+  } catch (err: any) {
+    console.error("uploadBookingEvidenceAction error:", err);
+    return { success: false, error: err.message || 'Failed to upload evidence photo.' };
   }
 }
 

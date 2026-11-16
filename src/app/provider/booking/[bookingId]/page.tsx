@@ -18,6 +18,7 @@ import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment, hasOnlinePaymentProof } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import StartBookingDialog from '@/components/shared/StartBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
 import type { UserActivityEventType } from '@/types/firestore';
@@ -79,9 +80,18 @@ export default function ProviderBookingDetailsPage() {
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<BookingStatus | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
   const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
   const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
+
+  const handleStartWorkClick = () => {
+    if (appConfig?.requireBookingOtp) {
+      setIsStartDialogOpen(true);
+    } else {
+      updateBookingStatus('InProgressByProvider');
+    }
+  };
 
   const providerFeeType = appConfig?.providerFeeType || 'percentage';
   const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
@@ -101,7 +111,13 @@ export default function ProviderBookingDetailsPage() {
   const displayTotal = isCash ? (booking?.totalAmount || 0) : (providerGross + extraChargesTotal);
 
 
-  const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
+  const updateBookingStatus = async (
+    newStatus: BookingStatus, 
+    additionalCharges?: {name: string, amount: number}[], 
+    finalizedPaymentMethod?: string,
+    otp?: string,
+    photoUrl?: string
+  ) => {
     if (!booking?.id || !providerUser) return;
     setIsProcessingAction(true);
     setProcessingStatus(newStatus);
@@ -111,7 +127,9 @@ export default function ProviderBookingDetailsPage() {
         providerUser.uid,
         newStatus,
         additionalCharges,
-        finalizedPaymentMethod
+        finalizedPaymentMethod,
+        otp,
+        photoUrl
       );
 
       if (!result.success) {
@@ -132,6 +150,12 @@ export default function ProviderBookingDetailsPage() {
         }
         if (finalizedPaymentMethod) {
           updated.paymentMethod = finalizedPaymentMethod;
+        }
+        if (newStatus === 'InProgressByProvider' && photoUrl) {
+          updated.startWorkPhotoUrl = photoUrl;
+        }
+        if (newStatus === 'Completed' && photoUrl) {
+          updated.completeWorkPhotoUrl = photoUrl;
         }
         return updated;
       });
@@ -172,9 +196,11 @@ export default function ProviderBookingDetailsPage() {
         body: JSON.stringify({ bookingDocId: booking.id }),
       }).catch(err => console.error("Provider trigger error:", err));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating job status:", error);
-      toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
+      const msg = error?.message || "Could not update job status.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      throw error;
     } finally {
       setIsProcessingAction(false);
       setProcessingStatus(null);
@@ -587,7 +613,7 @@ export default function ProviderBookingDetailsPage() {
 
             {booking.status === 'ProviderAccepted' && (
                 <Button 
-                    onClick={() => updateBookingStatus('InProgressByProvider')} 
+                    onClick={handleStartWorkClick} 
                     disabled={isProcessingAction}
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                 >
@@ -631,10 +657,26 @@ export default function ProviderBookingDetailsPage() {
         <CompleteBookingDialog 
           isOpen={isCompleteDialogOpen}
           onClose={() => setIsCompleteDialogOpen(false)}
-          onConfirm={(charges, pMethod) => updateBookingStatus('Completed', charges, pMethod)}
+          onConfirm={async (charges, pMethod, otp, photoUrl) => {
+            await updateBookingStatus('Completed', charges, pMethod, otp, photoUrl);
+            setIsCompleteDialogOpen(false);
+          }}
           booking={booking}
           originalAmount={booking.totalAmount}
           currentPaymentMethod={booking.paymentMethod || "Pay After Service"}
+          isProcessing={isProcessingAction}
+        />
+      )}
+
+      {booking && (
+        <StartBookingDialog 
+          isOpen={isStartDialogOpen}
+          onClose={() => setIsStartDialogOpen(false)}
+          onConfirm={async (otp, photoUrl) => {
+            await updateBookingStatus('InProgressByProvider', undefined, undefined, otp, photoUrl);
+            setIsStartDialogOpen(false);
+          }}
+          booking={booking}
           isProcessing={isProcessingAction}
         />
       )}

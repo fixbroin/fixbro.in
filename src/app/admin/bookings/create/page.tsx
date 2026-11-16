@@ -33,7 +33,7 @@ import type {
   FirestoreService, BookingStatus, BookingServiceItem, FirestorePromoCode
 } from '@/types/firestore';
 import { 
-  generateBookingId, getBasePriceForInvoice, 
+  generateBookingId, generateBookingOtp, getBasePriceForInvoice, 
   calculateIncrementalTotalPriceForItem 
 } from '@/lib/bookingUtils';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
@@ -566,6 +566,8 @@ export default function AdminCreateBookingPage() {
         totalAmount: summary.grandTotal, 
         paymentMethod: paymentMode, 
         status: bookingStatus, 
+        startOtp: generateBookingOtp(),
+        completeOtp: generateBookingOtp(),
         createdAt: Timestamp.now(), 
         updatedAt: Timestamp.now(), 
         isReviewedByCustomer: false,

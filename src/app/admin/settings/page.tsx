@@ -1804,6 +1804,23 @@ export default function AdminSettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground">Nearby providers within this radius will be automatically assigned to new bookings.</p>
                     </div>
+
+                    <div className="flex items-center justify-between rounded-lg border p-4 shadow-sm bg-muted/20">
+                      <div className="space-y-0.5 pr-4">
+                        <Label htmlFor="requireBookingOtp" className="text-sm font-semibold">
+                          Job Start & Completion OTP Verification
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          When enabled, providers must enter a customer-provided Start OTP to begin work and a Completion OTP to finish work (with optional before/after evidence photos). When disabled, bookings can be started and completed immediately without OTP.
+                        </p>
+                      </div>
+                      <Switch
+                        id="requireBookingOtp"
+                        checked={settings.requireBookingOtp ?? false}
+                        onCheckedChange={(checked) => handleSwitchChange('requireBookingOtp', checked)}
+                        disabled={isSaving}
+                      />
+                    </div>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
                     <Button onClick={() => handleSaveSettings("Provider")} disabled={isSaving}>
