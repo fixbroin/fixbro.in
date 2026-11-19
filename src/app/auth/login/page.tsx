@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from '@/hooks/use-toast';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
-import { isWebView, requestNativeGoogleSignIn } from '@/lib/webview-bridge';
+import { isWebView, requestNativeGoogleSignIn, hasFlutterBridge } from '@/lib/webview-bridge';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -209,7 +209,7 @@ export default function LoginPage() {
   };
   
   const onGoogleSubmit = async () => {
-    if (isWebView()) {
+    if (hasFlutterBridge()) {
       requestNativeGoogleSignIn();
       return;
     }
@@ -303,6 +303,19 @@ export default function LoginPage() {
   ].filter(Boolean) as ('email' | 'otp')[];
   const defaultTab = config.defaultLoginMethod === 'otp' ? 'otp' : 'email';
 
+  const termsAndConditionsText = (
+    <p className="text-center text-xs leading-relaxed text-muted-foreground pt-1">
+      By Clicking Continue You Agree To Our{' '}
+      <Link href="/terms-and-conditions" className="underline hover:text-primary">
+        Terms and Conditions
+      </Link>{' '}
+      &{' '}
+      <Link href="/privacy-policy" className="underline hover:text-primary">
+        Privacy Policy
+      </Link>
+    </p>
+  );
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-secondary/30 p-4">
       <div id="recaptcha-container"></div>
@@ -367,7 +380,11 @@ export default function LoginPage() {
             {config.enableGoogleLogin && (
               <>
                 <Button variant="outline" className="w-full h-11" onClick={onGoogleSubmit} disabled={authContextIsLoading}><GoogleIcon /> Continue with Google</Button>
-                {enabledMethods.length > 0 && <div className="relative my-4"><Separator /><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">OR</div></div>}
+                {enabledMethods.length > 0 ? (
+                  <div className="relative my-4"><Separator /><div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">OR</div></div>
+                ) : (
+                  termsAndConditionsText
+                )}
               </>
             )}
 
@@ -383,12 +400,14 @@ export default function LoginPage() {
                           <FormField control={emailLoginForm.control} name="password" render={({ field }) => (<FormItem><FormLabel htmlFor="password"><KeyRound className="inline mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel><FormControl><Input id="password" type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>)}/>
                           <div className="flex items-center justify-between"><Link href="/auth/forgot-password" passHref><Button variant="link" className="text-sm px-0">Forgot password?</Button></Link></div>
                           <Button type="submit" className="w-full" disabled={authContextIsLoading}>{authContextIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Login with Email</Button>
+                          {termsAndConditionsText}
                       </form></Form>
                   </TabsContent>
                   <TabsContent value="otp" className="pt-4">
                       <Form {...phoneForm}><form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
                           <FormField control={phoneForm.control} name="phone" render={({ field }) => (<FormItem><FormLabel htmlFor="phone"><Phone className="inline mr-2 h-4 w-4 text-muted-foreground" />Phone Number</FormLabel><FormControl><Input id="phone" type="tel" placeholder="Enter mobile number" onChange={handlePhoneInputChange} onKeyDown={handlePhoneKeyDown} defaultValue={config.defaultOtpCountryCode} /></FormControl><FormMessage /></FormItem>)}/>
                           <Button type="submit" className="w-full" disabled={isSendingOtp}>{isSendingOtp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Send OTP</Button>
+                          {termsAndConditionsText}
                       </form></Form>
                   </TabsContent>
                </Tabs>
@@ -398,11 +417,13 @@ export default function LoginPage() {
                   <FormField control={emailLoginForm.control} name="password" render={({ field }) => (<FormItem><FormLabel htmlFor="password"><KeyRound className="inline mr-2 h-4 w-4 text-muted-foreground" />Password</FormLabel><FormControl><Input id="password" type="password" placeholder="••••••••" {...field} /></FormControl><FormMessage /></FormItem>)}/>
                   <div className="flex items-center justify-between"><Link href="/auth/forgot-password" passHref><Button variant="link" className="text-sm px-0">Forgot password?</Button></Link></div>
                   <Button type="submit" className="w-full" disabled={authContextIsLoading}>{authContextIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Login with Email</Button>
+                  {termsAndConditionsText}
               </form></Form>
             ) : enabledMethods[0] === 'otp' ? (
               <Form {...phoneForm}><form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
                   <FormField control={phoneForm.control} name="phone" render={({ field }) => (<FormItem><FormLabel htmlFor="phone"><Phone className="inline mr-2 h-4 w-4 text-muted-foreground" />Phone Number</FormLabel><FormControl><Input id="phone" type="tel" placeholder="Enter mobile number" onChange={handlePhoneInputChange} onKeyDown={handlePhoneKeyDown} defaultValue={config.defaultOtpCountryCode}/></FormControl><FormMessage /></FormItem>)}/>
                   <Button type="submit" className="w-full" disabled={isSendingOtp}>{isSendingOtp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Send OTP</Button>
+                  {termsAndConditionsText}
               </form></Form>
             ) : (
               <p className="text-center text-sm text-muted-foreground">No login methods are currently enabled. Please contact support.</p>
@@ -410,20 +431,10 @@ export default function LoginPage() {
           </CardContent>
           )}
 
-          <CardFooter className="flex flex-col gap-2 pt-4">
+          <CardFooter className="flex flex-col gap-2 pt-2">
             <p className="text-sm text-center text-muted-foreground">Don't have an account?{' '}<Link href="/auth/signup" passHref><Button variant="link" className="px-1">Sign up</Button></Link></p>
           </CardFooter>
         </Card>
-        <p className="mt-4 px-2 text-center text-xs text-muted-foreground">
-          By Clicking Continue You Agree To Our{' '}
-          <Link href="/terms-and-conditions" className="underline hover:text-primary">
-              Terms and Conditions
-          </Link>{' '}
-          &{' '}
-          <Link href="/privacy-policy" className="underline hover:text-primary">
-              Privacy Policy
-          </Link>
-        </p>
       </div>
     </div>
   );

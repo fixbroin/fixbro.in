@@ -105,39 +105,49 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Checks if the application has an active, accessible Flutter JavaScript communication bridge.
+ */
+export const hasFlutterBridge = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return Boolean(
+    ((window as any).FlutterBridge && typeof (window as any).FlutterBridge.postMessage === 'function') ||
+    ((window as any).flutter_inappwebview && typeof (window as any).flutter_inappwebview.callHandler === 'function')
+  );
+};
+
+/**
  * Checks if the application is running inside the Flutter WebView container.
  */
 export const isWebView = (): boolean => {
   if (typeof window === 'undefined') return false;
   
-  if (
-    (window as any).isFlutterNativeApp ||
-    (window as any).FlutterBridge ||
-    (window as any).flutter_inappwebview
-  ) {
+  // 1. Direct active Flutter bridge
+  if (hasFlutterBridge() || (window as any).isFlutterNativeApp) {
     try {
       sessionStorage.setItem('is_flutter_app', 'true');
-      localStorage.setItem('is_flutter_app', 'true');
     } catch (e) {}
     return true;
   }
 
+  // 2. Specific App User-Agent check injected by Flutter
   const ua = (navigator.userAgent || '').toLowerCase();
-  if (ua.includes('fixbroapp') || ua.includes('fixbroproviderapp') || ua.includes('fixbro') || ua.includes('flutter')) {
+  if (ua.includes('fixbroapp') || ua.includes('fixbroproviderapp') || ua.includes('flutter')) {
     try {
       sessionStorage.setItem('is_flutter_app', 'true');
-      localStorage.setItem('is_flutter_app', 'true');
     } catch (e) {}
     return true;
   }
 
+  // 3. Intra-session tab navigation in WebView
   try {
-    if (sessionStorage.getItem('is_flutter_app') === 'true') return true;
+    if (sessionStorage.getItem('is_flutter_app') === 'true') {
+      return true;
+    }
   } catch (e) {}
 
+  // 4. Cleanup any legacy stale localStorage key from earlier sessions
   try {
-    if (localStorage.getItem('is_flutter_app') === 'true') return true;
-    if (Boolean(localStorage.getItem('fixbro_native_fcm_token'))) return true;
+    localStorage.removeItem('is_flutter_app');
   } catch (e) {}
 
   return false;
@@ -162,7 +172,7 @@ export const getPlatformSource = (): { source: 'app' | 'web'; platform: string; 
 
   // 2. User-Agent check (fixbroapp or Flutter token)
   const ua = (navigator.userAgent || '').toLowerCase();
-  const isAppUA = ua.includes('fixbroapp') || ua.includes('fixbro') || ua.includes('flutter');
+  const isAppUA = ua.includes('fixbroapp') || ua.includes('fixbroproviderapp') || ua.includes('flutter');
 
   // 3. Session storage persistence across page redirects
   let isSessionApp = false;
@@ -217,11 +227,11 @@ export const postToFlutter = (data: Record<string, any>) => {
  * Sends a message to Flutter to trigger the native Google Sign-In sheet.
  */
 export const requestNativeGoogleSignIn = () => {
-  if (isWebView()) {
+  if (hasFlutterBridge()) {
     console.log("requestNativeGoogleSignIn: Triggering native Google Sign-In dialog");
     postToFlutter({ action: 'requestGoogleSignIn' });
   } else {
-    console.warn("requestNativeGoogleSignIn called, but not in a WebView environment.");
+    console.warn("requestNativeGoogleSignIn called, but no Flutter bridge active.");
   }
 };
 
@@ -276,12 +286,7 @@ export const syncNativeFcmToken = (userId: string) => {
  * Falls back safely to standard browser download via Blob URL if no Flutter bridge is active.
  */
 export const requestFileDownload = (url: string, fileName?: string) => {
-  const hasFlutterBridge = typeof window !== 'undefined' && Boolean(
-    ((window as any).FlutterBridge && typeof (window as any).FlutterBridge.postMessage === 'function') ||
-    ((window as any).flutter_inappwebview && typeof (window as any).flutter_inappwebview.callHandler === 'function')
-  );
-
-  if (hasFlutterBridge) {
+  if (hasFlutterBridge()) {
     postToFlutter({ action: 'downloadFile', url, fileName });
     return;
   }

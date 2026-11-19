@@ -843,6 +843,10 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('fixbro_user_role');
         localStorage.removeItem('fixbro_user_name');
+        localStorage.removeItem('fixbro_user_uid');
+        localStorage.removeItem('fixbro_user_email');
+        localStorage.removeItem('is_flutter_app');
+        sessionStorage.removeItem('is_flutter_app');
       }
       toast({ title: "Logged Out", description: "You have been logged out." });
       router.push('/auth/login');
