@@ -134,21 +134,24 @@ export default function SignupPage() {
                     {authContextIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sign Up with Email
                   </Button>
-                  <p className="text-center text-xs leading-relaxed text-muted-foreground pt-1">
-                    By Clicking Continue You Agree To Our{' '}
-                    <Link href="/terms-and-conditions" className="underline hover:text-primary">
-                      Terms and Conditions
-                    </Link>{' '}
-                    &{' '}
-                    <Link href="/privacy-policy" className="underline hover:text-primary">
-                      Privacy Policy
-                    </Link>
-                  </p>
                 </form>
               </Form>
             ) : !config.enableGoogleLogin ? (
               <p className="text-center text-muted-foreground p-4">Sign up is currently disabled. Please contact support.</p>
             ) : null }
+
+            {(config.enableGoogleLogin || config.enableEmailPasswordLogin) && (
+              <p className="text-center text-xs leading-relaxed text-muted-foreground pt-1">
+                By Clicking Continue You Agree To Our{' '}
+                <Link href="/terms-and-conditions" className="underline hover:text-primary">
+                  Terms and Conditions
+                </Link>{' '}
+                &{' '}
+                <Link href="/privacy-policy" className="underline hover:text-primary">
+                  Privacy Policy
+                </Link>
+              </p>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4 pt-2">
             <p className="text-sm text-center text-muted-foreground">Already have an account?{' '}<Link href="/auth/login" passHref><Button variant="link" className="px-1">Login</Button></Link></p>
