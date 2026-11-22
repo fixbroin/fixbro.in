@@ -172,6 +172,7 @@ export async function resequenceUserNumbers() {
 
     await statsRef.set({ 
       lastUserNumber: totalUsers,
+      totalUsers: totalUsers,
       updatedAt: Timestamp.now() 
     }, { merge: true });
 

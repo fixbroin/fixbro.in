@@ -204,13 +204,16 @@ export async function assignNewUserNumber() {
       
       if (statsDoc.exists) {
         const data = statsDoc.data();
-        if (data && data.lastUserNumber !== undefined) {
+        if (data && data.lastUserNumber !== undefined && data.lastUserNumber > 0) {
           nextNumber = data.lastUserNumber + 1;
+        } else if (data && data.totalUsers !== undefined && data.totalUsers > 0) {
+          nextNumber = data.totalUsers + 1;
         }
       }
       
       transaction.set(statsRef, { 
         lastUserNumber: nextNumber,
+        totalUsers: nextNumber,
         updatedAt: Timestamp.now() 
       }, { merge: true });
       

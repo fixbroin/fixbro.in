@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp, FieldValue } from '@/lib/mysqlDbAdmin';
+import { assignNewUserNumber } from '@/lib/webServerUtils';
 
 function normalizePhoneNumber(rawPhone: string): string {
   if (!rawPhone) return '';
@@ -121,13 +122,8 @@ export async function POST(request: NextRequest) {
 
     const uid = userRecord.uid;
 
-    // 5. Generate sequential userNumber
-    const statsRef = adminDb.collection('appConfiguration').doc('stats');
-    const statsDoc = await statsRef.get();
-    let nextUserNumber = 1000;
-    if (statsDoc.exists) {
-      nextUserNumber = (statsDoc.data()?.totalUsers || 0) + 1001;
-    }
+    // 5. Generate sequential userNumber using authoritative sequence
+    const nextUserNumber = await assignNewUserNumber();
 
     // 6. Create record in 'users' collection
     const userDocRef = usersCol.doc(uid);
@@ -160,7 +156,6 @@ export async function POST(request: NextRequest) {
     }
 
     await userDocRef.set(userPayload, { merge: true });
-    await statsRef.set({ totalUsers: FieldValue.increment(1) }, { merge: true });
 
     // 7. If Provider: Initialize 'providerApplications' document
     if (cleanType === 'provider') {

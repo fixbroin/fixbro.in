@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp, FieldValue } from '@/lib/mysqlDbAdmin';
 import { SUPER_ADMIN_PERMISSIONS } from '@/config/rbac';
+import { assignNewUserNumber } from '@/lib/webServerUtils';
 
 export async function POST(request: NextRequest) {
   const user = await verifyRequest(request);
@@ -61,13 +62,8 @@ export async function POST(request: NextRequest) {
     const userDocRef = adminDb.collection('users').doc(uid);
     const userDoc = await userDocRef.get();
     if (!userDoc.exists) {
-        // Need a sequential user number
-        const statsRef = adminDb.collection('appConfiguration').doc('stats');
-        const statsDoc = await statsRef.get();
-        let nextNumber = 1000;
-        if (statsDoc.exists) {
-            nextNumber = (statsDoc.data()?.totalUsers || 0) + 1001;
-        }
+        // Need a sequential user number using authoritative sequence
+        const nextNumber = await assignNewUserNumber();
 
         await userDocRef.set({
             uid,
@@ -79,8 +75,6 @@ export async function POST(request: NextRequest) {
             lastLoginAt: Timestamp.now(),
             walletBalance: 0,
         }, { merge: true });
-        
-        await statsRef.set({ totalUsers: FieldValue.increment(1) }, { merge: true });
     } else {
         await userDocRef.set({
             displayName: name,
