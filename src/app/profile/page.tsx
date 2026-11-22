@@ -314,7 +314,7 @@ export default function ProfilePage() {
           firestoreUser={firestoreUser}
           onSendVerificationOtp={handleSendVerificationOtp}
           isSendingOtp={isSendingOtp}
-          isPhoneVerified={user?.providerData?.some(p => p.providerId === 'phone') || firestoreUser?.mobileNumberVerified}
+          isPhoneVerified={Boolean(firestoreUser?.mobileNumberVerified === true || user?.providerData?.some(p => p.providerId === 'phone'))}
           onEditName={() => setIsNameDialogOpen(true)}
         />
 

@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Users, Eye, Trash2, Loader2, UserCircle, PackageSearch, ShieldCheck, ShieldAlert, XCircle, Search, Download, FileDown, UserCheck, UserX, UserPlus, Phone, Mail, Calendar, MessageCircle, ChevronDown, FileSpreadsheet, FileText as FilePdfIcon, CheckCircle2, Wallet, Activity } from "lucide-react";
 import type { FirestoreUser, Address } from '@/types/firestore';
-import { db } from '@/lib/firebase'; 
+import { auth, db } from '@/lib/firebase'; 
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, limit, startAfter, getDocs, where, type QueryDocumentSnapshot } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import UserDetailsModal from '@/components/admin/UserDetailsModal'; 
@@ -323,15 +323,22 @@ export default function AdminUsersPage() {
     if (!userId) return;
     setIsDeleting(userId);
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "users", userId)),
-        deleteDoc(doc(db, "providerApplications", userId)),
-      ]);
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/users?id=${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+      const data = await res.json();
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to delete user");
+      }
       setUsers(prev => prev.filter(u => u.id !== userId && u.uid !== userId));
       await triggerRefresh('users'); // SmartSync
-      toast({ title: "User Deleted", description: "All user records have been permanently removed." });
-    } catch (error) {
-      toast({ title: "Delete Failed", variant: "destructive" });
+      toast({ title: "User Deleted", description: "User record and authentication have been permanently removed." });
+    } catch (error: any) {
+      toast({ title: "Delete Failed", description: error?.message || "Could not delete user.", variant: "destructive" });
     } finally {
       setIsDeleting(null);
     }

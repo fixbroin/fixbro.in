@@ -219,8 +219,8 @@ export default function ProfilePage() {
   }
   
   const displayEmail = user.email || firestoreUser?.email;
-  const isEmailVerified = user.emailVerified;
-  const isPhoneVerified = user?.providerData?.some(p => p.providerId === 'phone') || firestoreUser?.mobileNumberVerified;
+  const isEmailVerified = Boolean(user.emailVerified || (firestoreUser as any)?.emailVerified);
+  const isPhoneVerified = Boolean(firestoreUser?.mobileNumberVerified === true || user?.providerData?.some(p => p.providerId === 'phone'));
 
   return (
     <ProtectedRoute>

@@ -108,8 +108,14 @@ export async function POST(request: NextRequest) {
       if (effectivePhone && !primaryData.mobileNumber) {
         updateData.mobileNumber = effectivePhone;
       }
+      if (verifiedPhone) {
+        updateData.mobileNumberVerified = true;
+      }
       if (effectiveEmail && !primaryData.email) {
         updateData.email = effectiveEmail;
+      }
+      if (verifiedEmail) {
+        updateData.emailVerified = true;
       }
       if (!primaryData.displayName && callerData?.displayName) {
         updateData.displayName = callerData.displayName;
@@ -176,7 +182,6 @@ export async function POST(request: NextRequest) {
       // Delete/archive the secondary callerUid document in users so no duplicate row is ever kept
       if (callerUid !== primaryUid) {
         await usersCol.doc(callerUid).delete().catch(() => {});
-        adminAuth.deleteUser(callerUid).catch(() => {});
       }
 
       // Mint custom token for primaryUid so the client session runs on the SAME primary user ID
@@ -194,6 +199,14 @@ export async function POST(request: NextRequest) {
 
     // 4. No other account matched — standalone user
     if (callerData && callerData.displayName && (callerData.mobileNumber || callerData.email)) {
+      if (verifiedPhone && !callerData.mobileNumberVerified) {
+        await usersCol.doc(callerUid).set({ mobileNumberVerified: true }, { merge: true });
+        callerData.mobileNumberVerified = true;
+      }
+      if (verifiedEmail && !callerData.emailVerified) {
+        await usersCol.doc(callerUid).set({ emailVerified: true }, { merge: true });
+        callerData.emailVerified = true;
+      }
       return NextResponse.json({
         success: true,
         resolved: true,

@@ -38,7 +38,7 @@ export default function ProviderProfileDetails({
 
     const displayName = firestoreUser?.displayName || user.displayName;
     const displayEmail = user.email || firestoreUser?.email;
-    const isEmailVerified = user.emailVerified;
+    const isEmailVerified = Boolean(user.emailVerified || (firestoreUser as any)?.emailVerified === true);
 
     const handleSendVerificationEmail = async () => {
         const emailToVerify = firestoreUser?.email;

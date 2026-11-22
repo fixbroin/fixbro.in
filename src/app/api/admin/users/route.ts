@@ -1,6 +1,8 @@
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool, getDocsInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
+import { getPool, getDocsInternal, updateDocInternal, deleteDocInternal, getDocInternal } from '@/lib/mysql';
+import { adminAuth } from '@/lib/firebaseAdmin';
+import { deleteStorageFiles } from '@/lib/serverStorageUtils';
 
 export async function GET(request: NextRequest) {
   const user = await verifyRequest(request);
@@ -70,7 +72,86 @@ export async function DELETE(request: NextRequest) {
     if (!id) return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
 
     const pool = await getPool();
+
+    // 1. Fetch user doc to get email, phone, and photos before deletion
+    let userEmail: string | null = null;
+    let userPhone: string | null = null;
+    const filesToDelete: string[] = [];
+
+    try {
+      const userDoc = await getDocInternal(pool, 'users', id);
+      if (userDoc?.exists && userDoc?.data) {
+        userEmail = (userDoc.data.email || '').toLowerCase().trim();
+        userPhone = (userDoc.data.mobileNumber || '').trim();
+        if (userDoc.data.photoURL) filesToDelete.push(userDoc.data.photoURL);
+      }
+    } catch (e) {}
+
+    // Check if this user had a provider application
+    try {
+      const appDoc = await getDocInternal(pool, 'providerApplications', id);
+      if (appDoc?.exists && appDoc?.data) {
+        const app = appDoc.data;
+        if (app.profilePhotoUrl) filesToDelete.push(app.profilePhotoUrl);
+        if (app.bankDetails?.cancelledChequeUrl) filesToDelete.push(app.bankDetails.cancelledChequeUrl);
+        if (app.signatureUrl) filesToDelete.push(app.signatureUrl);
+        if (app.aadhaar?.frontImageUrl) filesToDelete.push(app.aadhaar.frontImageUrl);
+        if (app.aadhaar?.backImageUrl) filesToDelete.push(app.aadhaar.backImageUrl);
+        if (app.pan?.frontImageUrl) filesToDelete.push(app.pan.frontImageUrl);
+        if (app.pan?.backImageUrl) filesToDelete.push(app.pan.backImageUrl);
+        if (app.idCardUrl) filesToDelete.push(app.idCardUrl);
+        if (Array.isArray(app.additionalDocuments)) {
+          for (const doc of app.additionalDocuments) {
+            if (doc?.frontImageUrl) filesToDelete.push(doc.frontImageUrl);
+            if (doc?.backImageUrl) filesToDelete.push(doc.backImageUrl);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Purge files if any
+    if (filesToDelete.length > 0) {
+      await deleteStorageFiles(filesToDelete).catch(err => {
+        console.warn('Error purging user files:', err);
+      });
+    }
+
+    // 2. Delete database records
     await deleteDocInternal(pool, 'users', id);
+    await deleteDocInternal(pool, 'providerApplications', id).catch(() => {});
+    await deleteDocInternal(pool, 'userCarts', id).catch(() => {});
+    await deleteDocInternal(pool, 'providerIdCards', id).catch(() => {});
+
+    // 3. Delete Firebase Auth user by UID
+    try {
+      await adminAuth.deleteUser(id);
+    } catch (authErr: any) {
+      if (authErr?.code !== 'auth/user-not-found') {
+        console.warn('Could not delete Firebase Auth user by UID:', authErr);
+      }
+    }
+
+    // 4. Also delete any secondary Firebase Auth user matching email
+    if (userEmail) {
+      try {
+        const authUserByEmail = await adminAuth.getUserByEmail(userEmail);
+        if (authUserByEmail?.uid) {
+          await adminAuth.deleteUser(authUserByEmail.uid);
+        }
+      } catch (e) {}
+    }
+
+    // 5. Also delete any secondary Firebase Auth user matching phone
+    if (userPhone) {
+      try {
+        const fullPhone = userPhone.startsWith('+') ? userPhone : `+${userPhone}`;
+        const authUserByPhone = await adminAuth.getUserByPhoneNumber(fullPhone);
+        if (authUserByPhone?.uid) {
+          await adminAuth.deleteUser(authUserByPhone.uid);
+        }
+      } catch (e) {}
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

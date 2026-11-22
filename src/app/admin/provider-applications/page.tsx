@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Users2, MapPin, Eye, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Loader2, PackageSearch, UserCircle, Check, ChevronsUpDown, UserPlus } from "lucide-react";
 import type { ProviderApplication, ProviderApplicationStatus, FirestoreNotification } from '@/types/firestore';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, Timestamp, deleteDoc, addDoc, where, getDocs, limit } from '@/lib/mysqlDb';
 import { ref as storageRef, deleteObject } from '@/lib/mysqlStorage';
@@ -228,47 +228,23 @@ export default function AdminProviderApplicationsPage() {
     if (!applicationId) return;
     setIsUpdating(applicationId);
     try {
-      const appToDelete = applications.find((a) => a.id === applicationId);
-      if (appToDelete) {
-        const urlsToDelete: string[] = [];
-        if (appToDelete.profilePhotoUrl) urlsToDelete.push(appToDelete.profilePhotoUrl);
-        if (appToDelete.bankDetails?.cancelledChequeUrl) urlsToDelete.push(appToDelete.bankDetails.cancelledChequeUrl);
-        if (appToDelete.signatureUrl) urlsToDelete.push(appToDelete.signatureUrl);
-        
-        if (appToDelete.aadhaar?.frontImageUrl) urlsToDelete.push(appToDelete.aadhaar.frontImageUrl);
-        if (appToDelete.aadhaar?.backImageUrl) urlsToDelete.push(appToDelete.aadhaar.backImageUrl);
-        
-        if (appToDelete.pan?.frontImageUrl) urlsToDelete.push(appToDelete.pan.frontImageUrl);
-        if (appToDelete.pan?.backImageUrl) urlsToDelete.push(appToDelete.pan.backImageUrl);
-
-        if (appToDelete.additionalDocuments && appToDelete.additionalDocuments.length > 0) {
-          appToDelete.additionalDocuments.forEach((doc) => {
-            if (doc.frontImageUrl) urlsToDelete.push(doc.frontImageUrl);
-            if (doc.backImageUrl) urlsToDelete.push(doc.backImageUrl);
-          });
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/providers?id=${applicationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
         }
-
-        // Delete all images from Firebase Storage
-        await Promise.all(
-          urlsToDelete.map(async (url) => {
-            try {
-              if (url && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/uploads/") || url.includes("uploads/"))) {
-                const imageRef = storageRef(storage, url);
-                await deleteObject(imageRef);
-              }
-            } catch (err) {
-              console.error("Failed to delete application image:", url, err);
-            }
-          })
-        );
+      });
+      const data = await res.json();
+      if (!data?.success) {
+        throw new Error(data?.error || "Failed to delete provider");
       }
 
-      await deleteDoc(doc(db, PROVIDER_APPLICATION_COLLECTION, applicationId));
-      toast({title: "Success", description: "Provider application deleted."});
+      toast({ title: "Success", description: "Provider application, account, photos, and Firebase credentials deleted." });
       await fetchApplications();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting provider application:", error);
-      toast({title: "Error", description: "Could not delete application.", variant: "destructive"});
+      toast({ title: "Error", description: error?.message || "Could not delete application.", variant: "destructive" });
     } finally {
       setIsUpdating(null);
     }
