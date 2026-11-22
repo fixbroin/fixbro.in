@@ -213,9 +213,29 @@ export async function POST(request: NextRequest) {
         await cartsCol.doc(callerUid).delete().catch(() => {});
       }
 
-      // Delete/archive the secondary callerUid document in users so no duplicate row is ever kept
+      // Clean up the secondary callerUid completely so no ghost/skeleton user is ever kept
       if (callerUid !== primaryUid) {
+        // Transfer any FCM tokens from callerUid to primaryUid
+        try {
+          const callerSnap = await usersCol.doc(callerUid).get();
+          if (callerSnap.exists) {
+            const callerDocData = callerSnap.data() || {};
+            if (callerDocData.fcmTokens && typeof callerDocData.fcmTokens === 'object') {
+              const primarySnap = await usersCol.doc(primaryUid).get();
+              const primaryDataCurrent = primarySnap.data() || {};
+              const mergedTokens = { ...(primaryDataCurrent.fcmTokens || {}), ...callerDocData.fcmTokens };
+              await usersCol.doc(primaryUid).set({ fcmTokens: mergedTokens, updatedAt: Timestamp.now() }, { merge: true });
+            }
+          }
+        } catch (_) {}
+
+        // Delete secondary document from MySQL users table
         await usersCol.doc(callerUid).delete().catch(() => {});
+
+        // Delete temporary secondary user from Firebase Auth
+        try {
+          await adminAuth.deleteUser(callerUid);
+        } catch (_) {}
       }
 
       // Mint custom token for primaryUid so the client session runs on the SAME primary user ID

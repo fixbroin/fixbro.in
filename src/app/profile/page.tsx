@@ -180,11 +180,18 @@ export default function ProfilePage() {
     if (!user || !auth.currentUser) return;
     setIsSubmittingEmail(true);
     try {
-      // Verify email uniqueness
-      const emailQuery = query(collection(db, "users"), where("email", "==", values.email.toLowerCase()), limit(1));
-      const emailSnap = await getDocs(emailQuery);
-      if (!emailSnap.empty && emailSnap.docs[0].id !== user.uid) {
-        throw new Error("This email address is already linked to another account.");
+      // Verify email uniqueness via authoritative server API
+      const validateRes = await fetch('/api/auth/validate-unique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: values.email.toLowerCase().trim(),
+          currentUid: user.uid
+        })
+      });
+      const validateData = await validateRes.json().catch(() => ({}));
+      if (!validateRes.ok || validateData.success === false) {
+        throw new Error(validateData.error || "This email address is already linked to another account.");
       }
 
       await updateEmail(auth.currentUser, values.email); 
@@ -208,11 +215,18 @@ export default function ProfilePage() {
     const countryCode = appConfig?.defaultOtpCountryCode || '+91';
     const fullPhoneNumber = `${countryCode}${values.mobileNumber}`;
     try {
-      // Verify mobile number uniqueness
-      const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", fullPhoneNumber), limit(1));
-      const phoneSnap = await getDocs(phoneQuery);
-      if (!phoneSnap.empty && phoneSnap.docs[0].id !== user.uid) {
-        throw new Error("This mobile number is already linked to another account.");
+      // Verify mobile number uniqueness via authoritative server API
+      const validateRes = await fetch('/api/auth/validate-unique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mobileNumber: fullPhoneNumber,
+          currentUid: user.uid
+        })
+      });
+      const validateData = await validateRes.json().catch(() => ({}));
+      if (!validateRes.ok || validateData.success === false) {
+        throw new Error(validateData.error || "This mobile number is already linked to another account.");
       }
 
       await setDoc(doc(db, "users", user.uid), {

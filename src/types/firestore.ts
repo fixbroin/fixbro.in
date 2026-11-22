@@ -278,7 +278,9 @@ export interface FirestoreUser {
   email: string | null;
   displayName: string | null;
   mobileNumber?: string | null;
-  mobileNumberVerified?: boolean; 
+  mobileNumberVerified?: boolean;
+  emailVerified?: boolean;
+  isDuplicate?: boolean; 
   photoURL?: string | null; 
   isActive: boolean; 
   roles?: ('customer' | 'provider' | 'admin')[];

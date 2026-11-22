@@ -428,43 +428,23 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     const isCustomAuth = providerId === 'password' || providerId === 'phone';
     let initialWalletBalance = 0;
     try {
-      // 1. Email Uniqueness Verification
+      // 1. Authoritative Server-side Uniqueness Verification (blocks duplicate emails & phones)
       const targetEmail = (details.email || user.email)?.toLowerCase()?.trim();
-      if (targetEmail) {
-        const emailQuery = query(collection(db, "users"), where("email", "==", targetEmail), limit(5));
-        const emailSnap = await getDocs(emailQuery);
-        for (const docSnap of emailSnap.docs) {
-          const docData = docSnap.data();
-          if (docSnap.id !== user.uid && !docData.isArchived && !docData.mergedIntoUid) {
-            throw new Error("This email address is already linked to another account.");
-          }
-        }
-      }
-
-      // 2. Mobile Number Uniqueness Verification
       const targetMobile = details.mobileNumber || user.phoneNumber;
-      if (targetMobile) {
-        const cleanedMobile = targetMobile.replace(/[\s\-()]/g, '');
-        const raw10 = cleanedMobile.length >= 10 ? cleanedMobile.slice(-10) : cleanedMobile;
-        const withPlus91 = `+91${raw10}`;
-        const withPlus = cleanedMobile.startsWith('+') ? cleanedMobile : `+${cleanedMobile}`;
 
-        const phoneQueries = [
-          query(collection(db, "users"), where("mobileNumber", "==", targetMobile), limit(5)),
-          query(collection(db, "users"), where("mobileNumber", "==", raw10), limit(5)),
-          query(collection(db, "users"), where("mobileNumber", "==", withPlus91), limit(5)),
-          query(collection(db, "users"), where("mobileNumber", "==", withPlus), limit(5)),
-        ];
+      const validateRes = await fetch('/api/auth/validate-unique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          mobileNumber: targetMobile,
+          currentUid: user.uid
+        })
+      });
 
-        for (const pq of phoneQueries) {
-          const phoneSnap = await getDocs(pq);
-          for (const docSnap of phoneSnap.docs) {
-            const docData = docSnap.data();
-            if (docSnap.id !== user.uid && !docData.isArchived && !docData.mergedIntoUid) {
-              throw new Error("This mobile number is already linked to another account.");
-            }
-          }
-        }
+      const validateData = await validateRes.json().catch(() => ({}));
+      if (!validateRes.ok || validateData.success === false) {
+        throw new Error(validateData.error || "This contact detail is already linked to another account.");
       }
 
       // 3. Device account limit check (max 2 accounts per device for email signup)
@@ -602,13 +582,18 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           }
         }
   
+        const isEmailVerified = Boolean(user.emailVerified || authProvider === 'google.com');
+        const isPhoneVerified = Boolean(user.phoneNumber || authProvider === 'phone');
+
         const newUserFirestoreData: FirestoreUser = {
           id: user.uid,
           uid: user.uid,
           userNumber: nextUserNumber,
           email: details.email || user.email || null,
+          emailVerified: isEmailVerified,
           displayName: details.fullName,
           mobileNumber: user.phoneNumber || details.mobileNumber || null,
+          mobileNumberVerified: isPhoneVerified,
           photoURL: user.photoURL || null,
           isActive: true,
           createdAt: Timestamp.now(),
@@ -778,11 +763,17 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     }
     setIsLoading(true);
     try {
-      // 1. Verify email uniqueness
-      const emailQuery = query(collection(db, "users"), where("email", "==", data.email.toLowerCase()), limit(1));
-      const emailSnap = await getDocs(emailQuery);
-      if (!emailSnap.empty) {
-        throw new Error("This email address is already linked to another account.");
+      // 1. Authoritative Server-side Email Uniqueness Verification
+      const validateRes = await fetch('/api/auth/validate-unique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email.toLowerCase().trim()
+        })
+      });
+      const validateData = await validateRes.json().catch(() => ({}));
+      if (!validateRes.ok || validateData.success === false) {
+        throw new Error(validateData.error || "This email address is already linked to another account.");
       }
 
       // 2. Check device registration limit (max 2 accounts per device for email signup)

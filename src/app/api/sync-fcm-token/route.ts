@@ -26,8 +26,38 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanToken = token.trim();
-    const userDocRef = adminDb.collection('users').doc(targetUid);
-    const userDoc = await userDocRef.get();
+    let effectiveTargetUid = targetUid;
+    let userDocRef = adminDb.collection('users').doc(effectiveTargetUid);
+    let userDoc = await userDocRef.get();
+
+    // If document doesn't exist under this UID, check if the verified user has an email or phone matching an existing primary user:
+    if (!userDoc.exists) {
+      if (verification?.email) {
+        const snapEmail = await adminDb.collection('users').where('email', '==', verification.email.toLowerCase().trim()).limit(1).get();
+        if (!snapEmail.empty) {
+          effectiveTargetUid = snapEmail.docs[0].id;
+          userDocRef = adminDb.collection('users').doc(effectiveTargetUid);
+          userDoc = await userDocRef.get();
+        }
+      }
+      if (!userDoc.exists && (verification as any)?.phone_number) {
+        const cleanPhone = ((verification as any).phone_number || '').trim();
+        const raw10 = cleanPhone.slice(-10);
+        const snapPhone = await adminDb.collection('users').where('mobileNumber', '==', cleanPhone).limit(1).get();
+        if (!snapPhone.empty) {
+          effectiveTargetUid = snapPhone.docs[0].id;
+          userDocRef = adminDb.collection('users').doc(effectiveTargetUid);
+          userDoc = await userDocRef.get();
+        } else {
+          const snapPhoneRaw = await adminDb.collection('users').where('mobileNumber', '==', raw10).limit(1).get();
+          if (!snapPhoneRaw.empty) {
+            effectiveTargetUid = snapPhoneRaw.docs[0].id;
+            userDocRef = adminDb.collection('users').doc(effectiveTargetUid);
+            userDoc = await userDocRef.get();
+          }
+        }
+      }
+    }
 
     if (userDoc.exists) {
       const data = userDoc.data() || {};
@@ -43,18 +73,28 @@ export async function POST(request: NextRequest) {
         updatedAt: Timestamp.now()
       });
     } else {
-      await userDocRef.set({
-        id: targetUid,
-        fcmTokens: {
-          [cleanToken]: Timestamp.now()
-        },
-        lastDeviceToken: cleanToken,
-        lastAppPlatform: platform || 'android',
-        lastAppVariant: appVariant || 'customer',
-        lastTokenSyncedAt: Timestamp.now(),
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
-      }, { merge: true });
+      // Only create if we have actual identity (email, phone, or name) so no blank skeleton is created
+      const email = verification?.email || null;
+      const phone = (verification as any)?.phone_number || null;
+      const name = (verification as any)?.name || null;
+
+      if (email || phone || name) {
+        await userDocRef.set({
+          id: effectiveTargetUid,
+          email,
+          mobileNumber: phone,
+          displayName: name,
+          fcmTokens: {
+            [cleanToken]: Timestamp.now()
+          },
+          lastDeviceToken: cleanToken,
+          lastAppPlatform: platform || 'android',
+          lastAppVariant: appVariant || 'customer',
+          lastTokenSyncedAt: Timestamp.now(),
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        }, { merge: true });
+      }
     }
 
     // Also sync to admin document if an admin document exists for this user

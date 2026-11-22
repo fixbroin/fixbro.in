@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -95,6 +95,20 @@ export default function AdminUsersPage() {
 
   const [selectedUserForModal, setSelectedUserForModal] = useState<FirestoreUser | null>(null);
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("all_users");
+  const tabsListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tabsListRef.current) return;
+    const activeTrigger = tabsListRef.current.querySelector<HTMLElement>('[data-state="active"]');
+    if (activeTrigger) {
+      activeTrigger.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [activeTab]);
   const [selectedUserForWallet, setSelectedUserForWallet] = useState<FirestoreUser | null>(null);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
@@ -632,29 +646,32 @@ export default function AdminUsersPage() {
         </div>
       </header>
 
-      <Tabs defaultValue="all_users" className="w-full space-y-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList className="bg-muted/60 p-1.5 rounded-2xl h-13 w-full sm:w-auto inline-flex border border-border/40 shadow-xs">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+        <div className="w-full overflow-x-auto scrollbar-none pb-1.5 -mx-3 px-3 sm:mx-0 sm:px-0">
+          <TabsList 
+            ref={tabsListRef}
+            className="bg-muted/60 p-1.5 rounded-2xl h-13 inline-flex items-center w-max max-w-none border border-border/40 shadow-xs gap-1.5 flex-nowrap shrink-0"
+          >
             <TabsTrigger 
               value="all_users" 
-              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider shrink-0 whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 shrink-0" />
               <span>All Users ({filteredUsers.length || users.length})</span>
             </TabsTrigger>
             <TabsTrigger 
               value="active_users" 
-              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider shrink-0 whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
             >
-              <Activity className="h-4 w-4 text-emerald-500" />
+              <Activity className="h-4 w-4 text-emerald-500 shrink-0" />
               <span>Active Users</span>
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
             </TabsTrigger>
             <TabsTrigger 
               value="inactive_users" 
-              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider shrink-0 whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
             >
-              <UserX className="h-4 w-4 text-amber-500" />
+              <UserX className="h-4 w-4 text-amber-500 shrink-0" />
               <span>Inactive & Archived ({hiddenInactiveUsers.length})</span>
               {hiddenInactiveUsers.length > 0 && (
                 <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse ml-0.5" />
@@ -738,11 +755,28 @@ export default function AdminUsersPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground truncate max-w-[200px]"><Mail className="h-3 w-3 text-primary/60 shrink-0" /> {user.email}</div>
-                              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground truncate max-w-[220px]">
+                                <Mail className="h-3 w-3 text-primary/60 shrink-0" />
+                                <span className="truncate">{user.email || "No Email"}</span>
+                                {user.email && (
+                                  user.emailVerified ? (
+                                    <span title="Email Verified" className="text-emerald-600 font-bold text-[10px] ml-1">✓</span>
+                                  ) : (
+                                    <span title="Email Unverified" className="text-amber-500 font-bold text-[10px] ml-1">✕</span>
+                                  )
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                                 <Phone className="h-3 w-3 text-primary/60 shrink-0" /> 
                                 <a href={`tel:${user.mobileNumber}`} className="hover:underline">{user.mobileNumber || "No Contact"}</a>
-                                {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors"><img src="/whatsapp.png" alt="WA" className="h-5 w-5" /></button>}
+                                {user.mobileNumber && (
+                                  user.mobileNumberVerified ? (
+                                    <span title="Mobile Verified" className="text-emerald-600 font-bold text-[10px] ml-1">✓</span>
+                                  ) : (
+                                    <span title="Mobile Unverified" className="text-amber-500 font-bold text-[10px] ml-1">✕</span>
+                                  )
+                                )}
+                                {user.mobileNumber && <button onClick={(e) => handleWhatsAppClick(e, user.mobileNumber!)} className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-md transition-colors ml-1"><img src="/whatsapp.png" alt="WA" className="h-4 w-4" /></button>}
                               </div>
                             </div>
                           </TableCell>

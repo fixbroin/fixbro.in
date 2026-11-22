@@ -340,12 +340,41 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <div><strong>Member ID:</strong> <span className="font-bold text-primary">#{user.userNumber || "N/A"}</span></div>
                   <div><strong>Display Name:</strong> {user.displayName || "N/A"}</div>
-                  <div><strong>Email:</strong> {user.email || "N/A"}</div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <strong>Email:</strong> 
+                    <span>{user.email || "N/A"}</span>
+                    {user.email && (
+                      user.emailVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          <CheckCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          <XCircle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                          Unverified
+                        </span>
+                      )
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <strong>Mobile:</strong> 
                     <a href={`tel:${user.mobileNumber}`} className="text-primary hover:underline font-medium">{user.mobileNumber || "N/A"}</a>
                     {user.mobileNumber && (
-                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber)} title="Chat on WhatsApp">
+                      user.mobileNumberVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          <CheckCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          <XCircle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                          Unverified
+                        </span>
+                      )
+                    )}
+                    {user.mobileNumber && (
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 ml-auto sm:ml-0" onClick={(e) => handleWhatsAppClick(e, user.mobileNumber)} title="Chat on WhatsApp">
                            <AppImage src="/whatsapp.png" alt="WhatsApp Icon" width={24} height={24} />
                            <span className="sr-only">Chat on WhatsApp</span>
                         </Button>

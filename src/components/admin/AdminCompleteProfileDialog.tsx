@@ -60,8 +60,35 @@ export default function AdminCompleteProfileDialog({
 
   const handleSubmit = async (data: AdminProfileFormData) => {
     setIsSubmitting(true);
+    const formattedMobile = `${config.defaultOtpCountryCode || '+91'}${data.mobileNumber}`;
+
+    // Pre-validate uniqueness with the authoritative server API before submitting
     try {
-      const formattedMobile = `${config.defaultOtpCountryCode || '+91'}${data.mobileNumber}`;
+      const checkRes = await fetch('/api/auth/validate-unique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email || userCredential.user.email,
+          mobileNumber: formattedMobile,
+          currentUid: userCredential.user.uid
+        })
+      });
+      const checkData = await checkRes.json().catch(() => ({}));
+      if (!checkRes.ok || checkData.success === false) {
+        if (checkData.field === 'mobileNumber' || (checkData.error && checkData.error.toLowerCase().includes('mobile number'))) {
+          form.setError("mobileNumber", { type: "manual", message: checkData.error || "This mobile number is already linked to another account." });
+        } else if (checkData.field === 'email' || (checkData.error && checkData.error.toLowerCase().includes('email'))) {
+          form.setError("email", { type: "manual", message: checkData.error || "This email address is already linked to another account." });
+        }
+        toast({ title: "Account Conflict", description: checkData.error || "This contact detail is already in use.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (checkErr) {
+      console.warn("Pre-validation notice:", checkErr);
+    }
+
+    try {
       await onSubmit({
         fullName: data.fullName,
         email: data.email || userCredential.user.email || undefined,
