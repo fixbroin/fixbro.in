@@ -3,6 +3,7 @@
 
 import { adminDb } from './firebaseAdmin';
 import { Timestamp } from './mysqlDbAdmin';
+import { getPool } from './mysql';
 import type { GlobalWebSettings, ThemePalette, MarketingAutomationSettings, FirestoreSlide, ReferralSettings, FeaturesConfiguration } from '@/types/firestore';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, THEME_PALETTE_KEYS } from '@/lib/colorUtils';
 import { defaultGlobalWebSettings } from '@/config/webDefaults';
@@ -198,33 +199,41 @@ export async function assignNewUserNumber() {
   const statsRef = adminDb.collection('appConfiguration').doc('stats');
   
   try {
-    const result = await adminDb.runTransaction(async (transaction) => {
-      const statsDoc = await transaction.get(statsRef);
-      let nextNumber = 1;
-      
-      if (statsDoc.exists) {
-        const data = statsDoc.data();
-        if (data && data.lastUserNumber !== undefined && data.lastUserNumber > 0) {
-          nextNumber = data.lastUserNumber + 1;
-        } else if (data && data.totalUsers !== undefined && data.totalUsers > 0) {
-          nextNumber = data.totalUsers + 1;
-        }
-      }
-      
-      transaction.set(statsRef, { 
-        lastUserNumber: nextNumber,
-        totalUsers: nextNumber,
-        updatedAt: Timestamp.now() 
-      }, { merge: true });
-      
-      return nextNumber;
-    });
-    
-    return result;
+    const pool = await getPool();
+    // Query actual highest userNumber among all active users in MySQL database
+    const [rows]: any = await pool.query(`
+      SELECT MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(data, '$.userNumber')) AS UNSIGNED)) as maxNum,
+             COUNT(*) as totalActive
+      FROM \`users\`
+      WHERE (JSON_UNQUOTE(JSON_EXTRACT(data, '$.isArchived')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(data, '$.isArchived')) != 'true')
+        AND (JSON_UNQUOTE(JSON_EXTRACT(data, '$.mergedIntoUid')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(data, '$.mergedIntoUid')) = '')
+    `);
+
+    const currentMax = Number(rows?.[0]?.maxNum) || 0;
+    const totalActive = Number(rows?.[0]?.totalActive) || 0;
+    const nextNumber = currentMax + 1;
+
+    await statsRef.set({ 
+      lastUserNumber: nextNumber,
+      totalUsers: totalActive + 1,
+      updatedAt: Timestamp.now() 
+    }, { merge: true });
+
+    return nextNumber;
   } catch (error) {
     console.error("Error assigning new user number:", error);
-    // Fallback: use timestamp if transaction fails (less ideal but better than crash)
-    return Math.floor(Date.now() / 1000);
+    try {
+      const statsDoc = await statsRef.get();
+      let fallbackNum = 1;
+      if (statsDoc.exists) {
+        const data = statsDoc.data();
+        fallbackNum = (data?.lastUserNumber || data?.totalUsers || 0) + 1;
+      }
+      await statsRef.set({ lastUserNumber: fallbackNum, totalUsers: fallbackNum, updatedAt: Timestamp.now() }, { merge: true });
+      return fallbackNum;
+    } catch {
+      return Math.floor(Date.now() / 1000);
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 import { NextRequest, NextResponse } from 'next/server';
-import { getPool, getDocsInternal, updateDocInternal, deleteDocInternal, getDocInternal } from '@/lib/mysql';
+import { getPool, getDocsInternal, updateDocInternal, deleteDocInternal, getDocInternal, Timestamp } from '@/lib/mysql';
 import { adminAuth } from '@/lib/firebaseAdmin';
 import { deleteStorageFiles } from '@/lib/serverStorageUtils';
 
@@ -151,6 +151,24 @@ export async function DELETE(request: NextRequest) {
         }
       } catch (e) {}
     }
+
+    // 6. Update stats counter to current max active userNumber
+    try {
+      const [maxRows]: any = await pool.query(`
+        SELECT MAX(CAST(JSON_UNQUOTE(JSON_EXTRACT(data, '$.userNumber')) AS UNSIGNED)) as maxNum,
+               COUNT(*) as totalActive
+        FROM \`users\`
+        WHERE (JSON_UNQUOTE(JSON_EXTRACT(data, '$.isArchived')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(data, '$.isArchived')) != 'true')
+          AND (JSON_UNQUOTE(JSON_EXTRACT(data, '$.mergedIntoUid')) IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(data, '$.mergedIntoUid')) = '')
+      `);
+      const maxNum = Number(maxRows?.[0]?.maxNum) || 0;
+      const totalActive = Number(maxRows?.[0]?.totalActive) || 0;
+      await updateDocInternal(pool, 'appConfiguration', 'stats', {
+        lastUserNumber: maxNum,
+        totalUsers: totalActive,
+        updatedAt: Timestamp.now()
+      }).catch(() => {});
+    } catch (e) {}
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

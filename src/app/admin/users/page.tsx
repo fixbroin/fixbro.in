@@ -42,6 +42,7 @@ import PermissionGuard from '@/components/admin/PermissionGuard';
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ActiveUsersTab from '@/components/admin/ActiveUsersTab';
+import InactiveUsersTab from '@/components/admin/InactiveUsersTab';
 
 const formatUserTimestamp = (timestamp?: unknown, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -102,7 +103,7 @@ export default function AdminUsersPage() {
     setIsLoading(true);
     try {
       const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, orderBy("userNumber", "desc"));
+      const q = query(usersCollectionRef, orderBy("userNumber", sortOrder));
       const querySnapshot = await getDocs(q);
       const fetchedUsers = querySnapshot.docs.map(doc => ({
         ...doc.data(),
@@ -132,8 +133,9 @@ export default function AdminUsersPage() {
       const result = await resequenceUserNumbers();
       if (result.success) {
         toast({ title: "Sync Complete", description: `Successfully re-sequenced ${result.count} users.` });
+        await triggerRefresh("users");
         const usersCollectionRef = collection(db, "users");
-        const q = query(usersCollectionRef, orderBy("userNumber", "desc"));
+        const q = query(usersCollectionRef, orderBy("userNumber", sortOrder));
         const querySnapshot = await getDocs(q);
         const fetchedUsers = querySnapshot.docs.map(doc => ({
           ...doc.data(),
@@ -258,30 +260,48 @@ export default function AdminUsersPage() {
     }
   };
 
-  const filteredUsers = useMemo(() => {
-    let result = users.filter(user => 
-      !(user as any).isArchived && 
-      !(user as any).mergedIntoUid &&
-      (user.displayName || user.email || user.mobileNumber || (user as any).phoneNumber)
-    );
-
-    // Deduplicate any duplicate accounts sharing the same email or mobile number
+  const { filteredUsers, hiddenInactiveUsers } = useMemo(() => {
     const seenEmails = new Set<string>();
     const seenPhones = new Set<string>();
-    const deduped: FirestoreUser[] = [];
 
-    for (const u of result) {
+    const activeList: FirestoreUser[] = [];
+    const inactiveList: FirestoreUser[] = [];
+
+    // Sort by userNumber ascending so original primary accounts are retained
+    const sorted = [...users].sort((a, b) => {
+      const numA = Number(a.userNumber) || 0;
+      const numB = Number(b.userNumber) || 0;
+      return numA - numB;
+    });
+
+    for (const u of sorted) {
+      const isArchived = (u as any).isArchived;
+      const isMerged = (u as any).mergedIntoUid;
+      const isDisabled = u.isActive === false;
+      const isIncomplete = !u.displayName && !u.email && !u.mobileNumber && !(u as any).phoneNumber;
+
+      if (isArchived || isMerged || isDisabled || isIncomplete) {
+        inactiveList.push(u);
+        continue;
+      }
+
       const email = (u.email || '').toLowerCase().trim();
       const phone = (u.mobileNumber || (u as any).phoneNumber || '').replace(/\D/g, '').replace(/^91/, '');
 
-      if (email && seenEmails.has(email)) continue;
-      if (phone && seenPhones.has(phone)) continue;
+      let isDuplicate = false;
+      if (email && seenEmails.has(email)) isDuplicate = true;
+      if (phone && seenPhones.has(phone)) isDuplicate = true;
 
-      if (email) seenEmails.add(email);
-      if (phone) seenPhones.add(phone);
-      deduped.push(u);
+      if (isDuplicate) {
+        inactiveList.push({ ...u, isDuplicate: true } as any);
+      } else {
+        if (email) seenEmails.add(email);
+        if (phone) seenPhones.add(phone);
+        activeList.push(u);
+      }
     }
-    result = deduped;
+
+    let result = activeList;
 
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase().trim();
@@ -298,8 +318,14 @@ export default function AdminUsersPage() {
       });
     }
 
-    return [...result].sort((a, b) => (Number(b.userNumber) || 0) - (Number(a.userNumber) || 0));
-  }, [users, searchTerm]);
+    const sortedResult = [...result].sort((a, b) => {
+      const numA = Number(a.userNumber) || 0;
+      const numB = Number(b.userNumber) || 0;
+      return sortOrder === 'asc' ? numA - numB : numB - numA;
+    });
+
+    return { filteredUsers: sortedResult, hiddenInactiveUsers: inactiveList };
+  }, [users, searchTerm, sortOrder]);
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     if (!userId) return;
@@ -624,6 +650,16 @@ export default function AdminUsersPage() {
               <span>Active Users</span>
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" />
             </TabsTrigger>
+            <TabsTrigger 
+              value="inactive_users" 
+              className="rounded-xl px-5 h-10 font-bold text-xs uppercase tracking-wider data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all flex items-center gap-2"
+            >
+              <UserX className="h-4 w-4 text-amber-500" />
+              <span>Inactive & Archived ({hiddenInactiveUsers.length})</span>
+              {hiddenInactiveUsers.length > 0 && (
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse ml-0.5" />
+              )}
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -790,6 +826,17 @@ export default function AdminUsersPage() {
             users={users}
             isLoading={isLoading}
             onRefresh={handleRefreshUsers}
+            onViewUserDetails={handleViewDetails}
+            appConfig={appConfig}
+          />
+        </TabsContent>
+
+        <TabsContent value="inactive_users" className="space-y-6 mt-0">
+          <InactiveUsersTab
+            users={hiddenInactiveUsers}
+            isLoading={isLoading}
+            onRefresh={handleRefreshUsers}
+            onDeleteUser={handleDeleteUser}
             onViewUserDetails={handleViewDetails}
             appConfig={appConfig}
           />

@@ -265,12 +265,27 @@ export default function ProfilePage() {
     setIsDeletingAccount(true);
 
     try {
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        await fetch('/api/auth/delete-account', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${idToken}`
+          }
+        });
+      } catch (srvErr) {
+        console.warn("Server delete-account notice:", srvErr);
+      }
+
       const uid = user.uid;
       await Promise.all([
         deleteDoc(doc(db, "users", uid)),
         deleteDoc(doc(db, "providerApplications", uid)),
-      ]);
-      await deleteUser(auth.currentUser);
+      ]).catch(() => {});
+
+      await deleteUser(auth.currentUser).catch((err: any) => {
+        if (err?.code !== 'auth/user-not-found') throw err;
+      });
       await logOut();
       await triggerRefresh('users');
 

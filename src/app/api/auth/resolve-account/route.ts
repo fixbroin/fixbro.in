@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Search for existing user with matching phone or email
-    let matchingDoc: any = null;
+    let phoneMatchDoc: any = null;
+    let emailMatchDoc: any = null;
 
     if (effectivePhone) {
       const raw10 = effectivePhone.startsWith('+91') ? effectivePhone.slice(3) : effectivePhone.replace('+', '');
@@ -60,37 +61,70 @@ export async function POST(request: NextRequest) {
 
       const snapByPhone = await usersCol.where('mobileNumber', '==', fullPhone).limit(5).get();
       for (const d of snapByPhone.docs) {
-        if (d.id !== callerUid && !d.data()?.isArchived) {
-          matchingDoc = d;
+        if (d.id !== callerUid && !d.data()?.isArchived && !d.data()?.mergedIntoUid) {
+          phoneMatchDoc = d;
           break;
         }
       }
 
-      if (!matchingDoc) {
+      if (!phoneMatchDoc) {
         const snapByRaw = await usersCol.where('mobileNumber', '==', raw10).limit(5).get();
         for (const d of snapByRaw.docs) {
-          if (d.id !== callerUid && !d.data()?.isArchived) {
-            matchingDoc = d;
+          if (d.id !== callerUid && !d.data()?.isArchived && !d.data()?.mergedIntoUid) {
+            phoneMatchDoc = d;
             break;
           }
         }
       }
     }
 
-    if (!matchingDoc && effectiveEmail) {
+    if (effectiveEmail) {
       const snapByEmail = await usersCol.where('email', '==', effectiveEmail).limit(5).get();
       for (const d of snapByEmail.docs) {
-        if (d.id !== callerUid && !d.data()?.isArchived) {
-          matchingDoc = d;
+        if (d.id !== callerUid && !d.data()?.isArchived && !d.data()?.mergedIntoUid) {
+          emailMatchDoc = d;
           break;
         }
       }
     }
 
-    // 3. If matching existing user is found, unify under primaryUid
+    // Check for double conflict: phone matches User 1, but email matches User 2
+    if (phoneMatchDoc && emailMatchDoc && phoneMatchDoc.id !== emailMatchDoc.id) {
+      return NextResponse.json({
+        success: false,
+        conflict: 'multiple_accounts',
+        error: 'This mobile number and email belong to two different accounts.'
+      }, { status: 409 });
+    }
+
+    const matchingDoc = phoneMatchDoc || emailMatchDoc;
+
+    // 3. Conflict validation on matching user
     if (matchingDoc) {
+      const existingData = matchingDoc.data() || {};
+      const existingEmail = existingData.email ? existingData.email.toLowerCase().trim() : null;
+      const existingPhone = existingData.mobileNumber ? normalizePhoneNumber(existingData.mobileNumber) : null;
+
+      // Conflict 1: Caller matched by phone, but caller has a different email than existing account
+      if (effectiveEmail && existingEmail && effectiveEmail !== existingEmail) {
+        return NextResponse.json({
+          success: false,
+          conflict: 'phone_already_used',
+          error: 'This mobile number is already linked to another account.'
+        }, { status: 409 });
+      }
+
+      // Conflict 2: Caller matched by email, but caller has a different phone than existing account
+      if (effectivePhone && existingPhone && effectivePhone !== existingPhone) {
+        return NextResponse.json({
+          success: false,
+          conflict: 'email_already_used',
+          error: 'This email address is already linked to another account.'
+        }, { status: 409 });
+      }
+
+      // Legitimate match -> Proceed with unification under primaryUid
       const existingUid = matchingDoc.id;
-      const existingData = matchingDoc.data();
 
       // The primary UID is the existing account (or whichever has mergedIntoUid)
       const primaryUid = (existingData?.mergedIntoUid && existingData.mergedIntoUid !== callerUid)

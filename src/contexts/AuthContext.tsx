@@ -327,6 +327,18 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         });
         const resolveData = await resolveRes.json();
 
+        // Check if there is an account credential conflict (e.g. mobile number or email already in use)
+        if (!resolveRes.ok || resolveData?.conflict) {
+          toast({
+            title: "Account Notice",
+            description: resolveData?.error || "This account credential is already linked to another user.",
+            variant: "destructive"
+          });
+          await signOut(auth);
+          setIsLoading(false);
+          return;
+        }
+
         // If an existing account with the same phone or email exists, switch session to the primary UID
         if (resolveData?.success && resolveData?.customToken && resolveData?.primaryUid && resolveData.primaryUid !== user.uid) {
           console.log(`[UnifiedAuth] Automatically switching session to unified primary account: ${resolveData.primaryUid}`);
@@ -417,22 +429,41 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     let initialWalletBalance = 0;
     try {
       // 1. Email Uniqueness Verification
-      const targetEmail = (details.email || user.email)?.toLowerCase();
+      const targetEmail = (details.email || user.email)?.toLowerCase()?.trim();
       if (targetEmail) {
-        const emailQuery = query(collection(db, "users"), where("email", "==", targetEmail), limit(1));
+        const emailQuery = query(collection(db, "users"), where("email", "==", targetEmail), limit(5));
         const emailSnap = await getDocs(emailQuery);
-        if (!emailSnap.empty && emailSnap.docs[0].id !== user.uid) {
-          throw new Error("This email address is already linked to another account.");
+        for (const docSnap of emailSnap.docs) {
+          const docData = docSnap.data();
+          if (docSnap.id !== user.uid && !docData.isArchived && !docData.mergedIntoUid) {
+            throw new Error("This email address is already linked to another account.");
+          }
         }
       }
 
       // 2. Mobile Number Uniqueness Verification
       const targetMobile = details.mobileNumber || user.phoneNumber;
       if (targetMobile) {
-        const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", targetMobile), limit(1));
-        const phoneSnap = await getDocs(phoneQuery);
-        if (!phoneSnap.empty && phoneSnap.docs[0].id !== user.uid) {
-          throw new Error("This mobile number is already linked to another account.");
+        const cleanedMobile = targetMobile.replace(/[\s\-()]/g, '');
+        const raw10 = cleanedMobile.length >= 10 ? cleanedMobile.slice(-10) : cleanedMobile;
+        const withPlus91 = `+91${raw10}`;
+        const withPlus = cleanedMobile.startsWith('+') ? cleanedMobile : `+${cleanedMobile}`;
+
+        const phoneQueries = [
+          query(collection(db, "users"), where("mobileNumber", "==", targetMobile), limit(5)),
+          query(collection(db, "users"), where("mobileNumber", "==", raw10), limit(5)),
+          query(collection(db, "users"), where("mobileNumber", "==", withPlus91), limit(5)),
+          query(collection(db, "users"), where("mobileNumber", "==", withPlus), limit(5)),
+        ];
+
+        for (const pq of phoneQueries) {
+          const phoneSnap = await getDocs(pq);
+          for (const docSnap of phoneSnap.docs) {
+            const docData = docSnap.data();
+            if (docSnap.id !== user.uid && !docData.isArchived && !docData.mergedIntoUid) {
+              throw new Error("This mobile number is already linked to another account.");
+            }
+          }
         }
       }
 

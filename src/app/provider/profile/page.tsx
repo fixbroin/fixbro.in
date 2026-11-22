@@ -198,8 +198,22 @@ export default function ProfilePage() {
     if (!user || !auth.currentUser) return;
     setIsDeletingAccount(true);
     try {
-      await deleteDoc(doc(db, "users", user.uid));
-      await deleteUser(auth.currentUser);
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        await fetch('/api/auth/delete-account', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${idToken}`
+          }
+        });
+      } catch (srvErr) {
+        console.warn("Server delete-account notice:", srvErr);
+      }
+
+      await deleteDoc(doc(db, "users", user.uid)).catch(() => {});
+      await deleteUser(auth.currentUser).catch((err: any) => {
+        if (err?.code !== 'auth/user-not-found') throw err;
+      });
       toast({ title: "Account Deleted", description: "Your account has been successfully deleted." });
       router.push('/');
     } catch (error: any) {

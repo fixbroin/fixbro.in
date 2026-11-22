@@ -129,7 +129,7 @@ export async function POST(request: Request) {
 
     const userData = userDoc.data();
     const fcmTokensObj = userData?.fcmTokens || {};
-    const tokens = Object.keys(fcmTokensObj);
+    const tokens = Array.from(new Set(Object.keys(fcmTokensObj).filter(t => typeof t === 'string' && t.trim().length > 10)));
 
     if (tokens.length === 0) {
       return NextResponse.json({ error: 'No FCM tokens found for this user' }, { status: 200 });
@@ -186,10 +186,12 @@ export async function POST(request: Request) {
       },
       android: {
         priority: 'high' as const,
+        collapseKey: customType || pushType || 'general',
         ttl: 60 * 60 * 24 * 1000, // 24 hours
         notification: {
           title: finalTitle,
           body: finalBody,
+          tag: customType || pushType || 'general',
           channelId: targetChannelId,
           icon: 'ic_notification',
           color: '#2563EB',
