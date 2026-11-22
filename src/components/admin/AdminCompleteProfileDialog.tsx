@@ -69,7 +69,13 @@ export default function AdminCompleteProfileDialog({
       });
       toast({ title: "Profile Completed", description: "Your admin account is now ready." });
     } catch (error: any) {
-      toast({ title: "Update Failed", description: error.message || "Could not save profile details.", variant: "destructive" });
+      const errorMessage = error.message || "Could not save profile details.";
+      if (errorMessage.toLowerCase().includes('mobile number')) {
+        form.setError("mobileNumber", { type: "manual", message: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('email')) {
+        form.setError("email", { type: "manual", message: errorMessage });
+      }
+      toast({ title: "Update Failed", description: errorMessage, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

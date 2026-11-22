@@ -259,7 +259,30 @@ export default function AdminUsersPage() {
   };
 
   const filteredUsers = useMemo(() => {
-    let result = users.filter(user => user.displayName || user.email || user.mobileNumber || (user as any).phoneNumber);
+    let result = users.filter(user => 
+      !(user as any).isArchived && 
+      !(user as any).mergedIntoUid &&
+      (user.displayName || user.email || user.mobileNumber || (user as any).phoneNumber)
+    );
+
+    // Deduplicate any duplicate accounts sharing the same email or mobile number
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
+    const deduped: FirestoreUser[] = [];
+
+    for (const u of result) {
+      const email = (u.email || '').toLowerCase().trim();
+      const phone = (u.mobileNumber || (u as any).phoneNumber || '').replace(/\D/g, '').replace(/^91/, '');
+
+      if (email && seenEmails.has(email)) continue;
+      if (phone && seenPhones.has(phone)) continue;
+
+      if (email) seenEmails.add(email);
+      if (phone) seenPhones.add(phone);
+      deduped.push(u);
+    }
+    result = deduped;
+
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase().trim();
       const normalizedSearchPhone = lowerSearch.replace(/\D/g, '').replace(/^91/, '');

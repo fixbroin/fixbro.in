@@ -11,7 +11,31 @@ export async function GET(request: NextRequest) {
   try {
     const pool = await getPool();
     const rawUsers = await getDocsInternal(pool, 'users', []);
-    const users = rawUsers.map((u: any) => ({ id: u.id, ...u.data }));
+    const allUsers = rawUsers
+      .map((u: any) => ({ id: u.id, ...u.data }))
+      .filter((u: any) => !u.isArchived && !u.mergedIntoUid);
+
+    // Deduplicate so duplicate accounts for the same email or mobile number never appear twice
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
+    const users: any[] = [];
+
+    for (const u of allUsers) {
+      const email = (u.email || '').toLowerCase().trim();
+      const phone = (u.mobileNumber || '').trim().replace(/[\s\-()]/g, '');
+      const raw10 = phone.startsWith('+91') ? phone.slice(3) : phone.replace('+', '');
+
+      if (email && seenEmails.has(email)) continue;
+      if (raw10 && (seenPhones.has(raw10) || seenPhones.has(`+91${raw10}`))) continue;
+
+      if (email) seenEmails.add(email);
+      if (raw10) {
+        seenPhones.add(raw10);
+        seenPhones.add(`+91${raw10}`);
+      }
+      users.push(u);
+    }
+
     return NextResponse.json({ success: true, users });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

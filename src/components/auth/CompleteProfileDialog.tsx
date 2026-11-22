@@ -142,6 +142,11 @@ export default function CompleteProfileDialog({
       });
     } catch (error: any) {
       const errorMessage = error.message || "Could not save profile. Please try again.";
+      if (errorMessage.toLowerCase().includes('mobile number')) {
+        form.setError("mobileNumber", { type: "manual", message: errorMessage });
+      } else if (errorMessage.toLowerCase().includes('email')) {
+        form.setError("email", { type: "manual", message: errorMessage });
+      }
       toast({ title: "Registration Update", description: errorMessage, variant: errorMessage.includes('referral') ? "warning" : "destructive" });
     } finally {
       setIsSubmitting(false);

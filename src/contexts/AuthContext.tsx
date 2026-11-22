@@ -13,6 +13,7 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
   verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -314,24 +315,31 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
 
       let isProfileIncomplete = !docSnap.exists() || !userData?.displayName || !userData?.mobileNumber || !userData?.email;
 
-      // If user profile is incomplete or doc does not exist, check if an admin-created account exists to auto-link
-      if (isProfileIncomplete) {
-        try {
-          const idToken = await user.getIdToken();
-          const resolveRes = await fetch('/api/auth/resolve-account', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${idToken}`
-            }
-          });
-          const resolveData = await resolveRes.json();
-          if (resolveData?.success && resolveData?.resolved && resolveData?.user) {
-            isProfileIncomplete = false;
+      // Unified Account Linking: Check if an existing account with the same email or phone number exists
+      try {
+        const idToken = await user.getIdToken();
+        const resolveRes = await fetch('/api/auth/resolve-account', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
           }
-        } catch (resolveErr) {
-          console.warn('Account auto-link resolution check skipped:', resolveErr);
+        });
+        const resolveData = await resolveRes.json();
+
+        // If an existing account with the same phone or email exists, switch session to the primary UID
+        if (resolveData?.success && resolveData?.customToken && resolveData?.primaryUid && resolveData.primaryUid !== user.uid) {
+          console.log(`[UnifiedAuth] Automatically switching session to unified primary account: ${resolveData.primaryUid}`);
+          const unifiedCred = await signInWithCustomToken(auth, resolveData.customToken);
+          await handleSuccessfulAuth(unifiedCred);
+          return;
         }
+
+        if (resolveData?.success && resolveData?.resolved && resolveData?.user) {
+          isProfileIncomplete = false;
+        }
+      } catch (resolveErr) {
+        console.warn('Unified account check skipped:', resolveErr);
       }
 
       if (isProfileIncomplete) {

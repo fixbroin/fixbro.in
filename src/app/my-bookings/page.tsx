@@ -104,7 +104,7 @@ const getStatusBadgeClass = (status: BookingStatus) => {
 
 
 export default function MyBookingsPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, firestoreUser, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [myBookings, setMyBookings] = useState<EnrichedBooking[]>([]); // Use enriched type
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
@@ -152,7 +152,11 @@ export default function MyBookingsPage() {
 
     setIsLoadingBookings(true);
     const bookingsCollectionRef = collection(db, "bookings");
-    const userEmail = user.email ? user.email.toLowerCase().trim() : null;
+    const userEmail = (user.email || firestoreUser?.email || '').toLowerCase().trim();
+    const rawPhone = user.phoneNumber || firestoreUser?.mobileNumber || '';
+    const cleanPhone = rawPhone.trim().replace(/[\s\-()]/g, '');
+    const raw10Phone = cleanPhone.startsWith('+91') ? cleanPhone.slice(3) : (cleanPhone.startsWith('+') ? cleanPhone.replace('+', '') : cleanPhone);
+    const fullPhone = raw10Phone.length === 10 ? `+91${raw10Phone}` : cleanPhone;
 
     // Trigger background cleanup of any stale unpaid online booking attempts
     fetch('/api/bookings/cancel-pending-payment', {
@@ -181,10 +185,10 @@ export default function MyBookingsPage() {
           return true;
         });
 
-      // Auto-link any matching email booking missing userId
+      // Auto-link any matching booking missing or having a different userId
       if (user.uid) {
         fetchedBookings.forEach(booking => {
-          if (!booking.userId && booking.customerEmail && userEmail && booking.customerEmail.toLowerCase().trim() === userEmail && booking.id) {
+          if (booking.userId !== user.uid && booking.id) {
             updateDoc(doc(db, "bookings", booking.id), { userId: user.uid }).catch(() => {});
           }
         });
@@ -268,6 +272,37 @@ export default function MyBookingsPage() {
             emailSnap.docs.forEach(d => bookingMap.set(d.id, d));
           } catch (e) {
             console.warn("Could not query bookings by email:", e);
+          }
+        }
+
+        // If user has phone, also query by customerPhone to catch bookings made with phone
+        if (fullPhone) {
+          try {
+            const phoneQuery = query(
+              bookingsCollectionRef,
+              where("customerPhone", "==", fullPhone),
+              orderBy("createdAt", "desc"),
+              limit(50)
+            );
+            const phoneSnap = await getDocs(phoneQuery);
+            phoneSnap.docs.forEach(d => bookingMap.set(d.id, d));
+          } catch (e) {
+            console.warn("Could not query bookings by full phone:", e);
+          }
+        }
+
+        if (raw10Phone && raw10Phone !== fullPhone) {
+          try {
+            const rawPhoneQuery = query(
+              bookingsCollectionRef,
+              where("customerPhone", "==", raw10Phone),
+              orderBy("createdAt", "desc"),
+              limit(50)
+            );
+            const rawSnap = await getDocs(rawPhoneQuery);
+            rawSnap.docs.forEach(d => bookingMap.set(d.id, d));
+          } catch (e) {
+            console.warn("Could not query bookings by raw phone:", e);
           }
         }
 
