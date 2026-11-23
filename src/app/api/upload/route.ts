@@ -6,6 +6,9 @@ import path from 'node:path';
 import { executeDbGetDoc } from '@/app/actions/dbActions';
 import { verifyRequest } from '@/lib/dbSecurity';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 120; // 2 minutes for media uploads
+
 export async function POST(req: NextRequest) {
   try {
     const user = await verifyRequest(req);

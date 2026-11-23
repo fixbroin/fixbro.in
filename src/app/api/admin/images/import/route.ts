@@ -5,6 +5,9 @@ import AdmZip from 'adm-zip';
 import path from 'path';
 import fs from 'fs';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes for large image ZIP extraction
+
 export async function POST(req: NextRequest) {
   const user = await verifyRequest(req);
   if (!user || !isUserAdmin(user)) {

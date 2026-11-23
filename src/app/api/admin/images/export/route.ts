@@ -5,6 +5,9 @@ import AdmZip from 'adm-zip';
 import path from 'path';
 import fs from 'fs';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes for large image ZIP generation
+
 export async function GET(request: NextRequest) {
   const user = await verifyRequest(request);
   if (!user || !isUserAdmin(user)) {

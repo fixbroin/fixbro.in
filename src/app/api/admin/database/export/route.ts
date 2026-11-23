@@ -3,6 +3,9 @@ import { NextResponse, NextRequest } from 'next/server';
 import { getPool, TABLES } from '@/lib/mysql';
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes for full database dump
+
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyRequest(request);
