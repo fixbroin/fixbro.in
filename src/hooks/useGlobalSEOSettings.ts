@@ -13,9 +13,16 @@ const CACHE_KEY = "global-seo-settings";
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
   const botPatterns = [
-      'bot', 'crawler', 'spider', 'crawling', 'googlebot', 'bingbot', 'yandexbot', 
-      'slurp', 'duckduckbot', 'baiduspider', 'adsbot', 'mediapartners-google',
-      'lighthouse', 'gtmetrix', 'pingdom', 'facebookexternalhit', 'whatsapp', 'linkedinbot'
+    'bot', 'crawler', 'spider', 'crawling', 'crawl', 'slurp',
+    'googlebot', 'bingbot', 'yandex', 'duckduckbot', 'baiduspider', 'baidu',
+    'bytespider', 'bytedance', 'petalbot', 'aspiegelbot',
+    'ahrefs', 'semrush', 'dotbot', 'mj12bot', 'megaindex', 'zoominfobot',
+    'serpstat', 'dataforseo', 'screaming frog', 'seokicks', 'blexbot',
+    'gptbot', 'chatgpt', 'oai-searchbot', 'claudebot', 'anthropic',
+    'adsbot', 'mediapartners-google', 'lighthouse', 'gtmetrix', 'pingdom',
+    'facebookexternalhit', 'whatsapp', 'linkedinbot', 'twitterbot', 'telegrambot',
+    'headlesschrome', 'phantomjs', 'selenium', 'puppeteer', 'playwright',
+    'python', 'curl', 'wget', 'aiohttp', 'httpx', 'go-http-client'
   ];
   const ua = navigator.userAgent.toLowerCase();
   return botPatterns.some(pattern => ua.includes(pattern));

@@ -1,7 +1,18 @@
-User-agent: *
+# Allow verified search engines and AI assistants
+User-agent: Googlebot
+User-agent: Googlebot-Image
+User-agent: Googlebot-News
+User-agent: Googlebot-Video
+User-agent: Google-InspectionTool
+User-agent: Mediapartners-Google
+User-agent: AdsBot-Google
+User-agent: Storebot-Google
+User-agent: Bingbot
+User-agent: BingPreview
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: OAI-SearchBot
 Allow: /
-
-# Disallow private and administrative areas
 Disallow: /admin/
 Disallow: /admin/*
 Disallow: /provider/
@@ -10,8 +21,41 @@ Disallow: /api/
 Disallow: /api/*
 Disallow: /auth/
 Disallow: /auth/*
+Disallow: /_next/
+Disallow: /_next/*
 
-# Disallow build files and internal next.js folders
+# Disallow aggressive crawlers, SEO scrapers, and bot harvesters
+User-agent: Bytespider
+User-agent: Baiduspider
+User-agent: PetalBot
+User-agent: AspiegelBot
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: DotBot
+User-agent: MJ12bot
+User-agent: YandexBot
+User-agent: MegaIndex
+User-agent: ZoominfoBot
+User-agent: DataForSeoBot
+User-agent: Sogou web spider
+User-agent: Sogou Orion spider
+User-agent: BlexBot
+User-agent: SEOkicks
+User-agent: Screaming Frog SEO Spider
+User-agent: Scrapy
+Disallow: /
+
+# Default rule for all other crawlers
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /provider/
+Disallow: /provider/*
+Disallow: /api/
+Disallow: /api/*
+Disallow: /auth/
+Disallow: /auth/*
 Disallow: /_next/
 Disallow: /_next/*
 

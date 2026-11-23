@@ -26,7 +26,6 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SearchablePickerModal from '@/components/admin/SearchablePickerModal';
 import { generateFreeAreaServiceSeoData, getNearbyAreasSorted } from "@/lib/seoGenerator";
 
@@ -1106,19 +1105,23 @@ export default function ServiceSeoPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Delete by Filter Type</label>
-              <Select value={bulkDeleteType} onValueChange={(val: any) => setBulkDeleteType(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select deletion type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="city">Delete by City (All Areas & Services)</SelectItem>
-                  <SelectItem value="city-service">Delete by City + Service</SelectItem>
-                  <SelectItem value="service">Delete by Service (Across All Cities)</SelectItem>
-                  <SelectItem value="area">Delete by Area</SelectItem>
-                  <SelectItem value="category">Delete by Category</SelectItem>
-                  <SelectItem value="duplicates">Clean Duplicates ({serviceSeoDuplicates})</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchablePickerModal
+                title="Select Deletion Type"
+                placeholder="Select deletion type..."
+                searchPlaceholder="Search deletion type..."
+                selectedValue={bulkDeleteType}
+                onSelect={(val) => setBulkDeleteType(val as any)}
+                disabled={bulkDeleteRunning}
+                items={[
+                  { id: 'city', name: 'Delete by City (All Areas & Services)', subtitle: 'Delete all area and service overrides for a selected city' },
+                  { id: 'city-service', name: 'Delete by City + Service', subtitle: 'Delete overrides for a specific service in a specific city' },
+                  { id: 'service', name: 'Delete by Service (Across All Cities)', subtitle: 'Delete all overrides for a specific service nationwide' },
+                  { id: 'area', name: 'Delete by Area', subtitle: 'Delete all overrides for a single specific area' },
+                  { id: 'category', name: 'Delete by Category', subtitle: 'Delete all overrides belonging to a category' },
+                  { id: 'duplicates', name: `Clean Duplicates (${serviceSeoDuplicates})`, subtitle: 'Safely removes duplicate service override records' },
+                ]}
+                className="w-full"
+              />
             </div>
 
             {(bulkDeleteType === 'city' || bulkDeleteType === 'city-service') && (

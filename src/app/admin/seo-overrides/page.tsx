@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Switch } from "@/components/ui/switch";
 import { PlusCircle, Edit, Trash2, Loader2, PackageSearch, Zap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SearchablePickerModal from '@/components/admin/SearchablePickerModal';
 import type { CityCategorySeoSetting, AreaCategorySeoSetting, FirestoreCategory, FirestoreCity, FirestoreArea } from '@/types/firestore';
 import CityCategorySeoForm, { type CityCategorySeoFormData } from '@/components/admin/CityCategorySeoForm';
@@ -1049,26 +1048,30 @@ export default function SeoOverridesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Delete by Filter Type</label>
-              <Select value={bulkDeleteType} onValueChange={(val: any) => setBulkDeleteType(val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select deletion type..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="city">
-                    {activeTab === 'city-category' ? "Delete by City" : "Delete by City (All Areas)"}
-                  </SelectItem>
-                  {activeTab === 'area-category' && (
-                    <SelectItem value="city-category">Delete by City + Category</SelectItem>
-                  )}
-                  {activeTab === 'area-category' && (
-                    <SelectItem value="area">Delete by Area</SelectItem>
-                  )}
-                  <SelectItem value="category">Delete by Category</SelectItem>
-                  <SelectItem value="duplicates">
-                    Clean Duplicates ({activeTab === 'city-category' ? cityCategoryDuplicates : areaCategoryDuplicates})
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchablePickerModal
+                title="Select Deletion Type"
+                placeholder="Select deletion type..."
+                searchPlaceholder="Search deletion type..."
+                selectedValue={bulkDeleteType}
+                onSelect={(val) => setBulkDeleteType(val as any)}
+                disabled={bulkDeleteRunning}
+                items={
+                  activeTab === 'city-category'
+                    ? [
+                        { id: 'city', name: 'Delete by City', subtitle: 'Delete all category overrides for a selected city' },
+                        { id: 'category', name: 'Delete by Category', subtitle: 'Delete all overrides belonging to a category' },
+                        { id: 'duplicates', name: `Clean Duplicates (${cityCategoryDuplicates})`, subtitle: 'Safely remove duplicate City-Category records' },
+                      ]
+                    : [
+                        { id: 'city', name: 'Delete by City (All Areas)', subtitle: 'Delete all area category overrides in a city' },
+                        { id: 'city-category', name: 'Delete by City + Category', subtitle: 'Delete overrides for a specific category in a city' },
+                        { id: 'area', name: 'Delete by Area', subtitle: 'Delete overrides for a single specific area' },
+                        { id: 'category', name: 'Delete by Category', subtitle: 'Delete overrides for a specific category' },
+                        { id: 'duplicates', name: `Clean Duplicates (${areaCategoryDuplicates})`, subtitle: 'Safely remove duplicate Area-Category records' },
+                      ]
+                }
+                className="w-full"
+              />
             </div>
 
             {(bulkDeleteType === 'city' || bulkDeleteType === 'city-category') && (
