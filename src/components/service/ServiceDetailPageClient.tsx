@@ -32,12 +32,14 @@ import { cn, getTimestampMillis, formatCurrency } from '@/lib/utils';
 import { LazySection } from '@/components/shared/LazySection';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import RecommendedServicesSection from '@/components/service/RecommendedServicesSection';
+import ServiceLocalitiesInterlinking from '@/components/service/ServiceLocalitiesInterlinking';
 
 interface ServiceDetailPageClientProps {
   serviceSlug: string;
   initialServiceData?: ClientServiceData | null;
   initialH1Title?: string;
   initialRecommendedServices?: FirestoreService[];
+  availableAreas?: Array<{ id: string; name: string; slug: string }>;
 }
 
 const generateAiHint = (hint?: string, name?: string): string => {
@@ -127,6 +129,7 @@ export default function ServiceDetailPageClient({
   initialServiceData,
   initialH1Title,
   initialRecommendedServices,
+  availableAreas,
 }: ServiceDetailPageClientProps) {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
@@ -817,6 +820,17 @@ export default function ServiceDetailPageClient({
                 </CardContent>
             </Card>
         </LazySection>
+      )}
+
+      {/* LOCALITIES INTERLINKING SECTION */}
+      {availableAreas && availableAreas.length > 0 && service && (
+        <ServiceLocalitiesInterlinking
+          serviceName={service.name}
+          serviceSlug={serviceSlug}
+          citySlug="bangalore"
+          cityName="Bangalore"
+          areas={availableAreas}
+        />
       )}
 
       <StickyCartContinueButton />

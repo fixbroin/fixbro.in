@@ -291,6 +291,27 @@ export const getCategoryFullData = cache(async (categorySlug: string, citySlug?:
                         const data = doc.data();
                         return { id: doc.id, name: data.name, slug: data.slug };
                     });
+
+                    // For global category pages (/category/[slug]), provide Bangalore's areas so Googlebot & users can explore all localities
+                    const defaultCityDoc = citiesSnapshot.docs.find(d => (d.data() as any).slug === 'bangalore') || citiesSnapshot.docs[0];
+                    if (defaultCityDoc) {
+                        const areasSnapshot = await adminDb.collection('areas')
+                            .where('cityId', '==', defaultCityDoc.id)
+                            .where('isActive', '==', true)
+                            .orderBy('name', 'asc')
+                            .get();
+                        
+                        availableAreas = areasSnapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return { 
+                                id: doc.id, 
+                                name: data.name, 
+                                slug: data.slug,
+                                latitude: data.latitude,
+                                longitude: data.longitude
+                            };
+                        });
+                    }
                 }
 
                 let areaDataObj: FirestoreArea | null = null;

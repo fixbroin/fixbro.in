@@ -155,6 +155,9 @@ export async function getSitemapEntries() {
       const city = cityDoc.data() as FirestoreCity;
       if (!city.slug) continue;
 
+      const cityAreas = areasByCityId.get(cityDoc.id) || [];
+      if (cityAreas.length === 0) continue; // Skip cities with 0 areas to eliminate Soft 404s
+
       entries.push({
         url: `${appBaseUrl}/${city.slug}`,
         lastModified: safeToISOString(city.updatedAt || city.createdAt, currentDate),
@@ -168,12 +171,11 @@ export async function getSitemapEntries() {
             url: `${appBaseUrl}/${city.slug}/category/${category.slug}`,
             lastModified: safeToISOString(category.createdAt, currentDate),
             changeFrequency: 'daily',
-            priority: 0.8,
+            priority: 0.85,
           });
         }
       });
 
-      const cityAreas = areasByCityId.get(cityDoc.id) || [];
       cityAreas.forEach(area => {
         if (area.slug) {
           entries.push({
@@ -189,7 +191,7 @@ export async function getSitemapEntries() {
                 url: `${appBaseUrl}/${city.slug}/${area.slug}/${category.slug}`,
                 lastModified: safeToISOString(category.createdAt, currentDate),
                 changeFrequency: 'daily',
-                priority: 0.7,
+                priority: 0.8,
               });
             }
           });
@@ -213,7 +215,7 @@ export async function getSitemapEntries() {
           url: `${appBaseUrl}/${setting.citySlug}/${setting.areaSlug}/service/${setting.serviceSlug}`,
           lastModified: safeToISOString(setting.updatedAt || setting.createdAt, currentDate),
           changeFrequency: 'daily',
-          priority: 0.8,
+          priority: 0.75,
         });
       }
     });

@@ -256,13 +256,40 @@ export async function generateMetadata(
   };
 }
 
+const getBangaloreAreas = cache(async (): Promise<Array<{ id: string; name: string; slug: string }>> => {
+  return unstable_cache(
+    async () => {
+      try {
+        const citySnap = await adminDb.collection('cities').where('slug', '==', 'bangalore').limit(1).get();
+        if (citySnap.empty) return [];
+        const cityId = citySnap.docs[0].id;
+        const areasSnap = await adminDb.collection('areas')
+          .where('cityId', '==', cityId)
+          .where('isActive', '==', true)
+          .orderBy('name', 'asc')
+          .get();
+        return areasSnap.docs.map(d => {
+          const data = d.data();
+          return { id: d.id, name: data.name, slug: data.slug };
+        });
+      } catch (e) {
+        console.error('Error fetching bangalore areas for service page:', e);
+        return [];
+      }
+    },
+    ['bangalore-areas-interlinking-cache'],
+    { revalidate: false, tags: ['areas', 'cities', 'global-cache'] }
+  )();
+});
+
 export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const { slug } = await params;
-  const [serviceData, aggregateRating, seoSettings, appConfig] = await Promise.all([
+  const [serviceData, aggregateRating, seoSettings, appConfig, bangaloreAreas] = await Promise.all([
     getServiceData(slug),
     getAggregateRating(),
     getGlobalSEOSettings(),
-    getGlobalAppSettings()
+    getGlobalAppSettings(),
+    getBangaloreAreas()
   ]);
   const symbol = appConfig?.currencySymbol || "₹";
 
@@ -415,6 +442,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
         initialServiceData={serviceData} 
         initialH1Title={h1Title} 
         initialRecommendedServices={recommendedServices}
+        availableAreas={bangaloreAreas}
       />
     </>
   );
