@@ -5,6 +5,9 @@ import { getPool, TABLES } from '@/lib/mysql';
 import { NextRequest } from 'next/server';
 import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow 5 minutes for large database restore operations
+
 export async function POST(req: NextRequest) {
   try {
     const user = await verifyRequest(req);

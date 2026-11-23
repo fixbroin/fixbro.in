@@ -88,7 +88,7 @@ const BLOCKED_BOTS = [
   'sqlmap',
 ];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const ua = (request.headers.get('user-agent') || '').toLowerCase();
   const path = request.nextUrl.pathname;
 
@@ -98,8 +98,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Allow payment webhooks and critical third-party callbacks
+  // 2. Allow payment webhooks, admin operations, and file uploads directly without body buffering
   if (
+    path.startsWith('/api/admin') ||
+    path.startsWith('/api/upload') ||
     path.startsWith('/api/razorpay') ||
     path.startsWith('/api/stripe')
   ) {
@@ -146,15 +148,21 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Backwards compatibility for Next.js middleware and default export
+export const middleware = proxy;
+export default proxy;
+
 export const config = {
   matcher: [
     /*
      * Match all request paths except for:
      * - _next/static (static files)
      * - _next/image (image optimization files)
+     * - api/admin (admin API operations, large DB imports, backups)
+     * - api/upload (file & media uploads)
      * - favicon.ico, robots.txt, sitemap.xml, offline page, service worker
      * - static asset extensions (.png, .jpg, .webp, .svg, .woff, etc.)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|offline|sw\\.js|site\\.webmanifest|manifest\\.json|.*\\.(?:jpg|jpeg|gif|png|webp|avif|svg|woff|woff2|ttf|eot|ico|css|js)$).*)',
+    '/((?!_next/static|_next/image|api/admin|api/upload|favicon\\.ico|robots\\.txt|sitemap\\.xml|offline|sw\\.js|site\\.webmanifest|manifest\\.json|.*\\.(?:jpg|jpeg|gif|png|webp|avif|svg|woff|woff2|ttf|eot|ico|css|js)$).*)',
   ],
 };

@@ -138,13 +138,17 @@ const nextConfig: NextConfig = {
   experimental: {
     workerThreads: false,
     cpus: 4,
+    proxyClientMaxBodySize: '500mb',
+    serverActions: {
+      bodySizeLimit: '500mb',
+    },
     optimizePackageImports: [
       'lucide-react',
       'date-fns',
       'recharts',
       'framer-motion',
     ],
-  }
+  } as any
 };
 
 export default withPWA(nextConfig);
