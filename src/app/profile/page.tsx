@@ -294,14 +294,21 @@ export default function ProfilePage() {
 
     try {
       try {
-        const idToken = await auth.currentUser.getIdToken();
-        await fetch('/api/auth/delete-account', {
+        const idToken = await auth.currentUser.getIdToken(true);
+        const res = await fetch('/api/auth/delete-account', {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${idToken}`
           }
         });
-      } catch (srvErr) {
+        const resJson = await res.json().catch(() => null);
+        if (!res.ok && resJson?.error) {
+          throw new Error(resJson.error);
+        }
+      } catch (srvErr: any) {
+        if (srvErr?.message && !srvErr.message.includes('fetch')) {
+          throw srvErr;
+        }
         console.warn("Server delete-account notice:", srvErr);
       }
 
@@ -311,11 +318,22 @@ export default function ProfilePage() {
         deleteDoc(doc(db, "providerApplications", uid)),
       ]).catch(() => {});
 
-      await deleteUser(auth.currentUser).catch((err: any) => {
-        if (err?.code !== 'auth/user-not-found') throw err;
-      });
-      await logOut();
-      await triggerRefresh('users');
+      if (auth.currentUser) {
+        await deleteUser(auth.currentUser).catch((err: any) => {
+          console.warn("Firebase client deleteUser handled:", err?.code || err?.message);
+        });
+      }
+      await logOut().catch(() => {});
+      await triggerRefresh('users').catch(() => {});
+
+      // Clear local storage and session
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.clear();
+          localStorage.removeItem('fb_auth_user');
+          localStorage.removeItem('user_cart');
+        } catch (e) {}
+      }
 
       toast({
         title: "Account Deleted",
@@ -324,18 +342,42 @@ export default function ProfilePage() {
 
       window.location.href = "/";
     } catch (error: any) {
-      if (error.code === "auth/requires-recent-login") {
+      // If the error was user-token-expired or user-not-found, the account was already deleted on server
+      if (
+        error?.code === "auth/user-token-expired" ||
+        error?.code === "auth/user-not-found" ||
+        error?.code === "auth/null-user" ||
+        error?.message?.includes("user-token-expired")
+      ) {
+        await logOut().catch(() => {});
+        await triggerRefresh('users').catch(() => {});
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.clear();
+            localStorage.removeItem('fb_auth_user');
+            localStorage.removeItem('user_cart');
+          } catch (e) {}
+        }
+        toast({
+          title: "Account Deleted",
+          description: "Your account and all associated data have been permanently deleted."
+        });
+        window.location.href = "/";
+        return;
+      }
+
+      if (error?.code === "auth/requires-recent-login") {
         toast({
           title: "Please login again",
           description: "For security, logout and login again before deleting account.",
           variant: "destructive"
         });
 
-        await logOut();
+        await logOut().catch(() => {});
       } else {
         toast({
           title: "Delete failed",
-          description: error.message,
+          description: error?.message || "Failed to delete account. Please try again.",
           variant: "destructive"
         });
       }
@@ -343,6 +385,21 @@ export default function ProfilePage() {
       setIsDeletingAccount(false);
     }
   };
+
+  useEffect(() => {
+    if (!authIsLoading && !isLoadingData && (!user || !firestoreUser) && !isDeletingAccount) {
+      router.replace('/');
+    }
+  }, [authIsLoading, isLoadingData, user, firestoreUser, isDeletingAccount, router]);
+
+  if (isDeletingAccount) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-destructive" />
+        <p className="text-muted-foreground text-sm font-medium">Deleting account and data...</p>
+      </div>
+    );
+  }
 
   if (authIsLoading || isLoadingData || isLoadingAppSettings) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
