@@ -23,14 +23,14 @@ export async function generateMetadata(
   const { slug } = await params;
   const categorySnapshot = await adminDb.collection('adminCategories').where('slug', '==', slug).limit(1).get();
   
-  if (categorySnapshot.empty) return { title: "Service Near Me | Fixbro" };
+  if (categorySnapshot.empty) return { title: "Service Near Me" };
   
   const category = categorySnapshot.docs[0].data() as FirestoreCategory;
   const searchTerm = getCategorySearchTerm(category.name);
   const appBaseUrl = getBaseUrl();
 
   return {
-    title: `${searchTerm} Near Me | Local ${searchTerm} Services in Bangalore | Fixbro`,
+    title: `${searchTerm} Near Me | Local ${searchTerm} Services in Bangalore`,
     description: `Looking for a ${searchTerm.toLowerCase()} near me? Fixbro provides verified, high-quality ${category.name.toLowerCase()} experts across Bangalore. Book same-day service now.`,
     alternates: {
       canonical: `${appBaseUrl}/near-me/${slug}`,
