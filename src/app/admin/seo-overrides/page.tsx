@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { PlusCircle, Edit, Trash2, Loader2, PackageSearch, Zap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchablePickerModal from '@/components/admin/SearchablePickerModal';
 import type { CityCategorySeoSetting, AreaCategorySeoSetting, FirestoreCategory, FirestoreCity, FirestoreArea } from '@/types/firestore';
 import CityCategorySeoForm, { type CityCategorySeoFormData } from '@/components/admin/CityCategorySeoForm';
 import AreaCategorySeoForm, { type AreaCategorySeoFormData } from '@/components/admin/AreaCategorySeoForm';
@@ -20,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
-import { executeDbClearTable, executeBulkOverridesSeoGenerate, executeBulkDeleteByAreaAction, executeBulkDeleteByCategoryAction } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkOverridesSeoGenerate, executeBulkDeleteByAreaAction, executeBulkDeleteByCategoryAction, executeBulkDeleteCityCategoryByCityAction, executeBulkDeleteAreaCategoryByCityAction, executeDeleteDuplicateSeoAction } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getCache, setCache } from '@/lib/client-cache';
@@ -40,9 +41,11 @@ export default function SeoOverridesPage() {
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
   const [cities, setCities] = useState<FirestoreCity[]>([]);
   const [areas, setAreas] = useState<FirestoreArea[]>([]);
-  const [cityDisplayLimit, setCityDisplayLimit] = useState(500);
-  const [areaDisplayLimit, setAreaDisplayLimit] = useState(500);
+  const [cityDisplayLimit, setCityDisplayLimit] = useState(100);
+  const [areaDisplayLimit, setAreaDisplayLimit] = useState(100);
+  const [cityCityFilterId, setCityCityFilterId] = useState<string>("all");
   const [cityCategoryFilterId, setCityCategoryFilterId] = useState<string>("all");
+  const [areaCityFilterId, setAreaCityFilterId] = useState<string>("all");
   const [areaCategoryFilterId, setAreaCategoryFilterId] = useState<string>("all");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -75,7 +78,8 @@ export default function SeoOverridesPage() {
 
   // Bulk Delete State
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
-  const [bulkDeleteType, setBulkDeleteType] = useState<"area" | "category" | "">("");
+  const [bulkDeleteType, setBulkDeleteType] = useState<"city" | "area" | "category" | "city-category" | "duplicates" | "">("");
+  const [bulkDeleteCityId, setBulkDeleteCityId] = useState<string>("");
   const [bulkDeleteAreaId, setBulkDeleteAreaId] = useState<string>("");
   const [bulkDeleteCategoryId, setBulkDeleteCategoryId] = useState<string>("");
   const [bulkDeleteRunning, setBulkDeleteRunning] = useState(false);
@@ -190,6 +194,22 @@ export default function SeoOverridesPage() {
       return;
     }
 
+    if (bulkDeleteType === 'city' && !bulkDeleteCityId) {
+      toast({ title: "Validation Error", description: "Please select a target city.", variant: "destructive" });
+      return;
+    }
+
+    if (bulkDeleteType === 'city-category') {
+      if (!bulkDeleteCityId) {
+        toast({ title: "Validation Error", description: "Please select a target city.", variant: "destructive" });
+        return;
+      }
+      if (!bulkDeleteCategoryId) {
+        toast({ title: "Validation Error", description: "Please select a target category.", variant: "destructive" });
+        return;
+      }
+    }
+
     if (bulkDeleteType === 'area' && !bulkDeleteAreaId) {
       toast({ title: "Validation Error", description: "Please select a target area.", variant: "destructive" });
       return;
@@ -203,34 +223,66 @@ export default function SeoOverridesPage() {
     setBulkDeleteRunning(true);
 
     try {
-      if (bulkDeleteType === 'area') {
+      if (bulkDeleteType === 'city') {
+        if (activeTab === 'city-category') {
+          const res = await executeBulkDeleteCityCategoryByCityAction(bulkDeleteCityId);
+          if (res.success) {
+            toast({ title: "Success", description: res.message });
+          } else {
+            toast({ title: "Failed", description: res.error, variant: "destructive" });
+          }
+        } else {
+          const res = await executeBulkDeleteAreaCategoryByCityAction(bulkDeleteCityId);
+          if (res.success) {
+            toast({ title: "Success", description: res.message });
+          } else {
+            toast({ title: "Failed", description: res.error, variant: "destructive" });
+          }
+        }
+      } else if (bulkDeleteType === 'city-category') {
+        const res = await executeBulkDeleteAreaCategoryByCityAction(bulkDeleteCityId, bulkDeleteCategoryId);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'area') {
         const areaName = areas.find(a => a.id === bulkDeleteAreaId)?.name || "Selected Area";
         await executeBulkDeleteByAreaAction(bulkDeleteAreaId);
         toast({
           title: "Bulk Delete Success",
-          description: `Successfully deleted Area-Category overrides for area: ${areaName}.`,
+          description: `Successfully deleted overrides for area: ${areaName}.`,
           className: "bg-green-100 border-green-300 text-green-700"
         });
-      } else {
+      } else if (bulkDeleteType === 'category') {
         const catName = categories.find(c => c.id === bulkDeleteCategoryId)?.name || "Selected Category";
         await executeBulkDeleteByCategoryAction(bulkDeleteCategoryId);
         toast({
           title: "Bulk Delete Success",
-          description: `Successfully deleted City-Category and Area-Category overrides for category: ${catName}.`,
+          description: `Successfully deleted overrides for category: ${catName}.`,
           className: "bg-green-100 border-green-300 text-green-700"
         });
+      } else if (bulkDeleteType === 'duplicates') {
+        const table = activeTab === 'city-category' ? 'cityCategorySeoSettings' : 'areaCategorySeoSettings';
+        const res = await executeDeleteDuplicateSeoAction(table);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
       }
 
       setIsBulkDeleteOpen(false);
       setBulkDeleteType("");
+      setBulkDeleteCityId("");
       setBulkDeleteAreaId("");
       setBulkDeleteCategoryId("");
       await triggerRefresh('seo-settings');
       await triggerRefresh('sitemap');
       await fetchData(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error running bulk delete:", err);
-      toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+      toast({ title: "Delete Failed", description: err.message || "An error occurred.", variant: "destructive" });
     } finally {
       setBulkDeleteRunning(false);
     }
@@ -479,13 +531,39 @@ export default function SeoOverridesPage() {
   };
 
 
-  const filteredCitySettings = cityCategoryFilterId === 'all'
-    ? cityCategorySettings
-    : cityCategorySettings.filter(s => s.categoryId === cityCategoryFilterId);
+  const cityCategoryDuplicates = (() => {
+    const seen = new Set<string>();
+    let count = 0;
+    cityCategorySettings.forEach(s => {
+      const key = `${s.cityId}:${s.categoryId}`;
+      if (seen.has(key)) count++;
+      else seen.add(key);
+    });
+    return count;
+  })();
 
-  const filteredAreaSettings = areaCategoryFilterId === 'all'
-    ? areaCategorySettings
-    : areaCategorySettings.filter(s => s.categoryId === areaCategoryFilterId);
+  const areaCategoryDuplicates = (() => {
+    const seen = new Set<string>();
+    let count = 0;
+    areaCategorySettings.forEach(s => {
+      const key = `${s.areaId}:${s.categoryId}`;
+      if (seen.has(key)) count++;
+      else seen.add(key);
+    });
+    return count;
+  })();
+
+  const filteredCitySettings = cityCategorySettings.filter(s => {
+    const matchesCity = cityCityFilterId === 'all' || s.cityId === cityCityFilterId;
+    const matchesCategory = cityCategoryFilterId === 'all' || s.categoryId === cityCategoryFilterId;
+    return matchesCity && matchesCategory;
+  });
+
+  const filteredAreaSettings = areaCategorySettings.filter(s => {
+    const matchesCity = areaCityFilterId === 'all' || s.cityId === areaCityFilterId;
+    const matchesCategory = areaCategoryFilterId === 'all' || s.categoryId === areaCategoryFilterId;
+    return matchesCity && matchesCategory;
+  });
 
   if (!isMounted || isLoading) {
     return (
@@ -519,7 +597,7 @@ export default function SeoOverridesPage() {
                   <Button variant="outline" onClick={() => { setFormType('cityCategory'); setIsBatchOpen(true); }} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
                   {cityCategorySettings.length > 0 && (
                     <>
-                      <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive/10" onClick={() => { setBulkDeleteType('category'); setIsBulkDeleteOpen(true); }} disabled={isSubmitting}>
+                      <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive/10" onClick={() => { setBulkDeleteType(''); setIsBulkDeleteOpen(true); }} disabled={isSubmitting}>
                         <Trash2 className="mr-2 h-4 w-4"/>Bulk Delete
                       </Button>
                       <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting}>
@@ -533,21 +611,62 @@ export default function SeoOverridesPage() {
             </CardHeader>
             <CardContent>
               {cityCategorySettings.length > 0 && (
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-                  <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
-                  <Select value={cityCategoryFilterId} onValueChange={setCityCategoryFilterId}>
-                    <SelectTrigger className="w-[220px] h-9">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {cityCategoryFilterId !== 'all' && (
-                    <Button variant="ghost" size="sm" onClick={() => setCityCategoryFilterId('all')} className="h-9">Reset</Button>
+                <div className="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">City:</span>
+                    <SearchablePickerModal
+                      title="Filter by City"
+                      placeholder="All Cities"
+                      allOptionLabel="All Cities"
+                      allOptionBadge={cityCategorySettings.length}
+                      selectedValue={cityCityFilterId}
+                      onSelect={(val) => { setCityCityFilterId(val); setCityDisplayLimit(100); }}
+                      items={cities.map(c => ({
+                        id: c.id!,
+                        name: c.name,
+                        badge: `${cityCategorySettings.filter(s => s.cityId === c.id).length} overrides`,
+                      }))}
+                      size="sm"
+                      className="w-[180px]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Category:</span>
+                    <SearchablePickerModal
+                      title="Filter by Category"
+                      placeholder="All Categories"
+                      allOptionLabel="All Categories"
+                      allOptionBadge={cityCategorySettings.length}
+                      selectedValue={cityCategoryFilterId}
+                      onSelect={(val) => { setCityCategoryFilterId(val); setCityDisplayLimit(100); }}
+                      items={categories.map(cat => ({
+                        id: cat.id!,
+                        name: cat.name,
+                        badge: `${cityCategorySettings.filter(s => s.categoryId === cat.id).length} overrides`,
+                      }))}
+                      size="sm"
+                      className="w-[180px]"
+                    />
+                  </div>
+
+                  {(cityCityFilterId !== 'all' || cityCategoryFilterId !== 'all') && (
+                    <Button variant="ghost" size="sm" onClick={() => { setCityCityFilterId('all'); setCityCategoryFilterId('all'); }} className="h-9 text-xs">Reset Filters</Button>
+                  )}
+
+                  {cityCategoryDuplicates > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="ml-auto h-9 text-xs bg-amber-500/10 border-amber-500 text-amber-600 hover:bg-amber-500/20"
+                      onClick={() => {
+                        setBulkDeleteType('duplicates');
+                        setIsBulkDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Clean Duplicates ({cityCategoryDuplicates})
+                    </Button>
                   )}
                 </div>
               )}
@@ -555,7 +674,7 @@ export default function SeoOverridesPage() {
               {cityCategorySettings.length === 0 ? (
                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No City-Category SEO overrides found.</p></div>
               ) : filteredCitySettings.length === 0 ? (
-                 <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected category.</p></div>
+                 <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected filter.</p></div>
               ) : (
                 <Table>
                   <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -588,18 +707,31 @@ export default function SeoOverridesPage() {
                 </Table>
               )}
 
-              {filteredCitySettings.length > cityDisplayLimit && (
+              {filteredCitySettings.length > 0 && (
                 <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
                   <div>
-                    Showing first {Math.min(cityDisplayLimit, filteredCitySettings.length)} of {filteredCitySettings.length} overrides.
+                    Showing {Math.min(cityDisplayLimit, filteredCitySettings.length)} of {filteredCitySettings.length} overrides
+                    {filteredCitySettings.length !== cityCategorySettings.length ? ` (Total in DB: ${cityCategorySettings.length})` : ''}
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(prev => prev + 500)}>
-                      Load More (+500)
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(filteredCitySettings.length)}>
-                      Load All ({filteredCitySettings.length})
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {cityDisplayLimit < filteredCitySettings.length && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(prev => prev + 100)}>
+                          Load More (+100)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(prev => prev + 500)}>
+                          Load More (+500)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(filteredCitySettings.length)}>
+                          Load All ({filteredCitySettings.length})
+                        </Button>
+                      </>
+                    )}
+                    {cityDisplayLimit > 100 && (
+                      <Button variant="ghost" size="sm" onClick={() => setCityDisplayLimit(100)}>
+                        Reset to 100
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -629,21 +761,62 @@ export default function SeoOverridesPage() {
             </CardHeader>
             <CardContent>
               {areaCategorySettings.length > 0 && (
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-                  <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
-                  <Select value={areaCategoryFilterId} onValueChange={setAreaCategoryFilterId}>
-                    <SelectTrigger className="w-[220px] h-9">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {areaCategoryFilterId !== 'all' && (
-                    <Button variant="ghost" size="sm" onClick={() => setAreaCategoryFilterId('all')} className="h-9">Reset</Button>
+                <div className="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">City:</span>
+                    <SearchablePickerModal
+                      title="Filter by City"
+                      placeholder="All Cities"
+                      allOptionLabel="All Cities"
+                      allOptionBadge={areaCategorySettings.length}
+                      selectedValue={areaCityFilterId}
+                      onSelect={(val) => { setAreaCityFilterId(val); setAreaDisplayLimit(100); }}
+                      items={cities.map(c => ({
+                        id: c.id!,
+                        name: c.name,
+                        badge: `${areaCategorySettings.filter(s => s.cityId === c.id).length} overrides`,
+                      }))}
+                      size="sm"
+                      className="w-[180px]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Category:</span>
+                    <SearchablePickerModal
+                      title="Filter by Category"
+                      placeholder="All Categories"
+                      allOptionLabel="All Categories"
+                      allOptionBadge={areaCategorySettings.length}
+                      selectedValue={areaCategoryFilterId}
+                      onSelect={(val) => { setAreaCategoryFilterId(val); setAreaDisplayLimit(100); }}
+                      items={categories.map(cat => ({
+                        id: cat.id!,
+                        name: cat.name,
+                        badge: `${areaCategorySettings.filter(s => s.categoryId === cat.id).length} overrides`,
+                      }))}
+                      size="sm"
+                      className="w-[180px]"
+                    />
+                  </div>
+
+                  {(areaCityFilterId !== 'all' || areaCategoryFilterId !== 'all') && (
+                    <Button variant="ghost" size="sm" onClick={() => { setAreaCityFilterId('all'); setAreaCategoryFilterId('all'); }} className="h-9 text-xs">Reset Filters</Button>
+                  )}
+
+                  {areaCategoryDuplicates > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="ml-auto h-9 text-xs bg-amber-500/10 border-amber-500 text-amber-600 hover:bg-amber-500/20"
+                      onClick={() => {
+                        setBulkDeleteType('duplicates');
+                        setIsBulkDeleteOpen(true);
+                      }}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Clean Duplicates ({areaCategoryDuplicates})
+                    </Button>
                   )}
                 </div>
               )}
@@ -651,7 +824,7 @@ export default function SeoOverridesPage() {
               {areaCategorySettings.length === 0 ? (
                   <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No Area-Category SEO overrides found.</p></div>
               ) : filteredAreaSettings.length === 0 ? (
-                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected category.</p></div>
+                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected filter.</p></div>
               ) : (
                   <Table>
                       <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Area</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
@@ -684,18 +857,31 @@ export default function SeoOverridesPage() {
                   </Table>
               )}
 
-              {filteredAreaSettings.length > areaDisplayLimit && (
+              {filteredAreaSettings.length > 0 && (
                 <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
                   <div>
-                    Showing first {Math.min(areaDisplayLimit, filteredAreaSettings.length)} of {filteredAreaSettings.length} overrides.
+                    Showing {Math.min(areaDisplayLimit, filteredAreaSettings.length)} of {filteredAreaSettings.length} overrides
+                    {filteredAreaSettings.length !== areaCategorySettings.length ? ` (Total in DB: ${areaCategorySettings.length})` : ''}
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 500)}>
-                      Load More (+500)
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(filteredAreaSettings.length)}>
-                      Load All ({filteredAreaSettings.length})
-                    </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {areaDisplayLimit < filteredAreaSettings.length && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 100)}>
+                          Load More (+100)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 500)}>
+                          Load More (+500)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(filteredAreaSettings.length)}>
+                          Load All ({filteredAreaSettings.length})
+                        </Button>
+                      </>
+                    )}
+                    {areaDisplayLimit > 100 && (
+                      <Button variant="ghost" size="sm" onClick={() => setAreaDisplayLimit(100)}>
+                        Reset to 100
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -751,32 +937,36 @@ export default function SeoOverridesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Target City</label>
-              <Select value={batchCityId} onValueChange={setBatchCityId} disabled={batchRunning}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select City" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Cities</SelectItem>
-                  {cities.map(c => (
-                    <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchablePickerModal
+                title="Select Target City"
+                placeholder="Select City"
+                allOptionLabel="All Cities"
+                selectedValue={batchCityId}
+                onSelect={setBatchCityId}
+                disabled={batchRunning}
+                items={cities.map(c => ({
+                  id: c.id!,
+                  name: c.name,
+                }))}
+                className="w-full"
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Target Category</label>
-              <Select value={batchCategoryId} onValueChange={setBatchCategoryId} disabled={batchRunning}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchablePickerModal
+                title="Select Target Category"
+                placeholder="Select Category"
+                allOptionLabel="All Categories"
+                selectedValue={batchCategoryId}
+                onSelect={setBatchCategoryId}
+                disabled={batchRunning}
+                items={categories.map(c => ({
+                  id: c.id!,
+                  name: c.name,
+                }))}
+                className="w-full"
+              />
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
@@ -850,7 +1040,9 @@ export default function SeoOverridesPage() {
               <Trash2 className="h-6 w-6" /> Bulk Delete SEO Overrides
             </DialogTitle>
             <DialogDescription>
-              Delete SEO overrides selectively by Area or by Category.
+              {activeTab === 'city-category' 
+                ? "Selectively delete City-Category SEO overrides by City, by Category, or clean duplicates."
+                : "Selectively delete Area-Category SEO overrides by City, City + Category, Area, Category, or clean duplicates."}
             </DialogDescription>
           </DialogHeader>
 
@@ -862,47 +1054,84 @@ export default function SeoOverridesPage() {
                   <SelectValue placeholder="Select deletion type..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="city">
+                    {activeTab === 'city-category' ? "Delete by City" : "Delete by City (All Areas)"}
+                  </SelectItem>
+                  {activeTab === 'area-category' && (
+                    <SelectItem value="city-category">Delete by City + Category</SelectItem>
+                  )}
                   {activeTab === 'area-category' && (
                     <SelectItem value="area">Delete by Area</SelectItem>
                   )}
                   <SelectItem value="category">Delete by Category</SelectItem>
+                  <SelectItem value="duplicates">
+                    Clean Duplicates ({activeTab === 'city-category' ? cityCategoryDuplicates : areaCategoryDuplicates})
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {bulkDeleteType === 'area' && activeTab === 'area-category' && (
+            {(bulkDeleteType === 'city' || bulkDeleteType === 'city-category') && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Select Area</label>
-                <Select value={bulkDeleteAreaId} onValueChange={setBulkDeleteAreaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose Area..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map(area => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.name} ({cities.find(c => c.id === area.cityId)?.name || 'Unknown City'})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Select City</label>
+                <SearchablePickerModal
+                  title="Choose City"
+                  placeholder="Choose City..."
+                  selectedValue={bulkDeleteCityId}
+                  onSelect={setBulkDeleteCityId}
+                  disabled={bulkDeleteRunning}
+                  items={cities.map(city => ({
+                    id: city.id!,
+                    name: city.name,
+                  }))}
+                  className="w-full"
+                />
               </div>
             )}
 
-            {bulkDeleteType === 'category' && (
+            {(bulkDeleteType === 'category' || bulkDeleteType === 'city-category') && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Category</label>
-                <Select value={bulkDeleteCategoryId} onValueChange={setBulkDeleteCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose Category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchablePickerModal
+                  title="Choose Category"
+                  placeholder="Choose Category..."
+                  selectedValue={bulkDeleteCategoryId}
+                  onSelect={setBulkDeleteCategoryId}
+                  disabled={bulkDeleteRunning}
+                  items={categories.map(cat => ({
+                    id: cat.id!,
+                    name: cat.name,
+                  }))}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {bulkDeleteType === 'area' && activeTab === 'area-category' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Area</label>
+                <SearchablePickerModal
+                  title="Choose Area"
+                  placeholder="Choose Area..."
+                  selectedValue={bulkDeleteAreaId}
+                  onSelect={setBulkDeleteAreaId}
+                  disabled={bulkDeleteRunning}
+                  items={areas.map(area => ({
+                    id: area.id!,
+                    name: area.name,
+                    subtitle: cities.find(c => c.id === area.cityId)?.name || 'Unknown City',
+                  }))}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {bulkDeleteType === 'duplicates' && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <p className="font-semibold">Safe Duplicate Cleanup:</p>
+                <p>
+                  Scans all {activeTab === 'city-category' ? 'City-Category' : 'Area-Category'} records, keeps the earliest record for each unique combination, and permanently removes redundant duplicates.
+                </p>
               </div>
             )}
 
@@ -917,14 +1146,26 @@ export default function SeoOverridesPage() {
             <Button variant="outline" onClick={() => {
               setIsBulkDeleteOpen(false);
               setBulkDeleteType("");
+              setBulkDeleteCityId("");
               setBulkDeleteAreaId("");
               setBulkDeleteCategoryId("");
             }} disabled={bulkDeleteRunning}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleteRunning || !bulkDeleteType || (bulkDeleteType === 'area' && !bulkDeleteAreaId) || (bulkDeleteType === 'category' && !bulkDeleteCategoryId)}>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete} 
+              disabled={
+                bulkDeleteRunning || 
+                !bulkDeleteType || 
+                (bulkDeleteType === 'city' && !bulkDeleteCityId) ||
+                (bulkDeleteType === 'city-category' && (!bulkDeleteCityId || !bulkDeleteCategoryId)) ||
+                (bulkDeleteType === 'area' && !bulkDeleteAreaId) || 
+                (bulkDeleteType === 'category' && !bulkDeleteCategoryId)
+              }
+            >
               {bulkDeleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {bulkDeleteRunning ? "Delete Selected" : "Delete Selected"}
+              {bulkDeleteRunning ? "Deleting..." : "Delete Selected"}
             </Button>
           </div>
         </DialogContent>

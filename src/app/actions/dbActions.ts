@@ -773,6 +773,335 @@ export async function executeBulkDeleteByCategoryAction(categoryId: string) {
   });
 }
 
+export async function executeBulkDeleteAreasByCityAction(cityId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        // 1. Find all area ids in this city to clean up related SEO overrides
+        const [areas]: any = await conn.query(
+          "SELECT id FROM `areas` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.cityId')) = ?",
+          [cityId]
+        );
+        const areaIds = areas.map((a: any) => a.id);
+
+        if (areaIds.length > 0) {
+          const placeholders = areaIds.map(() => '?').join(', ');
+          await conn.query(
+            `DELETE FROM \`areaServiceSeoSettings\` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) IN (${placeholders})`,
+            areaIds
+          );
+          await conn.query(
+            `DELETE FROM \`areaCategorySeoSettings\` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) IN (${placeholders})`,
+            areaIds
+          );
+        }
+
+        // 2. Delete areas
+        const [res]: any = await conn.query(
+          "DELETE FROM `areas` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.cityId')) = ?",
+          [cityId]
+        );
+        deletedCount = res.affectedRows || 0;
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areas');
+      clearDocCache('areaServiceSeoSettings');
+      clearDocCache('areaCategorySeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} areas.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteAreasByCityAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Database deletion error' };
+    }
+  });
+}
+
+export async function executeDeleteDuplicateAreasAction() {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        const [rows]: any = await conn.query("SELECT id, data FROM `areas` ORDER BY id ASC");
+        const seenSlugs = new Set<string>();
+        const idsToDelete: string[] = [];
+
+        for (const row of rows) {
+          try {
+            const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+            const key = `${(d.cityId || '').trim()}:${(d.slug || '').trim().toLowerCase()}`;
+            if (seenSlugs.has(key)) {
+              idsToDelete.push(row.id);
+            } else {
+              seenSlugs.add(key);
+            }
+          } catch (e) {}
+        }
+
+        if (idsToDelete.length > 0) {
+          const placeholders = idsToDelete.map(() => '?').join(', ');
+          const [res]: any = await conn.query(
+            `DELETE FROM \`areas\` WHERE id IN (${placeholders})`,
+            idsToDelete
+          );
+          deletedCount = res.affectedRows || idsToDelete.length;
+        }
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areas');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} duplicate areas.` };
+    } catch (error: any) {
+      console.error("Error in executeDeleteDuplicateAreasAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Duplicate areas deletion error' };
+    }
+  });
+}
+
+export async function executeBulkDeleteSelectedAreasAction(areaIds: string[]) {
+  return withRetry(async () => {
+    try {
+      if (!areaIds || areaIds.length === 0) return { success: true, count: 0, message: 'No areas selected' };
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        const placeholders = areaIds.map(() => '?').join(', ');
+        await conn.query(
+          `DELETE FROM \`areaServiceSeoSettings\` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) IN (${placeholders})`,
+          areaIds
+        );
+        await conn.query(
+          `DELETE FROM \`areaCategorySeoSettings\` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) IN (${placeholders})`,
+          areaIds
+        );
+        const [res]: any = await conn.query(
+          `DELETE FROM \`areas\` WHERE id IN (${placeholders})`,
+          areaIds
+        );
+        deletedCount = res.affectedRows || areaIds.length;
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areas');
+      clearDocCache('areaServiceSeoSettings');
+      clearDocCache('areaCategorySeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} selected areas.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteSelectedAreasAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Selected areas deletion error' };
+    }
+  });
+}
+
+export async function executeBulkDeleteCityCategoryByCityAction(cityId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+        const [res]: any = await conn.query(
+          "DELETE FROM `cityCategorySeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.cityId')) = ?",
+          [cityId]
+        );
+        deletedCount = res.affectedRows || 0;
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('cityCategorySeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} city-category SEO overrides.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteCityCategoryByCityAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'City-category deletion error' };
+    }
+  });
+}
+
+export async function executeBulkDeleteAreaCategoryByCityAction(cityId: string, categoryId?: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        let query = "DELETE FROM `areaCategorySeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.cityId')) = ?";
+        const params: any[] = [cityId];
+
+        if (categoryId && categoryId !== 'all') {
+          query += " AND JSON_UNQUOTE(JSON_EXTRACT(data, '$.categoryId')) = ?";
+          params.push(categoryId);
+        }
+
+        const [res]: any = await conn.query(query, params);
+        deletedCount = res.affectedRows || 0;
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areaCategorySeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} area-category SEO overrides.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteAreaCategoryByCityAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Area-category deletion error' };
+    }
+  });
+}
+
+export async function executeBulkDeleteAreaServiceByCityAction(cityId: string, serviceId?: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        let query = "DELETE FROM `areaServiceSeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.cityId')) = ?";
+        const params: any[] = [cityId];
+
+        if (serviceId && serviceId !== 'all') {
+          query += " AND JSON_UNQUOTE(JSON_EXTRACT(data, '$.serviceId')) = ?";
+          params.push(serviceId);
+        }
+
+        const [res]: any = await conn.query(query, params);
+        deletedCount = res.affectedRows || 0;
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areaServiceSeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} area-service SEO overrides.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteAreaServiceByCityAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Area-service deletion error' };
+    }
+  });
+}
+
+export async function executeBulkDeleteAreaServiceByServiceAction(serviceId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+        const [res]: any = await conn.query(
+          "DELETE FROM `areaServiceSeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.serviceId')) = ?",
+          [serviceId]
+        );
+        deletedCount = res.affectedRows || 0;
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areaServiceSeoSettings');
+      return { success: true, count: deletedCount, message: `Successfully deleted ${deletedCount} area-service SEO overrides for service.` };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteAreaServiceByServiceAction:", error);
+      return { success: false, count: 0, message: '', error: error.message || 'Service SEO deletion error' };
+    }
+  });
+}
+
+export async function executeDeleteDuplicateSeoAction(tableName: 'cityCategorySeoSettings' | 'areaCategorySeoSettings' | 'areaServiceSeoSettings') {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      let deletedCount = 0;
+      try {
+        await conn.beginTransaction();
+
+        const [rows]: any = await conn.query(`SELECT id, data FROM \`${tableName}\` ORDER BY id ASC`);
+        const seenKeys = new Set<string>();
+        const idsToDelete: string[] = [];
+
+        for (const row of rows) {
+          try {
+            const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+            let key = (d.slug || '').trim().toLowerCase();
+            if (!key) {
+              if (tableName === 'cityCategorySeoSettings') key = `${d.cityId}:${d.categoryId}`;
+              else if (tableName === 'areaCategorySeoSettings') key = `${d.areaId}:${d.categoryId}`;
+              else if (tableName === 'areaServiceSeoSettings') key = `${d.areaId}:${d.serviceId}`;
+            }
+            if (key && seenKeys.has(key)) {
+              idsToDelete.push(row.id);
+            } else if (key) {
+              seenKeys.add(key);
+            }
+          } catch (e) {}
+        }
+
+        if (idsToDelete.length > 0) {
+          const placeholders = idsToDelete.map(() => '?').join(', ');
+          const [res]: any = await conn.query(
+            `DELETE FROM \`${tableName}\` WHERE id IN (${placeholders})`,
+            idsToDelete
+          );
+          deletedCount = res.affectedRows || idsToDelete.length;
+        }
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache(tableName);
+      return { success: true, count: deletedCount, message: `Successfully cleaned ${deletedCount} duplicate SEO overrides in ${tableName}.` };
+    } catch (error: any) {
+      console.error(`Error in executeDeleteDuplicateSeoAction for ${tableName}:`, error);
+      return { success: false, count: 0, message: '', error: error.message || 'Duplicate SEO deletion error' };
+    }
+  });
+}
+
 export async function getProviderBookingCountsAction(providerId: string) {
   return withRetry(async () => {
     try {

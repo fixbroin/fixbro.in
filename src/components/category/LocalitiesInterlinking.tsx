@@ -47,10 +47,17 @@ export default function LocalitiesInterlinking({
 
   const searchTerm = getCategorySearchTerm(categoryName);
 
-  // Filter out current area and sort priority hubs first
+  // Filter out current area, deduplicate by slug, and sort priority hubs first
   const sortedAreas = useMemo(() => {
     const priorityMap = new Map(TOP_BANGALORE_AREAS.map((slug, idx) => [slug, idx]));
-    const filtered = areas.filter(a => a.slug !== currentAreaSlug);
+    // Deduplicate areas by slug so duplicates in database (like Whitefield) never appear twice
+    const uniqueMap = new Map<string, Area>();
+    for (const a of areas) {
+      if (a.slug && a.slug !== currentAreaSlug && !uniqueMap.has(a.slug)) {
+        uniqueMap.set(a.slug, a);
+      }
+    }
+    const filtered = Array.from(uniqueMap.values());
     return filtered.sort((a, b) => {
       const pA = priorityMap.has(a.slug) ? priorityMap.get(a.slug)! : 9999;
       const pB = priorityMap.has(b.slug) ? priorityMap.get(b.slug)! : 9999;

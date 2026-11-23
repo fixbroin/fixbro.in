@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
-import { executeDbClearTable, executeBulkServiceSeoGenerate, executeBulkDeleteByAreaAction, executeBulkDeleteByCategoryAction } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkServiceSeoGenerate, executeBulkDeleteByAreaAction, executeBulkDeleteByCategoryAction, executeBulkDeleteAreaServiceByCityAction, executeBulkDeleteAreaServiceByServiceAction, executeDeleteDuplicateSeoAction } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getAdminServices, getCities, getAreas, getAreaServiceSeoSettings, getAdminCategories, getAdminSubCategories } from '@/lib/webServerUtils';
@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SearchablePickerModal from '@/components/admin/SearchablePickerModal';
 import { generateFreeAreaServiceSeoData, getNearbyAreasSorted } from "@/lib/seoGenerator";
 
 export default function ServiceSeoPage() {
@@ -35,7 +36,8 @@ export default function ServiceSeoPage() {
   const [areas, setAreas] = useState<FirestoreArea[]>([]);
   const [services, setServices] = useState<FirestoreService[]>([]);
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
-  const [displayLimit, setDisplayLimit] = useState(500);
+  const [displayLimit, setDisplayLimit] = useState(100);
+  const [cityFilterId, setCityFilterId] = useState<string>("all");
   const [categoryFilterId, setCategoryFilterId] = useState<string>("all");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -69,9 +71,11 @@ export default function ServiceSeoPage() {
 
   // Bulk Delete State
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
-  const [bulkDeleteType, setBulkDeleteType] = useState<"area" | "category" | "">("");
+  const [bulkDeleteType, setBulkDeleteType] = useState<"city" | "city-service" | "service" | "area" | "category" | "duplicates" | "">("");
+  const [bulkDeleteCityId, setBulkDeleteCityId] = useState<string>("");
   const [bulkDeleteAreaId, setBulkDeleteAreaId] = useState<string>("");
   const [bulkDeleteCategoryId, setBulkDeleteCategoryId] = useState<string>("");
+  const [bulkDeleteServiceId, setBulkDeleteServiceId] = useState<string>("");
   const [bulkDeleteRunning, setBulkDeleteRunning] = useState(false);
 
   // Dialog Picker Open States
@@ -190,7 +194,28 @@ export default function ServiceSeoPage() {
 
   const handleBulkDelete = async () => {
     if (!bulkDeleteType) {
-      toast({ title: "Validation Error", description: "Please select a deletion type (Area or Category).", variant: "destructive" });
+      toast({ title: "Validation Error", description: "Please select a deletion type.", variant: "destructive" });
+      return;
+    }
+
+    if (bulkDeleteType === 'city' && !bulkDeleteCityId) {
+      toast({ title: "Validation Error", description: "Please select a target city.", variant: "destructive" });
+      return;
+    }
+
+    if (bulkDeleteType === 'city-service') {
+      if (!bulkDeleteCityId) {
+        toast({ title: "Validation Error", description: "Please select a target city.", variant: "destructive" });
+        return;
+      }
+      if (!bulkDeleteServiceId) {
+        toast({ title: "Validation Error", description: "Please select a target service.", variant: "destructive" });
+        return;
+      }
+    }
+
+    if (bulkDeleteType === 'service' && !bulkDeleteServiceId) {
+      toast({ title: "Validation Error", description: "Please select a target service.", variant: "destructive" });
       return;
     }
     
@@ -207,7 +232,28 @@ export default function ServiceSeoPage() {
     setBulkDeleteRunning(true);
 
     try {
-      if (bulkDeleteType === 'area') {
+      if (bulkDeleteType === 'city') {
+        const res = await executeBulkDeleteAreaServiceByCityAction(bulkDeleteCityId);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'city-service') {
+        const res = await executeBulkDeleteAreaServiceByCityAction(bulkDeleteCityId, bulkDeleteServiceId);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'service') {
+        const res = await executeBulkDeleteAreaServiceByServiceAction(bulkDeleteServiceId);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'area') {
         const areaName = areas.find(a => a.id === bulkDeleteAreaId)?.name || "Selected Area";
         await executeBulkDeleteByAreaAction(bulkDeleteAreaId);
         toast({
@@ -215,7 +261,7 @@ export default function ServiceSeoPage() {
           description: `Successfully deleted all overrides for area: ${areaName}.`,
           className: "bg-green-100 border-green-300 text-green-700"
         });
-      } else {
+      } else if (bulkDeleteType === 'category') {
         const catName = categories.find(c => c.id === bulkDeleteCategoryId)?.name || "Selected Category";
         await executeBulkDeleteByCategoryAction(bulkDeleteCategoryId);
         toast({
@@ -223,18 +269,27 @@ export default function ServiceSeoPage() {
           description: `Successfully deleted all overrides for category: ${catName}.`,
           className: "bg-green-100 border-green-300 text-green-700"
         });
+      } else if (bulkDeleteType === 'duplicates') {
+        const res = await executeDeleteDuplicateSeoAction('areaServiceSeoSettings');
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
       }
 
       setIsBulkDeleteOpen(false);
       setBulkDeleteType("");
+      setBulkDeleteCityId("");
       setBulkDeleteAreaId("");
       setBulkDeleteCategoryId("");
+      setBulkDeleteServiceId("");
       await triggerRefresh('seo-settings');
       await triggerRefresh('sitemap');
       await fetchData(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error running bulk delete:", err);
-      toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+      toast({ title: "Delete Failed", description: err.message || "An error occurred.", variant: "destructive" });
     } finally {
       setBulkDeleteRunning(false);
     }
@@ -434,12 +489,25 @@ export default function ServiceSeoPage() {
     }
   };
 
-  const filteredSettings = categoryFilterId === 'all'
-    ? settings
-    : settings.filter(setting => {
-        const service = services.find(s => s.id === setting.serviceId);
-        return service && service.parentCategoryId === categoryFilterId;
-      });
+  const serviceSeoDuplicates = (() => {
+    const seen = new Set<string>();
+    let count = 0;
+    settings.forEach(s => {
+      const key = `${s.areaId}:${s.serviceId}`;
+      if (seen.has(key)) count++;
+      else seen.add(key);
+    });
+    return count;
+  })();
+
+  const filteredSettings = settings.filter(setting => {
+    const matchesCity = cityFilterId === 'all' || setting.cityId === cityFilterId;
+    const matchesCategory = categoryFilterId === 'all' || (() => {
+      const service = services.find(s => s.id === setting.serviceId);
+      return service && service.parentCategoryId === categoryFilterId;
+    })();
+    return matchesCity && matchesCategory;
+  });
 
   if (!isMounted || isLoading) {
     return (
@@ -490,21 +558,61 @@ export default function ServiceSeoPage() {
         </CardHeader>
         <CardContent>
           {settings.length > 0 && (
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-              <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
-              <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
-                <SelectTrigger className="w-[220px] h-9">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {categoryFilterId !== 'all' && (
-                <Button variant="ghost" size="sm" onClick={() => setCategoryFilterId('all')} className="h-9">Reset</Button>
+            <div className="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">City:</span>
+                <SearchablePickerModal
+                  title="Filter by City"
+                  placeholder="All Cities"
+                  allOptionLabel="All Cities"
+                  allOptionBadge={settings.length}
+                  selectedValue={cityFilterId}
+                  onSelect={(val) => { setCityFilterId(val); setDisplayLimit(100); }}
+                  items={cities.map(c => ({
+                    id: c.id!,
+                    name: c.name,
+                    badge: `${settings.filter(s => s.cityId === c.id).length} overrides`,
+                  }))}
+                  size="sm"
+                  className="w-[180px]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">Category:</span>
+                <SearchablePickerModal
+                  title="Filter by Category"
+                  placeholder="All Categories"
+                  allOptionLabel="All Categories"
+                  allOptionBadge={settings.length}
+                  selectedValue={categoryFilterId}
+                  onSelect={(val) => { setCategoryFilterId(val); setDisplayLimit(100); }}
+                  items={categories.map(cat => ({
+                    id: cat.id!,
+                    name: cat.name,
+                  }))}
+                  size="sm"
+                  className="w-[180px]"
+                />
+              </div>
+
+              {(cityFilterId !== 'all' || categoryFilterId !== 'all') && (
+                <Button variant="ghost" size="sm" onClick={() => { setCityFilterId('all'); setCategoryFilterId('all'); }} className="h-9 text-xs">Reset Filters</Button>
+              )}
+
+              {serviceSeoDuplicates > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="ml-auto h-9 text-xs bg-amber-500/10 border-amber-500 text-amber-600 hover:bg-amber-500/20"
+                  onClick={() => {
+                    setBulkDeleteType('duplicates');
+                    setIsBulkDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Clean Duplicates ({serviceSeoDuplicates})
+                </Button>
               )}
             </div>
           )}
@@ -522,7 +630,10 @@ export default function ServiceSeoPage() {
           ) : filteredSettings.length === 0 ? (
             <div className="text-center py-12">
               <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No overrides found for the selected category.</p>
+              <p className="text-muted-foreground">No overrides found for the selected filter.</p>
+              <Button variant="link" size="sm" onClick={() => { setCityFilterId('all'); setCategoryFilterId('all'); }}>
+                Clear Filters
+              </Button>
             </div>
           ) : (
             <Table>
@@ -592,18 +703,31 @@ export default function ServiceSeoPage() {
             </Table>
           )}
 
-          {filteredSettings.length > displayLimit && (
+          {filteredSettings.length > 0 && (
             <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
               <div>
-                Showing first {Math.min(displayLimit, filteredSettings.length)} of {filteredSettings.length} overrides.
+                Showing {Math.min(displayLimit, filteredSettings.length)} of {filteredSettings.length} overrides
+                {filteredSettings.length !== settings.length ? ` (Total in DB: ${settings.length})` : ''}
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
-                  Load More (+500)
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredSettings.length)}>
-                  Load All ({filteredSettings.length})
-                </Button>
+              <div className="flex flex-wrap gap-2">
+                {displayLimit < filteredSettings.length && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 100)}>
+                      Load More (+100)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
+                      Load More (+500)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredSettings.length)}>
+                      Load All ({filteredSettings.length})
+                    </Button>
+                  </>
+                )}
+                {displayLimit > 100 && (
+                  <Button variant="ghost" size="sm" onClick={() => setDisplayLimit(100)}>
+                    Reset to 100
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -975,7 +1099,7 @@ export default function ServiceSeoPage() {
               <Trash2 className="h-6 w-6" /> Bulk Delete SEO Overrides
             </DialogTitle>
             <DialogDescription>
-              Delete SEO overrides selectively by Area or by Category.
+              Delete service-wise SEO overrides selectively by City, City + Service, Service, Area, Category, or clean duplicates.
             </DialogDescription>
           </DialogHeader>
 
@@ -987,45 +1111,95 @@ export default function ServiceSeoPage() {
                   <SelectValue placeholder="Select deletion type..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="city">Delete by City (All Areas & Services)</SelectItem>
+                  <SelectItem value="city-service">Delete by City + Service</SelectItem>
+                  <SelectItem value="service">Delete by Service (Across All Cities)</SelectItem>
                   <SelectItem value="area">Delete by Area</SelectItem>
                   <SelectItem value="category">Delete by Category</SelectItem>
+                  <SelectItem value="duplicates">Clean Duplicates ({serviceSeoDuplicates})</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {(bulkDeleteType === 'city' || bulkDeleteType === 'city-service') && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select City</label>
+                <SearchablePickerModal
+                  title="Choose City"
+                  placeholder="Choose City..."
+                  selectedValue={bulkDeleteCityId}
+                  onSelect={setBulkDeleteCityId}
+                  disabled={bulkDeleteRunning}
+                  items={cities.map(city => ({
+                    id: city.id!,
+                    name: city.name,
+                  }))}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {(bulkDeleteType === 'service' || bulkDeleteType === 'city-service') && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Service</label>
+                <SearchablePickerModal
+                  title="Choose Service"
+                  placeholder="Choose Service..."
+                  selectedValue={bulkDeleteServiceId}
+                  onSelect={setBulkDeleteServiceId}
+                  disabled={bulkDeleteRunning}
+                  items={services.map(srv => ({
+                    id: srv.id!,
+                    name: srv.name,
+                  }))}
+                  className="w-full"
+                />
+              </div>
+            )}
+
             {bulkDeleteType === 'area' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Area</label>
-                <Select value={bulkDeleteAreaId} onValueChange={setBulkDeleteAreaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose Area..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map(area => (
-                      <SelectItem key={area.id} value={area.id}>
-                        {area.name} ({cities.find(c => c.id === area.cityId)?.name || 'Unknown City'})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchablePickerModal
+                  title="Choose Area"
+                  placeholder="Choose Area..."
+                  selectedValue={bulkDeleteAreaId}
+                  onSelect={setBulkDeleteAreaId}
+                  disabled={bulkDeleteRunning}
+                  items={areas.map(area => ({
+                    id: area.id!,
+                    name: area.name,
+                    subtitle: cities.find(c => c.id === area.cityId)?.name || 'Unknown City',
+                  }))}
+                  className="w-full"
+                />
               </div>
             )}
 
             {bulkDeleteType === 'category' && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Select Category</label>
-                <Select value={bulkDeleteCategoryId} onValueChange={setBulkDeleteCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose Category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchablePickerModal
+                  title="Choose Category"
+                  placeholder="Choose Category..."
+                  selectedValue={bulkDeleteCategoryId}
+                  onSelect={setBulkDeleteCategoryId}
+                  disabled={bulkDeleteRunning}
+                  items={categories.map(cat => ({
+                    id: cat.id!,
+                    name: cat.name,
+                  }))}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {bulkDeleteType === 'duplicates' && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <p className="font-semibold">Safe Duplicate Cleanup:</p>
+                <p>
+                  Scans all Area-Service SEO records, keeps the earliest record for each unique Area + Service pair, and permanently removes redundant duplicate rows.
+                </p>
               </div>
             )}
 
@@ -1040,14 +1214,28 @@ export default function ServiceSeoPage() {
             <Button variant="outline" onClick={() => {
               setIsBulkDeleteOpen(false);
               setBulkDeleteType("");
+              setBulkDeleteCityId("");
               setBulkDeleteAreaId("");
               setBulkDeleteCategoryId("");
+              setBulkDeleteServiceId("");
             }} disabled={bulkDeleteRunning}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleteRunning || !bulkDeleteType || (bulkDeleteType === 'area' && !bulkDeleteAreaId) || (bulkDeleteType === 'category' && !bulkDeleteCategoryId)}>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete} 
+              disabled={
+                bulkDeleteRunning || 
+                !bulkDeleteType || 
+                (bulkDeleteType === 'city' && !bulkDeleteCityId) ||
+                (bulkDeleteType === 'city-service' && (!bulkDeleteCityId || !bulkDeleteServiceId)) ||
+                (bulkDeleteType === 'service' && !bulkDeleteServiceId) ||
+                (bulkDeleteType === 'area' && !bulkDeleteAreaId) || 
+                (bulkDeleteType === 'category' && !bulkDeleteCategoryId)
+              }
+            >
               {bulkDeleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {bulkDeleteRunning ? "Delete Selected" : "Delete Selected"}
+              {bulkDeleteRunning ? "Deleting..." : "Delete Selected"}
             </Button>
           </div>
         </DialogContent>

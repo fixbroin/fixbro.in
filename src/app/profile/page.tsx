@@ -78,15 +78,29 @@ export default function ProfilePage() {
   const otpForm = useForm<OtpFormData>({ resolver: zodResolver(otpSchema) });
 
   useEffect(() => {
-    if (user && firestoreUser) {
-      nameForm.reset({ displayName: firestoreUser.displayName || user.displayName || "" });
-      mobileForm.reset({ mobileNumber: (firestoreUser.mobileNumber || user.phoneNumber || "").replace(appConfig?.defaultOtpCountryCode || '+91', '') });
-      emailForm.reset({ email: firestoreUser.email || user.email || "" });
-      setIsLoadingData(false);
-    } else if (!authIsLoading && !user) {
-      setIsLoadingData(false); // User not logged in, stop loading
+    if (!authIsLoading) {
+      if (user && firestoreUser) {
+        nameForm.reset({ displayName: firestoreUser.displayName || user.displayName || "" });
+        mobileForm.reset({ mobileNumber: (firestoreUser.mobileNumber || user.phoneNumber || "").replace(appConfig?.defaultOtpCountryCode || '+91', '') });
+        emailForm.reset({ email: firestoreUser.email || user.email || "" });
+        setIsLoadingData(false);
+      } else if (!user) {
+        setIsLoadingData(false);
+        router.replace('/auth/login');
+      } else if (user && !firestoreUser) {
+        // User record was deleted in database (e.g., by admin or self)
+        setIsLoadingData(false);
+        toast({
+          title: "Account Not Found",
+          description: "Your user account is no longer active or has been removed. Redirecting to home...",
+          variant: "destructive"
+        });
+        logOut().catch(() => {}).finally(() => {
+          router.replace('/');
+        });
+      }
     }
-  }, [user, firestoreUser, authIsLoading, appConfig, nameForm, mobileForm, emailForm]);
+  }, [user, firestoreUser, authIsLoading, appConfig, nameForm, mobileForm, emailForm, router, logOut, toast]);
 
   const setupAndRenderRecaptcha = useCallback(async (): Promise<RecaptchaVerifier> => {
     if (recaptchaVerifierRef.current) {
@@ -308,7 +322,7 @@ export default function ProfilePage() {
         description: "Your account and all associated data have been permanently deleted."
       });
 
-      router.push("/");
+      window.location.href = "/";
     } catch (error: any) {
       if (error.code === "auth/requires-recent-login") {
         toast({
@@ -330,8 +344,18 @@ export default function ProfilePage() {
     }
   };
 
-  if (authIsLoading || isLoadingData || isLoadingAppSettings || !user) {
+  if (authIsLoading || isLoadingData || isLoadingAppSettings) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  }
+
+  if (!user || !firestoreUser) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] p-6 text-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground text-sm">Account not found or session ended. Redirecting...</p>
+        <Button variant="outline" size="sm" onClick={() => router.replace('/')}>Go to Home</Button>
+      </div>
+    );
   }
   
   return (

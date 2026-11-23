@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, RefreshCw, Map } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, MapPin, CheckCircle, XCircle, PackageSearch, RefreshCw, Map, Search, Filter, Layers, CheckSquare } from "lucide-react";
 import type { FirestoreArea, FirestoreCity } from '@/types/firestore';
 import AreaForm from '@/components/admin/AreaForm';
 import { db, auth } from '@/lib/firebase';
@@ -15,7 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
-import { executeDbClearTable } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkDeleteAreasByCityAction, executeDeleteDuplicateAreasAction, executeBulkDeleteSelectedAreasAction } from '@/app/actions/dbActions';
+import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +27,7 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Zap } from "lucide-react";
+import SearchablePickerModal from '@/components/admin/SearchablePickerModal';
 
 const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -80,8 +82,20 @@ export default function AdminAreasPage() {
   const [deleteRunning, setDeleteRunning] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [deleteStatus, setDeleteStatus] = useState("");
-  const [displayLimit, setDisplayLimit] = useState(500);
+  const [displayLimit, setDisplayLimit] = useState(100);
   const [onlyMajorAreas, setOnlyMajorAreas] = useState(true);
+
+  // Filter & Selection States
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string>("all");
+  const [areaSearchFilter, setAreaSearchFilter] = useState<string>("");
+  const [selectedAreaIds, setSelectedAreaIds] = useState<Record<string, boolean>>({});
+  const [duplicateCount, setDuplicateCount] = useState<number>(0);
+
+  // Bulk Delete Modal States
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [bulkDeleteType, setBulkDeleteType] = useState<"city" | "duplicates" | "selected" | "">("");
+  const [bulkDeleteCityId, setBulkDeleteCityId] = useState<string>("");
+  const [bulkDeleteRunning, setBulkDeleteRunning] = useState(false);
 
   // Load Leaflet dynamically on mount
   useEffect(() => {
@@ -526,16 +540,78 @@ export default function AdminAreasPage() {
       const fetchedCities = citiesSnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreCity));
       setCities(fetchedCities);
 
-      const areasQuery = query(areasCollectionRef, orderBy("name", "asc"), limit(500));
+      const areasQuery = query(areasCollectionRef, orderBy("name", "asc"), limit(10000));
       const areasSnapshot = await getDocs(areasQuery);
       const fetchedAreas = areasSnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as FirestoreArea));
       setAreas(fetchedAreas);
 
+      // Compute duplicate areas
+      const seen = new Set<string>();
+      let dupes = 0;
+      fetchedAreas.forEach(a => {
+        const key = `${a.cityId || ''}:${(a.slug || a.name || '').toLowerCase().trim()}`;
+        if (seen.has(key)) {
+          dupes++;
+        } else {
+          seen.add(key);
+        }
+      });
+      setDuplicateCount(dupes);
+      setSelectedAreaIds({});
     } catch (error) {
       console.error("Error fetching cities or areas: ", error);
       toast({ title: "Error", description: "Could not fetch required data.", variant: "destructive" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleteRunning(true);
+    try {
+      if (bulkDeleteType === 'city') {
+        if (!bulkDeleteCityId) {
+          toast({ title: "Error", description: "Please select a city.", variant: "destructive" });
+          setBulkDeleteRunning(false);
+          return;
+        }
+        const res = await executeBulkDeleteAreasByCityAction(bulkDeleteCityId);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'duplicates') {
+        const res = await executeDeleteDuplicateAreasAction();
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      } else if (bulkDeleteType === 'selected') {
+        const ids = Object.keys(selectedAreaIds).filter(id => selectedAreaIds[id]);
+        if (ids.length === 0) {
+          toast({ title: "Error", description: "No areas selected.", variant: "destructive" });
+          setBulkDeleteRunning(false);
+          return;
+        }
+        const res = await executeBulkDeleteSelectedAreasAction(ids);
+        if (res.success) {
+          toast({ title: "Success", description: res.message });
+          setSelectedAreaIds({});
+        } else {
+          toast({ title: "Failed", description: res.error, variant: "destructive" });
+        }
+      }
+
+      setIsBulkDeleteOpen(false);
+      await triggerRefresh('locations');
+      await triggerRefresh('sitemap');
+      await fetchCitiesAndAreas();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to execute bulk delete", variant: "destructive" });
+    } finally {
+      setBulkDeleteRunning(false);
     }
   };
 
@@ -674,6 +750,43 @@ export default function AdminAreasPage() {
     }
   };
   
+  const filteredAreas = areas.filter(area => {
+    const matchesCity = selectedCityFilter === "all" || area.cityId === selectedCityFilter;
+    const matchesSearch = !areaSearchFilter.trim() || 
+      area.name.toLowerCase().includes(areaSearchFilter.toLowerCase().trim()) ||
+      (area.slug && area.slug.toLowerCase().includes(areaSearchFilter.toLowerCase().trim())) ||
+      (area.cityName && area.cityName.toLowerCase().includes(areaSearchFilter.toLowerCase().trim()));
+    return matchesCity && matchesSearch;
+  });
+
+  const selectedCount = Object.values(selectedAreaIds).filter(Boolean).length;
+  const visibleAreas = filteredAreas.slice(0, displayLimit);
+  const allVisibleSelected = visibleAreas.length > 0 && visibleAreas.every(a => !!selectedAreaIds[a.id]);
+
+  const toggleSelectAllVisible = (checked: boolean) => {
+    const newSelected = { ...selectedAreaIds };
+    visibleAreas.forEach(a => {
+      if (checked) {
+        newSelected[a.id] = true;
+      } else {
+        delete newSelected[a.id];
+      }
+    });
+    setSelectedAreaIds(newSelected);
+  };
+
+  const toggleSelectArea = (id: string, checked: boolean) => {
+    setSelectedAreaIds(prev => {
+      const next = { ...prev };
+      if (checked) {
+        next[id] = true;
+      } else {
+        delete next[id];
+      }
+      return next;
+    });
+  };
+
   if (!isMounted) {
      return (
       <div className="space-y-6">
@@ -690,9 +803,9 @@ export default function AdminAreasPage() {
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
             <CardTitle className="text-2xl flex items-center"><MapPin className="mr-2 h-6 w-6 text-primary" />Manage Areas</CardTitle>
-            <CardDescription>Add, edit, or delete service areas under cities.</CardDescription>
+            <CardDescription>Add, edit, or delete service areas under cities. Filter by city, clean duplicates, or bulk delete.</CardDescription>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <PermissionGuard moduleId="areas" action="delete">
               <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting || isLoading || areas.length === 0} className="w-full sm:w-auto">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete All
@@ -712,7 +825,91 @@ export default function AdminAreasPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-2 space-y-4">
+          {/* Filter & Bulk Action Toolbar */}
+          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-muted/30 p-3 rounded-lg border">
+            <div className="flex flex-col sm:flex-row gap-2 flex-1">
+              <div className="w-full sm:w-56">
+                <SearchablePickerModal
+                  title="Filter by City"
+                  placeholder="All Cities"
+                  allOptionLabel="All Cities"
+                  allOptionBadge={areas.length}
+                  selectedValue={selectedCityFilter}
+                  onSelect={(val) => { setSelectedCityFilter(val); setDisplayLimit(100); }}
+                  items={cities.map(c => ({
+                    id: c.id!,
+                    name: c.name,
+                    badge: `${areas.filter(a => a.cityId === c.id).length} areas`,
+                  }))}
+                  size="sm"
+                  className="w-full"
+                />
+              </div>
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search area name, slug, or city..."
+                  value={areaSearchFilter}
+                  onChange={(e) => setAreaSearchFilter(e.target.value)}
+                  className="pl-8 h-9"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <PermissionGuard moduleId="areas" action="delete">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-9 text-xs border-dashed text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setBulkDeleteType('city');
+                    setBulkDeleteCityId(selectedCityFilter !== 'all' ? selectedCityFilter : (cities[0]?.id || ''));
+                    setIsBulkDeleteOpen(true);
+                  }}
+                  disabled={isLoading || cities.length === 0}
+                >
+                  <Layers className="mr-1.5 h-3.5 w-3.5" />
+                  Delete by City
+                </Button>
+
+                {duplicateCount > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 text-xs bg-amber-500/10 border-amber-500 text-amber-600 hover:bg-amber-500/20"
+                    onClick={() => {
+                      setBulkDeleteType('duplicates');
+                      setIsBulkDeleteOpen(true);
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Clean Duplicates ({duplicateCount})
+                  </Button>
+                )}
+
+                {selectedCount > 0 && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-9 text-xs"
+                    onClick={() => {
+                      setBulkDeleteType('selected');
+                      setIsBulkDeleteOpen(true);
+                    }}
+                    disabled={isLoading}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                    Delete Selected ({selectedCount})
+                  </Button>
+                )}
+              </PermissionGuard>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -722,86 +919,121 @@ export default function AdminAreasPage() {
              <p className="text-muted-foreground text-center py-6">
                 No cities found. Please add cities first to create areas under them.
             </p>
-          ) : areas.length === 0 ? (
+          ) : filteredAreas.length === 0 ? (
             <div className="text-center py-10">
               <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No areas found yet. Add one to get started.</p>
+              <p className="text-muted-foreground">No areas match your current filter or search criteria.</p>
+              {(selectedCityFilter !== 'all' || areaSearchFilter) && (
+                <Button variant="link" size="sm" onClick={() => { setSelectedCityFilter('all'); setAreaSearchFilter(''); }}>
+                  Clear Filters
+                </Button>
+              )}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Area Name</TableHead>
-                  <TableHead>Parent City</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>H1 Title</TableHead>
-                  <TableHead className="text-center">Active</TableHead>
-                  <TableHead className="text-right min-w-[120px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {areas.slice(0, displayLimit).map((area) => (
-                  <TableRow key={area.id}>
-                    <TableCell className="font-medium">{area.name}</TableCell>
-                    <TableCell>{area.cityName}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{area.slug}</TableCell>
-                    <TableCell className="text-xs max-w-xs truncate" title={area.h1_title}>{area.h1_title || "Not set"}</TableCell>
-                    <TableCell className="text-center">
-                      {area.isActive ? <CheckCircle className="h-5 w-5 text-green-500 mx-auto" /> : <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                        <PermissionGuard moduleId="areas" action="write">
-                          <Button variant="outline" size="icon" onClick={() => handleEditArea(area)} disabled={isSubmitting}>
-                            <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
-                          </Button>
-                        </PermissionGuard>
-                        <PermissionGuard moduleId="areas" action="delete">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete the area "{area.name}". Services under this area might be affected.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteArea(area.id)}
-                                  disabled={isSubmitting}
-                                  className="bg-destructive hover:bg-destructive/90">
-                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </PermissionGuard>
-                      </div>
-                    </TableCell>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12 text-center">
+                      <Checkbox 
+                        checked={allVisibleSelected}
+                        onCheckedChange={(checked) => toggleSelectAllVisible(!!checked)}
+                        aria-label="Select all visible"
+                      />
+                    </TableHead>
+                    <TableHead>Area Name</TableHead>
+                    <TableHead>Parent City</TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>H1 Title</TableHead>
+                    <TableHead className="text-center">Active</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {visibleAreas.map((area) => (
+                    <TableRow key={area.id} className={selectedAreaIds[area.id] ? "bg-muted/50" : ""}>
+                      <TableCell className="text-center">
+                        <Checkbox 
+                          checked={!!selectedAreaIds[area.id]}
+                          onCheckedChange={(checked) => toggleSelectArea(area.id, !!checked)}
+                          aria-label={`Select ${area.name}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{area.name}</TableCell>
+                      <TableCell>{area.cityName}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{area.slug}</TableCell>
+                      <TableCell className="text-xs max-w-xs truncate" title={area.h1_title}>{area.h1_title || "Not set"}</TableCell>
+                      <TableCell className="text-center">
+                        {area.isActive ? <CheckCircle className="h-5 w-5 text-green-500 mx-auto" /> : <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
+                          <PermissionGuard moduleId="areas" action="write">
+                            <Button variant="outline" size="icon" onClick={() => handleEditArea(area)} disabled={isSubmitting}>
+                              <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
+                            </Button>
+                          </PermissionGuard>
+                          <PermissionGuard moduleId="areas" action="delete">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                  <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete the area "{area.name}". Services under this area might be affected.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteArea(area.id)}
+                                    disabled={isSubmitting}
+                                    className="bg-destructive hover:bg-destructive/90">
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </PermissionGuard>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
-          {areas.length > displayLimit && (
-            <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+          {filteredAreas.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
               <div>
-                Showing first {Math.min(displayLimit, areas.length)} of {areas.length} areas.
+                Showing {visibleAreas.length} of {filteredAreas.length} filtered areas
+                {filteredAreas.length !== areas.length ? ` (Total in DB: ${areas.length})` : ''}
+                {selectedCount > 0 ? ` • ${selectedCount} selected` : ''}
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
-                  Load More (+500)
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(areas.length)}>
-                  Load All ({areas.length})
-                </Button>
+              <div className="flex flex-wrap gap-2">
+                {visibleAreas.length < filteredAreas.length && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 100)}>
+                      Load More (+100)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
+                      Load More (+500)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredAreas.length)}>
+                      Load All ({filteredAreas.length})
+                    </Button>
+                  </>
+                )}
+                {displayLimit > 100 && (
+                  <Button variant="ghost" size="sm" onClick={() => setDisplayLimit(100)}>
+                    Reset to 100
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -846,17 +1078,19 @@ export default function AdminAreasPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Select City</label>
-              <select
-                value={batchCityId}
-                onChange={(e) => setBatchCityId(e.target.value)}
+              <SearchablePickerModal
+                title="Select City for Coordinates"
+                placeholder="-- Choose City --"
+                selectedValue={batchCityId}
+                onSelect={setBatchCityId}
                 disabled={isBatchRunning}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="">-- Choose City --</option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </select>
+                items={cities.map((city) => ({
+                  id: city.id!,
+                  name: city.name,
+                  badge: `${areas.filter(a => a.cityId === city.id).length} areas`,
+                }))}
+                className="w-full"
+              />
             </div>
 
             {isBatchRunning && (
@@ -907,17 +1141,21 @@ export default function AdminAreasPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Target City</label>
-              <Select value={batchSeoCityId} onValueChange={setBatchSeoCityId} disabled={batchSeoRunning}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select City" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Cities</SelectItem>
-                  {cities.map(c => (
-                    <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchablePickerModal
+                title="Select Target City"
+                placeholder="Select City"
+                allOptionLabel="All Cities"
+                allOptionBadge={areas.length}
+                selectedValue={batchSeoCityId}
+                onSelect={setBatchSeoCityId}
+                disabled={batchSeoRunning}
+                items={cities.map(c => ({
+                  id: c.id!,
+                  name: c.name,
+                  badge: `${areas.filter(a => a.cityId === c.id).length} areas`,
+                }))}
+                className="w-full"
+              />
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
@@ -965,16 +1203,19 @@ export default function AdminAreasPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-muted-foreground">Target City (Parent)</label>
-                <select
-                  value={mapCityId}
-                  onChange={(e) => setMapCityId(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <option value="">-- Choose Target City --</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>{city.name}</option>
-                  ))}
-                </select>
+                <SearchablePickerModal
+                  title="Choose Target City"
+                  placeholder="-- Choose Target City --"
+                  selectedValue={mapCityId}
+                  onSelect={setMapCityId}
+                  disabled={isImporting || isFetchingPlaces}
+                  items={cities.map((city) => ({
+                    id: city.id!,
+                    name: city.name,
+                    badge: `${areas.filter(a => a.cityId === city.id).length} areas`,
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1">
@@ -1154,6 +1395,78 @@ export default function AdminAreasPage() {
             <Button variant="destructive" onClick={handleDeleteAll} disabled={deleteRunning}>
               {deleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deleteRunning ? "Deleting..." : "Yes, Delete All"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Granular Bulk Delete Dialog */}
+      <Dialog open={isBulkDeleteOpen} onOpenChange={(open) => { if (!bulkDeleteRunning) setIsBulkDeleteOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-destructive">
+              <Trash2 className="h-5 w-5 mr-2" />
+              {bulkDeleteType === 'city' && "Delete Areas by City"}
+              {bulkDeleteType === 'duplicates' && "Clean Duplicate Areas"}
+              {bulkDeleteType === 'selected' && `Delete ${selectedCount} Selected Areas`}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkDeleteType === 'city' && "Choose a city to permanently remove all areas belonging to that city."}
+              {bulkDeleteType === 'duplicates' && `Found ${duplicateCount} duplicate area records. The system will keep the original record and delete redundant duplicates.`}
+              {bulkDeleteType === 'selected' && `Are you sure you want to delete the ${selectedCount} checked areas?`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {bulkDeleteType === 'city' && (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-muted-foreground">Select City</label>
+                <SearchablePickerModal
+                  title="Select City to Delete Areas"
+                  placeholder="Select target city..."
+                  selectedValue={bulkDeleteCityId}
+                  onSelect={setBulkDeleteCityId}
+                  disabled={bulkDeleteRunning}
+                  items={cities.map(c => ({
+                    id: c.id!,
+                    name: c.name,
+                    badge: `${areas.filter(a => a.cityId === c.id).length} areas`,
+                  }))}
+                  className="w-full"
+                />
+                {bulkDeleteCityId && (
+                  <p className="text-xs text-destructive">
+                    Warning: This will delete all {areas.filter(a => a.cityId === bulkDeleteCityId).length} areas in {cities.find(c => c.id === bulkDeleteCityId)?.name}.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {bulkDeleteType === 'duplicates' && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <p className="font-semibold">Safe Duplicate Cleanup:</p>
+                <p>Scans all areas grouped by City + Slug/Name. For any duplicated areas, the earliest created record is kept while duplicate rows are permanently removed.</p>
+              </div>
+            )}
+
+            {bulkDeleteType === 'selected' && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded p-3 text-xs text-destructive">
+                <p>This action will permanently delete {selectedCount} selected area records.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsBulkDeleteOpen(false)} disabled={bulkDeleteRunning}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete} 
+              disabled={bulkDeleteRunning || (bulkDeleteType === 'city' && !bulkDeleteCityId)}
+            >
+              {bulkDeleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {bulkDeleteRunning ? "Deleting..." : "Confirm & Delete"}
             </Button>
           </div>
         </DialogContent>
