@@ -688,6 +688,7 @@ export interface AppSettings {
   maxProviderRadiusKm?: number; // New for provider work area
   autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
   requireBookingOtp?: boolean; // Toggle for requiring Start & Complete OTP verification for providers
+  enableJobPhotos?: boolean; // Toggle for enabling optional before & after work evidence photos
   
   // Login Settings
   enableEmailPasswordLogin?: boolean;

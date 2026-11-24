@@ -86,7 +86,7 @@ export default function ProviderBookingDetailsPage() {
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
 
   const handleStartWorkClick = () => {
-    if (appConfig?.requireBookingOtp) {
+    if (appConfig?.requireBookingOtp || (appConfig?.enableJobPhotos ?? true)) {
       setIsStartDialogOpen(true);
     } else {
       updateBookingStatus('InProgressByProvider');

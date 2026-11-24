@@ -80,6 +80,7 @@ export const defaultAppSettings: AppSettings = {
   maxProviderRadiusKm: 50, // Added default max provider radius
   autoDispatchRadiusKm: 5, // Default auto-dispatch radius (km)
   requireBookingOtp: false, // OTP verification disabled by default
+  enableJobPhotos: true, // Job evidence photos enabled by default
   
   // Login Settings
   enableEmailPasswordLogin: true,

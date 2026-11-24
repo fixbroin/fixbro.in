@@ -76,7 +76,7 @@ export default function ProviderDashboardPage() {
     const job = bookings.find(b => b.id === bookingId);
     if (!job) return;
 
-    if (appConfig?.requireBookingOtp) {
+    if (appConfig?.requireBookingOtp || (appConfig?.enableJobPhotos ?? true)) {
       setBookingToStart(job);
       setIsStartDialogOpen(true);
     } else {
