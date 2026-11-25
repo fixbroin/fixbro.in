@@ -65,11 +65,6 @@ export async function POST(req: NextRequest) {
       ''
     ).toUpperCase();
 
-    // Block China traffic from visitor logs immediately
-    if (cdnCountry === 'CN') {
-      return NextResponse.json({ success: true, bypassed: true, reason: 'China country filtered' });
-    }
-
     // 4. Fetch Geo-data from Server side (More reliable)
     let geoData = {
         city: 'Unknown City',
@@ -86,11 +81,6 @@ export async function POST(req: NextRequest) {
             if (geoRes.ok) {
                 const data = await geoRes.json();
                 if (data.status === 'success') {
-                    // Double check if resolved IP is from China
-                    if (data.countryCode === 'CN' || (data.country && data.country.toLowerCase().includes('china'))) {
-                      return NextResponse.json({ success: true, bypassed: true, reason: 'China IP filtered' });
-                    }
-
                     geoData = {
                         city: data.city || 'Unknown City',
                         region: data.regionName || 'Unknown Region',
@@ -106,11 +96,7 @@ export async function POST(req: NextRequest) {
         }
     }
     
-    // Final check on resolved country
-    if (geoData.countryCode === 'CN' || geoData.country.toLowerCase().includes('china')) {
-      return NextResponse.json({ success: true, bypassed: true, reason: 'China filtered' });
-    }
-
+    // If not blocked by firewall/proxy, log the visitor info so Admin has 100% visibility
     const visitorLog: any = {
       ipAddress: userIp,
       city: geoData.city,
