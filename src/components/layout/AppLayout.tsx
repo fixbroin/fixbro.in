@@ -23,6 +23,7 @@ import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileD
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 import { isWebView } from '@/lib/webview-bridge';
 import type { SiloData } from '@/lib/seoServerUtils';
+import SeasonalEffectsOverlay from '@/components/shared/SeasonalEffectsOverlay';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -380,6 +381,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
           {children}
         </main>
         {showFooter && !isHiddenRoute && <Footer initialWebSettings={initialWebSettings} initialSiloData={initialSiloData} />}
+        {isClientMounted && <SeasonalEffectsOverlay initialSeasonalEffect={initialWebSettings?.seasonalEffect} />}
         {shouldShowBottomNav && <BottomNavigationBar />}
         {shouldShowNewsletterPopupManager && <PopupDisplayManager />}
         {shouldShowGlobalAdminPopup && <GlobalAdminPopup />}

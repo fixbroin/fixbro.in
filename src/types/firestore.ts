@@ -420,6 +420,31 @@ export type LoaderType =
   | "heart"
   | "matrix";
 
+export type SeasonalEffectMode =
+  | "none"
+  | "rain"
+  | "clouds"
+  | "snow"
+  | "sunshine"
+  | "diwali"
+  | "holi"
+  | "celebration"
+  | "tricolor"
+  | "spring"
+  | "custom-png"
+  | "custom-text";
+
+export interface SeasonalEffectConfig {
+  mode: SeasonalEffectMode;
+  customImageUrl?: string;
+  customText?: string;
+  intensity?: "light" | "medium" | "festive";
+  scope?: "home" | "all";
+  durationType?: "always" | "1h" | "24h" | "custom";
+  startAt?: string;
+  expiresAt?: string;
+}
+
 
 export interface GlobalAdminPopup {
   message: string;
@@ -468,6 +493,7 @@ export interface GlobalWebSettings {
   };
   themeColors?: ThemeColors;
   loaderType?: LoaderType; // Added loader type
+  seasonalEffect?: SeasonalEffectConfig; // Weather & Festival falling/floating overlay
   isChatEnabled?: boolean; 
   isAiChatBotEnabled?: boolean; // New: Master switch for the AI bot
   chatNotificationSoundUrl?: string;

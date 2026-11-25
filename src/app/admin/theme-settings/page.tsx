@@ -5,17 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Palette, Save, Loader2, RefreshCw, XCircle, Sun, Moon, Sparkles, CheckCircle2, Layout, Zap, Component, Settings2 } from "lucide-react";
+import { Palette, Save, Loader2, RefreshCw, XCircle, Sun, Moon, Sparkles, CheckCircle2, Layout, Zap, Component, Settings2, CloudRain, Cloud, Snowflake, Flower2, PartyPopper, Flag, Upload, Trash2, Image as ImageIcon, Type, Clock } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import type { GlobalWebSettings, ThemeColors, ThemePalette, LoaderType } from '@/types/firestore';
+import type { GlobalWebSettings, ThemeColors, ThemePalette, LoaderType, SeasonalEffectConfig, SeasonalEffectMode } from '@/types/firestore';
 import { hexToHslString, hslStringToHex, DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, CORE_THEME_PALETTE_KEYS } from '@/lib/colorUtils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
 const WEB_SETTINGS_DOC_ID = "global";
@@ -207,6 +208,7 @@ const isHexClose = (hexA?: string, hexB?: string): boolean => {
 
 export default function ThemeSettingsPage() {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ThemeMode>('light');
@@ -217,6 +219,17 @@ export default function ThemeSettingsPage() {
     dark: {},
   });
   const [selectedLoader, setSelectedLoader] = useState<LoaderType>('logo-pulse');
+  const [seasonalEffect, setSeasonalEffect] = useState<SeasonalEffectConfig>({
+    mode: 'none',
+    intensity: 'medium',
+    scope: 'all',
+    customImageUrl: '',
+    customText: '',
+    durationType: 'always',
+    startAt: '',
+    expiresAt: '',
+  });
+  const [isUploadingEffectPng, setIsUploadingEffectPng] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
 
   const loadThemeSettings = useCallback(async () => {
@@ -227,6 +240,18 @@ export default function ThemeSettingsPage() {
       if (docSnap.exists()) {
         const globalSettings = docSnap.data() as GlobalWebSettings;
         setSelectedLoader(globalSettings.loaderType || 'logo-pulse');
+        if (globalSettings.seasonalEffect) {
+          setSeasonalEffect({
+            mode: globalSettings.seasonalEffect.mode || 'none',
+            intensity: globalSettings.seasonalEffect.intensity || 'medium',
+            scope: globalSettings.seasonalEffect.scope || 'all',
+            customImageUrl: globalSettings.seasonalEffect.customImageUrl || '',
+            customText: globalSettings.seasonalEffect.customText || '',
+            durationType: globalSettings.seasonalEffect.durationType || 'always',
+            startAt: globalSettings.seasonalEffect.startAt || '',
+            expiresAt: globalSettings.seasonalEffect.expiresAt || '',
+          });
+        }
         const loadedLightHexColors: Record<string, string> = {};
         const loadedDarkHexColors: Record<string, string> = {};
 
@@ -296,10 +321,27 @@ export default function ThemeSettingsPage() {
         if (currentColorsHex.dark[key]) themeColorsToSave.dark![key] = hexToHslString(currentColorsHex.dark[key]);
       });
 
+      let effectToSave: SeasonalEffectConfig = { ...seasonalEffect };
+      if (effectToSave.mode === 'none' || effectToSave.durationType === 'always' || !effectToSave.durationType) {
+        effectToSave.durationType = effectToSave.mode === 'none' ? 'always' : (effectToSave.durationType || 'always');
+        effectToSave.startAt = '';
+        effectToSave.expiresAt = '';
+      } else if (effectToSave.durationType === '1h') {
+        const now = Date.now();
+        effectToSave.startAt = new Date(now).toISOString();
+        effectToSave.expiresAt = new Date(now + 60 * 60 * 1000).toISOString();
+        setSeasonalEffect(effectToSave);
+      } else if (effectToSave.durationType === '24h') {
+        const now = Date.now();
+        effectToSave.startAt = new Date(now).toISOString();
+        effectToSave.expiresAt = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+        setSeasonalEffect(effectToSave);
+      }
+
       const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
-      await setDoc(settingsDocRef, { themeColors: themeColorsToSave, loaderType: selectedLoader, updatedAt: Timestamp.now() }, { merge: true });
+      await setDoc(settingsDocRef, { themeColors: themeColorsToSave, loaderType: selectedLoader, seasonalEffect: effectToSave, updatedAt: Timestamp.now() }, { merge: true });
       await triggerRefresh('global-cache');
-      toast({ title: "Theme Updated", description: "Your brand colors and loader have been synchronized." });
+      toast({ title: "Theme Updated", description: "Your brand colors, loader, and seasonal effect have been synchronized." });
     } catch (error) {
       toast({ title: "Save Failed", variant: "destructive" });
     } finally {
@@ -314,16 +356,79 @@ export default function ThemeSettingsPage() {
       await setDoc(settingsDocRef, {
         themeColors: { light: { ...DEFAULT_LIGHT_THEME_COLORS_HSL }, dark: { ...DEFAULT_DARK_THEME_COLORS_HSL } },
         loaderType: 'logo-pulse',
+        seasonalEffect: { mode: 'none', intensity: 'medium', scope: 'all', customImageUrl: '' },
         updatedAt: Timestamp.now(),
       }, { merge: true });
       await triggerRefresh('global-cache');
       resetToDefaultColorsState();
       setSelectedLoader('logo-pulse');
+      setSeasonalEffect({ mode: 'none', intensity: 'medium', scope: 'all', customImageUrl: '' });
       toast({ title: "System Reset Complete", description: "Default theme settings restored." });
     } catch (error) {
       toast({ title: "Reset Failed", variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const deleteOldEffectPng = async (fileUrl?: string) => {
+    if (!fileUrl) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      await fetch('/api/upload', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ fileUrl }),
+      });
+    } catch (err) {
+      console.warn("Could not delete previous seasonal PNG:", err);
+    }
+  };
+
+  const handleUploadEffectPng = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.includes('png') && !file.type.includes('webp') && !file.type.includes('image/')) {
+      toast({ title: "Invalid File", description: "Please upload a PNG or WebP image (transparent PNG recommended).", variant: "destructive" });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "Please choose a small PNG under 2MB for smooth falling animation.", variant: "destructive" });
+      return;
+    }
+
+    const previousUrl = seasonalEffect.customImageUrl;
+    setIsUploadingEffectPng(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('uploadPath', 'theme-effects');
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.url) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      if (previousUrl && previousUrl !== data.url) {
+        await deleteOldEffectPng(previousUrl);
+      }
+
+      setSeasonalEffect(prev => ({ ...prev, mode: 'custom-png', customImageUrl: data.url }));
+      toast({ title: "PNG Replaced", description: "Previous PNG deleted and new PNG uploaded. Click 'Save Changes' to publish." });
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message || "Could not upload image.", variant: "destructive" });
+    } finally {
+      setIsUploadingEffectPng(false);
+      e.target.value = '';
     }
   };
 
@@ -674,6 +779,261 @@ export default function ThemeSettingsPage() {
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Weather & Festival Falling Effects */}
+            <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-card">
+              <CardHeader className="p-6 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2.5 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                    <CardTitle className="text-lg font-black tracking-tight uppercase">Weather &amp; Festival Effects</CardTitle>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium">Customer pages only · Non-blocking overlay</span>
+                </div>
+                <CardDescription className="text-xs font-medium">
+                  Enable live weather (rain, clouds, snow) or festival falling flowers/confetti, or upload your own custom PNG image.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 pt-2 space-y-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {([
+                    { id: 'none', label: 'Off (None)', sub: 'Normal clean view', icon: XCircle, color: 'text-muted-foreground' },
+                    { id: 'rain', label: 'Monsoon Rain', sub: 'Falling raindrops', icon: CloudRain, color: 'text-blue-500' },
+                    { id: 'clouds', label: 'Floating Clouds', sub: 'Drifting soft clouds', icon: Cloud, color: 'text-sky-400' },
+                    { id: 'snow', label: 'Winter Snow', sub: 'Soft snowflakes', icon: Snowflake, color: 'text-cyan-400' },
+                    { id: 'sunshine', label: 'Golden Glow', sub: 'Warm light motes', icon: Sun, color: 'text-amber-500' },
+                    { id: 'diwali', label: 'Diwali Flowers', sub: 'Marigold & sparkles', icon: Sparkles, color: 'text-orange-500' },
+                    { id: 'holi', label: 'Holi Colors', sub: 'Vibrant color splash', icon: Palette, color: 'text-pink-500' },
+                    { id: 'celebration', label: 'Celebration', sub: 'Party confetti', icon: PartyPopper, color: 'text-purple-500' },
+                    { id: 'tricolor', label: 'Tricolor', sub: 'Saffron, White, Green', icon: Flag, color: 'text-emerald-600' },
+                    { id: 'spring', label: 'Spring Blossoms', sub: 'Pink & white petals', icon: Flower2, color: 'text-rose-400' },
+                    { id: 'custom-png', label: 'Custom PNG', sub: 'Upload your own PNG', icon: ImageIcon, color: 'text-primary' },
+                    { id: 'custom-text', label: 'Custom Text', sub: 'Color-changing text', icon: Type, color: 'text-violet-500' },
+                  ] as { id: SeasonalEffectMode; label: string; sub: string; icon: any; color: string }[]).map((item) => {
+                    const IconComp = item.icon;
+                    const isSelected = seasonalEffect.mode === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSeasonalEffect(prev => ({ ...prev, mode: item.id }))}
+                        className={cn(
+                          "text-left p-3 rounded-2xl border-2 transition-all duration-200 flex flex-col gap-1.5 cursor-pointer",
+                          isSelected
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/25 shadow-sm"
+                            : "border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/40"
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <IconComp className={cn("h-4 w-4", item.color)} />
+                          {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}
+                        </div>
+                        <div>
+                          <p className={cn("text-xs font-bold leading-tight", isSelected ? "text-primary" : "text-foreground")}>{item.label}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {seasonalEffect.mode !== 'none' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                    {/* Intensity Selector */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Effect Intensity</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['light', 'medium', 'festive'] as const).map((lvl) => (
+                          <Button
+                            key={lvl}
+                            type="button"
+                            size="sm"
+                            variant={seasonalEffect.intensity === lvl ? 'default' : 'outline'}
+                            onClick={() => setSeasonalEffect(prev => ({ ...prev, intensity: lvl }))}
+                            className="capitalize text-xs h-8"
+                          >
+                            {lvl}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Scope Selector */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Where to Show</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={seasonalEffect.scope === 'home' ? 'default' : 'outline'}
+                          onClick={() => setSeasonalEffect(prev => ({ ...prev, scope: 'home' }))}
+                          className="text-xs h-8"
+                        >
+                          Homepage Only
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={seasonalEffect.scope !== 'home' ? 'default' : 'outline'}
+                          onClick={() => setSeasonalEffect(prev => ({ ...prev, scope: 'all' }))}
+                          className="text-xs h-8"
+                        >
+                          All Customer Pages
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Schedule / Auto-Expire Selector */}
+                    <div className="md:col-span-2 space-y-2.5 pt-2 border-t border-border/40">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-primary" /> Auto-Expire Schedule
+                        </Label>
+                        {seasonalEffect.durationType && seasonalEffect.durationType !== 'always' && seasonalEffect.expiresAt && (
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                            Date.now() >= Date.parse(seasonalEffect.expiresAt)
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {(() => {
+                              const tz = appConfig?.timezone || 'Asia/Kolkata';
+                              const formattedExpiry = `${formatDateInTimezone(seasonalEffect.expiresAt, tz, appConfig?.dateFormat)} ${formatTimeInTimezone(seasonalEffect.expiresAt, tz)}`;
+                              return Date.now() >= Date.parse(seasonalEffect.expiresAt)
+                                ? `Expired (${formattedExpiry})`
+                                : `Active until ${formattedExpiry}`;
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {([
+                          { id: 'always', label: 'Always On' },
+                          { id: '1h', label: '1 Hour' },
+                          { id: '24h', label: '1 Day (24h)' },
+                          { id: 'custom', label: 'Custom Dates' },
+                        ] as const).map((opt) => (
+                          <Button
+                            key={opt.id}
+                            type="button"
+                            size="sm"
+                            variant={(seasonalEffect.durationType || 'always') === opt.id ? 'default' : 'outline'}
+                            onClick={() => setSeasonalEffect(prev => ({ ...prev, durationType: opt.id }))}
+                            className="text-xs h-8"
+                          >
+                            {opt.label}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {seasonalEffect.durationType === 'custom' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="space-y-1">
+                            <Label htmlFor="effect-start-at" className="text-[11px] text-muted-foreground">Start Date &amp; Time</Label>
+                            <Input
+                              id="effect-start-at"
+                              type="datetime-local"
+                              value={seasonalEffect.startAt ? new Date(new Date(seasonalEffect.startAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSeasonalEffect(prev => ({ ...prev, startAt: val ? new Date(val).toISOString() : '' }));
+                              }}
+                              className="h-9 text-xs bg-background rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="effect-expires-at" className="text-[11px] text-muted-foreground">End Date &amp; Time (Auto Turn Off)</Label>
+                            <Input
+                              id="effect-expires-at"
+                              type="datetime-local"
+                              value={seasonalEffect.expiresAt ? new Date(new Date(seasonalEffect.expiresAt).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSeasonalEffect(prev => ({ ...prev, expiresAt: val ? new Date(val).toISOString() : '' }));
+                              }}
+                              className="h-9 text-xs bg-background rounded-xl"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {seasonalEffect.mode === 'custom-png' && (
+                  <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {seasonalEffect.customImageUrl ? (
+                        <div className="h-14 w-14 rounded-xl border bg-background p-1.5 flex items-center justify-center shrink-0 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={seasonalEffect.customImageUrl} alt="Custom Effect PNG" className="max-h-full max-w-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="h-14 w-14 rounded-xl border border-dashed flex items-center justify-center bg-muted/50 shrink-0">
+                          <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-xs font-bold">Custom Falling PNG Image</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Upload a transparent PNG (e.g., flower, diya, offer badge). Max 2MB.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/png,image/webp,image/*"
+                          className="hidden"
+                          onChange={handleUploadEffectPng}
+                          disabled={isUploadingEffectPng}
+                        />
+                        <span className="inline-flex items-center justify-center h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all shadow-sm">
+                          {isUploadingEffectPng ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                          {isUploadingEffectPng ? 'Uploading...' : (seasonalEffect.customImageUrl ? 'Change PNG' : 'Upload PNG')}
+                        </span>
+                      </label>
+                      {seasonalEffect.customImageUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const urlToDelete = seasonalEffect.customImageUrl;
+                            setSeasonalEffect(prev => ({ ...prev, customImageUrl: '' }));
+                            if (urlToDelete) await deleteOldEffectPng(urlToDelete);
+                          }}
+                          className="h-9 px-2.5 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {seasonalEffect.mode === 'custom-text' && (
+                  <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 space-y-2">
+                    <Label htmlFor="custom-effect-text" className="text-xs font-bold flex items-center gap-1.5">
+                      <Type className="h-3.5 w-3.5 text-primary" /> Floating Custom Text
+                    </Label>
+                    <Input
+                      id="custom-effect-text"
+                      type="text"
+                      maxLength={40}
+                      value={seasonalEffect.customText || ''}
+                      onChange={(e) => setSeasonalEffect(prev => ({ ...prev, customText: e.target.value }))}
+                      placeholder="e.g. Happy Diwali, Happy Birthday, Happy Holi..."
+                      className="bg-background rounded-xl h-10 text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      This text will float gently across the screen while smoothly cycling through vibrant colors.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
