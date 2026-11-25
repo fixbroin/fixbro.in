@@ -49,6 +49,147 @@ const colorGroups: ColorGroup[] = [
 
 type ThemeMode = 'light' | 'dark';
 
+interface ThemePreset {
+  id: string;
+  name: string;
+  tagline: string;
+  light: Partial<Record<keyof ThemePalette, string>>;
+  dark: Partial<Record<keyof ThemePalette, string>>;
+}
+
+const getDefaultHexPalette = (mode: ThemeMode): Partial<Record<keyof ThemePalette, string>> => {
+  const source = mode === 'light' ? DEFAULT_LIGHT_THEME_COLORS_HSL : DEFAULT_DARK_THEME_COLORS_HSL;
+  const result: Partial<Record<keyof ThemePalette, string>> = {};
+  CORE_THEME_PALETTE_KEYS.forEach((key) => {
+    result[key] = hslStringToHex(source[key]!);
+  });
+  return result;
+};
+
+const THEME_PRESETS: ThemePreset[] = [
+  {
+    id: 'default-teal',
+    name: 'Fixbro Default',
+    tagline: 'Original Teal',
+    light: getDefaultHexPalette('light'),
+    dark: getDefaultHexPalette('dark'),
+  },
+  {
+    id: 'ocean-blue',
+    name: 'Ocean Blue',
+    tagline: 'Crisp Corporate',
+    light: {
+      background: '#F4F8FC', foreground: '#1E293B', card: '#FFFFFF', 'card-foreground': '#1E293B',
+      popover: '#FFFFFF', 'popover-foreground': '#1E293B', primary: '#0284C7', 'primary-foreground': '#FFFFFF',
+      secondary: '#E0F2FE', 'secondary-foreground': '#0F172A', muted: '#E2E8F0', 'muted-foreground': '#475569',
+      accent: '#0369A1', 'accent-foreground': '#FFFFFF', destructive: '#EF4444', 'destructive-foreground': '#FFFFFF',
+      border: '#CBD5E1', input: '#94A3B8', ring: '#0284C7',
+    },
+    dark: {
+      background: '#0B1120', foreground: '#F1F5F9', card: '#111827', 'card-foreground': '#F1F5F9',
+      popover: '#111827', 'popover-foreground': '#F1F5F9', primary: '#38BDF8', 'primary-foreground': '#0F172A',
+      secondary: '#1E293B', 'secondary-foreground': '#F1F5F9', muted: '#1E293B', 'muted-foreground': '#94A3B8',
+      accent: '#0EA5E9', 'accent-foreground': '#0F172A', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#334155', input: '#334155', ring: '#38BDF8',
+    },
+  },
+  {
+    id: 'emerald-fresh',
+    name: 'Emerald Fresh',
+    tagline: 'Clean Mint Green',
+    light: {
+      background: '#F2FBF7', foreground: '#1E293B', card: '#FFFFFF', 'card-foreground': '#1E293B',
+      popover: '#FFFFFF', 'popover-foreground': '#1E293B', primary: '#059669', 'primary-foreground': '#FFFFFF',
+      secondary: '#D1FAE5', 'secondary-foreground': '#064E3B', muted: '#E2EFEA', 'muted-foreground': '#475569',
+      accent: '#047857', 'accent-foreground': '#FFFFFF', destructive: '#EF4444', 'destructive-foreground': '#FFFFFF',
+      border: '#CBD5E1', input: '#94A3B8', ring: '#059669',
+    },
+    dark: {
+      background: '#0A1410', foreground: '#ECFDF5', card: '#111F19', 'card-foreground': '#ECFDF5',
+      popover: '#111F19', 'popover-foreground': '#ECFDF5', primary: '#34D399', 'primary-foreground': '#064E3B',
+      secondary: '#1A2E25', 'secondary-foreground': '#ECFDF5', muted: '#1A2E25', 'muted-foreground': '#94A3B8',
+      accent: '#10B981', 'accent-foreground': '#064E3B', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#2B4237', input: '#2B4237', ring: '#34D399',
+    },
+  },
+  {
+    id: 'royal-indigo',
+    name: 'Royal Indigo',
+    tagline: 'Modern Violet',
+    light: {
+      background: '#F5F6FF', foreground: '#1E1B4B', card: '#FFFFFF', 'card-foreground': '#1E293B',
+      popover: '#FFFFFF', 'popover-foreground': '#1E293B', primary: '#4F46E5', 'primary-foreground': '#FFFFFF',
+      secondary: '#E0E7FF', 'secondary-foreground': '#1E1B4B', muted: '#E5E7EB', 'muted-foreground': '#475569',
+      accent: '#4338CA', 'accent-foreground': '#FFFFFF', destructive: '#EF4444', 'destructive-foreground': '#FFFFFF',
+      border: '#CBD5E1', input: '#94A3B8', ring: '#4F46E5',
+    },
+    dark: {
+      background: '#0F1020', foreground: '#EEF2FF', card: '#17192E', 'card-foreground': '#EEF2FF',
+      popover: '#17192E', 'popover-foreground': '#EEF2FF', primary: '#818CF8', 'primary-foreground': '#0F172A',
+      secondary: '#232642', 'secondary-foreground': '#EEF2FF', muted: '#232642', 'muted-foreground': '#94A3B8',
+      accent: '#6366F1', 'accent-foreground': '#FFFFFF', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#31355C', input: '#31355C', ring: '#818CF8',
+    },
+  },
+  {
+    id: 'sunset-orange',
+    name: 'Sunset Orange',
+    tagline: 'Warm & Energetic',
+    light: {
+      background: '#FFF8F4', foreground: '#1F2937', card: '#FFFFFF', 'card-foreground': '#1F2937',
+      popover: '#FFFFFF', 'popover-foreground': '#1F2937', primary: '#EA580C', 'primary-foreground': '#FFFFFF',
+      secondary: '#FFEDD5', 'secondary-foreground': '#431407', muted: '#F3EAE3', 'muted-foreground': '#57534E',
+      accent: '#C2410C', 'accent-foreground': '#FFFFFF', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#D6D3D1', input: '#A8A29E', ring: '#EA580C',
+    },
+    dark: {
+      background: '#14100E', foreground: '#FAF5F0', card: '#1F1916', 'card-foreground': '#FAF5F0',
+      popover: '#1F1916', 'popover-foreground': '#FAF5F0', primary: '#FB923C', 'primary-foreground': '#1C1917',
+      secondary: '#2E241F', 'secondary-foreground': '#FAF5F0', muted: '#2E241F', 'muted-foreground': '#A8A29E',
+      accent: '#F97316', 'accent-foreground': '#1C1917', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#44362E', input: '#44362E', ring: '#FB923C',
+    },
+  },
+  {
+    id: 'crimson-ruby',
+    name: 'Crimson Ruby',
+    tagline: 'Bold Rose Red',
+    light: {
+      background: '#FFF5F7', foreground: '#1F2937', card: '#FFFFFF', 'card-foreground': '#1F2937',
+      popover: '#FFFFFF', 'popover-foreground': '#1F2937', primary: '#E11D48', 'primary-foreground': '#FFFFFF',
+      secondary: '#FFE4E6', 'secondary-foreground': '#4C0519', muted: '#F3E8EA', 'muted-foreground': '#52525B',
+      accent: '#BE123C', 'accent-foreground': '#FFFFFF', destructive: '#B91C1C', 'destructive-foreground': '#FFFFFF',
+      border: '#D4D4D8', input: '#A1A1AA', ring: '#E11D48',
+    },
+    dark: {
+      background: '#140D10', foreground: '#FFF1F2', card: '#1F1418', 'card-foreground': '#FFF1F2',
+      popover: '#1F1418', 'popover-foreground': '#FFF1F2', primary: '#FB7185', 'primary-foreground': '#18181B',
+      secondary: '#2E1D23', 'secondary-foreground': '#FFF1F2', muted: '#2E1D23', 'muted-foreground': '#A1A1AA',
+      accent: '#F43F5E', 'accent-foreground': '#FFFFFF', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#472C36', input: '#472C36', ring: '#FB7185',
+    },
+  },
+  {
+    id: 'executive-amber',
+    name: 'Executive Gold',
+    tagline: 'Warm Slate & Amber',
+    light: {
+      background: '#FAF8F5', foreground: '#1E293B', card: '#FFFFFF', 'card-foreground': '#1E293B',
+      popover: '#FFFFFF', 'popover-foreground': '#1E293B', primary: '#D97706', 'primary-foreground': '#FFFFFF',
+      secondary: '#FEF3C7', 'secondary-foreground': '#451A03', muted: '#EAE8E1', 'muted-foreground': '#475569',
+      accent: '#B45309', 'accent-foreground': '#FFFFFF', destructive: '#EF4444', 'destructive-foreground': '#FFFFFF',
+      border: '#CBD5E1', input: '#94A3B8', ring: '#D97706',
+    },
+    dark: {
+      background: '#12110E', foreground: '#F8FAFC', card: '#1C1A15', 'card-foreground': '#F8FAFC',
+      popover: '#1C1A15', 'popover-foreground': '#F8FAFC', primary: '#FBBF24', 'primary-foreground': '#18181B',
+      secondary: '#2B271F', 'secondary-foreground': '#F8FAFC', muted: '#2B271F', 'muted-foreground': '#94A3B8',
+      accent: '#F59E0B', 'accent-foreground': '#18181B', destructive: '#DC2626', 'destructive-foreground': '#FFFFFF',
+      border: '#3F3A2E', input: '#3F3A2E', ring: '#FBBF24',
+    },
+  },
+];
+
 export default function ThemeSettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -438,7 +579,80 @@ export default function ThemeSettingsPage() {
           </div>
 
           {/* Right: Color Settings & Previews (9 cols) */}
-          <div className="lg:col-span-9">
+          <div className="lg:col-span-9 space-y-6">
+            {/* Quick Theme Presets */}
+            <Card className="border-none shadow-xl rounded-[2rem] overflow-hidden bg-card">
+              <CardHeader className="p-6 pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2.5 text-primary">
+                    <Palette className="h-5 w-5" />
+                    <CardTitle className="text-lg font-black tracking-tight uppercase">Quick Theme Presets</CardTitle>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground font-medium">1-click high-contrast palettes</span>
+                </div>
+                <CardDescription className="text-xs font-medium">
+                  Select any preset below to load both Light &amp; Dark palettes, then click Save Changes to apply it live.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {THEME_PRESETS.map((preset) => {
+                    const isSelected =
+                      currentColorsHex.light.primary?.toLowerCase() === preset.light.primary?.toLowerCase() &&
+                      currentColorsHex.light.background?.toLowerCase() === preset.light.background?.toLowerCase();
+
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => {
+                          setCurrentColorsHex({
+                            light: { ...preset.light },
+                            dark: { ...preset.dark },
+                          });
+                          toast({
+                            title: `${preset.name} Loaded`,
+                            description: "Preview updated. Click 'Save Changes' to publish this theme.",
+                          });
+                        }}
+                        className={cn(
+                          "group text-left p-3 rounded-2xl border transition-all duration-200 flex flex-col gap-2.5 cursor-pointer",
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/25 shadow-md"
+                            : "border-border/60 bg-muted/20 hover:bg-muted/40 hover:border-primary/40"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center -space-x-1.5">
+                            <span
+                              className="h-6 w-6 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm"
+                              style={{ backgroundColor: preset.light.primary }}
+                              title="Primary"
+                            />
+                            <span
+                              className="h-6 w-6 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm"
+                              style={{ backgroundColor: preset.light.accent }}
+                              title="Accent"
+                            />
+                            <span
+                              className="h-6 w-6 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm"
+                              style={{ backgroundColor: preset.light.background }}
+                              title="Background"
+                            />
+                          </div>
+                          {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground leading-tight">{preset.name}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{preset.tagline}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ThemeMode)} className="w-full">
               <div className="flex justify-center mb-8">
                 <TabsList className="grid w-full max-md:max-w-md grid-cols-2 p-1 bg-card/50 rounded-[1.5rem] h-14 border shadow-sm backdrop-blur-sm">
