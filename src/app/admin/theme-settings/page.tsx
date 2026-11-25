@@ -190,11 +190,27 @@ const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
+const isHexClose = (hexA?: string, hexB?: string): boolean => {
+  if (!hexA || !hexB) return false;
+  const norm = (h: string) => {
+    const clean = h.replace('#', '');
+    if (clean.length === 3) return clean.split('').map(c => c + c).join('');
+    return clean;
+  };
+  const a = norm(hexA);
+  const b = norm(hexB);
+  if (a.length !== 6 || b.length !== 6) return false;
+  const r1 = parseInt(a.slice(0, 2), 16), g1 = parseInt(a.slice(2, 4), 16), b1 = parseInt(a.slice(4, 6), 16);
+  const r2 = parseInt(b.slice(0, 2), 16), g2 = parseInt(b.slice(2, 4), 16), b2 = parseInt(b.slice(4, 6), 16);
+  return Math.abs(r1 - r2) <= 10 && Math.abs(g1 - g2) <= 10 && Math.abs(b1 - b2) <= 10;
+};
+
 export default function ThemeSettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ThemeMode>('light');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   
   const [currentColorsHex, setCurrentColorsHex] = useState<Record<ThemeMode, Partial<Record<keyof ThemePalette, string>>>>({
     light: {},
@@ -598,14 +614,17 @@ export default function ThemeSettingsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {THEME_PRESETS.map((preset) => {
                     const isSelected =
-                      currentColorsHex.light.primary?.toLowerCase() === preset.light.primary?.toLowerCase() &&
-                      currentColorsHex.light.background?.toLowerCase() === preset.light.background?.toLowerCase();
+                      selectedPresetId === preset.id ||
+                      (selectedPresetId === null &&
+                        isHexClose(currentColorsHex.light.primary, preset.light.primary) &&
+                        isHexClose(currentColorsHex.light.background, preset.light.background));
 
                     return (
                       <button
                         key={preset.id}
                         type="button"
                         onClick={() => {
+                          setSelectedPresetId(preset.id);
                           setCurrentColorsHex({
                             light: { ...preset.light },
                             dark: { ...preset.dark },
@@ -616,10 +635,10 @@ export default function ThemeSettingsPage() {
                           });
                         }}
                         className={cn(
-                          "group text-left p-3 rounded-2xl border transition-all duration-200 flex flex-col gap-2.5 cursor-pointer",
+                          "group text-left p-3.5 rounded-2xl border-2 transition-all duration-200 flex flex-col gap-2.5 cursor-pointer relative",
                           isSelected
-                            ? "border-primary bg-primary/5 ring-2 ring-primary/25 shadow-md"
-                            : "border-border/60 bg-muted/20 hover:bg-muted/40 hover:border-primary/40"
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md"
+                            : "border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/40"
                         )}
                       >
                         <div className="flex items-center justify-between w-full">
@@ -640,10 +659,15 @@ export default function ThemeSettingsPage() {
                               title="Background"
                             />
                           </div>
-                          {isSelected && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                          {isSelected && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shadow-sm">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Active
+                            </span>
+                          )}
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-foreground leading-tight">{preset.name}</p>
+                          <p className={cn("text-xs font-bold leading-tight", isSelected ? "text-primary" : "text-foreground")}>{preset.name}</p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">{preset.tagline}</p>
                         </div>
                       </button>
