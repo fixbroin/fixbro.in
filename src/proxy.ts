@@ -108,8 +108,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Block aggressive scrapers and unwanted crawlers
-  const isBlockedBot = BLOCKED_BOTS.some((bot) => ua.includes(bot));
+  // 3. Block aggressive scrapers and unwanted crawlers (any bot/scraper not in ALLOWED_BOTS)
+  const isGenericBot = /(bot\b|crawler|spider|scraper|slurp|curl|wget|python|scrapy|aiohttp|httpx|axios|node-fetch|go-http-client|libwww|headless|phantomjs|selenium|puppeteer|playwright)/i.test(ua);
+  const isBlockedBot = isGenericBot || BLOCKED_BOTS.some((bot) => ua.includes(bot));
   if (isBlockedBot) {
     return new NextResponse('Forbidden: Automated crawler blocked.', {
       status: 403,
