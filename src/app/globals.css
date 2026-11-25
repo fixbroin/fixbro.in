@@ -164,3 +164,95 @@ html, body {
         padding-bottom: 160px !important;
     }
 }
+
+/* Native Apple Safari / iOS Liquid Glass Bottom Bar & Buttons */
+.apple-glass-bar {
+  background-color: rgba(255, 255, 255, 0.62);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+}
+
+.dark .apple-glass-bar {
+  background-color: rgba(24, 24, 27, 0.65);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.apple-glass-btn {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), background 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.apple-glass-btn:active {
+  transform: scale(0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.35) 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95), 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.dark .apple-glass-btn:active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25), 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.apple-glass-btn-active {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0.07) 100%);
+  border: 1px solid hsl(var(--primary) / 0.28);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.85), 0 4px 12px hsl(var(--primary) / 0.16);
+}
+
+.dark .apple-glass-btn-active {
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.28) 0%, hsl(var(--primary) / 0.12) 100%);
+  border: 1px solid hsl(var(--primary) / 0.35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.22), 0 4px 12px hsl(var(--primary) / 0.25);
+}
+
+/* Global Apple Glass Buttons & Pop-ups */
+.apple-ui-btn {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+.apple-ui-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.apple-glass-overlay {
+  background-color: rgba(15, 23, 42, 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.apple-glass-panel {
+  background-color: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  backdrop-filter: saturate(180%) blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.9);
+}
+
+.dark .apple-glass-panel {
+  background-color: rgba(24, 24, 27, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Native Apple Safari / iOS Liquid Glass Header Bar */
+.apple-glass-header {
+  background-color: rgba(255, 255, 255, 0.68);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+}
+
+.dark .apple-glass-header {
+  background-color: rgba(24, 24, 27, 0.68);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+}

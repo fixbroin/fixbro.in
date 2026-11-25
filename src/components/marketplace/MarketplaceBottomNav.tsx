@@ -44,38 +44,59 @@ export default function MarketplaceBottomNav({
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-card/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:hidden">
-        <div className="max-w-md mx-auto px-3 py-1.5 flex items-center justify-between relative">
+      <div className="apple-glass-bar fixed bottom-0 left-0 right-0 z-40 md:hidden pb-safe">
+        <div className="max-w-md mx-auto px-2 h-16 flex items-center justify-around gap-1 relative">
           {/* Furniture */}
           <Link
             href="/furniture"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
+            onTouchStart={() => {}}
+            className={`apple-glass-btn relative flex flex-col items-center justify-center flex-1 h-[54px] rounded-2xl select-none ${
               currentTab === 'furniture'
-                ? 'text-primary font-bold'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'
+                ? 'apple-glass-btn-active text-primary font-bold'
+                : 'text-gray-500 dark:text-gray-400 border border-transparent hover:bg-white/30 dark:hover:bg-white/5'
             }`}
           >
-            <Armchair className="h-5 w-5 mb-0.5" />
-            <span className="text-[10px]">Furniture</span>
+            <span
+              className={`absolute -top-[5px] left-1/2 -translate-x-1/2 h-[3px] rounded-b-full bg-primary transition-all duration-300 ${
+                currentTab === 'furniture'
+                  ? 'w-8 opacity-100 shadow-[0_2px_8px_hsl(var(--primary)/0.65)]'
+                  : 'w-0 opacity-0'
+              }`}
+            />
+            <div className={`p-1 rounded-xl transition-transform duration-300 ${currentTab === 'furniture' ? 'scale-110' : ''}`}>
+              <Armchair className="h-5 w-5" strokeWidth={currentTab === 'furniture' ? 2.4 : 1.9} />
+            </div>
+            <span className="text-[10px] leading-none mt-0.5">Furniture</span>
           </Link>
 
           {/* Rent Home */}
           <Link
             href="/rent-home"
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
+            onTouchStart={() => {}}
+            className={`apple-glass-btn relative flex flex-col items-center justify-center flex-1 h-[54px] rounded-2xl select-none ${
               currentTab === 'rentals'
-                ? 'text-primary font-bold'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'
+                ? 'apple-glass-btn-active text-primary font-bold'
+                : 'text-gray-500 dark:text-gray-400 border border-transparent hover:bg-white/30 dark:hover:bg-white/5'
             }`}
           >
-            <Home className="h-5 w-5 mb-0.5" />
-            <span className="text-[10px]">Rent Home</span>
+            <span
+              className={`absolute -top-[5px] left-1/2 -translate-x-1/2 h-[3px] rounded-b-full bg-primary transition-all duration-300 ${
+                currentTab === 'rentals'
+                  ? 'w-8 opacity-100 shadow-[0_2px_8px_hsl(var(--primary)/0.65)]'
+                  : 'w-0 opacity-0'
+              }`}
+            />
+            <div className={`p-1 rounded-xl transition-transform duration-300 ${currentTab === 'rentals' ? 'scale-110' : ''}`}>
+              <Home className="h-5 w-5" strokeWidth={currentTab === 'rentals' ? 2.4 : 1.9} />
+            </div>
+            <span className="text-[10px] leading-none mt-0.5">Rent Home</span>
           </Link>
 
-          {/* Central Elevated Post (+) Button */}
-          <div className="flex flex-col items-center justify-center flex-1 -mt-5">
+          {/* Central Elevated Post (+) Glass Button */}
+          <div className="flex flex-col items-center justify-center min-w-[56px] -mt-5">
             <button
               type="button"
+              onTouchStart={() => {}}
               onClick={() => {
                 if (!user) {
                   router.push('/auth/login?redirect=/furniture/post');
@@ -83,17 +104,18 @@ export default function MarketplaceBottomNav({
                 }
                 setIsPostChooserOpen(true);
               }}
-              className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center border-4 border-white dark:border-card focus:outline-none"
+              className="apple-glass-btn w-12 h-12 rounded-full bg-gradient-to-tr from-primary via-primary to-blue-500 text-white shadow-[0_8px_20px_hsl(var(--primary)/0.45),inset_0_1.5px_2px_rgba(255,255,255,0.65)] ring-4 ring-white/80 dark:ring-zinc-900/80 backdrop-blur-md hover:scale-105 transition-all flex items-center justify-center focus:outline-none"
               aria-label="Post Free Ad"
             >
-              <Plus className="h-6 w-6 stroke-[3]" />
+              <Plus className="h-6 w-6 stroke-[2.8]" />
             </button>
-            <span className="text-[10px] font-bold text-primary mt-0.5">Post (+)</span>
+            <span className="text-[10px] font-bold text-primary mt-1">Post (+)</span>
           </div>
 
           {/* My Posts */}
           <button
             type="button"
+            onTouchStart={() => {}}
             onClick={() => {
               if (!user) {
                 router.push('/auth/login?redirect=/marketplace/my-posts');
@@ -101,23 +123,35 @@ export default function MarketplaceBottomNav({
               }
               router.push('/marketplace/my-posts');
             }}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
+            className={`apple-glass-btn relative flex flex-col items-center justify-center flex-1 h-[54px] rounded-2xl select-none ${
               currentTab === 'my-posts'
-                ? 'text-primary font-bold'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'
+                ? 'apple-glass-btn-active text-primary font-bold'
+                : 'text-gray-500 dark:text-gray-400 border border-transparent hover:bg-white/30 dark:hover:bg-white/5'
             }`}
           >
-            <FileText className="h-5 w-5 mb-0.5" />
-            <span className="text-[10px]">My Posts</span>
+            <span
+              className={`absolute -top-[5px] left-1/2 -translate-x-1/2 h-[3px] rounded-b-full bg-primary transition-all duration-300 ${
+                currentTab === 'my-posts'
+                  ? 'w-8 opacity-100 shadow-[0_2px_8px_hsl(var(--primary)/0.65)]'
+                  : 'w-0 opacity-0'
+              }`}
+            />
+            <div className={`p-1 rounded-xl transition-transform duration-300 ${currentTab === 'my-posts' ? 'scale-110' : ''}`}>
+              <FileText className="h-5 w-5" strokeWidth={currentTab === 'my-posts' ? 2.4 : 1.9} />
+            </div>
+            <span className="text-[10px] leading-none mt-0.5">My Posts</span>
           </button>
 
           {/* Home Services */}
           <Link
             href="/"
-            className="flex flex-col items-center justify-center flex-1 py-1 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900"
+            onTouchStart={() => {}}
+            className="apple-glass-btn relative flex flex-col items-center justify-center flex-1 h-[54px] rounded-2xl select-none text-gray-500 dark:text-gray-400 border border-transparent hover:bg-white/30 dark:hover:bg-white/5"
           >
-            <Wrench className="h-5 w-5 mb-0.5" />
-            <span className="text-[10px]">Services</span>
+            <div className="p-1 rounded-xl">
+              <Wrench className="h-5 w-5" strokeWidth={1.9} />
+            </div>
+            <span className="text-[10px] leading-none mt-0.5">Services</span>
           </Link>
         </div>
       </div>

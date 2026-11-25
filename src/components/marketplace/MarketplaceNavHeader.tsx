@@ -114,7 +114,7 @@ export default function MarketplaceNavHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-card/95 backdrop-blur-md border-b shadow-sm transition-all">
+      <header className="apple-glass-header sticky top-0 z-40 transition-all">
         {/* Main Header Bar */}
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex items-center justify-between gap-2">
           {/* Left: Logo & Desktop Switcher Tabs */}

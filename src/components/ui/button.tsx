@@ -7,26 +7,27 @@ import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "apple-ui-btn inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-primary text-primary-foreground shadow-[0_2px_10px_hsl(var(--primary)/0.28),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:bg-primary/90 hover:shadow-[0_4px_16px_hsl(var(--primary)/0.38),inset_0_1px_1px_rgba(255,255,255,0.5)]",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/80",
+          "bg-destructive text-destructive-foreground shadow-[0_2px_10px_hsl(var(--destructive)/0.28),inset_0_1px_1px_rgba(255,255,255,0.35)] hover:bg-destructive/90",
         outline:
-          "border border-input bg-background hover:bg-muted hover:text-foreground",
+          "border border-input/80 bg-white/75 dark:bg-zinc-900/60 backdrop-blur-md shadow-[0_1px_3px_rgba(0,0,0,0.04),inset_0_1px_0_rgba(255,255,255,0.65)] hover:bg-white/95 dark:hover:bg-zinc-800/80 hover:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-muted hover:text-foreground",
+          "bg-secondary/85 backdrop-blur-md text-secondary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] hover:bg-secondary",
+        ghost: "hover:bg-muted/70 hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
-        xs: "h-7 rounded-sm px-2 text-xs",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        xs: "h-7 rounded-lg px-2 text-xs",
+        sm: "h-9 rounded-xl px-3",
+        lg: "h-11 rounded-xl px-8",
+        icon: "h-10 w-10 rounded-xl",
       },
     },
     defaultVariants: {

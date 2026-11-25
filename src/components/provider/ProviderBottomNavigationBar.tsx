@@ -72,24 +72,42 @@ const ProviderBottomNavigationBar = () => {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-lg border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40 pb-safe">
-      <div className="container mx-auto flex justify-around items-center h-16 px-2">
+    <nav className="apple-glass-bar fixed bottom-0 left-0 right-0 md:hidden z-40 pb-safe">
+      <div className="container mx-auto flex justify-around items-center h-16 px-2 gap-1">
         {navItems.map((item) => {
           const isActive = !item.isButton && pathname === item.href;
           const IconComponent = item.icon;
+          const tabClasses = cn(
+            "apple-glass-btn relative flex flex-col items-center justify-center flex-1 h-[54px] rounded-2xl select-none text-[10px]",
+            isActive
+              ? "apple-glass-btn-active text-primary font-bold"
+              : "text-muted-foreground font-semibold border border-transparent hover:bg-white/30 dark:hover:bg-white/5"
+          );
+
+          const indicator = (
+            <span
+              className={cn(
+                "absolute -top-[5px] left-1/2 -translate-x-1/2 h-[3px] rounded-b-full bg-primary transition-all duration-300",
+                isActive
+                  ? "w-8 opacity-100 shadow-[0_2px_8px_hsl(var(--primary)/0.65)]"
+                  : "w-0 opacity-0"
+              )}
+            />
+          );
           
           if (item.isButton) {
               return (
                  <button
                     key={item.label}
                     onClick={(e) => handleNav(e, item)}
-                    className={cn(
-                        "flex flex-col items-center justify-center text-xs py-2 transition-colors duration-150 ease-in-out w-1/5",
-                        "text-muted-foreground hover:text-primary"
-                    )}
+                    onTouchStart={() => {}}
+                    className={tabClasses}
                     >
-                    <IconComponent className="h-5 w-5 mb-0.5" strokeWidth={2} />
-                    {item.label}
+                    {indicator}
+                    <div className="p-1 rounded-xl">
+                      <IconComponent className="h-5 w-5" strokeWidth={1.9} />
+                    </div>
+                    <span className="mt-0.5 leading-none">{item.label}</span>
                 </button>
               )
           }
@@ -99,13 +117,14 @@ const ProviderBottomNavigationBar = () => {
               key={item.label}
               href={item.href}
               onClick={(e) => handleNav(e, item)}
-              className={cn(
-                "flex flex-col items-center justify-center text-xs py-2 transition-colors duration-150 ease-in-out w-1/5",
-                isActive ? "text-primary font-medium" : "text-muted-foreground hover:text-primary"
-              )}
+              onTouchStart={() => {}}
+              className={tabClasses}
             >
-              <IconComponent className={cn("h-5 w-5 mb-0.5", isActive ? "text-primary" : "")} strokeWidth={isActive ? 2.5 : 2} />
-              {item.label}
+              {indicator}
+              <div className={cn("p-1 rounded-xl transition-transform duration-300", isActive ? "scale-110" : "")}>
+                <IconComponent className={cn("h-5 w-5", isActive ? "text-primary" : "")} strokeWidth={isActive ? 2.4 : 1.9} />
+              </div>
+              <span className="mt-0.5 leading-none truncate max-w-full px-1">{item.label}</span>
             </Link>
           );
         })}

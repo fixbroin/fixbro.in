@@ -453,7 +453,7 @@ export default function ProviderClientLayout({ children }: PropsWithChildren) {
             <ProviderSidebarContent />
           </Sidebar>
           <SidebarInset className="bg-muted/30 overflow-x-hidden flex-grow">
-            <header className="bg-background/95 backdrop-blur-xl sticky top-0 z-40 border-b border-border/40 transition-all duration-300 h-16 flex items-center justify-between px-4 sm:px-6">
+            <header className="apple-glass-header sticky top-0 z-40 transition-all duration-300 h-16 flex items-center justify-between px-4 sm:px-6">
               <div className="flex items-center gap-3">
                 <SidebarTrigger className="hidden md:inline-flex text-muted-foreground hover:text-primary transition-colors" />
                 <div className="md:hidden flex items-center">

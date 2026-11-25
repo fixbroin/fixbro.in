@@ -37,114 +37,75 @@ const BottomNavigationBar = () => {
     }
   };
 
+  const renderTab = (item: NavItem) => {
+    const isActive = pathname === item.href;
+    const IconComponent = item.icon;
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={(e) => handleNav(e, item)}
+        onTouchStart={() => {}}
+        className={cn(
+          "apple-glass-btn relative flex flex-col items-center justify-center flex-1 max-w-[76px] h-[54px] rounded-2xl select-none",
+          isActive
+            ? "apple-glass-btn-active text-primary"
+            : "text-muted-foreground border border-transparent hover:bg-white/30 dark:hover:bg-white/5"
+        )}
+      >
+        {/* Top Active Indicator Line (Amazon / Flipkart style) */}
+        <span
+          className={cn(
+            "absolute -top-[5px] left-1/2 -translate-x-1/2 h-[3px] rounded-b-full bg-primary transition-all duration-300",
+            isActive
+              ? "w-8 opacity-100 shadow-[0_2px_8px_hsl(var(--primary)/0.65)]"
+              : "w-0 opacity-0"
+          )}
+        />
+
+        <div className={cn("p-1 rounded-xl transition-transform duration-300", isActive ? "scale-110" : "")}>
+          <IconComponent className="h-5 w-5" strokeWidth={isActive ? 2.4 : 1.9} />
+        </div>
+        <span
+          className={cn(
+            "text-[10px] tracking-tight leading-none mt-0.5 transition-all",
+            isActive ? "font-bold opacity-100" : "font-semibold opacity-80"
+          )}
+        >
+          {item.label}
+        </span>
+      </Link>
+    );
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-background/95 backdrop-blur-lg border-t border-border/50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40 pb-safe">
-      <div className="container mx-auto flex justify-around items-center h-16 px-2">
-        {/* 1. Home */}
-        <Link
-          href="/"
-          onClick={(e) => handleNav(e, { href: '/', label: 'Home', icon: Home, isProtected: false })}
-          className={cn(
-            "flex flex-col items-center justify-center min-w-[56px] h-14 rounded-2xl transition-all duration-300",
-            pathname === '/' 
-              ? "bg-primary/10 text-primary" 
-              : "text-muted-foreground active:bg-muted active:scale-95"
-          )}
-        >
-          <div className={cn("p-1.5 rounded-xl transition-transform duration-300", pathname === '/' ? "scale-110" : "")}>
-            <Home className="h-5 w-5" strokeWidth={pathname === '/' ? 2.5 : 2} />
-          </div>
-          <span className={cn(
-            "text-[10px] font-bold uppercase tracking-tighter mt-0.5",
-            pathname === '/' ? "opacity-100" : "opacity-80"
-          )}>
-            Home
-          </span>
-        </Link>
+    <nav className="apple-glass-bar fixed bottom-0 left-0 right-0 md:hidden z-40 pb-safe">
+      <div className="container mx-auto flex justify-around items-center h-16 px-2 gap-1">
+        {renderTab({ href: '/', label: 'Home', icon: Home, isProtected: false })}
+        {renderTab({ href: '/categories', label: 'Categories', icon: Layers, isProtected: true })}
 
-        {/* 2. Categories */}
-        <Link
-          href="/categories"
-          onClick={(e) => handleNav(e, { href: '/categories', label: 'Categories', icon: Layers, isProtected: true })}
-          className={cn(
-            "flex flex-col items-center justify-center min-w-[56px] h-14 rounded-2xl transition-all duration-300",
-            pathname === '/categories' 
-              ? "bg-primary/10 text-primary" 
-              : "text-muted-foreground active:bg-muted active:scale-95"
-          )}
-        >
-          <div className={cn("p-1.5 rounded-xl transition-transform duration-300", pathname === '/categories' ? "scale-110" : "")}>
-            <Layers className="h-5 w-5" strokeWidth={pathname === '/categories' ? 2.5 : 2} />
-          </div>
-          <span className={cn(
-            "text-[10px] font-bold uppercase tracking-tighter mt-0.5",
-            pathname === '/categories' ? "opacity-100" : "opacity-80"
-          )}>
-            Categories
-          </span>
-        </Link>
-
-        {/* 3. Central Elevated SELL Button (Replaces Referral, Navigates to Buy & Sell Page) */}
+        {/* Central Elevated SELL Glass Button */}
         {showSellButton && (
           <Link
             href="/furniture"
             onClick={() => {
               if (pathname !== '/furniture') showLoading();
             }}
-            className="flex flex-col items-center justify-center min-w-[56px] -mt-5 transition-all group"
+            onTouchStart={() => {}}
+            className="apple-glass-btn flex flex-col items-center justify-center min-w-[56px] -mt-5 group select-none"
           >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center border-4 border-background focus:outline-none">
-              <Plus className="h-6 w-6 stroke-[3]" />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary via-primary to-blue-500 text-white shadow-[0_8px_20px_hsl(var(--primary)/0.45),inset_0_1.5px_2px_rgba(255,255,255,0.65)] ring-4 ring-white/80 dark:ring-zinc-900/80 backdrop-blur-md group-hover:scale-105 active:scale-95 transition-all flex items-center justify-center focus:outline-none">
+              <Plus className="h-6 w-6 stroke-[2.8]" />
             </div>
-            <span className="text-[10px] font-bold text-primary mt-0.5 tracking-tight uppercase">
+            <span className="text-[10px] font-bold text-primary mt-1 tracking-tight uppercase">
               Sell
             </span>
           </Link>
         )}
 
-        {/* 4. Bookings */}
-        <Link
-          href="/my-bookings"
-          onClick={(e) => handleNav(e, { href: '/my-bookings', label: 'Bookings', icon: Briefcase, isProtected: true })}
-          className={cn(
-            "flex flex-col items-center justify-center min-w-[56px] h-14 rounded-2xl transition-all duration-300",
-            pathname === '/my-bookings' 
-              ? "bg-primary/10 text-primary" 
-              : "text-muted-foreground active:bg-muted active:scale-95"
-          )}
-        >
-          <div className={cn("p-1.5 rounded-xl transition-transform duration-300", pathname === '/my-bookings' ? "scale-110" : "")}>
-            <Briefcase className="h-5 w-5" strokeWidth={pathname === '/my-bookings' ? 2.5 : 2} />
-          </div>
-          <span className={cn(
-            "text-[10px] font-bold uppercase tracking-tighter mt-0.5",
-            pathname === '/my-bookings' ? "opacity-100" : "opacity-80"
-          )}>
-            Bookings
-          </span>
-        </Link>
-
-        {/* 5. Profile */}
-        <Link
-          href="/account"
-          onClick={(e) => handleNav(e, { href: '/account', label: 'Profile', icon: UserIcon, isProtected: true })}
-          className={cn(
-            "flex flex-col items-center justify-center min-w-[56px] h-14 rounded-2xl transition-all duration-300",
-            pathname === '/account' 
-              ? "bg-primary/10 text-primary" 
-              : "text-muted-foreground active:bg-muted active:scale-95"
-          )}
-        >
-          <div className={cn("p-1.5 rounded-xl transition-transform duration-300", pathname === '/account' ? "scale-110" : "")}>
-            <UserIcon className="h-5 w-5" strokeWidth={pathname === '/account' ? 2.5 : 2} />
-          </div>
-          <span className={cn(
-            "text-[10px] font-bold uppercase tracking-tighter mt-0.5",
-            pathname === '/account' ? "opacity-100" : "opacity-80"
-          )}>
-            Profile
-          </span>
-        </Link>
+        {renderTab({ href: '/my-bookings', label: 'Bookings', icon: Briefcase, isProtected: true })}
+        {renderTab({ href: '/account', label: 'Profile', icon: UserIcon, isProtected: true })}
       </div>
     </nav>
   );

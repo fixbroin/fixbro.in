@@ -226,7 +226,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
 
   return (
     <>
-      <header className="bg-background/95 backdrop-blur-xl shadow-sm sticky top-0 z-50 border-b border-border/40 transition-all duration-300">
+      <header className="apple-glass-header sticky top-0 z-50 transition-all duration-300">
         <div data-hydration-state="hydrated" className="container mx-auto px-4 h-16 flex items-center justify-between">
           {/* Left: Desktop Nav / Mobile Logo */}
           <div className="flex items-center gap-8">
@@ -238,6 +238,7 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                  <Link
                     key={item.href}
                     href={item.href}
+                    onTouchStart={() => {}}
                     onClick={(e) => {
                       if (item.isProtected && !user) {
                         e.preventDefault();
@@ -248,10 +249,10 @@ const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
                       }
                     }}
                     className={cn(
-                      "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300",
+                      "apple-ui-btn px-4 py-2 text-sm font-semibold rounded-full",
                       currentPathnameFromHook === item.href 
-                        ? "bg-primary text-primary-foreground shadow-md" 
-                        : "bg-muted/50 text-foreground/70 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
+                        ? "bg-primary text-primary-foreground shadow-[0_2px_10px_hsl(var(--primary)/0.3),inset_0_1px_1px_rgba(255,255,255,0.4)]" 
+                        : "bg-white/60 dark:bg-zinc-800/60 text-foreground/80 border border-white/60 dark:border-white/10 hover:bg-primary hover:text-primary-foreground hover:shadow-md"
                     )}
                   >
                   {item.label}

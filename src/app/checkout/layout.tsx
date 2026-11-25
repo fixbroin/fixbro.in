@@ -8,7 +8,7 @@ interface CheckoutLayoutProps {
 export default function CheckoutLayout({ children }: CheckoutLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col bg-secondary/30">
-      <header className="bg-background shadow-sm">
+      <header className="apple-glass-header sticky top-0 z-40">
         <div className="container mx-auto px-4 h-12 flex items-center justify-center">
           <div className="flex items-center text-sm text-muted-foreground">
             <Lock className="h-4 w-4 mr-2 text-accent" />
