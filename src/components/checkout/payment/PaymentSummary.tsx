@@ -116,6 +116,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
   const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
   const [serviceDetailsMap, setServiceDetailsMap] = useState<Record<string, FirestoreService>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
@@ -184,20 +185,45 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     const entries = getActiveCheckoutEntries();
     setCartEntries(entries);
 
     if (entries.length === 0) {
+      setServiceDetailsMap({});
+      setSumOfDisplayedItemPrices(0);
+      setSubTotal(0);
+      setVisitingCharge(0);
+      setTaxAmount(0);
+      setTotalAmountDue(0);
       setIsLoading(false);
       return;
     }
 
     try {
-      const detailsPromises = entries.map(async (entry) => {
-        const serviceSnap = await getDoc(doc(db, "adminServices", entry.serviceId));
-        return serviceSnap.exists() ? { ...serviceSnap.data(), id: serviceSnap.id } as FirestoreService : null;
-      });
-      const resolved = (await Promise.all(detailsPromises)).filter(Boolean) as FirestoreService[];
+      const fetchServiceWithRetry = async (serviceId: string): Promise<FirestoreService | null> => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const serviceSnap = await getDoc(doc(db, "adminServices", serviceId));
+            if (serviceSnap.exists()) {
+              return { ...serviceSnap.data(), id: serviceSnap.id } as FirestoreService;
+            }
+          } catch (err) {
+            if (attempt === 1) throw err;
+          }
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+        return null;
+      };
+
+      const resolved = (await Promise.all(entries.map(e => fetchServiceWithRetry(e.serviceId)))).filter(Boolean) as FirestoreService[];
+      if (resolved.length === 0) {
+        setServiceDetailsMap({});
+        setLoadError("Could not load service details. Please check your connection and retry.");
+        setIsLoading(false);
+        return;
+      }
+
       const map = resolved.reduce((acc, s) => ({ ...acc, [s.id]: s }), {});
       setServiceDetailsMap(map);
 
@@ -217,6 +243,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       setCategoryOverrides(customCategoryData);
     } catch (error) {
       console.error("Error loading payment data", error);
+      setLoadError("Network error while loading service details. Please retry.");
     } finally {
       setIsLoading(false);
     }
@@ -224,6 +251,13 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
 
   useEffect(() => {
     loadData();
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'fixbroUserCart' || event.key === 'fixbroActiveCheckoutItems' || event.key === null) {
+        loadData();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [loadData]);
 
   useEffect(() => {
@@ -282,7 +316,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     const policyDesc = (categoryOverrides && categoryOverrides.minimumBookingPolicyDescription) ? categoryOverrides.minimumBookingPolicyDescription : appConfig.minimumBookingPolicyDescription;
 
     if (appConfig.enableMinimumBookingPolicy && typeof minBooking === 'number' && typeof vcAmount === 'number') {
-      if (netAmount < minBooking) {
+      if (netAmount > 0 && netAmount < minBooking) {
         displayedVC = vcAmount;
         baseVC = getBasePrice(displayedVC, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent);
         if (policyDesc) {
@@ -421,6 +455,10 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
         imageUrl: detail.imageUrl || null
       };
     }).filter(Boolean);
+
+    if (bookingServices.length === 0 || subTotal <= 0 || totalAmountDue <= 0) {
+      throw new Error("Service details could not be verified. Please refresh your cart and try again.");
+    }
 
     const totalPlatformFeeBaseAmount = calculatedPlatformFees.reduce((sum, fee) => sum + fee.calculatedFeeAmount, 0);
     const totalTaxOnPlatformFees = calculatedPlatformFees.reduce((sum, fee) => sum + fee.taxAmountOnFee, 0);
@@ -662,6 +700,15 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
 
   const handleBookNow = async () => {
     if (!canBook) return;
+    if (loadError || cartEntries.length === 0 || sumOfDisplayedItemPrices <= 0 || totalAmountDue <= 0) {
+      toast({
+        title: "Unable to Proceed",
+        description: "Service details are still loading or missing. Please tap Retry to reload your cart.",
+        variant: "destructive",
+      });
+      loadData();
+      return;
+    }
     setIsProcessingPayment(true);
     showLoading();
 
@@ -775,9 +822,19 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
             Cancellation Policy
           </button>.
         </p>
+        {loadError && (
+          <Alert variant="destructive" className="py-2.5">
+            <AlertDescription className="text-xs flex items-center justify-between gap-2">
+              <span>{loadError}</span>
+              <Button type="button" size="xs" variant="outline" onClick={loadData} className="shrink-0 bg-background text-foreground">
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         <Button 
           className="w-full py-6 text-lg font-bold shadow-lg text-white" 
-          disabled={!canBook || isProcessingPayment}
+          disabled={!canBook || isProcessingPayment || Boolean(loadError) || cartEntries.length === 0 || sumOfDisplayedItemPrices <= 0 || totalAmountDue <= 0}
           onClick={handleBookNow}
         >
           {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin mr-2 text-white" /> : null}

@@ -544,6 +544,10 @@ export default function PaymentPage() {
       };
     }).filter(Boolean);
 
+    if (bookingServices.length === 0 || subTotal <= 0 || totalAmountDue <= 0) {
+      throw new Error("Service details could not be verified. Please refresh your cart and try again.");
+    }
+
     const effectiveUserId = currentUser?.uid || auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null);
 
     const newBookingData = {
