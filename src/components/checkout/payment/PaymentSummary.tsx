@@ -15,7 +15,7 @@ import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, addDoc, deleteDoc } from '@/lib/mysqlDb';
 import type { FirestoreService, AppliedPlatformFeeItem } from '@/types/firestore';
 import { generateBookingOtp } from '@/lib/bookingUtils';
-import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
+import { getActiveCheckoutEntries, saveCartEntries, type CartEntry } from '@/lib/cartManager';
 import TaxBreakdownDisplay from '@/components/shared/TaxBreakdownDisplay';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -186,7 +186,27 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    const entries = getActiveCheckoutEntries();
+    let entries = getActiveCheckoutEntries();
+
+    // Database fallback: if localStorage is empty for a logged-in user, recover from userCarts
+    if (entries.length === 0) {
+      const uid = auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('fixbro_user_uid') : null);
+      if (uid) {
+        try {
+          const cartSnap = await getDoc(doc(db, 'userCarts', uid));
+          if (cartSnap.exists()) {
+            const dbItems = (cartSnap.data()?.items || []) as CartEntry[];
+            if (Array.isArray(dbItems) && dbItems.length > 0) {
+              entries = dbItems;
+              saveCartEntries(dbItems);
+            }
+          }
+        } catch (cartErr) {
+          console.warn("Could not recover cart from database:", cartErr);
+        }
+      }
+    }
+
     setCartEntries(entries);
 
     if (entries.length === 0) {
